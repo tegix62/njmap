@@ -11,6 +11,7 @@ const TYPES = {
   name: 'Name the highlighted town',
   dir: 'Which direction?',
   confuse: 'Sound-alikes',
+  section: 'Which town is this village in?',
 };
 const DIR8 = ['NW', 'N', 'NE', 'W', '', 'E', 'SW', 'S', 'SE'];
 const DIR_DEG = { N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315 };
@@ -115,6 +116,21 @@ export function initPractice(ctx) {
     const b = twins.length && Math.random() < 0.35 ? rand(twins) : rand(cands);
     return { kind: 'dir', m: a, b };
   }
+  function makeSection(p) {
+    const hasKnown = (m) => m.sections.some((x) => x.known);
+    let cands = p.filter(hasKnown);
+    if (cands.length < 2) cands = munis.filter(hasKnown);
+    const m = pick(cands);
+    const section = rand(m.sections.filter((x) => x.known));
+    // Wrong answers: nearby towns, which never also have a section by that name.
+    const ok = (o) => o !== m && !o.sections.some((x) => x.name === section.name);
+    const seen = new Set();
+    const others = [...shuffle([...m.neighbors]), ...shuffle(munis.filter((o) => o.c === m.c))]
+      .filter((o) => ok(o) && !seen.has(o.id) && seen.add(o.id))
+      .slice(0, 3);
+    return { kind: 'sec', m, section, choices: shuffle([m, ...others]) };
+  }
+
   function makeConfuse(p) {
     const ids = new Set(p.map((m) => m.id));
     const curated = ctx.confusables.groups.filter((g) => g.curated);
@@ -126,8 +142,8 @@ export function initPractice(ctx) {
   }
   function next() {
     const p = pool();
-    const t = cfg.type === 'mix' ? rand(['find', 'find', 'name', 'name', 'dir', 'dir', 'confuse']) : cfg.type;
-    q = { find: makeFind, name: makeName, dir: makeDir, confuse: makeConfuse }[t](p);
+    const t = cfg.type === 'mix' ? rand(['find', 'find', 'name', 'name', 'dir', 'dir', 'confuse', 'section']) : cfg.type;
+    q = { find: makeFind, name: makeName, dir: makeDir, confuse: makeConfuse, section: makeSection }[t](p);
     q.p = p;
     q.answered = false;
     show();
@@ -194,6 +210,9 @@ export function initPractice(ctx) {
       ctx.highlight(m.id, 'q');
       ctx.hud(`<div class="qkind">${q.group ? 'Sound-alikes' : 'Name it'}</div><div class="q">Which town is highlighted?</div>`);
       body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
+    } else if (q.kind === 'sec') {
+      ctx.hud(`<div class="qkind">Villages &amp; sections</div><div class="q"><b>${esc(q.section.name)}</b> is part of which town?</div>`);
+      body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
     } else if (q.kind === 'dir') {
       ctx.highlight(m.id, 'q');
       ctx.reveal([{ m, color: '#5b21b6' }]);
@@ -207,6 +226,7 @@ export function initPractice(ctx) {
     // Frame the question without giving it away.
     requestAnimationFrame(() => {
       if (q.kind === 'find') ctx.fit([areaBox(q.p)], 12);
+      else if (q.kind === 'sec') ctx.fit([{ bbox: countyBox[m.c] }], 12);
       else if (q.kind === 'name') ctx.fit(q.group ? q.group.members : [{ bbox: countyBox[m.c] }, m], 12.5);
       else if (q.kind === 'dir') {
         const r = distanceMi(m.pt, q.b.pt) * 1.25;
@@ -257,6 +277,28 @@ export function initPractice(ctx) {
       ctx.reveal(items);
       feedback(ok, html);
       ctx.fit(q.group ? q.group.members : ok ? [{ bbox: countyBox[m.c] }] : [m, pickd], 12);
+    } else if (q.kind === 'sec') {
+      const pickd = munis[+btn.dataset.id];
+      const ok = pickd === m;
+      const name = q.section.name;
+      record(m, ok);
+      btn.classList.add(ok ? 'right' : 'wrong');
+      document.querySelector(`#qbody .choice[data-id="${m.id}"]`).classList.add('right');
+      ctx.highlight(m.id, 'good');
+      const items = [{ m, color: '#166534' }];
+      const placed = ctx.placedSections(m).get(name.toLowerCase());
+      if (placed) items.push({ m, pt: placed.pt, label: name, color: '#3730a3' });
+      let html = `${ok ? '✓' : '✗'} <b>${esc(name)}</b> is part of <b>${esc(m.full)}</b>, ${esc(m.c)} County.`;
+      if (!ok) {
+        ctx.highlight(pickd.id, 'bad');
+        items.push({ m: pickd, color: '#991b1b' });
+        html += ` ${esc(m.n)} is ${ctx.relative(pickd.pt, m.pt).text} of ${esc(pickd.n)}.`;
+      }
+      const siblings = m.sections.filter((x) => x.known && x.name !== name).map((x) => x.name);
+      if (siblings.length) html += `<div class="note">Also in ${esc(m.n)}: ${esc(siblings.slice(0, 6).join(', '))}</div>`;
+      ctx.reveal(items);
+      feedback(ok, html);
+      ctx.fit(ok ? [m] : [m, pickd], 13);
     } else if (q.kind === 'dir') {
       const b = q.b;
       const brg = bearing(m.pt, b.pt);

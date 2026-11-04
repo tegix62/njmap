@@ -119,6 +119,7 @@ export function initDrive(ctx) {
     const now = Date.now();
     if (now - st.lookAt > 2000) {
       st.look = lookAround(pt, st.heading);
+      st.near = nearestSection(pt, st.cur);
       st.lookAt = now;
     }
     if (ctx.mode === 'drive') {
@@ -185,6 +186,17 @@ export function initDrive(ctx) {
     }
     return null;
   }
+  /** Closest named village/section of the current town within 1.5 mi. */
+  function nearestSection(pt, m) {
+    if (!m) return null;
+    let best = null;
+    for (const s of ctx.placedSections(m).values()) {
+      const d = distanceMi(pt, s.pt);
+      if (d <= 1.5 && (!best || d < best.d)) best = { ...s, d };
+    }
+    return best;
+  }
+
   function lookAround(pt, h) {
     if (h == null) return null;
     return {
@@ -263,7 +275,8 @@ export function initDrive(ctx) {
     const opts = {
       center: ctx.pos.pt,
       bearing: settings.northUp || st.heading == null ? 0 : st.heading,
-      padding: { top: pad.top + extra, bottom: pad.bottom, left: 0, right: 0 },
+      // offset (not padding): padding would stick to the map and skew later fits
+      offset: [0, (pad.top + extra - pad.bottom) / 2],
       duration,
       essential: true,
     };
@@ -294,13 +307,7 @@ export function initDrive(ctx) {
     applyOrientation();
     flash(settings.northUp ? 'North-up: map stays fixed, north is always the top edge' : 'Heading-up: map turns with you, watch the N/E/S/W letters on the edges');
   }
-  function flash(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.hidden = false;
-    clearTimeout(flash.t);
-    flash.t = setTimeout(() => (t.hidden = true), 3200);
-  }
+  const flash = (msg) => ctx.toast(msg);
 
   // ---- HUD ------------------------------------------------------------------
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -342,6 +349,7 @@ export function initDrive(ctx) {
       m
         ? `<div class="town">${esc(m.n)}</div>
            <div class="meta">${esc(m.t)} · <b>${esc(m.c)} County</b> ${acc}</div>
+           ${st.near ? `<div class="near">near <b>${esc(st.near.name)}</b> <span class="muted">· part of ${esc(m.n)}</span></div>` : ''}
            ${head}${look}`
         : `<div class="town">Outside New Jersey</div><div class="meta">or offshore ${acc}</div>${head}`
     );

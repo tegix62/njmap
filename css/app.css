@@ -528,3 +528,25 @@ body[data-mode='drive'].unfollowed #recenter {
 body[data-mode='practice'] .maplibregl-ctrl-bottom-left {
   display: none;
 }
+
+/* ---- villages / sections -------------------------------------------------- */
+#hud .near {
+  margin-top: 4px;
+  font-size: 16px;
+}
+#hud .near b {
+  font-style: italic;
+  color: #c7d2fe;
+}
+.chip.sec {
+  background: rgba(199, 210, 254, 0.14);
+  font-style: italic;
+}
+.chip.sec.known {
+  font-weight: 700;
+}
+.chip.more {
+  background: none;
+  text-decoration: underline;
+  color: var(--panel-muted);
+}

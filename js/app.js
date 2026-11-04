@@ -162,7 +162,12 @@ const DEFAULT_SETTINGS = {
 };
 
 async function main() {
-  const topo = await (await fetch('data/nj.topo.json')).json();
+  const [topo, sectionsByKey] = await Promise.all([
+    fetch('data/nj.topo.json').then((r) => r.json()),
+    fetch('data/sections.json')
+      .then((r) => r.json())
+      .catch(() => ({})),
+  ]);
   const fc = (o) => topojson.feature(topo, topo.objects[o]);
   const munisFC = fc('munis');
   const labelsFC = fc('labels');
@@ -191,7 +196,17 @@ async function main() {
       pt: labelsFC.features[i].geometry.coordinates,
     };
   });
-  munis.forEach((m, i) => (m.neighbors = nbIdx[i].map((j) => munis[j])));
+  munis.forEach((m, i) => {
+    m.neighbors = nbIdx[i].map((j) => munis[j]);
+    // Villages / sections inside this municipality: [{name, known}], well-known first
+    m.sections = (sectionsByKey[m.key] || []).map(([name, known]) => ({ name, known: !!known }));
+  });
+  // Names drawn on the map as sections. Skip any that are also a municipality's
+  // name (Hanover's "Monroe"), which would read as the wrong town.
+  const muniNames = new Set(munis.map((m) => m.n.toLowerCase()));
+  const sectionNames = [...new Set(munis.flatMap((m) => m.sections.map((x) => x.name)))].filter(
+    (n) => !muniNames.has(n.toLowerCase())
+  );
   const byKey = new Map(munis.map((m) => [m.key, m]));
   const confusables = resolveGroups(munis);
   const counties = countiesFC.features.map((f) => f.properties.c).sort();
@@ -322,6 +337,31 @@ async function main() {
           paint: { 'text-color': '#7a2e0e', 'text-halo-color': 'rgba(255,255,255,0.85)', 'text-halo-width': 1.5 },
         },
         {
+          // Villages & sections (Towaco, Pompton Plains…): position from
+          // OpenStreetMap place points in the background tiles, shown only when
+          // the name is on the official local-names list.
+          id: 'section-label',
+          type: 'symbol',
+          source: 'omt',
+          'source-layer': 'place',
+          minzoom: 11.5,
+          filter: [
+            'all',
+            ['match', ['get', 'class'], ['town', 'village', 'hamlet', 'suburb', 'quarter', 'neighbourhood'], true, false],
+            ['in', ['get', 'name'], ['literal', sectionNames]],
+          ],
+          layout: {
+            visibility: settings.basemap === 'none' ? 'none' : 'visible',
+            'text-field': ['get', 'name'],
+            'text-font': ['Noto Sans Italic'],
+            'text-size': ['interpolate', ['linear'], ['zoom'], 11.5, 11, 16, 14],
+            'text-padding': 4,
+            'text-max-width': 8,
+            'text-rotation-alignment': 'viewport',
+          },
+          paint: { 'text-color': '#55606f', 'text-halo-color': 'rgba(255,255,255,0.9)', 'text-halo-width': 1.4 },
+        },
+        {
           id: 'muni-label',
           type: 'symbol',
           source: 'labels',
@@ -365,6 +405,8 @@ async function main() {
   const hudEl = $('#hud');
   const sheetEl = $('#sheet');
   const highlighted = new Map();
+  let labelsOn = true;
+  let toastTimer = 0;
 
   const ctx = {
     map,
@@ -420,7 +462,9 @@ async function main() {
       );
     },
     showLabels(on) {
+      labelsOn = on;
       map.setLayoutProperty('muni-label', 'visibility', on ? 'visible' : 'none');
+      map.setLayoutProperty('section-label', 'visibility', on && settings.basemap !== 'none' ? 'visible' : 'none');
     },
     padding() {
       const top = hudEl.hidden ? 12 : hudEl.getBoundingClientRect().bottom + 12;
@@ -429,6 +473,9 @@ async function main() {
       return { top, bottom, left: 16, right: 56 };
     },
     fit(items, maxZoom = 13) {
+      // fitBounds adds any padding already stored on the map; keep it at zero.
+      const mp = map.getPadding();
+      if (mp.top || mp.bottom || mp.left || mp.right) map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
       let b = null;
       for (const it of items) {
         const bb = Array.isArray(it) ? [it[0], it[1], it[0], it[1]] : it.bbox;
@@ -461,6 +508,39 @@ async function main() {
       ctx.saveSettings();
       for (const [l, modes] of [...BASE_LAYERS, ...BASE_LABEL_LAYERS])
         map.setLayoutProperty(l.id, 'visibility', modes.split(' ').includes(key) ? 'visible' : 'none');
+      ctx.showLabels(labelsOn);
+    },
+    /**
+     * Sections of `m` that the loaded background tiles can place on the map:
+     * Map<lowercased name, {name, pt}>. Empty offline or with the basemap off.
+     */
+    placedSections(m) {
+      const out = new Map();
+      if (!m.sections.length || settings.basemap === 'none' || !map.getSource('omt')) return out;
+      const want = new Map(m.sections.map((x) => [x.name.toLowerCase(), x.name]));
+      let feats = [];
+      try {
+        feats = map.querySourceFeatures('omt', { sourceLayer: 'place' });
+      } catch {
+        return out;
+      }
+      for (const f of feats) {
+        const n = f.properties && f.properties.name;
+        if (!n || f.geometry.type !== 'Point') continue;
+        const k = n.toLowerCase();
+        if (!want.has(k) || out.has(k)) continue;
+        const pt = f.geometry.coordinates;
+        if (ctx.locate(pt) !== m) continue; // must actually sit inside this town
+        out.set(k, { name: want.get(k), pt });
+      }
+      return out;
+    },
+    toast(msg, ms = 3200) {
+      const t = $('#toast');
+      t.textContent = msg;
+      t.hidden = false;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => (t.hidden = true), ms);
     },
     updateEdges: () => updateEdges(),
   };
