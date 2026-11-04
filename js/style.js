@@ -50,10 +50,10 @@ const baseLayers = (Z) => [
       type: 'line',
       source: 'omt',
       'source-layer': 'transportation',
-      minzoom: Z.town - 0.5,
+      minzoom: Math.max(Z.town, 10.3) - 0.5,
       filter: ['all', isClass(['secondary', 'tertiary']), notTunnel],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': T.road.mid, 'line-width': roadWidth(0.4, 1.4, 9), 'line-opacity': fadeIn(Z.town - 0.5, Z.town) },
+      paint: { 'line-color': T.road.mid, 'line-width': roadWidth(0.4, 1.4, 9), 'line-opacity': fadeIn(Math.max(Z.town, 10.3) - 0.5, Math.max(Z.town, 10.3)) },
     },
     'streets',
   ],
@@ -87,6 +87,19 @@ const baseLayers = (Z) => [
       filter: ['==', ['get', 'ref'], '__none__'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: { 'line-color': T.hl.sel, 'line-opacity': 0.75, 'line-width': roadWidth(3, 6, 18) },
+    },
+    'streets light',
+  ],
+  [
+    {
+      // the road you picked, when it was the wrong one
+      id: 'road-focus-bad',
+      type: 'line',
+      source: 'omt',
+      'source-layer': 'transportation_name',
+      filter: ['==', ['get', 'ref'], '__none__'],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': T.hl.bad, 'line-opacity': 0.75, 'line-width': roadWidth(3, 6, 18) },
     },
     'streets light',
   ],
@@ -245,7 +258,7 @@ export function buildStyle({ base, basemap, data, sectionNames, Z, majorSize, gr
         source: 'munis',
         paint: {
           'line-color': T.ink4,
-          'line-opacity': ['interpolate', ['linear'], ['zoom'], 7, 0.35, Z.region, 0.6, Z.town, 0.9],
+          'line-opacity': ['interpolate', ['linear'], ['zoom'], 7, 0.5, Z.region, 0.7, Z.town, 0.9],
           'line-width': ['interpolate', ['linear'], ['zoom'], 7, 0.3, Z.town, 0.9, 13, 1.5, 16, 2.4],
         },
       },
@@ -361,7 +374,7 @@ export function buildStyle({ base, basemap, data, sectionNames, Z, majorSize, gr
         id: 'landmark-label',
         type: 'symbol',
         source: 'landmarks',
-        minzoom: Z.town,
+        minzoom: Z.town + 0.8,
         layout: {
           'text-field': ['get', 'name'],
           'text-font': ['Noto Sans Italic'],
@@ -373,7 +386,8 @@ export function buildStyle({ base, basemap, data, sectionNames, Z, majorSize, gr
         },
         paint: { 'text-color': T.ink2, 'text-halo-color': T.halo, 'text-halo-width': 1.6 },
       },
-      muniLabel(Z, 'muni-label-major', Z.region, Z.town, ['>=', ['get', 'p'], majorSize]),
+      // Region zoom: the big and the well-known first
+      muniLabel(Z, 'muni-label-major', Z.region, Z.town, ['any', ['>=', ['get', 'p'], majorSize], ['==', ['get', 'wk'], 1]]),
       muniLabel(Z, 'muni-label', Z.town),
       {
         id: 'anchor-dot',

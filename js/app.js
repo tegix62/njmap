@@ -104,7 +104,7 @@ async function main() {
     features: munis.map((m) => ({
       type: 'Feature',
       id: m.id,
-      properties: { label: m.mapLabel, p: m.p },
+      properties: { label: m.mapLabel, p: m.p, wk: m.wellKnown ? 1 : 0 },
       geometry: { type: 'Point', coordinates: m.pt },
     })),
   };
@@ -369,8 +369,14 @@ async function main() {
         map.setLayoutProperty(id, 'visibility', on && settings.basemap === 'streets' ? 'visible' : 'none');
     },
     /** Highlight one road (its raw OSM refs) on the map; null clears. */
-    focusRoad(raw) {
+    focusRoad(raw, color) {
       map.setFilter('road-focus', raw && raw.length ? ['in', ['get', 'ref'], ['literal', raw]] : ['==', ['get', 'ref'], '__none__']);
+      map.setPaintProperty('road-focus', 'line-color', color || theme.hl.sel);
+      if (!raw) map.setFilter('road-focus-bad', ['==', ['get', 'ref'], '__none__']);
+    },
+    /** The road you picked when it was wrong (drawn in the "wrong" color). */
+    focusRoadBad(raw) {
+      map.setFilter('road-focus-bad', raw && raw.length ? ['in', ['get', 'ref'], ['literal', raw]] : ['==', ['get', 'ref'], '__none__']);
     },
     toast(msg, ms = 3200) {
       const t = $('#toast');

@@ -30,7 +30,7 @@ export default {
     [-71.5, 42.5],
   ],
   // Zoom levels: groups = where county names replace the three regions
-  zooms: { groups: 7.45, region: 8.3, town: 10.3, street: 13 },
+  zooms: { groups: 7.45, region: 7.9, town: 9.4, street: 13 },
   majorSize: 20000, // towns this populous get names at region zoom
   sizeWord: 'pop.',
   superGroups: REGIONS,

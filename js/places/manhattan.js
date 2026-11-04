@@ -139,7 +139,7 @@ export default {
     [-74.45, 40.45],
     [-73.55, 41.1],
   ],
-  zooms: { groups: 9, region: 11.9, town: 12.7, street: 14.2 },
+  zooms: { groups: 9, region: 11.3, town: 12.1, street: 14.2 },
   majorSize: 4000, // neighborhood area in units of 100 m²: the bigger ones get names first
   sizeWord: null,
   superGroups: null,

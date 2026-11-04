@@ -46,8 +46,35 @@ export function initExplore(ctx) {
 
   map.on('click', (e) => {
     if (ctx.mode !== 'explore' || e.handledByAnchor) return;
-    select(ctx.locate([e.lngLat.lng, e.lngLat.lat]), false);
+    const m = ctx.locate([e.lngLat.lng, e.lngLat.lat]);
+    select(m, m && m !== sel && !comfortablyInView(m));
   });
+
+  /**
+   * Snap to a tapped town and its neighbors only when they aren't already
+   * comfortably on screen, so free looking around isn't interrupted.
+   */
+  function comfortablyInView(m) {
+    const group = [m, ...m.neighbors];
+    const b = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const o of group) {
+      b[0] = Math.min(b[0], o.bbox[0]);
+      b[1] = Math.min(b[1], o.bbox[1]);
+      b[2] = Math.max(b[2], o.bbox[2]);
+      b[3] = Math.max(b[3], o.bbox[3]);
+    }
+    // the part of the screen not covered by the card or the tab bar
+    const pad = ctx.padding();
+    const W = map.getContainer().clientWidth;
+    const H = map.getContainer().clientHeight;
+    const tl = map.unproject([pad.left, pad.top]);
+    const br = map.unproject([W - pad.right, H - pad.bottom]);
+    const inside = b[0] >= tl.lng && b[2] <= br.lng && b[3] <= tl.lat && b[1] >= br.lat;
+    if (!inside) return false;
+    // ...and not so small that it's hard to read
+    const cam = map.cameraForBounds([[b[0], b[1]], [b[2], b[3]]], { padding: pad, maxZoom: 13 });
+    return !cam || map.getZoom() >= cam.zoom - 1.5;
+  }
 
   function select(m, fly = true) {
     if (sel) ctx.highlight(sel.id, null);
@@ -59,11 +86,10 @@ export function initExplore(ctx) {
     sel = m;
     ctx.reveal([]);
     ctx.focus(m);
-    if (m) {
-      ctx.highlight(m.id, 'sel');
-      if (fly) ctx.fit([m, ...m.neighbors], 13);
-    }
+    if (m) ctx.highlight(m.id, 'sel');
     render();
+    // frame after the card has its new height
+    if (m && fly) requestAnimationFrame(() => ctx.fit([m, ...m.neighbors], 13));
   }
 
   const offset = () => {

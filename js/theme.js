@@ -91,27 +91,29 @@ export const INK = {
     ref: '#3a332b',
     refHalo: '#f3eee3',
   },
-  accent: '#c2410c',
+  // Colors with one job each: blue = you / selected / the question,
+  // green = right, red = wrong.
+  accent: '#2b4fb3',
   hl: {
-    cur: '#c2410c',
-    sel: '#c2410c',
-    q: '#c2410c',
-    good: '#1f1b16',
-    bad: '#c2410c',
+    cur: '#2b4fb3',
+    sel: '#2b4fb3',
+    q: '#2b4fb3',
+    good: '#15803d',
+    bad: '#b91c1c',
     near: '#a39a8c',
   },
   label: {
-    q: '#9a3412',
-    good: '#1f1b16',
-    bad: '#9a3412',
+    q: '#1e3a8a',
+    good: '#166534',
+    bad: '#991b1b',
     neutral: '#3a332b',
     place: '#3a332b',
   },
   // ink fill by how well you know a place (0 = not practiced yet)
   know: [0, 0.07, 0.15, 0.26],
-  you: '#c2410c',
+  you: '#2b4fb3',
   anchor: '#1f1b16',
-  trip: '#c2410c',
+  trip: '#2b4fb3',
 };
 
 export const THEMES = { classic: THEME, ink: INK };

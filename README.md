@@ -78,7 +78,7 @@ Every color lives in `js/theme.js`, so trying another scheme is a change to that
 | --- | --- |
 | Whole state | North / Central / South Jersey, interstates, the Turnpike and the Parkway |
 | One step in | The 21 counties |
-| Region | The largest towns, all main highways, landmark dots, big rivers |
+| Region | The largest and best-known towns, all main highways, landmark dots, big rivers |
 | Town | Every town, secondary roads, lakes, landmark names |
 | Street | Villages and sections, local roads, street names |
 
@@ -93,7 +93,9 @@ The level breakpoints are in `js/style.js`.
 - Following GPS directions passively weakens spatial learning (Ishikawa et al., 2008; Dahmani & Bohbot, 2020). Hence *guess first*.
 - A heading-up map helps you decide turns, while north-up helps you understand the area (Aretz & Wickens, 1992). Hence heading-up while driving, and north-up for Explore, Practice and the trip recap.
 
-**Ink look (the default).** Three colors: paper, ink, and one vermilion accent for you and whatever's selected. As you practice, each town fills in with ink, so the map becomes a picture of what you *know* rather than where you've *been*. The classic softer county colors are in Settings → Look.
+**Ink look (the default).** Paper and ink, plus three colors that each have one job: **blue** for you, what's selected and what a question is about; **green** for right; **red** for wrong. As you practice, each town fills in with ink, so the map becomes a picture of what you *know* rather than where you've *been*. The classic softer county colors are in Settings → Look.
+
+**Tapping a town in Explore** frames it with all of its neighbors, but only when they aren't already comfortably on screen, so free looking around isn't interrupted.
 
 **Privacy.** Remembering where you've been (the towns you pass through and your drive routes) is **off by default**. Turn it on in Settings if you want trip recaps and the "towns I've been through" practice area. It stays on this phone, and "Forget where I've been" wipes it.
 
