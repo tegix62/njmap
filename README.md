@@ -26,6 +26,8 @@ The screen is built in two layers. The first is what you can take in at a glance
   - *Name the highlighted town*
   - *Which direction is B from A?*
   - *Which of these borders Wayne?* (the wrong answers are nearby towns that don't touch it)
+  - *⚡ Rapid round:* one-tap questions back to back against a shrinking timer bar, 3 lives, faster every round. A hit or miss just flashes, then the next question starts. It's built for speed: recall that's automatic rather than worked out. Misses go into review, and your best score is kept.
+  - *🧩 Drop in:* a county with some towns cut out. Each missing town falls from the top as a piece shaped exactly like it, labeled with its name; drag it into its hole before it lands. Pieces fall faster as you go. It ties a place's name, shape and location together. Pick a county in the area menu, or let it choose one.
   - *Left or right?* "You're in Clifton heading north. Is Paterson ahead, left, right or behind?" The map turns to your heading, which drills turning a compass direction into a turn.
   - *Point to the big places:* from a town, point the dial at Manhattan, Philadelphia, Atlantic City, Newark Airport or Trenton.
   - *Which way does the highway run?* Point the dial along it (either direction counts).

@@ -23,8 +23,12 @@ const TYPES = {
   bigpoint: 'Point to the big places',
   hwydir: 'Which way does the highway run?',
   hwyfact: 'Highway ends & crossings',
+  rapid: '⚡ Rapid round',
+  dropin: '🧩 Drop in (county puzzle)',
   trip: 'My last drive',
 };
+// One-tap kinds that work against a clock
+const RAPID_TYPES = ['leftright', 'borders', 'north', 'find', 'name', 'avedir', 'crossing', 'hwyfact', 'dir'];
 const WEIGHT = { find: 2, dir: 2, borders: 2, north: 2, point: 2, roadto: 3, leftright: 3, bigpoint: 2 };
 const DIR8 = ['NW', 'N', 'NE', 'W', '', 'E', 'SW', 'S', 'SE'];
 const DIR_DEG = { N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315 };
@@ -36,7 +40,7 @@ export function initPractice(ctx) {
   const CFG_KEY = R.id === 'nj' ? 'practice' : `practice.${R.id}`;
   const cfg = { type: 'mix', area: R.wellKnown ? 'known' : 'all', ...store.get(CFG_KEY, {}) };
   const SC = R.gridAngle ? 0.12 : 1; // Manhattan distances are short
-  const allowed = ['mix', ...R.quizTypes, 'trip'];
+  const allowed = ['mix', 'rapid', 'dropin', ...R.quizTypes, 'trip'];
   if (!allowed.includes(cfg.type)) cfg.type = 'mix';
   const score = { right: 0, total: 0, streak: 0 };
   let q = null;
@@ -458,6 +462,10 @@ export function initPractice(ctx) {
     return { kind: 'name', m, choices: shuffle(choices), group: g };
   }
   function next() {
+    stopRapidTimer();
+    if (cfg.type === 'rapid') return nextRapid();
+    if (cfg.type === 'dropin') return startDropIn();
+    ctx.dropin.stop();
     const p = pool();
     // Mixed mode interleaves question types and never repeats one back to back
     // (interleaving helps tell similar things apart; Kornell & Bjork, 2008).
@@ -468,29 +476,107 @@ export function initPractice(ctx) {
       while (t === lastType);
     }
     lastType = t;
-    q = {
-      find: makeFind,
-      name: makeName,
-      dir: makeDir,
-      confuse: makeConfuse,
-      section: makeSection,
-      borders: makeBorders,
-      landmark: makeLandmark,
-      north: makeNorth,
-      point: makePoint,
-      trip: makeTrip,
-      avedir: makeAveDir,
-      crossing: makeCrossing,
-      uptown: makeUptown,
-      roadto: makeRoadTo,
-      leftright: makeLeftRight,
-      bigpoint: makeBigPoint,
-      hwydir: makeHwyDir,
-      hwyfact: makeHwyFact,
-    }[t](p);
+    q = MAKERS[t](p);
     q.p = p;
     q.answered = false;
     show();
+  }
+
+  const MAKERS = {
+    find: makeFind,
+    name: makeName,
+    dir: makeDir,
+    confuse: makeConfuse,
+    section: makeSection,
+    borders: makeBorders,
+    landmark: makeLandmark,
+    north: makeNorth,
+    point: makePoint,
+    trip: makeTrip,
+    avedir: makeAveDir,
+    crossing: makeCrossing,
+    uptown: makeUptown,
+    roadto: makeRoadTo,
+    leftright: makeLeftRight,
+    bigpoint: makeBigPoint,
+    hwydir: makeHwyDir,
+    hwyfact: makeHwyFact,
+  };
+
+  // ---- Rapid round ------------------------------------------------------------
+  // One-tap questions against a shrinking clock, 3 lives, faster as you go.
+  // The point is speed: recall that's automatic, not worked out.
+  const rapid = { on: false, lives: 3, score: 0, round: 0, misses: [], timer: 0, advance: 0 };
+  const BEST_KEY = `rapidBest.${R.id}`;
+  function stopRapidTimer() {
+    clearTimeout(rapid.timer);
+    clearTimeout(rapid.advance);
+  }
+  function nextRapid() {
+    if (!rapid.on) {
+      q = { kind: 'rapidstart', m: null, answered: false };
+      return show();
+    }
+    if (rapid.lives <= 0) {
+      rapid.on = false;
+      const best = Math.max(store.get(BEST_KEY, 0), rapid.score);
+      q = { kind: 'rapidend', m: null, answered: false, best, newBest: rapid.score >= best && rapid.score > 0 };
+      store.set(BEST_KEY, best);
+      return show();
+    }
+    const types = RAPID_TYPES.filter((t) => R.quizTypes.includes(t));
+    let t;
+    do t = rand(types);
+    while (t === lastType && types.length > 1);
+    lastType = t;
+    const p = pool();
+    q = MAKERS[t](p);
+    q.p = p;
+    q.answered = false;
+    q.rapid = true;
+    rapid.round++;
+    show();
+    // shorter and shorter: 8.5 s down to 3.5 s
+    const secs = Math.max(3.5, 8.5 - 0.3 * (rapid.round - 1));
+    document.getElementById('hud').insertAdjacentHTML('beforeend', `<div class="tbar"><span style="animation-duration:${secs}s"></span></div>`);
+    const token = q;
+    rapid.timer = setTimeout(() => q === token && !q.answered && rapidTimeout(), secs * 1000);
+  }
+  function rapidTimeout() {
+    q.answered = true;
+    for (const b of document.querySelectorAll('#qbody .choice')) b.disabled = true;
+    if (q.m && q.m.key) record(q.m, false);
+    if (q.m && q.m.id != null) {
+      ctx.highlight(q.m.id, 'good');
+      ctx.reveal([{ m: q.m, color: L.good }]);
+    }
+    rapidResult(false, '⏱');
+  }
+  function rapidResult(ok, mark) {
+    clearTimeout(rapid.timer);
+    q.answered = true;
+    if (ok) rapid.score++;
+    else {
+      rapid.lives--;
+      const what = (q.m && q.m.n) || q.name || (q.h && q.h.label) || (q.j && `${q.j.a} × ${q.j.b}`) || '';
+      if (what) rapid.misses.push(what);
+    }
+    const qb = document.getElementById('qbody');
+    for (const g of qb.querySelectorAll('.choices, .rose8, .lrpad')) g.classList.add('answered');
+    qb.insertAdjacentHTML('beforeend', `<div class="flash ${ok ? 'ok' : 'no'}">${mark || (ok ? '✓' : '✗')}</div>`);
+    document.querySelector('#sheet .score').outerHTML = header().match(/<div class="score">.*<\/div>$/s)[0];
+    // a quick beat on a hit, a longer look at the answer on a miss
+    rapid.advance = setTimeout(nextRapid, ok ? 450 : 1300);
+  }
+
+  // ---- Drop in ------------------------------------------------------------------
+  function startDropIn() {
+    q = { kind: 'dropin', m: null, answered: false };
+    ctx.clearHighlights();
+    ctx.reveal([]);
+    ctx.line(null);
+    ctx.showLabels(false);
+    ctx.dropin.start({ pool: pool(), area: cfg.area, header: () => header(), bindHeader: () => bindHeader(), record });
   }
 
   // ---- rendering ------------------------------------------------------------
@@ -511,6 +597,16 @@ export function initPractice(ctx) {
       `<optgroup label="${R.groupPlural}">${ctx.counties.map((c) => areaOpt('county:' + c, ctx.groupName(c))).join('')}</optgroup>`;
     const pct = score.total ? Math.round((100 * score.right) / score.total) : 0;
     const due = dueCount(pool());
+    if ((cfg.type === 'rapid' && !rapid.on) || cfg.type === 'dropin')
+      return `<div class="prow">
+        <select id="qType" aria-label="Question type">${opts(Object.fromEntries(allowed.map((k) => [k, TYPES[k]])))}</select>
+        <select id="qArea" aria-label="Area">${area}</select>
+      </div><div class="score"></div>`;
+    if (cfg.type === 'rapid' && rapid.on)
+      return `<div class="prow">
+        <select id="qType" aria-label="Question type">${opts(Object.fromEntries(allowed.map((k) => [k, TYPES[k]])))}</select>
+        <select id="qArea" aria-label="Area">${area}</select>
+      </div><div class="score"><span class="lives">${'♥'.repeat(Math.max(0, rapid.lives))}${'♡'.repeat(Math.max(0, 3 - rapid.lives))}</span> · ${rapid.score} right · round ${rapid.round}</div>`;
     return `<div class="prow">
         <select id="qType" aria-label="Question type">${opts(Object.fromEntries(allowed.map((k) => [k, TYPES[k]])))}</select>
         <select id="qArea" aria-label="Area">${area}</select>
@@ -583,6 +679,16 @@ export function initPractice(ctx) {
     } else if (q.kind === 'landmark') {
       ctx.hud(`<div class="qkind">Landmarks</div><div class="q"><b>${esc(q.landmark.name)}</b> is in which ${R.unit}?</div>`);
       body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
+    } else if (q.kind === 'rapidstart') {
+      ctx.hud(`<div class="qkind">⚡ Rapid round</div><div class="q">Quick questions, back to back</div>`);
+      body = `<div class="hint">One tap each, against the clock. Three lives, and it speeds up as you go. Misses go to your review pile.</div>
+        ${store.get(BEST_KEY, 0) ? `<div class="hint muted">Best: ${store.get(BEST_KEY, 0)}</div>` : ''}
+        <button class="primary" id="rapidGo">Start</button>`;
+    } else if (q.kind === 'rapidend') {
+      ctx.hud(`<div class="qkind">⚡ Rapid round</div><div class="q">${rapid.score} right${q.newBest ? ' · new best!' : ''}</div>`);
+      body = `<div class="hint muted">Best: ${q.best}</div>
+        ${rapid.misses.length ? `<div class="label-sm">Missed: back for review soon</div><div class="chips">${[...new Set(rapid.misses)].map((n) => `<span class="chip">${esc(n)}</span>`).join('')}</div>` : ''}
+        <button class="primary" id="rapidGo">Play again</button>`;
     } else if (q.kind === 'leftright') {
       const a = q.from;
       ctx.highlight(a.id, 'q');
@@ -693,6 +799,12 @@ export function initPractice(ctx) {
     bindHeader();
     for (const b of document.querySelectorAll('#qbody .choice')) b.addEventListener('click', () => answer(b));
     if (q.kind === 'point' || q.kind === 'uptown' || q.kind === 'hwydir') bindDial();
+    const rg = document.getElementById('rapidGo');
+    if (rg)
+      rg.addEventListener('click', () => {
+        Object.assign(rapid, { on: true, lives: 3, score: 0, round: 0, misses: [] });
+        nextRapid();
+      });
     const tq = document.getElementById('tripQuiz');
     if (tq) tq.addEventListener('click', next);
 
@@ -723,6 +835,7 @@ export function initPractice(ctx) {
   }
 
   function feedback(ok, html) {
+    if (q.rapid) return rapidResult(ok);
     score.total++;
     if (ok) {
       score.right++;
@@ -1138,10 +1251,13 @@ export function initPractice(ctx) {
   return {
     enter() {
       ctx.clearHighlights();
-      if (q && !q.answered) show();
+      if (q && !q.answered && !q.rapid && q.kind !== 'dropin' && q.kind !== 'rapidend') show();
       else next();
     },
     leave() {
+      stopRapidTimer();
+      rapid.on = false;
+      ctx.dropin.stop();
       ctx.clearHighlights();
       ctx.reveal([]);
       ctx.line(null);

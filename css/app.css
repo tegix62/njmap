@@ -1125,3 +1125,99 @@ details.more summary {
   color: var(--accent);
   font-weight: 600;
 }
+
+/* rapid round */
+.tbar {
+  height: 5px;
+  margin-top: 10px;
+  background: rgba(127, 127, 127, 0.2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.tbar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  animation: tbar linear forwards;
+  transform-origin: left;
+}
+@keyframes tbar {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+.flash {
+  text-align: center;
+  font-size: 34px;
+  font-weight: 800;
+  margin-top: 4px;
+  line-height: 1;
+}
+.flash.ok {
+  color: #16a34a;
+}
+.flash.no {
+  color: #dc2626;
+}
+.score .lives {
+  color: #dc2626;
+  letter-spacing: 2px;
+  font-size: 14px;
+}
+
+/* Drop in */
+.piece {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  touch-action: none;
+  cursor: grab;
+  will-change: transform;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.25));
+}
+.piece svg {
+  display: block;
+  overflow: visible;
+}
+.piece path {
+  fill: rgba(43, 79, 179, 0.32);
+  stroke: #1e3a8a;
+  stroke-width: 2;
+}
+.piece span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  font-weight: 800;
+  font-size: 14px;
+  color: #1f1b16;
+  background: rgba(255, 255, 255, 0.85);
+  padding: 1px 6px;
+  border-radius: 6px;
+  pointer-events: none;
+}
+.piece.held {
+  cursor: grabbing;
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35));
+}
+.piece.snap {
+  transition: transform 0.25s ease-out;
+}
+.piece.shake {
+  animation: shake 0.35s;
+}
+@keyframes shake {
+  0%, 100% { margin-left: 0; }
+  25% { margin-left: -8px; }
+  75% { margin-left: 8px; }
+}
+body.dropping #fabs,
+body.dropping #edges {
+  display: none;
+}

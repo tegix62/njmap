@@ -54,6 +54,7 @@ export const THEME = {
     good: '#16a34a',
     bad: '#dc2626',
     near: '#a8a29e', // neighbors of the selected town
+    hole: '#ffffff', // Drop in: a town still to be placed
   },
   // Text colors for labels revealed in practice/explore
   label: {
@@ -101,6 +102,7 @@ export const INK = {
     good: '#15803d',
     bad: '#b91c1c',
     near: '#a39a8c',
+    hole: '#ffffff',
   },
   label: {
     q: '#1e3a8a',

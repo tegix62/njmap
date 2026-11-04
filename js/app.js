@@ -10,6 +10,7 @@ import { buildStyle, MUNI_LABEL_IDS, PLACE_LAYER_IDS } from './style.js';
 import { THEMES } from './theme.js';
 import { activeRegion, switchRegion, ALL_REGIONS } from './region.js';
 import { initAnchors } from './anchors.js';
+import { initDropIn } from './dropin.js';
 
 const TYPE_ABBR = { Township: 'Twp', Borough: 'Boro', City: 'City', Town: 'Town', Village: 'Vlg' };
 
@@ -444,6 +445,7 @@ async function main() {
   window.addEventListener('resize', updateEdges);
 
   ctx.anchors = initAnchors(ctx); // before the modes, so it can claim map taps
+  ctx.dropin = initDropIn(ctx);
   for (const m of munis) ctx.setKnow(m);
 
   // ---- modes ----------------------------------------------------------------
