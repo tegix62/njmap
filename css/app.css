@@ -1281,3 +1281,18 @@ button.primary.ghost {
 #hud .quizline.ans {
   background: rgba(21, 128, 61, 0.12);
 }
+
+/* answered dial: smaller, so the feedback and Next fit */
+.dialwrap.answered #dial {
+  width: 112px;
+  height: 112px;
+}
+.dialwrap.answered .dial-read {
+  display: none;
+}
+/* Next always reachable at the bottom of the panel */
+#sheet #nextQ {
+  position: sticky;
+  bottom: 0;
+  box-shadow: 0 -8px 12px var(--panel);
+}

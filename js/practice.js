@@ -1019,7 +1019,14 @@ export function initPractice(ctx) {
     const qb = document.getElementById('qbody');
     // Once answered, the choices shrink so the map gets the room back
     for (const g of qb.querySelectorAll('.choices, .rose8, .lrpad')) g.classList.add('answered');
+    // a dial question: shrink the dial so the answer and Next fit
+    for (const d of qb.querySelectorAll('.dialwrap')) d.classList.add('answered');
     qb.insertAdjacentHTML('beforeend', `<div class="fb ${ok ? 'ok' : 'no'}">${html}</div><button class="primary" id="nextQ">Next</button>`);
+    // make sure Next is in view, however long the feedback is
+    requestAnimationFrame(() => {
+      const sh = document.getElementById('sheet');
+      sh.scrollTop = sh.scrollHeight;
+    });
     document.querySelector('#sheet .score').outerHTML = header().match(/<div class="score[^"]*">.*<\/div>$/s)[0];
     document.getElementById('nextQ').addEventListener('click', next);
     ctx.updateEdges();
