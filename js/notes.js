@@ -5,6 +5,21 @@ import { store } from './store.js';
 const KEY = 'notes';
 const load = () => store.get(KEY, { town: {}, road: {} });
 
+/** Roads used to be labeled "US 46" / "Rt 23" / "US 1/9"; now "Route 46" etc. */
+export const newRoadKey = (k) =>
+  k.replace(/^US (\d+\w?)\/(\d+\w?)$/, 'Route $1&$2').replace(/^(?:US|Rt|NY) (\d+\w?)$/, 'Route $1');
+export function migrateRoadKeys() {
+  if (store.get('roadKeysV2', false)) return;
+  const d = load();
+  const road = {};
+  for (const [k, v] of Object.entries(d.road || {})) road[newRoadKey(k)] = [...(road[newRoadKey(k)] || []), ...v];
+  d.road = road;
+  store.set(KEY, d);
+  const spoken = store.get('spokenRoads', {});
+  store.set('spokenRoads', Object.fromEntries(Object.entries(spoken).map(([k, v]) => [newRoadKey(k), v])));
+  store.set('roadKeysV2', true);
+}
+
 export const notes = {
   /** kind: 'town' (key = municipality key) or 'road' (key = road label) */
   list(kind, key) {

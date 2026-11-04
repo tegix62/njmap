@@ -85,11 +85,11 @@ const LANDMARKS = [
 const ROAD_NOTES = {
   'FDR Drive': 'Runs along the East River the whole East Side, from the Battery up to Harlem, where it becomes the Harlem River Drive.',
   'Harlem River Drive': 'Continues the FDR north along the Harlem River to the GWB approaches in Washington Heights.',
-  'NY 9A':
+  'Route 9A':
     'The West Side highway: West Street / West Side Highway from the Battery up to 72nd St, then the Henry Hudson Parkway north past the GWB to the Bronx.',
   'I-95': 'In Manhattan, the Trans-Manhattan Expressway: the short stretch across Washington Heights between the GWB and the Bronx.',
   'I-78': 'In Manhattan, I-78 is just the Holland Tunnel and its exits around Canal St.',
-  'Rt 495': 'The helix in Weehawken down to the Lincoln Tunnel, fed by the Turnpike and Route 3.',
+  'Route 495': 'The helix in Weehawken down to the Lincoln Tunnel, fed by the Turnpike and Route 3.',
 };
 
 const CONFUSABLES = [

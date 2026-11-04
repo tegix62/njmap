@@ -5,7 +5,7 @@ import { store } from './store.js';
 import { initDrive } from './drive.js';
 import { initExplore } from './explore.js';
 import { initPractice } from './practice.js';
-import { notes } from './notes.js';
+import { notes, migrateRoadKeys } from './notes.js';
 import { buildStyle, MUNI_LABEL_IDS, PLACE_LAYER_IDS } from './style.js';
 import { THEMES } from './theme.js';
 import { activeRegion, switchRegion, ALL_REGIONS } from './region.js';
@@ -92,6 +92,7 @@ async function main() {
   if (region.groupOrder) counties.sort((a, b) => region.groupOrder.indexOf(a) - region.groupOrder.indexOf(b));
 
   const settings = { ...DEFAULT_SETTINGS, ...store.get('settings', {}) };
+  migrateRoadKeys();
 
   // ---- map ------------------------------------------------------------------
   const base = location.href.replace(/[#?].*$/, '').replace(/[^/]*$/, '');

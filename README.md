@@ -9,7 +9,7 @@ A phone web app for learning New Jersey's 564 municipalities and Manhattan's nei
 The screen is built in two layers. The first is what you can take in at a glance while driving. Everything else is one tap away, so the screen never asks you to read a paragraph at 50 mph.
 
 - **Drive**
-  - *At a glance:* the town and county you're in, the village you're near ("near Towaco"), your heading with which way is left and right (*"Heading EAST · left N · right S"*), and the main road: *"On I-80 E"* or *"I-80 0.4 mi N · US 46 1.1 mi S"*.
+  - *At a glance:* the town and county you're in, the village you're near ("near Towaco"), your heading with which way is left and right (*"Heading EAST · left N · right S"*), and the main road: *"On I-80 E"* or *"I-80 0.4 mi N · Route 46 1.1 mi S"*. Roads are named the way people say them: I-80, Route 46, Route 23, Route 1&9, the Turnpike, the Parkway.
   - *Tap the card for more:* which towns lie to your left, ahead and right; notes on the road you're on; your notes on the town.
   - *Voice:* speaks when you cross a town line (*"Entering Clifton, Passaic County. Heading west. Not Rockaway — that's 19 miles west-northwest."*). The first time you drive a road that has a note, it reads the note once.
   - *Guess first* (Settings): *"New town. Which one?"*, a 4-second pause, then the answer. The card shows "?" until then.

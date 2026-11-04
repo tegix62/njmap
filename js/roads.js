@@ -11,8 +11,9 @@ const NAMED_REFS = {
 };
 
 /**
- * OSM route refs ("I 80", "US 1;US 9", "NJ 23", "I 95;NJTP") -> a short label
- * ("I-80", "US 1/9", "Rt 23", "Turnpike"). County routes and unknown refs -> null.
+ * OSM route refs ("I 80", "US 1;US 9", "NJ 23", "I 95;NJTP") -> the label people
+ * use ("I-80", "Route 1&9", "Route 23", "Turnpike"). County routes and unknown
+ * refs -> null.
  */
 export function normRef(raw) {
   if (!raw) return null;
@@ -21,15 +22,15 @@ export function normRef(raw) {
     let m;
     if (NAMED_REFS[p]) parts.push(NAMED_REFS[p]);
     else if ((m = p.match(/^I[ -]?(\d+)$/))) parts.push(`I-${m[1]}`);
-    else if ((m = p.match(/^US[ -]?(\d+\w?)$/))) parts.push(`US ${m[1]}`);
-    else if ((m = p.match(/^NJ[ -]?(\d+\w?)$/))) parts.push(`Rt ${m[1]}`);
-    else if ((m = p.match(/^NY[ -]?(\d+\w?)$/))) parts.push(`NY ${m[1]}`);
+    // People say "Route 46" for US 46 and "Route 23" for NJ 23, so both read that way
+    else if ((m = p.match(/^(US|NJ|NY)[ -]?(\d+\w?)$/))) parts.push(`Route ${m[2]}`);
   }
   if (!parts.length) return null;
   // The Turnpike is also I-95 in places: call it the Turnpike.
   if (parts.includes('Turnpike')) return 'Turnpike';
-  const us = parts.filter((p) => p.startsWith('US '));
-  if (us.length > 1 && us.length === parts.length) return 'US ' + us.map((p) => p.slice(3)).join('/');
+  // "Route 1&9" for roads carrying two routes
+  const rt = [...new Set(parts)].filter((p) => p.startsWith('Route '));
+  if (rt.length > 1 && rt.length === new Set(parts).size) return 'Route ' + rt.map((p) => p.slice(6)).join('&');
   return [...new Set(parts)].join(' / ');
 }
 
@@ -38,7 +39,12 @@ export function draftNote(label, name, notes) {
   if (name && notes[name]) return notes[name];
   if (!label) return null;
   if (notes[label]) return notes[label];
-  for (const part of label.split(' / ')) if (notes[part]) return notes[part];
+  for (const part of label.split(' / ')) {
+    if (notes[part]) return notes[part];
+    // "Route 1&9" -> try "Route 1", then "Route 9"
+    const m = part.match(/^Route (.+)$/);
+    if (m) for (const n of m[1].split('&')) if (notes[`Route ${n}`]) return notes[`Route ${n}`];
+  }
   return null;
 }
 

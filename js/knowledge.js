@@ -4,7 +4,7 @@
 
 /**
  * Road notes keyed by the short label the app shows (see roads.js normRef):
- * "I-80", "US 46", "Rt 23", "Turnpike", "Parkway", … or by a road's name.
+ * "I-80", "Route 46", "Route 23", "Turnpike", "Parkway", … or by a road's name.
  */
 export const ROAD_NOTES = {
   'I-80':
@@ -21,23 +21,23 @@ export const ROAD_NOTES = {
     'The Garden State Parkway: from Cape May up the Shore and through Union, Essex, Passaic and Bergen to the NY line at Montvale. Exit numbers are mileposts from Cape May, so Exit 105 is about 105 miles up.',
   'AC Expressway': 'Toll road from the Philadelphia suburbs (Turnersville) to Atlantic City.',
   'Palisades Pkwy': 'Palisades Interstate Parkway: from the George Washington Bridge north along the Hudson cliffs into New York.',
-  'US 46': 'Older east–west highway that shadows I-80 through Morris, Passaic and Bergen, with traffic lights and businesses. Useful for short hops between towns along 80.',
-  'US 1': 'The old main road: Trenton past Princeton to New Brunswick, Edison and Woodbridge, then Elizabeth and Newark. Runs parallel to the Turnpike.',
-  'Pulaski Skyway': 'Pulaski Skyway (US 1/9): a free elevated route between Newark and Jersey City, next to the Turnpike extension.',
-  'US 9': 'North–south through Middlesex, Monmouth and Ocean (Old Bridge, Freehold, Howell, Lakewood), roughly parallel to the Parkway.',
-  'US 22': 'East–west through Hillside, Union, Springfield, Mountainside and on to Bridgewater, alongside I-78. Stores line it and the median.',
-  'US 202':
+  'Route 46': 'Older east–west highway that shadows I-80 through Morris, Passaic and Bergen, with traffic lights and businesses. Useful for short hops between towns along 80.',
+  'Route 1': 'The old main road: Trenton past Princeton to New Brunswick, Edison and Woodbridge, then Elizabeth and Newark. Runs parallel to the Turnpike.',
+  'Pulaski Skyway': 'Pulaski Skyway (Route 1&9): a free elevated route between Newark and Jersey City, next to the Turnpike extension.',
+  'Route 9': 'North–south through Middlesex, Monmouth and Ocean (Old Bridge, Freehold, Howell, Lakewood), roughly parallel to the Parkway.',
+  'Route 22': 'East–west through Hillside, Union, Springfield, Mountainside and on to Bridgewater, alongside I-78. Stores line it and the median.',
+  'Route 202':
     'Morristown south to Bernardsville and Somerville; north from Morristown through Parsippany, Montville (Towaco), Lincoln Park and Wayne toward Oakland and Mahwah.',
-  'Rt 3': 'Short, busy link from Clifton through Rutherford and Secaucus (the Meadowlands) toward the Lincoln Tunnel.',
-  'Rt 4': 'East–west from the George Washington Bridge through Fort Lee, Englewood, Teaneck and Hackensack to Paramus.',
-  'Rt 10': 'East–west across Morris County from Livingston through Hanover (Whippany) and Parsippany to Roxbury.',
-  'Rt 17': 'North–south through Bergen County: from the Meadowlands up through Hasbrouck Heights, Paramus and Ramsey to Mahwah and the NY line.',
-  'Rt 18': 'From New Brunswick southeast through East Brunswick and Marlboro toward the Shore.',
-  'Rt 21': 'McCarter Highway: follows the Passaic River from Newark north to Clifton. A way north out of Newark that isn’t the Parkway.',
-  'Rt 23': 'The main road from Wayne northwest through Pequannock, Butler and Kinnelon into Sussex County (Franklin, Sussex, High Point).',
-  'Rt 24': 'Short freeway from I-78 at Springfield to I-287 at Morristown, past Millburn, Summit, Chatham and Madison.',
-  'Rt 208': 'Diagonal from Route 4 in Fair Lawn northwest to I-287 in Oakland.',
-  'Rt 495': 'The approach to the Lincoln Tunnel: from the Turnpike and Route 3 through Union City down the helix in Weehawken.',
+  'Route 3': 'Short, busy link from Clifton through Rutherford and Secaucus (the Meadowlands) toward the Lincoln Tunnel.',
+  'Route 4': 'East–west from the George Washington Bridge through Fort Lee, Englewood, Teaneck and Hackensack to Paramus.',
+  'Route 10': 'East–west across Morris County from Livingston through Hanover (Whippany) and Parsippany to Roxbury.',
+  'Route 17': 'North–south through Bergen County: from the Meadowlands up through Hasbrouck Heights, Paramus and Ramsey to Mahwah and the NY line.',
+  'Route 18': 'From New Brunswick southeast through East Brunswick and Marlboro toward the Shore.',
+  'Route 21': 'McCarter Highway: follows the Passaic River from Newark north to Clifton. A way north out of Newark that isn’t the Parkway.',
+  'Route 23': 'The main road from Wayne northwest through Pequannock, Butler and Kinnelon into Sussex County (Franklin, Sussex, High Point).',
+  'Route 24': 'Short freeway from I-78 at Springfield to I-287 at Morristown, past Millburn, Summit, Chatham and Madison.',
+  'Route 208': 'Diagonal from Route 4 in Fair Lawn northwest to I-287 in Oakland.',
+  'Route 495': 'The approach to the Lincoln Tunnel: from the Turnpike and Route 3 through Union City down the helix in Weehawken.',
 };
 ROAD_NOTES['I-95'] = ROAD_NOTES.Turnpike;
 

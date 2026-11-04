@@ -290,7 +290,7 @@ export function initDrive(ctx) {
       if (steady) firstTimeOn(st.roads[0]);
     }
   }
-  const sayRoad = (label) => label.replace(/^Rt /, 'Route ').replace(/\bUS (\d+)\/(\d+)/, 'US $1 and $2');
+  const sayRoad = (label) => label.replace(/&/g, ' and ');
   /** The first time you drive a road that has a note, read the note out once. */
   function firstTimeOn(r) {
     const spoken = store.get('spokenRoads', {});
