@@ -48,7 +48,7 @@ export function initDropIn(ctx) {
     for (const m of towns) ctx.highlight(m.id, pieces.includes(m) ? 'hole' : 'near');
     render();
     requestAnimationFrame(() => {
-      ctx.fit(towns, 13);
+      ctx.fit(towns, 13, { bearing: 0, duration: 1000 });
       map.once('moveend', () => g && nextPiece());
     });
   }

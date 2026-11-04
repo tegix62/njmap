@@ -290,7 +290,13 @@ async function main() {
       const bottom = Math.max(12, window.innerHeight - sheetTop + 12);
       return { top, bottom, left: 16, right: 56 };
     },
-    fit(items, maxZoom = 13) {
+    /** Animation length, or 0 when the phone asks for reduced motion. */
+    dur: (ms) => (matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : ms),
+    /**
+     * Frame a set of places. opts.bearing turns the map at the same time
+     * (one smooth move instead of a snap); default keeps the current heading.
+     */
+    fit(items, maxZoom = 13, opts = {}) {
       // fitBounds adds any padding already stored on the map; keep it at zero.
       const mp = map.getPadding();
       if (mp.top || mp.bottom || mp.left || mp.right) map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
@@ -305,7 +311,7 @@ async function main() {
           [b[0], b[1]],
           [b[2], b[3]],
         ],
-        { padding: ctx.padding(), maxZoom, bearing: map.getBearing(), duration: 600 }
+        { padding: ctx.padding(), maxZoom, bearing: opts.bearing ?? map.getBearing(), duration: ctx.dur(opts.duration ?? 800), essential: true }
       );
     },
     /** "12 mi NW of Clifton" style phrase: where `to` sits relative to `from`. */
@@ -485,7 +491,7 @@ async function main() {
     for (const b of document.querySelectorAll('#tabs [data-mode]')) b.setAttribute('aria-selected', b.dataset.mode === m);
     store.set('mode', m);
     // Study modes are north-up; Drive re-applies its own orientation.
-    if (m !== 'drive' && map.getBearing() !== 0) map.jumpTo({ bearing: 0 });
+    if (m !== 'drive' && map.getBearing() !== 0) map.easeTo({ bearing: 0, duration: ctx.dur(900) });
     modes[m].enter();
     updateEdges();
   }

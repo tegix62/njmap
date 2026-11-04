@@ -29,6 +29,8 @@ const TYPES = {
   dropin: '🧩 Drop in (county puzzle)',
   trip: 'My last drive',
 };
+// How long the map takes to turn and move to the next question
+const QUESTION_MOVE_MS = 1200;
 // One-tap kinds that work against a clock
 const RAPID_TYPES = ['leftright', 'borders', 'north', 'find', 'name', 'avedir', 'crossing', 'hwyfact', 'dir', 'findpt'];
 const WEIGHT = { find: 2, dir: 2, borders: 2, north: 2, point: 2, roadto: 3, leftright: 3, bigpoint: 2 };
@@ -679,7 +681,6 @@ export function initPractice(ctx) {
     ctx.focusRoad(null);
     ctx.showLabels(false);
     ctx.showRoadRefs(false); // fewer labels while answering; shown after a road question
-    if (q.kind !== 'leftright' && map.getBearing() !== 0) map.jumpTo({ bearing: 0 });
     const m = q.m;
     let body = '';
     if (q.kind === 'find') {
@@ -714,7 +715,6 @@ export function initPractice(ctx) {
       const a = q.from;
       ctx.highlight(a.id, 'q');
       ctx.reveal([{ m: a, color: L.q }]);
-      map.jumpTo({ bearing: q.heading });
       ctx.hud(
         `<div class="qkind">Left or right?</div><div class="q">You're in ${prompt(a)}, heading <b>${dirWord(compass8(q.heading))}</b>. Which way is ${prompt(m)}?</div>`
       );
@@ -739,7 +739,7 @@ export function initPractice(ctx) {
       body = `<div class="hint muted">Reading the road map for this area.</div>`;
       const token = q;
       requestAnimationFrame(() => {
-        ctx.fit([aroundBox(m.pt, 9 * SC)], 11.5);
+        ctx.fit([aroundBox(m.pt, 9 * SC)], 11.5, { bearing: 0, duration: QUESTION_MOVE_MS });
         let done = false;
         const go = () => {
           if (done) return;
@@ -830,29 +830,38 @@ export function initPractice(ctx) {
     if (tq) tq.addEventListener('click', next);
 
     // Frame the question without giving it away.
+    // Each question has its own orientation: north-up for most, your heading
+    // for "Left or right?". The map turns and moves there in one smooth move.
     requestAnimationFrame(() => {
-      if (q.kind === 'findpt') ctx.fit([{ bbox: [R.bounds[0][0], R.bounds[0][1], R.bounds[1][0], R.bounds[1][1]] }], 9);
+      const camBearing = q.kind === 'leftright' ? q.heading : 0;
+      let framed = false;
+      const frame = (items, z) => {
+        framed = true;
+        ctx.fit(items, z, { bearing: camBearing, duration: q.rapid ? 700 : QUESTION_MOVE_MS });
+      };
+      if (q.kind === 'findpt') frame([{ bbox: [R.bounds[0][0], R.bounds[0][1], R.bounds[1][0], R.bounds[1][1]] }], 9);
       else if (q.kind === 'find')
         // A short list would frame the answer itself; show the surroundings instead.
-        ctx.fit([q.p.length < 8 ? aroundBox(destinationPt(m.pt, Math.random() * 360, Math.random() * 8 * SC), 15 * SC) : areaBox(q.p)], 12);
-      else if (q.kind === 'sec' || q.kind === 'landmark') ctx.fit([{ bbox: countyBox[m.c] }], 12);
-      else if (q.kind === 'borders') ctx.fit([m, ...q.choices], 12.5);
-      else if (q.kind === 'north') ctx.fit(q.choices, 15);
-      else if (q.kind === 'roadto' && !q.pending) ctx.fit([m, q.target], 12.5);
-      else if (q.kind === 'crossing') ctx.fit([m, ...R.crossings.map((c) => c.pt)], 14);
-      else if (q.kind === 'avedir' || q.kind === 'uptown') ctx.fit([{ bbox: [R.bounds[0][0], R.bounds[0][1], R.bounds[1][0], R.bounds[1][1]] }], 13);
-      else if (q.kind === 'point' && q.big) ctx.fit([aroundBox(q.from.pt, 8 * SC)], 12);
-      else if (q.kind === 'point') ctx.fit([aroundBox(q.from.pt, distanceMi(q.from.pt, m.pt) * 1.3)], 13);
-      else if (q.kind === 'leftright') ctx.fit([aroundBox(q.from.pt, distanceMi(q.from.pt, m.pt) * 1.2)], 13);
-      else if (q.kind === 'hwydir' || q.kind === 'hwyfact') ctx.fit([{ bbox: [R.bounds[0][0], R.bounds[0][1], R.bounds[1][0], R.bounds[1][1]] }], 9);
-      else if (q.kind.startsWith('trip') && q.trip) ctx.fit([{ bbox: tripBox(q.trip) }], 13);
-      else if (q.kind === 'name') ctx.fit(q.group ? q.group.members : [{ bbox: countyBox[m.c] }, m], 12.5);
+        frame([q.p.length < 8 ? aroundBox(destinationPt(m.pt, Math.random() * 360, Math.random() * 8 * SC), 15 * SC) : areaBox(q.p)], 12);
+      else if (q.kind === 'sec' || q.kind === 'landmark') frame([{ bbox: countyBox[m.c] }], 12);
+      else if (q.kind === 'borders') frame([m, ...q.choices], 12.5);
+      else if (q.kind === 'north') frame(q.choices, 15);
+      else if (q.kind === 'roadto' && !q.pending) frame([m, q.target], 12.5);
+      else if (q.kind === 'crossing') frame([m, ...R.crossings.map((c) => c.pt)], 14);
+      else if (q.kind === 'avedir' || q.kind === 'uptown') frame([{ bbox: [R.bounds[0][0], R.bounds[0][1], R.bounds[1][0], R.bounds[1][1]] }], 13);
+      else if (q.kind === 'point' && q.big) frame([aroundBox(q.from.pt, 8 * SC)], 12);
+      else if (q.kind === 'point') frame([aroundBox(q.from.pt, distanceMi(q.from.pt, m.pt) * 1.3)], 13);
+      else if (q.kind === 'leftright') frame([aroundBox(q.from.pt, distanceMi(q.from.pt, m.pt) * 1.2)], 13);
+      else if (q.kind === 'hwydir' || q.kind === 'hwyfact') frame([{ bbox: [R.bounds[0][0], R.bounds[0][1], R.bounds[1][0], R.bounds[1][1]] }], 9);
+      else if (q.kind.startsWith('trip') && q.trip) frame([{ bbox: tripBox(q.trip) }], 13);
+      else if (q.kind === 'name') frame(q.group ? q.group.members : [{ bbox: countyBox[m.c] }, m], 12.5);
       else if (q.kind === 'dir') {
         const r = distanceMi(m.pt, q.b.pt) * 1.25;
         const dLat = r / 69;
         const dLon = r / (69 * Math.cos((m.pt[1] * Math.PI) / 180));
-        ctx.fit([{ bbox: [m.pt[0] - dLon, m.pt[1] - dLat, m.pt[0] + dLon, m.pt[1] + dLat] }], 13);
+        frame([{ bbox: [m.pt[0] - dLon, m.pt[1] - dLat, m.pt[0] + dLon, m.pt[1] + dLat] }], 13);
       }
+      if (!framed && Math.abs(map.getBearing() - camBearing) > 0.5) map.easeTo({ bearing: camBearing, duration: ctx.dur(QUESTION_MOVE_MS) });
     });
   }
 
