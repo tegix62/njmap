@@ -200,3 +200,36 @@ export const BIG_PLACES = [
   { name: 'Newark Airport', pt: [-74.1745, 40.6895] },
   { name: 'Trenton', pt: [-74.7699, 40.2204] },
 ];
+
+/**
+ * Lakes, reservoirs, mountains and ridges. Many span several towns, so the
+ * app never asks "which town is it in": questions are about where it is
+ * (point to it, tap it), scored by distance. `r` = how close a tap must be (mi).
+ */
+export const NATURE = [
+  { name: 'Lake Hopatcong', kind: 'Lake', pt: [-74.62, 40.95], r: 2.5, note: 'New Jersey’s largest lake, off I-80 in western Morris County, on the Sussex line.' },
+  { name: 'Greenwood Lake', kind: 'Lake', pt: [-74.33, 41.145], r: 2.5, note: 'Long, narrow lake that crosses the New York line at West Milford.' },
+  { name: 'Round Valley Reservoir', kind: 'Reservoir', pt: [-74.85, 40.62], r: 2, note: 'Deep, round reservoir in Hunterdon County, off I-78 near Lebanon.' },
+  { name: 'Spruce Run Reservoir', kind: 'Reservoir', pt: [-74.93, 40.66], r: 2, note: 'Next to Round Valley, by Clinton.' },
+  { name: 'Wanaque Reservoir', kind: 'Reservoir', pt: [-74.3, 41.04], r: 2.5, note: 'Big North Jersey water-supply reservoir in Passaic County, by Ringwood and West Milford.' },
+  { name: 'Monksville Reservoir', kind: 'Reservoir', pt: [-74.29, 41.12], r: 2, note: 'Just upstream of the Wanaque Reservoir.' },
+  { name: 'Boonton Reservoir', kind: 'Reservoir', pt: [-74.4, 40.885], r: 2, note: 'Jersey City’s water supply, by I-287 between Boonton and Parsippany.' },
+  { name: 'Lake Mohawk', kind: 'Lake', pt: [-74.665, 41.02], r: 1.5, note: 'Sparta’s lake community.' },
+  { name: 'Budd Lake', kind: 'Lake', pt: [-74.735, 40.87], r: 1.5, note: 'Natural lake in Mount Olive, by Route 46.' },
+  { name: 'Swartswood Lake', kind: 'Lake', pt: [-74.82, 41.08], r: 1.5, note: 'Sussex County lake in Swartswood State Park.' },
+  { name: 'Oradell Reservoir', kind: 'Reservoir', pt: [-74.02, 40.975], r: 1.5, note: 'On the Hackensack River in Bergen County.' },
+  { name: 'Manasquan Reservoir', kind: 'Reservoir', pt: [-74.16, 40.17], r: 1.5, note: 'Monmouth County reservoir in Howell.' },
+  { name: 'Union Lake', kind: 'Lake', pt: [-75.04, 39.41], r: 1.5, note: 'Large lake in Millville, Cumberland County.' },
+  { name: 'Merrill Creek Reservoir', kind: 'Reservoir', pt: [-75.09, 40.73], r: 1.5, note: 'Warren County reservoir near the Delaware.' },
+  { name: 'High Point', kind: 'Mountain', pt: [-74.6617, 41.3209], r: 3, note: '1,803 ft, the highest point in New Jersey, on the Kittatinny Ridge at the state’s northern tip.' },
+  { name: 'Mount Tammany (Delaware Water Gap)', kind: 'Mountain', pt: [-75.12, 40.97], r: 3, note: 'The New Jersey side of the Delaware Water Gap, where I-80 crosses into Pennsylvania.' },
+  { name: 'Kittatinny Ridge', kind: 'Ridge', pt: [-74.78, 41.19], r: 5, note: 'The long ridge along New Jersey’s northwest edge, from the Water Gap up to High Point (Stokes State Forest).' },
+  { name: 'Garret Mountain', kind: 'Ridge', pt: [-74.183, 40.896], r: 2, note: 'Ridge-top park above Paterson with views to New York, on the Watchung ridges.' },
+  { name: 'Watchung Reservation', kind: 'Ridge', pt: [-74.37, 40.685], r: 2.5, note: 'Union County’s big forested park, set between the Watchung ridges.' },
+  { name: 'Ramapo Mountains', kind: 'Ridge', pt: [-74.24, 41.06], r: 4, note: 'Ridges along the New York line west of Mahwah: Ringwood, Ramapo Mountain State Forest.' },
+  { name: 'The Palisades', kind: 'Ridge', pt: [-73.952, 40.885], r: 3, note: 'Cliffs along the Hudson from Fort Lee north to the New York line.' },
+  { name: 'Schooley’s Mountain', kind: 'Ridge', pt: [-74.79, 40.8], r: 2.5, note: 'Morris County ridge in Washington Township, by Long Valley.' },
+  { name: 'Sourland Mountain', kind: 'Ridge', pt: [-74.75, 40.46], r: 4, note: 'Wooded ridge across Somerset, Hunterdon and Mercer, near Hillsborough and Hopewell.' },
+  { name: 'Jenny Jump Mountain', kind: 'Ridge', pt: [-74.93, 40.91], r: 2.5, note: 'Warren County ridge near Hope; Jenny Jump State Forest.' },
+  { name: 'Bearfort Mountain', kind: 'Ridge', pt: [-74.37, 41.13], r: 2.5, note: 'Ridge in West Milford above Greenwood Lake.' },
+];

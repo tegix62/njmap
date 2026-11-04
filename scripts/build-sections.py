@@ -8,7 +8,12 @@ Sources
 - "Well-known" flag: a name counts as well known if it is a NJ post office
   name (npm `zipcodes`, BSD) or a GeoNames populated place with 1,000+ people
   (npm `cities.json`, CC-BY 4.0). Those are the names that show up in mailing
-  addresses and on signs. Only the flag is derived from them.
+  addresses and on signs.
+- Locations: GeoNames populated places (CC-BY 4.0) with 500+ people (npm
+  `cities-500-structured`) and 1,000+ (`cities.json`). Up to three candidate
+  points per name are stored; the app only uses one that actually falls
+  inside the right municipality, so a same-named place elsewhere can't
+  mislabel the map.
 
 Data files are parsed as text; no downloaded code is executed.
 Usage: python3 scripts/build-sections.py
@@ -25,6 +30,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOCALNAMES = "https://raw.githubusercontent.com/HackJersey/garden-style/master/data/localnames.csv"
 ZIPCODES = "https://registry.npmjs.org/zipcodes/-/zipcodes-8.0.0.tgz"
 CITIES = "https://registry.npmjs.org/cities.json/-/cities.json-1.1.66.tgz"
+CITIES500 = "https://registry.npmjs.org/cities-500-structured/-/cities-500-structured-1.0.1.tgz"
 
 # Municipality spellings in localnames.csv that differ from the NJOGIS layer.
 ALIASES = {
@@ -63,7 +69,22 @@ def main():
     codes = json.loads(zips_js[start : zips_js.index("};", start) + 1])
     known = {z["city"].lower() for z in codes.values() if z.get("state") == "NJ"}
     cities = json.loads(tar_member(get(CITIES), "cities.json"))
-    known |= {c["name"].lower() for c in cities if c.get("country") == "US" and c.get("admin1") == "NJ"}
+    nj_cities = [c for c in cities if c.get("country") == "US" and c.get("admin1") == "NJ"]
+    known |= {c["name"].lower() for c in nj_cities}
+
+    # Candidate locations by name (GeoNames)
+    where = {}
+    def add_pt(name, lon, lat):
+        pts = where.setdefault(name.lower(), [])
+        pt = [round(float(lon), 5), round(float(lat), 5)]
+        if pt not in pts and len(pts) < 3:
+            pts.append(pt)
+    for c in nj_cities:
+        add_pt(c["name"], c["lng"], c["lat"])
+    for line in tar_member(get(CITIES500), "cities500.txt").splitlines():
+        f = line.split("\t")
+        if len(f) > 10 and f[8] == "US" and f[10] == "NJ":
+            add_pt(f[1], f[5], f[4])
 
     rows = csv.DictReader(io.StringIO(get(LOCALNAMES).decode("utf-8-sig")))
     out = {}
@@ -90,13 +111,18 @@ def main():
         raise SystemExit(f"unmatched municipalities: {sorted(unmatched)}")
 
     # {key: [[name, wellKnown], ...]} with well-known names first
-    data = {k: sorted(([n, f] for n, f in v.items()), key=lambda x: (-x[1], x[0])) for k, v in sorted(out.items())}
+    # {key: [[name, wellKnown, [[lon, lat], ...]?], ...]} with well-known names first
+    data = {
+        k: sorted(([n, f] + ([where[n.lower()]] if n.lower() in where else []) for n, f in v.items()), key=lambda x: (-x[1], x[0]))
+        for k, v in sorted(out.items())
+    }
     path = os.path.join(ROOT, "data/sections.json")
     with open(path, "w") as f:
         json.dump(data, f, separators=(",", ":"))
     total = sum(len(v) for v in data.values())
-    known_n = sum(f for v in data.values() for _, f in v)
-    print(f"wrote {path}: {total} names in {len(data)} municipalities ({known_n} well-known)")
+    known_n = sum(x[1] for v in data.values() for x in v)
+    located = sum(1 for v in data.values() for x in v if len(x) > 2)
+    print(f"wrote {path}: {total} names in {len(data)} municipalities ({known_n} well-known, {located} with candidate locations)")
 
 
 if __name__ == "__main__":

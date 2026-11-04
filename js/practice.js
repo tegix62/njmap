@@ -23,12 +23,14 @@ const TYPES = {
   bigpoint: 'Point to the big places',
   hwydir: 'Which way does the highway run?',
   hwyfact: 'Highway ends & crossings',
+  naturept: 'Point to the lake or mountain',
+  findpt: 'Find the lake or mountain',
   rapid: '⚡ Rapid round',
   dropin: '🧩 Drop in (county puzzle)',
   trip: 'My last drive',
 };
 // One-tap kinds that work against a clock
-const RAPID_TYPES = ['leftright', 'borders', 'north', 'find', 'name', 'avedir', 'crossing', 'hwyfact', 'dir'];
+const RAPID_TYPES = ['leftright', 'borders', 'north', 'find', 'name', 'avedir', 'crossing', 'hwyfact', 'dir', 'findpt'];
 const WEIGHT = { find: 2, dir: 2, borders: 2, north: 2, point: 2, roadto: 3, leftright: 3, bigpoint: 2 };
 const DIR8 = ['NW', 'N', 'NE', 'W', '', 'E', 'SW', 'S', 'SE'];
 const DIR_DEG = { N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315 };
@@ -403,6 +405,20 @@ export function initPractice(ctx) {
   const theHwy = (label) => (/^I-|^Route /.test(label) ? label : `the ${label}`);
   const TheHwy = (label) => theHwy(label).replace(/^the /, 'The ');
 
+  /** "From Wayne, point to Lake Hopatcong" (compass dial). */
+  function makeNaturePoint(p) {
+    const from = pick(p);
+    const far = R.nature.filter((n) => distanceMi(from.pt, n.pt) > 3 && distanceMi(from.pt, n.pt) < 45);
+    if (!far.length) return makePoint(p);
+    const n = rand(far);
+    return { kind: 'point', big: true, m: { key: `nat:${n.name}`, n: n.name, pt: n.pt }, from: { name: from.n, pt: from.pt, m: from }, angle: null, nat: n };
+  }
+  /** "Tap Lake Hopatcong": scored by how close the tap is. */
+  function makeFindPt() {
+    const n = rand(R.nature);
+    return { kind: 'findpt', n, m: { key: `nat:${n.name}` } };
+  }
+
   /** "Which way does the Turnpike run?": point along it (either end counts). */
   function makeHwyDir() {
     const h = rand(R.highways);
@@ -501,6 +517,8 @@ export function initPractice(ctx) {
     bigpoint: makeBigPoint,
     hwydir: makeHwyDir,
     hwyfact: makeHwyFact,
+    naturept: makeNaturePoint,
+    findpt: makeFindPt,
   };
 
   // ---- Rapid round ------------------------------------------------------------
@@ -679,6 +697,9 @@ export function initPractice(ctx) {
     } else if (q.kind === 'landmark') {
       ctx.hud(`<div class="qkind">Landmarks</div><div class="q"><b>${esc(q.landmark.name)}</b> is in which ${R.unit}?</div>`);
       body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
+    } else if (q.kind === 'findpt') {
+      ctx.hud(`<div class="qkind">${esc(q.n.kind)}</div><div class="q">Tap <b>${esc(q.n.name)}</b> on the map</div>`);
+      body = `<div class="hint muted">Close counts: within about ${q.n.r} mi.</div>`;
     } else if (q.kind === 'rapidstart') {
       ctx.hud(`<div class="qkind">⚡ Rapid round</div><div class="q">Quick questions, back to back</div>`);
       body = `<div class="hint">One tap each, against the clock. Three lives, and it speeds up as you go. Misses go to your review pile.</div>
@@ -810,7 +831,8 @@ export function initPractice(ctx) {
 
     // Frame the question without giving it away.
     requestAnimationFrame(() => {
-      if (q.kind === 'find')
+      if (q.kind === 'findpt') ctx.fit([{ bbox: [R.bounds[0][0], R.bounds[0][1], R.bounds[1][0], R.bounds[1][1]] }], 9);
+      else if (q.kind === 'find')
         // A short list would frame the answer itself; show the surroundings instead.
         ctx.fit([q.p.length < 8 ? aroundBox(destinationPt(m.pt, Math.random() * 360, Math.random() * 8 * SC), 15 * SC) : areaBox(q.p)], 12);
       else if (q.kind === 'sec' || q.kind === 'landmark') ctx.fit([{ bbox: countyBox[m.c] }], 12);
@@ -1170,7 +1192,7 @@ export function initPractice(ctx) {
     const from = q.from.you ? 'you' : q.from.name;
     feedback(
       ok,
-      `${ok ? '✓' : err <= 45 ? '≈' : '✗'} You were <b>${Math.round(err)}°</b> off. <b>${esc(m.n)}</b> is ${d < 10 ? d.toFixed(1) : Math.round(d)} mi <b>${dirWord(compass16(truth))}</b> (${Math.round(truth)}°) of ${esc(from)}.`
+      `${ok ? '✓' : err <= 45 ? '≈' : '✗'} You were <b>${Math.round(err)}°</b> off. <b>${esc(m.n)}</b> is ${d < 10 ? d.toFixed(1) : Math.round(d)} mi <b>${dirWord(compass16(truth))}</b> (${Math.round(truth)}°) of ${esc(from)}.${q.nat ? `<details class="more"><summary>About it</summary><div class="note">${esc(q.nat.note)}</div></details>` : ''}`
     );
     ctx.fit([q.big ? m.pt : m, q.from.pt], 12);
   }
@@ -1194,6 +1216,24 @@ export function initPractice(ctx) {
       `${ok ? '✓' : '✗'} You were <b>${Math.round(err)}°</b> off. ${ctx.swatch(h.label)}${esc(TheHwy(h.label))} runs ${esc(h.runs)}, from ${esc(h.ends[0].name)} to ${esc(h.ends[1].name)}.`
     );
     ctx.fit([a, b], 11);
+  }
+
+  function answerFindPt(tap) {
+    const n = q.n;
+    const d = distanceMi(tap, n.pt);
+    const ok = d <= n.r;
+    record(q.m, ok);
+    ctx.reveal([
+      { m: null, pt: n.pt, label: n.name, color: L.good, key: true },
+      ...(ok ? [] : [{ m: null, pt: tap, label: 'your tap', color: L.bad }]),
+    ]);
+    if (!ok) ctx.line([tap, n.pt]);
+    const rel = ctx.relative(tap, n.pt);
+    feedback(
+      ok,
+      `${ok ? '✓' : '✗'} ${ok ? `Within ${d.toFixed(1)} mi.` : `${esc(n.name)} is <b>${rel.text}</b> of your tap.`}<details class="more"${ok ? '' : ' open'}><summary>About it</summary><div class="note">${esc(n.note)}</div></details>`
+    );
+    ctx.fit(ok ? [{ bbox: [n.pt[0] - 0.15, n.pt[1] - 0.1, n.pt[0] + 0.15, n.pt[1] + 0.1] }] : [tap, n.pt], 11);
   }
 
   function answerUptown() {
@@ -1220,7 +1260,9 @@ export function initPractice(ctx) {
 
   // Map taps answer "find it" questions.
   map.on('click', (e) => {
-    if (ctx.mode !== 'practice' || e.handledByAnchor || !q || q.kind !== 'find' || q.answered) return;
+    if (ctx.mode !== 'practice' || e.handledByAnchor || !q || q.answered) return;
+    if (q.kind === 'findpt') return answerFindPt([e.lngLat.lng, e.lngLat.lat]);
+    if (q.kind !== 'find') return;
     const m = q.m;
     const t = ctx.locate([e.lngLat.lng, e.lngLat.lat]);
     const ok = t === m;

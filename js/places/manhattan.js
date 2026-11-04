@@ -156,6 +156,7 @@ export default {
   highways: [],
   junctions: [],
   bigPlaces: [],
+  nature: [],
   wellKnown: null, // every neighborhood counts
   avenues: AVENUES,
   avenueNote: AVENUE_NOTE,

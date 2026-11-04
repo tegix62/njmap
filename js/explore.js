@@ -77,6 +77,7 @@ export function initExplore(ctx) {
   }
 
   function select(m, fly = true) {
+    natSel = null;
     if (hwySel) {
       hwySel = null;
       ctx.focusRoad(null);
@@ -113,6 +114,15 @@ export function initExplore(ctx) {
     };
     if (tryFind()) return;
     const giveUp = () => ctx.toast(`${name} is part of ${m.n}, but the map data doesn't pin down exactly where.`);
+    // The background map only includes small villages when zoomed in: zoom
+    // into the town, let it load, then look again.
+    if (map.getZoom() < 13.4) {
+      ctx.fit([m], 14);
+      map.once('idle', () => {
+        if (sel === m && !tryFind()) giveUp();
+      });
+      return;
+    }
     if (!map.isMoving() && map.areTilesLoaded()) return giveUp();
     map.once('idle', () => {
       if (sel === m && !tryFind()) giveUp();
@@ -147,10 +157,15 @@ export function initExplore(ctx) {
     if (tab === 'villages') {
       const secs = showAllSections ? m.sections : m.sections.slice(0, 12);
       const more = m.sections.length - secs.length;
+      // Put every village we can place on the map right away
+      const placed = ctx.placedSections(m);
+      requestAnimationFrame(() =>
+        ctx.reveal([...placed.values()].map((p) => ({ m, pt: p.pt, label: p.name, color: L.place })))
+      );
       return `<div class="chips">${secs
-        .map((s) => `<button class="chip sec${s.known ? ' known' : ''}" data-sec="${esc(s.name)}">${esc(s.name)}</button>`)
+        .map((s) => `<button class="chip sec${s.known ? ' known' : ''}${placed.has(s.name.toLowerCase()) ? ' located' : ''}" data-sec="${esc(s.name)}">${esc(s.name)}</button>`)
         .join('')}${more > 0 ? `<button class="chip more" id="moreSec">+${more} more</button>` : ''}</div>
-        <div class="hint muted">Bold = names you'll see on mail and signs. Tap one to find it on the map.</div>`;
+        <div class="hint muted">Bold = names you'll see on mail and signs. ● = shown on the map now; tap any to zoom to it.</div>`;
     }
     if (tab === 'roads') {
       const roads = roadsInTown(map, m, ctx.locate);
@@ -234,6 +249,7 @@ export function initExplore(ctx) {
   }
   function showHighway(h) {
     hwySel = h;
+    natSel = null;
     if (sel) ctx.highlight(sel.id, null);
     sel = null;
     ctx.focus(null);
@@ -241,6 +257,41 @@ export function initExplore(ctx) {
     ctx.focusHighway(h);
     render();
     requestAnimationFrame(() => ctx.fit(h.ends.map((e) => e.pt), 11));
+  }
+
+  // ---- lakes & mountains -------------------------------------------------------
+  let natSel = null;
+  function natureChips() {
+    const ns = ctx.region.nature || [];
+    if (!ns.length) return '';
+    const group = (kinds, title) =>
+      `<div class="label-sm">${title}</div><div class="chips">${ns
+        .map((n, i) => [n, i])
+        .filter(([n]) => kinds.includes(n.kind))
+        .map(([n, i]) => `<button class="chip nat" data-nat="${i}">${esc(n.name)}</button>`)
+        .join('')}</div>`;
+    return group(['Lake', 'Reservoir'], 'Lakes & reservoirs') + group(['Mountain', 'Ridge'], 'Mountains & ridges');
+  }
+  function natureCard(n) {
+    const near = ctx.anchors.phrase(n.pt);
+    const you = ctx.pos ? `${ctx.relative(ctx.pos.pt, n.pt).text} of you` : '';
+    return `<div class="titlerow"><div class="town">${esc(n.name)}</div><button class="star" id="natBack">✕ Close</button></div>
+      <div class="meta">${esc(n.kind)}${near ? ` · ${esc(near)}` : ''}${you ? ` · ${esc(you)}` : ''}</div>
+      <div class="note">${esc(n.note)}</div>`;
+  }
+  function showNature(n) {
+    natSel = n;
+    hwySel = null;
+    if (sel) ctx.highlight(sel.id, null);
+    sel = null;
+    ctx.focus(null);
+    ctx.focusRoad(null);
+    ctx.reveal([{ m: null, pt: n.pt, label: n.name, color: L.place, key: true }]);
+    render();
+    const pad = ctx.padding();
+    requestAnimationFrame(() =>
+      map.easeTo({ center: n.pt, zoom: n.r >= 4 ? 10.5 : 11.5, offset: [(pad.left - pad.right) / 2, (pad.top - pad.bottom) / 2], duration: 700 })
+    );
   }
 
   function starBtn(m) {
@@ -251,13 +302,15 @@ export function initExplore(ctx) {
   function render() {
     const R = ctx.region;
     const search = `<input id="search" type="search" list="townlist" placeholder="${R.sections ? 'Search a town, village or landmark…' : `Search a ${R.unit} or landmark…`}" autocomplete="off" enterkeyhint="go">`;
-    if (hwySel) {
+    if (natSel) {
+      ctx.hud(`${search}${natureCard(natSel)}`);
+    } else if (hwySel) {
       ctx.hud(`${search}${highwayCard(hwySel)}`);
     } else if (!sel) {
       ctx.hud(
         `${search}<div class="meta">Tap anywhere on the map to see which ${R.unit} it is and what surrounds it. ${
           R.sections ? 'Search also finds villages ("Towaco") and landmarks ("Willowbrook").' : 'Search also finds landmarks ("Penn Station").'
-        }</div>${highwayChips()}`
+        }</div>${highwayChips()}${natureChips()}`
       );
     } else {
       const m = sel;
@@ -304,6 +357,14 @@ export function initExplore(ctx) {
     });
     for (const b of hud.querySelectorAll('[data-id]')) b.addEventListener('click', () => select(ctx.munis[+b.dataset.id]));
     for (const b of hud.querySelectorAll('[data-hwy]')) b.addEventListener('click', () => showHighway(ctx.hwy(b.dataset.hwy)));
+    for (const b of hud.querySelectorAll('[data-nat]')) b.addEventListener('click', () => showNature(ctx.region.nature[+b.dataset.nat]));
+    const natBack = document.getElementById('natBack');
+    if (natBack)
+      natBack.addEventListener('click', () => {
+        natSel = null;
+        ctx.reveal([]);
+        render();
+      });
     const back = document.getElementById('hwyBack');
     if (back)
       back.addEventListener('click', () => {

@@ -69,12 +69,19 @@ async function main() {
   munis.forEach((m, i) => {
     m.neighbors = nbIdx[i].map((j) => munis[j]);
     // Villages / sections inside this municipality: [{name, known}], well-known first
-    m.sections = (sectionsByKey[m.key] || []).map(([name, known]) => ({ name, known: !!known }));
+    m.sections = (sectionsByKey[m.key] || []).map(([name, known, cands]) => ({ name, known: !!known, cands: cands || [] }));
   });
   // Names drawn on the map as sections. Skip any that are also a municipality's
   // name (Hanover's "Monroe"), which would read as the wrong town.
+  // Built-in village locations: use a candidate only if it really falls inside
+  // this municipality (a same-named place elsewhere must not mislabel the map).
+  {
+    const locate0 = makeLocator(munis);
+    for (const m of munis) for (const x of m.sections) x.pt = x.cands.find((p) => locate0(p) === m) || null;
+  }
   const muniNames = new Set(munis.map((m) => m.n.toLowerCase()));
-  const sectionNames = [...new Set(munis.flatMap((m) => m.sections.map((x) => x.name)))].filter(
+  // Names the background map's own place points may label (those without a built-in location)
+  const sectionNames = [...new Set(munis.flatMap((m) => m.sections.filter((x) => !x.pt).map((x) => x.name)))].filter(
     (n) => !muniNames.has(n.toLowerCase())
   );
   const byKey = new Map(munis.map((m) => [m.key, m]));
@@ -149,6 +156,18 @@ async function main() {
       countyLabels: countyLabelsFC,
       regionLabels,
       landmarks: landmarksData,
+      nature: {
+        type: 'FeatureCollection',
+        features: (region.nature || []).map((n) => ({ type: 'Feature', properties: { name: n.name, kind: n.kind }, geometry: { type: 'Point', coordinates: n.pt } })),
+      },
+      sectionPts: {
+        type: 'FeatureCollection',
+        features: munis.flatMap((m) =>
+          m.sections
+            .filter((x) => x.pt && !muniNames.has(x.name.toLowerCase()))
+            .map((x) => ({ type: 'Feature', properties: { name: x.name }, geometry: { type: 'Point', coordinates: x.pt } }))
+        ),
+      },
       anchors: anchorsData(store.get('anchors', [])),
       empty,
     },
@@ -262,6 +281,7 @@ async function main() {
       labelsOn = on;
       for (const id of MUNI_LABEL_IDS) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
       map.setLayoutProperty('section-label', 'visibility', on && settings.basemap !== 'none' ? 'visible' : 'none');
+      map.setLayoutProperty('section-label-local', 'visibility', on ? 'visible' : 'none');
       for (const id of PLACE_LAYER_IDS) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
     },
     padding() {
@@ -314,6 +334,7 @@ async function main() {
      */
     placedSections(m) {
       const out = new Map();
+      for (const x of m.sections) if (x.pt) out.set(x.name.toLowerCase(), { name: x.name, pt: x.pt });
       if (!m.sections.length || settings.basemap === 'none' || !map.getSource('omt')) return out;
       const want = new Map(m.sections.map((x) => [x.name.toLowerCase(), x.name]));
       let feats = [];

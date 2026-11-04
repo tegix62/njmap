@@ -254,7 +254,7 @@ const muniLabel = (Z, id, minzoom, maxzoom, filter) => ({
 
 /** Every layer that shows a town name (toggled together). */
 export const MUNI_LABEL_IDS = ['muni-label-major', 'muni-label'];
-export const PLACE_LAYER_IDS = ['landmark-dot', 'landmark-label'];
+export const PLACE_LAYER_IDS = ['landmark-dot', 'landmark-label', 'nature-dot', 'nature-label'];
 
 /**
  * Returns { style, baseLayers } for a region. `Z` = the region's zoom levels:
@@ -283,6 +283,8 @@ export function buildStyle({ base, basemap, data, sectionNames, Z, majorSize, gr
       countylabels: { type: 'geojson', data: data.countyLabels },
       regionlabels: { type: 'geojson', data: data.regionLabels },
       landmarks: { type: 'geojson', data: data.landmarks },
+      sectionpts: { type: 'geojson', data: data.sectionPts },
+      nature: { type: 'geojson', data: data.nature },
       anchors: { type: 'geojson', data: data.anchors },
       trip: { type: 'geojson', data: data.empty },
       reveal: { type: 'geojson', data: data.empty },
@@ -409,6 +411,57 @@ export function buildStyle({ base, basemap, data, sectionNames, Z, majorSize, gr
           'text-rotation-alignment': 'viewport',
         },
         paint: { 'text-color': T.ink3, 'text-halo-color': T.halo, 'text-halo-width': 1.4 },
+      },
+      {
+        // Villages & sections: positions from OSM place points in the tiles,
+        // shown only when the name is on that town's official local-names list.
+        id: 'section-label-local',
+        type: 'symbol',
+        source: 'sectionpts',
+        minzoom: 12,
+        layout: {
+          visibility: 'visible',
+          'text-field': ['get', 'name'],
+          'text-font': ['Noto Sans Italic'],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 12, 11, 16, 14],
+          'text-padding': 4,
+          'text-max-width': 8,
+          'text-rotation-alignment': 'viewport',
+        },
+        paint: { 'text-color': T.ink3, 'text-halo-color': T.halo, 'text-halo-width': 1.4 },
+      },
+      {
+        // Lakes and mountains (curated): small marks with italic names
+        id: 'nature-dot',
+        type: 'circle',
+        source: 'nature',
+        minzoom: 8.2,
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 8.2, 2.5, 13, 4.5],
+          'circle-color': ['match', ['get', 'kind'], ['Lake', 'Reservoir'], T.waterInk, T.ink3],
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 1,
+        },
+      },
+      {
+        id: 'nature-label',
+        type: 'symbol',
+        source: 'nature',
+        minzoom: 8.2,
+        layout: {
+          'text-field': ['get', 'name'],
+          'text-font': ['Noto Sans Italic'],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 8.2, 10.5, 12, 13],
+          'text-anchor': 'top',
+          'text-offset': [0, 0.5],
+          'text-max-width': 8,
+          'text-optional': true,
+        },
+        paint: {
+          'text-color': ['match', ['get', 'kind'], ['Lake', 'Reservoir'], T.waterInk, T.ink2],
+          'text-halo-color': T.halo,
+          'text-halo-width': 1.5,
+        },
       },
       {
         id: 'landmark-dot',
