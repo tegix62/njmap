@@ -550,3 +550,200 @@ body[data-mode='practice'] .maplibregl-ctrl-bottom-left {
   text-decoration: underline;
   color: var(--panel-muted);
 }
+
+/* ---- progressive disclosure ---------------------------------------------- */
+#hud .handle {
+  float: right;
+  border: 0;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--panel-muted);
+  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  margin: 2px 0 0 8px;
+  font-size: 16px;
+  cursor: pointer;
+}
+#hud .roadline {
+  margin-top: 6px;
+  font-size: 15px;
+  color: var(--panel-muted);
+}
+#hud .roadline b {
+  color: #fff;
+  background: rgba(37, 99, 235, 0.55);
+  border-radius: 6px;
+  padding: 0 6px;
+  font-weight: 700;
+}
+#hud .roadline .on b {
+  background: #2563eb;
+}
+.detail {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.notecard {
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.4;
+  position: relative;
+}
+.notecard .tag {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--panel-muted);
+  display: block;
+  margin-bottom: 2px;
+}
+.notecard.mine {
+  background: rgba(34, 197, 94, 0.14);
+}
+.notecard .del {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  border: 0;
+  background: none;
+  color: var(--panel-muted);
+  font-size: 16px;
+  cursor: pointer;
+}
+.addnote {
+  margin-top: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+  background: none;
+  color: var(--panel-ink);
+  border-radius: 10px;
+  padding: 7px 10px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* tabs that reveal one detail panel at a time */
+.dtabs {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.dtabs button {
+  flex: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 11px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--panel-ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dtabs button[aria-pressed='true'] {
+  background: var(--panel-ink);
+  color: var(--ink);
+}
+.dtabs .n {
+  opacity: 0.6;
+  margin-left: 3px;
+}
+
+/* neighbor compass: 3×3, the town in the middle, neighbors by direction */
+.ncompass {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
+  margin-top: 10px;
+}
+.ncell {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 4px 5px;
+  min-height: 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.ncell .dl {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--accent);
+}
+.ncell button {
+  border: 0;
+  background: none;
+  color: var(--panel-ink);
+  padding: 1px 0;
+  font-size: 13px;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.ncell.mid {
+  background: rgba(37, 99, 235, 0.35);
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-weight: 800;
+  font-size: 14px;
+}
+.ncell.empty {
+  background: transparent;
+}
+
+#noteDlg {
+  border: 0;
+  border-radius: 16px;
+  padding: 16px;
+  width: min(480px, calc(100vw - 32px));
+}
+#noteDlg h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+#noteDlg textarea {
+  width: 100%;
+  font: inherit;
+  font-size: 16px;
+  border-radius: 10px;
+  border: 1px solid #d0d5dd;
+  padding: 8px;
+}
+.btnrow.end {
+  justify-content: flex-end;
+}
+button.primary.inline {
+  display: inline-block;
+  width: auto;
+  margin: 0;
+  padding: 8px 16px;
+}
+#settings .filebtn {
+  border: 1px solid #d0d5dd;
+  background: #fff;
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.chip.on {
+  background: #2563eb;
+}
+#noteDlg .btnrow {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+#noteDlg .btnrow button:not(.primary) {
+  border: 1px solid #d0d5dd;
+  background: #fff;
+  border-radius: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+}

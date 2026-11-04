@@ -5,6 +5,8 @@ import { store } from './store.js';
 import { initDrive } from './drive.js';
 import { initExplore } from './explore.js';
 import { initPractice } from './practice.js';
+import { LANDMARKS } from './knowledge.js';
+import { notes } from './notes.js';
 
 // Hand-assigned so that bordering counties never share a color.
 const PALETTE = {
@@ -101,9 +103,54 @@ const BASE_LAYERS = [
     },
     'streets light',
   ],
+  [
+    {
+      id: 'road-focus',
+      type: 'line',
+      source: 'omt',
+      'source-layer': 'transportation_name',
+      filter: ['==', ['get', 'ref'], '__none__'],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#2563eb', 'line-opacity': 0.75, 'line-width': roadWidth(3, 6, 18) },
+    },
+    'streets light',
+  ],
 ];
 // Drawn above the town fills/lines, below the town names.
 const BASE_LABEL_LAYERS = [
+  [
+    {
+      id: 'river-name',
+      type: 'symbol',
+      source: 'omt',
+      'source-layer': 'waterway',
+      minzoom: 9.5,
+      filter: ['all', ['==', ['get', 'class'], 'river'], ['has', 'name']],
+      layout: {
+        'symbol-placement': 'line',
+        'symbol-spacing': 400,
+        'text-field': ['get', 'name'],
+        'text-font': ['Noto Sans Italic'],
+        'text-size': 12,
+        'text-letter-spacing': 0.05,
+      },
+      paint: { 'text-color': '#2b6cb0', 'text-halo-color': 'rgba(255,255,255,0.85)', 'text-halo-width': 1.4 },
+    },
+    'streets light',
+  ],
+  [
+    {
+      id: 'lake-name',
+      type: 'symbol',
+      source: 'omt',
+      'source-layer': 'water_name',
+      minzoom: 9.5,
+      filter: ['match', ['get', 'class'], ['lake', 'bay', 'reservoir'], true, false],
+      layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Italic'], 'text-size': 12, 'text-max-width': 7 },
+      paint: { 'text-color': '#2b6cb0', 'text-halo-color': 'rgba(255,255,255,0.85)', 'text-halo-width': 1.4 },
+    },
+    'streets light',
+  ],
   [
     {
       id: 'road-ref',
@@ -149,7 +196,7 @@ const withVis = (pairs, key) =>
   pairs.map(([l, modes]) => ({ ...l, layout: { ...(l.layout || {}), visibility: modes.split(' ').includes(key) ? 'visible' : 'none' } }));
 
 const TYPE_ABBR = { Township: 'Twp', Borough: 'Boro', City: 'City', Town: 'Town', Village: 'Vlg' };
-const HL_COLORS = { cur: '#f59e0b', sel: '#2563eb', good: '#16a34a', bad: '#dc2626', q: '#7c3aed', near: '#64748b' };
+const HL_COLORS = { cur: '#f59e0b', sel: '#2563eb', good: '#16a34a', bad: '#dc2626', q: '#7c3aed', near: '#94a3b8' };
 
 const DEFAULT_SETTINGS = {
   voice: true,
@@ -236,6 +283,11 @@ async function main() {
     })),
   };
   const empty = { type: 'FeatureCollection', features: [] };
+  const landmarks = LANDMARKS.filter((l) => byKey.has(l.town)).map((l, i) => ({ ...l, id: i, m: byKey.get(l.town) }));
+  const landmarksData = {
+    type: 'FeatureCollection',
+    features: landmarks.map((l) => ({ type: 'Feature', id: l.id, properties: { name: l.name }, geometry: { type: 'Point', coordinates: l.pt } })),
+  };
   if (!['streets', 'light', 'none'].includes(settings.basemap)) settings.basemap = 'streets';
 
   const map = new maplibregl.Map({
@@ -262,6 +314,7 @@ async function main() {
         counties: { type: 'geojson', data: countiesFC, attribution: 'Boundaries: <a href="https://njogis-newjersey.opendata.arcgis.com/">NJOGIS</a>' },
         labels: { type: 'geojson', data: labelsData },
         countylabels: { type: 'geojson', data: countyLabelsFC },
+        landmarks: { type: 'geojson', data: landmarksData },
         reveal: { type: 'geojson', data: empty },
         qline: { type: 'geojson', data: empty },
       },
@@ -362,6 +415,34 @@ async function main() {
           paint: { 'text-color': '#55606f', 'text-halo-color': 'rgba(255,255,255,0.9)', 'text-halo-width': 1.4 },
         },
         {
+          id: 'landmark-dot',
+          type: 'circle',
+          source: 'landmarks',
+          minzoom: 8.5,
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 8.5, 3, 13, 5.5],
+            'circle-color': '#9f1239',
+            'circle-stroke-color': '#ffffff',
+            'circle-stroke-width': 1.5,
+          },
+        },
+        {
+          id: 'landmark-label',
+          type: 'symbol',
+          source: 'landmarks',
+          minzoom: 10,
+          layout: {
+            'text-field': ['get', 'name'],
+            'text-font': ['Noto Sans Medium'],
+            'text-size': 11.5,
+            'text-anchor': 'top',
+            'text-offset': [0, 0.6],
+            'text-max-width': 8,
+            'text-optional': true,
+          },
+          paint: { 'text-color': '#9f1239', 'text-halo-color': '#ffffff', 'text-halo-width': 1.6 },
+        },
+        {
           id: 'muni-label',
           type: 'symbol',
           source: 'labels',
@@ -375,7 +456,13 @@ async function main() {
             'symbol-sort-key': ['-', 0, ['get', 'p']],
             'text-rotation-alignment': 'viewport',
           },
-          paint: { 'text-color': '#101828', 'text-halo-color': 'rgba(255,255,255,0.92)', 'text-halo-width': 1.6 },
+          paint: {
+            'text-color': '#101828',
+            'text-halo-color': 'rgba(255,255,255,0.92)',
+            'text-halo-width': 1.6,
+            // Explore "focus": the selected town and its neighbors stay solid.
+            'text-opacity': ['case', ['boolean', ['global-state', 'focusing'], false], ['case', ['boolean', ['feature-state', 'focus'], false], 1, 0.28], 1],
+          },
         },
         {
           id: 'reveal-label',
@@ -406,6 +493,8 @@ async function main() {
   const sheetEl = $('#sheet');
   const highlighted = new Map();
   let labelsOn = true;
+  let focused = [];
+  let tinted = [];
   let toastTimer = 0;
 
   const ctx = {
@@ -465,6 +554,7 @@ async function main() {
       labelsOn = on;
       map.setLayoutProperty('muni-label', 'visibility', on ? 'visible' : 'none');
       map.setLayoutProperty('section-label', 'visibility', on && settings.basemap !== 'none' ? 'visible' : 'none');
+      for (const id of ['landmark-dot', 'landmark-label']) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
     },
     padding() {
       const top = hudEl.hidden ? 12 : hudEl.getBoundingClientRect().bottom + 12;
@@ -496,9 +586,9 @@ async function main() {
       const dir = compass16(bearing(fromPt, toPt));
       return { d, dir, text: `${d < 10 ? d.toFixed(1) : Math.round(d)} mi ${dir}`, words: `${d < 10 ? d.toFixed(1) : Math.round(d)} miles ${dirWord(dir)}` };
     },
+    /** Queued, so a town announcement doesn't cut off a road note (or vice versa). */
     speak(text) {
       if (!settings.voice || !('speechSynthesis' in window)) return;
-      speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.lang = 'en-US';
       speechSynthesis.speak(u);
@@ -534,6 +624,34 @@ async function main() {
         out.set(k, { name: want.get(k), pt });
       }
       return out;
+    },
+    landmarks,
+    notes,
+    /**
+     * Focus a town: tint its neighbors and fade every other town label.
+     * Pass null to clear.
+     */
+    focus(m) {
+      for (const id of focused) map.removeFeatureState({ source: 'labels', id }, 'focus');
+      for (const id of tinted) if (highlighted.get(id) === 'near') ctx.highlight(id, null);
+      focused = [];
+      tinted = [];
+      if (m) {
+        for (const o of [m, ...m.neighbors]) {
+          map.setFeatureState({ source: 'labels', id: o.id }, { focus: true });
+          focused.push(o.id);
+        }
+        for (const o of m.neighbors)
+          if (!highlighted.has(o.id)) {
+            ctx.highlight(o.id, 'near');
+            tinted.push(o.id);
+          }
+      }
+      map.setGlobalStateProperty('focusing', !!m);
+    },
+    /** Highlight one road (its raw OSM refs) on the map; null clears. */
+    focusRoad(raw) {
+      map.setFilter('road-focus', raw && raw.length ? ['in', ['get', 'ref'], ['literal', raw]] : ['==', ['get', 'ref'], '__none__']);
     },
     toast(msg, ms = 3200) {
       const t = $('#toast');
@@ -596,6 +714,8 @@ async function main() {
     document.body.dataset.mode = m;
     for (const b of document.querySelectorAll('#tabs [data-mode]')) b.setAttribute('aria-selected', b.dataset.mode === m);
     store.set('mode', m);
+    // Study modes are north-up; Drive re-applies its own orientation.
+    if (m !== 'drive' && map.getBearing() !== 0) map.jumpTo({ bearing: 0 });
     modes[m].enter();
     updateEdges();
   }
@@ -636,6 +756,25 @@ async function main() {
     if (confirm('Forget the list of towns you have driven through?')) store.del('visited');
   });
   $('#closeSettings').addEventListener('click', () => dlg.close());
+  $('#exportNotes').addEventListener('click', () => {
+    const blob = new Blob([notes.exportJSON()], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `townfinder-notes-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  $('#importNotes').addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    try {
+      const n = notes.importJSON(await f.text());
+      ctx.toast(`Imported ${n} note${n === 1 ? '' : 's'}`);
+    } catch (err) {
+      ctx.toast(`Couldn't import: ${err.message}`);
+    }
+    e.target.value = '';
+  });
   $('#stopTracking').addEventListener('click', () => {
     modes.drive.stop();
     dlg.close();

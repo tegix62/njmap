@@ -12,6 +12,8 @@ const TYPES = {
   dir: 'Which direction?',
   confuse: 'Sound-alikes',
   section: 'Which town is this village in?',
+  borders: 'Which of these borders…?',
+  landmark: 'Where is this landmark?',
 };
 const DIR8 = ['NW', 'N', 'NE', 'W', '', 'E', 'SW', 'S', 'SE'];
 const DIR_DEG = { N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315 };
@@ -131,6 +133,27 @@ export function initPractice(ctx) {
     return { kind: 'sec', m, section, choices: shuffle([m, ...others]) };
   }
 
+  /** "Which of these borders Wayne?": wrong answers are nearby towns that don't touch it. */
+  function makeBorders(p) {
+    const cands = p.filter((m) => m.neighbors.length >= 3);
+    const m = pick(cands.length ? cands : munis.filter((x) => x.neighbors.length >= 3));
+    const right = rand(m.neighbors);
+    const touching = new Set([m.id, ...m.neighbors.map((o) => o.id)]);
+    const ring2 = [...new Set(m.neighbors.flatMap((o) => o.neighbors))].filter((o) => !touching.has(o.id));
+    const wrong = ring2.sort((a, b) => distanceMi(m.pt, a.pt) - distanceMi(m.pt, b.pt)).slice(0, 6);
+    return { kind: 'borders', m, right, choices: shuffle([right, ...shuffle(wrong).slice(0, 3)]) };
+  }
+
+  /** "Willowbrook Mall is in which town?" */
+  function makeLandmark(p) {
+    const ids = new Set(p.map((m) => m.id));
+    const local = ctx.landmarks.filter((l) => ids.has(l.m.id));
+    const l = rand(local.length ? local : ctx.landmarks);
+    const m = l.m;
+    const others = [...shuffle([...m.neighbors]), ...shuffle(munis.filter((o) => o.c === m.c))].filter((o, i, a) => o !== m && a.indexOf(o) === i);
+    return { kind: 'landmark', m, landmark: l, choices: shuffle([m, ...others.slice(0, 3)]) };
+  }
+
   function makeConfuse(p) {
     const ids = new Set(p.map((m) => m.id));
     const curated = ctx.confusables.groups.filter((g) => g.curated);
@@ -142,8 +165,8 @@ export function initPractice(ctx) {
   }
   function next() {
     const p = pool();
-    const t = cfg.type === 'mix' ? rand(['find', 'find', 'name', 'name', 'dir', 'dir', 'confuse', 'section']) : cfg.type;
-    q = { find: makeFind, name: makeName, dir: makeDir, confuse: makeConfuse, section: makeSection }[t](p);
+    const t = cfg.type === 'mix' ? rand(['find', 'find', 'name', 'name', 'dir', 'dir', 'borders', 'borders', 'confuse', 'section', 'landmark']) : cfg.type;
+    q = { find: makeFind, name: makeName, dir: makeDir, confuse: makeConfuse, section: makeSection, borders: makeBorders, landmark: makeLandmark }[t](p);
     q.p = p;
     q.answered = false;
     show();
@@ -210,6 +233,14 @@ export function initPractice(ctx) {
       ctx.highlight(m.id, 'q');
       ctx.hud(`<div class="qkind">${q.group ? 'Sound-alikes' : 'Name it'}</div><div class="q">Which town is highlighted?</div>`);
       body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
+    } else if (q.kind === 'borders') {
+      ctx.highlight(m.id, 'q');
+      ctx.reveal([{ m, color: '#5b21b6' }]);
+      ctx.hud(`<div class="qkind">Borders</div><div class="q">Which of these borders ${prompt(m)}?</div>`);
+      body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
+    } else if (q.kind === 'landmark') {
+      ctx.hud(`<div class="qkind">Landmarks</div><div class="q"><b>${esc(q.landmark.name)}</b> is in which town?</div>`);
+      body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
     } else if (q.kind === 'sec') {
       ctx.hud(`<div class="qkind">Villages &amp; sections</div><div class="q"><b>${esc(q.section.name)}</b> is part of which town?</div>`);
       body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
@@ -226,7 +257,8 @@ export function initPractice(ctx) {
     // Frame the question without giving it away.
     requestAnimationFrame(() => {
       if (q.kind === 'find') ctx.fit([areaBox(q.p)], 12);
-      else if (q.kind === 'sec') ctx.fit([{ bbox: countyBox[m.c] }], 12);
+      else if (q.kind === 'sec' || q.kind === 'landmark') ctx.fit([{ bbox: countyBox[m.c] }], 12);
+      else if (q.kind === 'borders') ctx.fit([m, ...q.choices], 12.5);
       else if (q.kind === 'name') ctx.fit(q.group ? q.group.members : [{ bbox: countyBox[m.c] }, m], 12.5);
       else if (q.kind === 'dir') {
         const r = distanceMi(m.pt, q.b.pt) * 1.25;
@@ -277,6 +309,47 @@ export function initPractice(ctx) {
       ctx.reveal(items);
       feedback(ok, html);
       ctx.fit(q.group ? q.group.members : ok ? [{ bbox: countyBox[m.c] }] : [m, pickd], 12);
+    } else if (q.kind === 'borders') {
+      const pickd = munis[+btn.dataset.id];
+      const ok = pickd === q.right;
+      record(q.right, ok);
+      btn.classList.add(ok ? 'right' : 'wrong');
+      document.querySelector(`#qbody .choice[data-id="${q.right.id}"]`).classList.add('right');
+      // Show the whole ring of neighbors so the answer sits in context.
+      for (const o of m.neighbors) ctx.highlight(o.id, 'near');
+      ctx.highlight(q.right.id, 'good');
+      const items = [{ m, color: '#5b21b6' }, ...m.neighbors.map((o) => ({ m: o, color: o === q.right ? '#166534' : '#344054' }))];
+      const side = compass8(bearing(m.pt, q.right.pt));
+      let html = `${ok ? '✓' : '✗'} <b>${esc(q.right.n)}</b> borders ${esc(m.n)} on the ${side}.`;
+      if (!ok) {
+        ctx.highlight(pickd.id, 'bad');
+        items.push({ m: pickd, color: '#991b1b' });
+        html += ` ${esc(pickd.n)} doesn't touch it. It's ${ctx.relative(m.pt, pickd.pt).text} of ${esc(m.n)}.`;
+      }
+      html += `<div class="note">All ${m.neighbors.length} neighbors of ${esc(m.n)}: ${esc(
+        [...m.neighbors].sort((a, b) => bearing(m.pt, a.pt) - bearing(m.pt, b.pt)).map((o) => `${o.n} (${compass8(bearing(m.pt, o.pt))})`).join(', ')
+      )}</div>`;
+      ctx.reveal(items);
+      feedback(ok, html);
+      ctx.fit([m, ...m.neighbors, pickd], 13);
+    } else if (q.kind === 'landmark') {
+      const pickd = munis[+btn.dataset.id];
+      const ok = pickd === m;
+      const l = q.landmark;
+      record(m, ok);
+      btn.classList.add(ok ? 'right' : 'wrong');
+      document.querySelector(`#qbody .choice[data-id="${m.id}"]`).classList.add('right');
+      ctx.highlight(m.id, 'good');
+      const items = [{ m, color: '#166534' }, { m, pt: l.pt, label: l.name, color: '#9f1239' }];
+      let html = `${ok ? '✓' : '✗'} <b>${esc(l.name)}</b> (${esc(l.kind.toLowerCase())}) is in <b>${esc(m.full)}</b>, ${esc(m.c)} County.`;
+      if (!ok) {
+        ctx.highlight(pickd.id, 'bad');
+        items.push({ m: pickd, color: '#991b1b' });
+        html += ` ${esc(pickd.n)} is ${ctx.relative(l.pt, pickd.pt).text} of it.`;
+      }
+      ctx.reveal(items);
+      feedback(ok, html);
+      ctx.fit(ok ? [m] : [m, pickd], 13);
     } else if (q.kind === 'sec') {
       const pickd = munis[+btn.dataset.id];
       const ok = pickd === m;

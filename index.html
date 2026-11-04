@@ -73,11 +73,27 @@
         <button id="resetStats">Clear practice scores</button>
         <button id="resetVisited">Forget visited towns</button>
       </div>
+      <div class="btnrow">
+        <button id="exportNotes">Export my notes</button>
+        <label class="filebtn">Import notes<input type="file" id="importNotes" accept="application/json,.json" hidden /></label>
+      </div>
       <p class="fine">
         Town boundaries: NJ Office of GIS, Municipal Boundaries of NJ (564 municipalities). Background map © OpenStreetMap
-        contributors, served by OpenFreeMap (OpenMapTiles schema). Your location and scores are stored only on this device.
+        contributors, served by OpenFreeMap (OpenMapTiles schema). Your location, scores and notes are stored only on this
+        device; export your notes to move them to another phone.
       </p>
       <button class="primary" id="closeSettings">Done</button>
+    </dialog>
+
+    <dialog id="noteDlg">
+      <form method="dialog">
+        <h2>Note</h2>
+        <textarea rows="5" maxlength="2000" placeholder="e.g. Use Route 23 instead of 287 at rush hour"></textarea>
+        <div class="btnrow end">
+          <button value="cancel" formnovalidate>Cancel</button>
+          <button value="save" class="primary inline">Save</button>
+        </div>
+      </form>
     </dialog>
 
     <script src="lib/maplibre-gl.js"></script>

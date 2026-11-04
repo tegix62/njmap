@@ -1,5 +1,7 @@
 /* global maplibregl */
 import { bearing, destination, distanceMi, compass8, compass16, dirWord, angleDiff } from './geo.js';
+import { nearbyRoads, alongRoad, travelDir, draftNote } from './roads.js';
+import { editNote } from './notes.js';
 
 const MIN_MOVING_MPS = 2; // ~4.5 mph; below this GPS course is noise
 const LOOK_STEP_MI = 0.08;
@@ -21,6 +23,11 @@ export function initDrive(ctx) {
     wake: null,
     error: null,
     active: false,
+    roads: [], // nearby major roads, nearest first
+    onRoad: null, // label of the road you're driving on, once it's been steady for a few seconds
+    onCand: null,
+    onCount: 0,
+    expanded: store.get('driveExpanded', false),
   };
   let visited = store.get('visited', {});
 
@@ -120,6 +127,7 @@ export function initDrive(ctx) {
     if (now - st.lookAt > 2000) {
       st.look = lookAround(pt, st.heading);
       st.near = nearestSection(pt, st.cur);
+      updateRoads(pt);
       st.lookAt = now;
     }
     if (ctx.mode === 'drive') {
@@ -186,6 +194,35 @@ export function initDrive(ctx) {
     }
     return null;
   }
+  // ---- roads ------------------------------------------------------------------
+  function updateRoads(pt) {
+    st.roads = nearbyRoads(map, pt, 3, 3);
+    const top = st.roads[0];
+    const on = top && top.d < 0.025 && st.heading != null && st.gpsHeading && alongRoad(st.heading, top.segBearing) ? top.label : null;
+    if (on && on === st.onCand) st.onCount++;
+    else {
+      st.onCand = on;
+      st.onCount = on ? 1 : 0;
+    }
+    const steady = st.onCount >= 2 ? st.onCand : on === null ? null : st.onRoad;
+    if (steady !== st.onRoad) {
+      st.onRoad = steady;
+      if (steady) firstTimeOn(st.roads[0]);
+    }
+  }
+  const sayRoad = (label) => label.replace(/^Rt /, 'Route ').replace(/\bUS (\d+)\/(\d+)/, 'US $1 and $2');
+  /** The first time you drive a road that has a note, read the note out once. */
+  function firstTimeOn(r) {
+    const spoken = store.get('spokenRoads', {});
+    if (spoken[r.label]) return;
+    const mine = ctx.notes.list('road', r.label);
+    const note = mine.length ? mine[mine.length - 1].text : draftNote(r.label, r.name);
+    if (!note) return;
+    spoken[r.label] = Date.now();
+    store.set('spokenRoads', spoken);
+    ctx.speak(`On ${sayRoad(r.label)}. ${note}`);
+  }
+
   /** Closest named village/section of the current town within 1.5 mi. */
   function nearestSection(pt, m) {
     if (!m) return null;
@@ -318,13 +355,50 @@ export function initDrive(ctx) {
     return `<div class="look ${cls}"><span class="k">${label} <b>${compass8(r.dir)}</b></span><span class="v">${name}</span><span class="d">${mi(r.d)}</span></div>`;
   }
 
+  function roadLine() {
+    if (!st.roads.length) return '';
+    if (st.onRoad && st.heading != null)
+      return `<div class="roadline"><span class="on">On <b>${esc(st.onRoad)} ${travelDir(st.heading)}</b></span>${
+        st.roads[1] ? ` · ${esc(st.roads[1].label)} ${mi(st.roads[1].d)} ${st.roads[1].dir}` : ''
+      }</div>`;
+    return `<div class="roadline">${st.roads
+      .slice(0, 2)
+      .map((r) => `<b>${esc(r.label)}</b> ${mi(r.d)} ${r.dir}`)
+      .join(' · ')}</div>`;
+  }
+
+  function noteCards(kind, key, draft) {
+    const mine = ctx.notes
+      .list(kind, key)
+      .map((n) => `<div class="notecard mine"><span class="tag">your note</span>${esc(n.text)}</div>`)
+      .join('');
+    return (draft ? `<div class="notecard"><span class="tag">draft note</span>${esc(draft)}</div>` : '') + mine;
+  }
+
+  /** Second layer: only rendered when the card is expanded. */
+  function details(m) {
+    const look = st.look
+      ? `<div class="looks">${sideCell('left', '◀ Left', st.look.left)}${sideCell('ahead', '▲ Ahead', st.look.ahead)}${sideCell('right', 'Right ▶', st.look.right)}</div>`
+      : '';
+    const road = st.roads.find((r) => r.label === st.onRoad) || st.roads[0];
+    const roadNotes = road
+      ? `<div class="label-sm">${esc(road.label)}</div>${noteCards('road', road.label, draftNote(road.label, road.name))}
+         <button class="addnote" data-note="road" data-key="${esc(road.label)}">＋ Note about ${esc(road.label)}</button>`
+      : '';
+    const townNotes = m
+      ? `<div class="label-sm">${esc(m.n)}</div>${noteCards('town', m.key)}
+         <button class="addnote" data-note="town" data-key="${esc(m.key)}">＋ Note about ${esc(m.n)}</button>`
+      : '';
+    return `<div class="detail">${look}${roadNotes}${townNotes}</div>`;
+  }
+
   function render() {
     if (ctx.mode !== 'drive') return;
     const tracking = st.watchId != null;
     if (!tracking) {
       ctx.hud(
         `<div class="town">Where am I?</div>
-         <div class="meta">${st.error ? esc(st.error) : 'Shows the town and county you are in, which way you are heading, and what is ahead. Your location never leaves this phone.'}</div>
+         <div class="meta">${st.error ? esc(st.error) : 'Shows the town and county you are in, which way you are heading, and the main road nearby. Your location never leaves this phone.'}</div>
          <button class="primary" id="startBtn">Start</button>`
       );
       document.getElementById('startBtn').addEventListener('click', start);
@@ -337,23 +411,54 @@ export function initDrive(ctx) {
     const m = st.cur;
     const h = st.heading;
     const acc = ctx.pos.acc > 150 ? `<span class="warn">GPS ±${Math.round(ctx.pos.acc)} m</span>` : '';
+    // Layer 1, readable at a glance: town, county, heading (+ which way is left/right), the main road.
     const head =
       h == null
         ? `<div class="heading muted">Heading appears once you start moving</div>`
-        : `<div class="heading">Heading <b>${dirWord(compass8(h)).toUpperCase()}</b> <span class="deg">${Math.round(h)}° ${compass16(h)}</span></div>
-           <div class="lr-key">your left = <b>${compass8(h - 90)}</b> · your right = <b>${compass8(h + 90)}</b></div>`;
-    const look = st.look
-      ? `<div class="looks">${sideCell('left', '◀ Left', st.look.left)}${sideCell('ahead', '▲ Ahead', st.look.ahead)}${sideCell('right', 'Right ▶', st.look.right)}</div>`
-      : '';
+        : `<div class="heading">Heading <b>${dirWord(compass8(h)).toUpperCase()}</b> <span class="lr-key">· left <b>${compass8(h - 90)}</b> · right <b>${compass8(h + 90)}</b></span></div>`;
+    const near = m && st.near ? ` · near <i>${esc(st.near.name)}</i>` : '';
+    const handle = `<button class="handle" id="hudToggle" aria-label="${st.expanded ? 'Show less' : 'Show more'}">${st.expanded ? '▴' : '▾'}</button>`;
     ctx.hud(
-      m
-        ? `<div class="town">${esc(m.n)}</div>
-           <div class="meta">${esc(m.t)} · <b>${esc(m.c)} County</b> ${acc}</div>
-           ${st.near ? `<div class="near">near <b>${esc(st.near.name)}</b> <span class="muted">· part of ${esc(m.n)}</span></div>` : ''}
-           ${head}${look}`
-        : `<div class="town">Outside New Jersey</div><div class="meta">or offshore ${acc}</div>${head}`
+      `${handle}` +
+        (m
+          ? `<div class="town">${esc(m.n)}</div>
+             <div class="meta">${esc(m.t)} · <b>${esc(m.c)} County</b>${near} ${acc}</div>`
+          : `<div class="town">Outside New Jersey</div><div class="meta">or offshore ${acc}</div>`) +
+        head +
+        roadLine() +
+        (st.expanded ? details(m) : '')
     );
+    bindHud();
   }
+
+  function bindHud() {
+    const hud = document.getElementById('hud');
+    document.getElementById('hudToggle').addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleExpanded();
+    });
+    for (const b of hud.querySelectorAll('.addnote'))
+      b.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const label = b.dataset.note === 'town' ? ctx.byKey.get(b.dataset.key).n : b.dataset.key;
+        const text = await editNote(`Note about ${label}`);
+        if (text) {
+          ctx.notes.add(b.dataset.note, b.dataset.key, text);
+          render();
+        }
+      });
+  }
+  function toggleExpanded() {
+    st.expanded = !st.expanded;
+    store.set('driveExpanded', st.expanded);
+    render();
+    if (st.follow) camera(300);
+  }
+  // Tapping the card itself (not a button) also expands/collapses it.
+  document.getElementById('hud').addEventListener('click', (e) => {
+    if (ctx.mode !== 'drive' || st.watchId == null || e.target.closest('button, a, input')) return;
+    toggleExpanded();
+  });
 
   return {
     enter() {

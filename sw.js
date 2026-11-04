@@ -1,7 +1,7 @@
 // Offline support: the app shell, boundary data, libraries and fonts are
 // cached, so "which town am I in" keeps working with no signal. Background map
 // tiles are only cached opportunistically.
-const VERSION = 'njtf-v3';
+const VERSION = 'njtf-v4';
 const SHELL = [
   './',
   'index.html',
@@ -13,6 +13,9 @@ const SHELL = [
   'js/practice.js',
   'js/confusables.js',
   'js/store.js',
+  'js/knowledge.js',
+  'js/roads.js',
+  'js/notes.js',
   'lib/maplibre-gl.js',
   'lib/maplibre-gl.css',
   'lib/topojson-client.min.js',
