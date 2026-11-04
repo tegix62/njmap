@@ -37,6 +37,7 @@ export const ROAD_NOTES = {
   'Rt 23': 'The main road from Wayne northwest through Pequannock, Butler and Kinnelon into Sussex County (Franklin, Sussex, High Point).',
   'Rt 24': 'Short freeway from I-78 at Springfield to I-287 at Morristown, past Millburn, Summit, Chatham and Madison.',
   'Rt 208': 'Diagonal from Route 4 in Fair Lawn northwest to I-287 in Oakland.',
+  'Rt 495': 'The approach to the Lincoln Tunnel: from the Turnpike and Route 3 through Union City down the helix in Weehawken.',
 };
 ROAD_NOTES['I-95'] = ROAD_NOTES.Turnpike;
 

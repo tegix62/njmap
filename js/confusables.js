@@ -65,7 +65,7 @@ export const GROUPS = [
  * Resolves GROUPS against the loaded municipalities.
  * Returns { groups: [{members, note}], byId: Map<id, group[]> } and logs unknown names.
  */
-export function resolveGroups(munis) {
+export function resolveGroups(munis, groupsDef = GROUPS) {
   const byName = new Map();
   for (const m of munis) {
     if (!byName.has(m.n)) byName.set(m.n, []);
@@ -80,7 +80,7 @@ export function resolveGroups(munis) {
       byId.get(m.id).push(g);
     }
   };
-  for (const g of GROUPS) {
+  for (const g of groupsDef) {
     const members = [];
     for (const n of g.names) {
       const hits = byName.get(n);

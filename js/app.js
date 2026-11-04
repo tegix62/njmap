@@ -5,10 +5,9 @@ import { store } from './store.js';
 import { initDrive } from './drive.js';
 import { initExplore } from './explore.js';
 import { initPractice } from './practice.js';
-import { LANDMARKS } from './knowledge.js';
 import { notes } from './notes.js';
-import { buildStyle, BASE_LAYERS, BASE_LABEL_LAYERS, MUNI_LABEL_IDS, PLACE_LAYER_IDS } from './style.js';
-import { REGIONS } from './regions.js';
+import { buildStyle, MUNI_LABEL_IDS, PLACE_LAYER_IDS } from './style.js';
+import { activeRegion, switchRegion, ALL_REGIONS } from './region.js';
 import { initAnchors } from './anchors.js';
 
 const TYPE_ABBR = { Township: 'Twp', Borough: 'Boro', City: 'City', Town: 'Town', Village: 'Vlg' };
@@ -25,11 +24,15 @@ const DEFAULT_SETTINGS = {
 };
 
 async function main() {
+  const region = activeRegion();
+  document.body.dataset.region = region.id;
   const [topo, sectionsByKey] = await Promise.all([
-    fetch('data/nj.topo.json').then((r) => r.json()),
-    fetch('data/sections.json')
-      .then((r) => r.json())
-      .catch(() => ({})),
+    fetch(region.data).then((r) => r.json()),
+    region.sections
+      ? fetch(region.sections)
+          .then((r) => r.json())
+          .catch(() => ({}))
+      : {},
   ]);
   const fc = (o) => topojson.feature(topo, topo.objects[o]);
   const munisFC = fc('munis');
@@ -71,8 +74,9 @@ async function main() {
     (n) => !muniNames.has(n.toLowerCase())
   );
   const byKey = new Map(munis.map((m) => [m.key, m]));
-  const confusables = resolveGroups(munis);
+  const confusables = resolveGroups(munis, region.confusables);
   const counties = countiesFC.features.map((f) => f.properties.c).sort();
+  if (region.groupOrder) counties.sort((a, b) => region.groupOrder.indexOf(a) - region.groupOrder.indexOf(b));
 
   const settings = { ...DEFAULT_SETTINGS, ...store.get('settings', {}) };
 
@@ -92,7 +96,7 @@ async function main() {
     })),
   };
   const empty = { type: 'FeatureCollection', features: [] };
-  const landmarks = LANDMARKS.filter((l) => byKey.has(l.town)).map((l, i) => ({ ...l, id: i, m: byKey.get(l.town) }));
+  const landmarks = region.landmarks.filter((l) => byKey.has(l.town)).map((l, i) => ({ ...l, id: i, m: byKey.get(l.town) }));
   const landmarksData = {
     type: 'FeatureCollection',
     features: landmarks.map((l) => ({ type: 'Feature', id: l.id, properties: { name: l.name }, geometry: { type: 'Point', coordinates: l.pt } })),
@@ -100,7 +104,7 @@ async function main() {
   if (!['streets', 'light', 'none'].includes(settings.basemap)) settings.basemap = 'streets';
   const regionLabels = {
     type: 'FeatureCollection',
-    features: Object.entries(REGIONS).map(([name, cs]) => {
+    features: Object.entries(region.superGroups || {}).map(([name, cs]) => {
       const ms = munis.filter((m) => cs.includes(m.c));
       const pt = [ms.reduce((a, m) => a + m.pt[0], 0) / ms.length, ms.reduce((a, m) => a + m.pt[1], 0) / ms.length];
       return { type: 'Feature', properties: { name }, geometry: { type: 'Point', coordinates: pt } };
@@ -111,36 +115,36 @@ async function main() {
     features: list.map((a, i) => ({ type: 'Feature', id: i, properties: { name: a.name }, geometry: { type: 'Point', coordinates: a.pt } })),
   });
 
+  const built = buildStyle({
+    base,
+    basemap: settings.basemap,
+    sectionNames,
+    Z: region.zooms,
+    majorSize: region.majorSize,
+    groupTint: region.groupTint,
+    attribution: region.attribution,
+    data: {
+      munis: munisData,
+      counties: countiesFC,
+      labels: labelsData,
+      countyLabels: countyLabelsFC,
+      regionLabels,
+      landmarks: landmarksData,
+      anchors: anchorsData(store.get('anchors', [])),
+      empty,
+    },
+  });
+
   const map = new maplibregl.Map({
     container: 'map',
     attributionControl: false,
-    bounds: [
-      [-75.56, 38.93],
-      [-73.89, 41.36],
-    ],
+    bounds: region.bounds,
     fitBoundsOptions: { padding: 20 },
-    maxBounds: [
-      [-78, 37.5],
-      [-71.5, 42.5],
-    ],
+    maxBounds: region.maxBounds,
     dragRotate: true,
     pitchWithRotate: false,
     touchPitch: false,
-    style: buildStyle({
-      base,
-      basemap: settings.basemap,
-      sectionNames,
-      data: {
-        munis: munisData,
-        counties: countiesFC,
-        labels: labelsData,
-        countyLabels: countyLabelsFC,
-        regionLabels,
-        landmarks: landmarksData,
-        anchors: anchorsData(store.get('anchors', [])),
-        empty,
-      },
-    }),
+    style: built.style,
   });
   map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
   map.addControl(new maplibregl.ScaleControl({ unit: 'imperial', maxWidth: 90 }), 'bottom-left');
@@ -169,7 +173,9 @@ async function main() {
     locate: makeLocator(munis),
     pos: null, // {pt, acc, speed, heading, t}
     mode: null,
-    sub: (m) => `${m.t} · ${m.c} County`,
+    region,
+    sub: (m) => region.sub(m),
+    groupName: (c) => region.groupName(c),
     name: (m) => (m.dup ? `${m.n} ${TYPE_ABBR[m.t] || m.t} (${m.c})` : m.n),
     saveSettings() {
       store.set('settings', settings);
@@ -268,7 +274,7 @@ async function main() {
     setBasemap(key) {
       settings.basemap = key;
       ctx.saveSettings();
-      for (const [l, modes] of [...BASE_LAYERS, ...BASE_LABEL_LAYERS])
+      for (const [l, modes] of built.baseLayers)
         map.setLayoutProperty(l.id, 'visibility', modes.split(' ').includes(key) ? 'visible' : 'none');
       ctx.showLabels(labelsOn);
     },
@@ -444,7 +450,9 @@ async function main() {
     dlg.close();
     ctx.anchors.startPick(n);
   });
+  $('#regionSel').addEventListener('change', (e) => switchRegion(e.target.value));
   $('#settingsBtn').addEventListener('click', () => {
+    $('#regionSel').value = region.id;
     renderAnchors();
     for (const el of dlg.querySelectorAll('[data-setting]')) {
       const k = el.dataset.setting;

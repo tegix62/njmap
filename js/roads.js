@@ -1,7 +1,6 @@
 // Major roads, read from the OpenFreeMap tiles already loaded for the
 // background map (OpenStreetMap data, OpenMapTiles schema).
 import { bearing, compass8, angleDiff } from './geo.js';
-import { ROAD_NOTES } from './knowledge.js';
 
 const MAJOR = ['motorway', 'trunk', 'primary'];
 const NAMED_REFS = {
@@ -24,6 +23,7 @@ export function normRef(raw) {
     else if ((m = p.match(/^I[ -]?(\d+)$/))) parts.push(`I-${m[1]}`);
     else if ((m = p.match(/^US[ -]?(\d+\w?)$/))) parts.push(`US ${m[1]}`);
     else if ((m = p.match(/^NJ[ -]?(\d+\w?)$/))) parts.push(`Rt ${m[1]}`);
+    else if ((m = p.match(/^NY[ -]?(\d+\w?)$/))) parts.push(`NY ${m[1]}`);
   }
   if (!parts.length) return null;
   // The Turnpike is also I-95 in places: call it the Turnpike.
@@ -34,11 +34,11 @@ export function normRef(raw) {
 }
 
 /** Draft note for a road, by name first ("Pulaski Skyway"), then each part of its label. */
-export function draftNote(label, name) {
-  if (name && ROAD_NOTES[name]) return ROAD_NOTES[name];
+export function draftNote(label, name, notes) {
+  if (name && notes[name]) return notes[name];
   if (!label) return null;
-  if (ROAD_NOTES[label]) return ROAD_NOTES[label];
-  for (const part of label.split(' / ')) if (ROAD_NOTES[part]) return ROAD_NOTES[part];
+  if (notes[label]) return notes[label];
+  for (const part of label.split(' / ')) if (notes[part]) return notes[part];
   return null;
 }
 

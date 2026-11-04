@@ -1,6 +1,10 @@
 # NJ Townfinder
 
-A phone web app for learning New Jersey's 564 municipalities and keeping your bearings while you drive.
+A phone web app for learning New Jersey's 564 municipalities and Manhattan's neighborhoods, and for keeping your bearings while you drive.
+
+**Two maps.** Switch between them in Settings → Map. When your GPS shows you've crossed into the other region's area, Drive offers a one-tap switch.
+- **New Jersey:** 564 towns, grouped by county.
+- **Manhattan:** 58 neighborhoods by the names people actually use, grouped Downtown (below 14th St), Midtown (14th–59th), Uptown (59th–110th) and Upper Manhattan.
 
 The screen is built in two layers. The first is what you can take in at a glance while driving. Everything else is one tap away, so the screen never asks you to read a paragraph at 50 mph.
 
@@ -31,6 +35,30 @@ The screen is built in two layers. The first is what you can take in at a glance
   Limit questions to a county, a region, towns within 15 miles of you, or **towns you've actually driven through**. Review is spaced over days: a right answer pushes a town's next review out to 1, 3, 7, 16, then 35 days, and a miss brings it back within 10 minutes. Mixed mode never asks the same type of question twice in a row.
 - **Your notes**: add a note to any town or road, e.g. *"Use 23 instead of 287 at rush hour"*. Notes show up in Drive and Explore. They stay on your phone; Settings can export and import them as a file.
 - **On the map**: river and lake names, and 31 landmarks (stadiums, malls, train stations, parks, colleges).
+
+## Manhattan mode
+
+- **Directions the way New Yorkers give them.** The street grid is turned about 29° clockwise from true north. Drive says *"Heading UPTOWN (NNE) · left West Side · right East Side"*, and announcements say "heading uptown".
+- **Your corner:** *"near 9th Ave & W 40th St"*, read from street names in the map data. GPS bounces off Midtown's tall buildings, so expect it to wobble a block or two there.
+- **The three crossings:**
+
+  | Crossing | Comes out | So it's for |
+  | --- | --- | --- |
+  | GWB | Washington Heights, ~178th St | Uptown |
+  | Lincoln Tunnel | Hell's Kitchen / Hudson Yards, ~39th–42nd St | Midtown |
+  | Holland Tunnel | Canal & Varick, between SoHo and Tribeca | Downtown |
+
+  The landmarks also include Penn Station, Port Authority, Grand Central, and the PATH stops at 33rd, 23rd, 14th, 9th, Christopher and WTC.
+- **Practice adds:**
+  - *Which way does 7th Ave run?* (uptown / downtown / both ways)
+  - *Which crossing lands closest to SoHo?* (only asked when one clearly does)
+  - *Point uptown* (the 29° tilt)
+  - *Which is farther uptown?*
+  - Sound-alikes: SoHo/NoHo/NoMad/Tribeca, Hudson Yards/Hudson Square/Hudson Heights, the Hills, the Heights, Kips Bay/Turtle Bay…
+- **Neighborhood map:** OpenStreetMap's neighborhood boundaries, where the smaller, more specific name wins (Times Square over Midtown). Gaps are filled from NYC's official 2020 Neighborhood Tabulation Areas. Nolita isn't in the OpenStreetMap snapshot, so it falls under Little Italy. Rebuild with `python3 scripts/build-manhattan.py` (needs `pip install shapely`).
+- **Debatable answers stay out of quizzes.** Some landmarks sit where people disagree on the neighborhood, like Penn Station (Chelsea? Midtown? the Garment District?). Those are shown on the map but never asked as "which neighborhood?".
+
+Everything Manhattan-specific lives in `js/places/manhattan.js`: crossings, avenue directions, landmarks, road notes (FDR Drive, West Side Highway / Henry Hudson Parkway, Harlem River Drive…) and sound-alikes. New Jersey's equivalent is `js/places/nj.js`.
 
 ## Design notes
 
@@ -108,6 +136,9 @@ Location only works over HTTPS (or on `localhost`). To try it on a computer, run
 | `js/style.js` | Map layers and zoom levels |
 | `js/anchors.js` | Your places |
 | `js/regions.js` | North / Central / South Jersey by county |
+| `js/region.js`, `js/places/*.js` | The active map and each region's settings, words and knowledge |
+| `js/grid.js` | Manhattan grid directions and nearest intersection |
+| `data/manhattan.topo.json` | 58 Manhattan neighborhoods in 4 areas |
 | `js/geo.js` | Distance, bearing, point-in-polygon |
 | `data/nj.topo.json` | 564 municipalities + 21 counties (TopoJSON) |
 | `data/sections.json` | Villages, sections and local names, by municipality |
@@ -118,5 +149,6 @@ Location only works over HTTPS (or on `localhost`). To try it on a computer, run
 
 - Municipal boundaries: [NJ Office of GIS](https://njogis-newjersey.opendata.arcgis.com/datasets/municipal-boundaries-of-nj-hosted-3857), via the [`@njam-data/new-jersey-municipalities`](https://www.npmjs.com/package/@njam-data/new-jersey-municipalities) package. Population figures are from the 2010 Census.
 - Village and section names: the NJ local place-name list from [HackJersey/garden-style](https://github.com/HackJersey/garden-style) (MIT). Post office names from the [`zipcodes`](https://www.npmjs.com/package/zipcodes) package (BSD) and [GeoNames](https://www.geonames.org/) (CC-BY 4.0), via [`cities.json`](https://www.npmjs.com/package/cities.json), decide which names count as well known.
+- Manhattan neighborhoods: © OpenStreetMap contributors (ODbL), via an Overpass snapshot from January 2019, with gaps filled from NYC Department of City Planning's 2020 Neighborhood Tabulation Areas (public domain).
 - Background map: © OpenStreetMap contributors, via [OpenFreeMap](https://openfreemap.org/) (free, no API key).
 - [MapLibre GL JS](https://maplibre.org/) (BSD-3), [topojson-client](https://github.com/topojson/topojson-client) (ISC), Noto Sans (SIL OFL). Their licenses are in `lib/` and `fonts/`.

@@ -1,6 +1,6 @@
 import { bearing, distanceMi, compass8, compass16, angleDiff, dirWord, destination as destinationPt } from './geo.js';
 import { THEME } from './theme.js';
-import { REGIONS } from './regions.js';
+import { gridY } from './grid.js';
 
 const L = THEME.label;
 
@@ -15,14 +15,23 @@ const TYPES = {
   landmark: 'Where is this landmark?',
   north: 'Which is farther north/east?',
   point: 'Point to it',
+  avedir: 'Which way does the avenue run?',
+  crossing: 'Which crossing lands closest?',
+  uptown: 'Point uptown',
   trip: 'My last drive',
 };
+const WEIGHT = { find: 2, dir: 2, borders: 2, north: 2, point: 2 };
 const DIR8 = ['NW', 'N', 'NE', 'W', '', 'E', 'SW', 'S', 'SE'];
 const DIR_DEG = { N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315 };
 
 export function initPractice(ctx) {
   const { map, store, munis } = ctx;
-  const cfg = { type: 'mix', area: 'all', ...store.get('practice', {}) };
+  const R = ctx.region;
+  const CFG_KEY = R.id === 'nj' ? 'practice' : `practice.${R.id}`;
+  const cfg = { type: 'mix', area: 'all', ...store.get(CFG_KEY, {}) };
+  const SC = R.gridAngle ? 0.12 : 1; // Manhattan distances are short
+  const allowed = ['mix', ...R.quizTypes, 'trip'];
+  if (!allowed.includes(cfg.type)) cfg.type = 'mix';
   const score = { right: 0, total: 0, streak: 0 };
   let q = null;
   const recent = [];
@@ -61,12 +70,12 @@ export function initPractice(ctx) {
     let p = munis;
     if (a.startsWith('county:')) p = munis.filter((m) => m.c === a.slice(7));
     else if (a.startsWith('region:')) {
-      const cs = REGIONS[a.slice(7)];
+      const cs = (R.superGroups || {})[a.slice(7)] || [];
       p = munis.filter((m) => cs.includes(m.c));
     } else if (a === 'visited') {
       const v = ctx.modes.drive.visited;
       p = munis.filter((m) => v[m.key]);
-    } else if (a === 'near' && ctx.pos) p = munis.filter((m) => distanceMi(ctx.pos.pt, m.pt) <= 15);
+    } else if (a === 'near' && ctx.pos) p = munis.filter((m) => distanceMi(ctx.pos.pt, m.pt) <= R.nearMi);
     return p.length >= 4 ? p : munis;
   }
 
@@ -148,9 +157,10 @@ export function initPractice(ctx) {
     const twins = (ctx.confusables.byId.get(a.id) || [])
       .filter((g) => g.curated)
       .flatMap((g) => g.members)
-      .filter((o) => o.n !== a.n && distanceMi(a.pt, o.pt) > 3);
-    let cands = p.filter((o) => o !== a && distanceMi(a.pt, o.pt) > 2.5 && distanceMi(a.pt, o.pt) < 35);
-    if (!cands.length) cands = munis.filter((o) => o !== a && distanceMi(a.pt, o.pt) > 2.5 && distanceMi(a.pt, o.pt) < 35);
+      .filter((o) => o.n !== a.n && distanceMi(a.pt, o.pt) > 3 * SC);
+    const okD = (o) => o !== a && distanceMi(a.pt, o.pt) > 2.5 * SC && distanceMi(a.pt, o.pt) < 35 * SC;
+    let cands = p.filter(okD);
+    if (!cands.length) cands = munis.filter(okD);
     const b = twins.length && Math.random() < 0.35 ? rand(twins) : rand(cands);
     return { kind: 'dir', m: a, b };
   }
@@ -183,8 +193,10 @@ export function initPractice(ctx) {
   /** "Willowbrook Mall is in which town?" */
   function makeLandmark(p) {
     const ids = new Set(p.map((m) => m.id));
-    const local = ctx.landmarks.filter((l) => ids.has(l.m.id));
-    const l = rand(local.length ? local : ctx.landmarks);
+    // Skip debatable ones, and giveaways (Times Square is in… Times Square)
+    const quizzable = ctx.landmarks.filter((l) => l.quiz !== false && !l.name.toLowerCase().includes(l.m.n.toLowerCase()));
+    const local = quizzable.filter((l) => ids.has(l.m.id));
+    const l = rand(local.length ? local : quizzable);
     const m = l.m;
     const others = [...shuffle([...m.neighbors]), ...shuffle(munis.filter((o) => o.c === m.c))].filter((o, i, a) => o !== m && a.indexOf(o) === i);
     return { kind: 'landmark', m, landmark: l, choices: shuffle([m, ...others.slice(0, 3)]) };
@@ -197,6 +209,7 @@ export function initPractice(ctx) {
    * the towns say the other.
    */
   function makeNorth(p) {
+    if (R.gridAngle) return makeUptownPair(p);
     const axis = Math.random() < 0.6 ? 'N' : 'E';
     const i = axis === 'N' ? 1 : 0;
     const k = axis === 'N' ? 69.05 : 69.17 * Math.cos(0.7115); // mi per degree at NJ's latitude
@@ -222,6 +235,42 @@ export function initPractice(ctx) {
     return { kind: 'north', axis, m: win, other: lose, diff: Math.abs(best.d), tricky: best.tricky, choices: shuffle([best.a, best.b]) };
   }
 
+  /** Manhattan: "Which is farther uptown?" measured along the grid. */
+  function makeUptownPair(p) {
+    for (let tries = 0; tries < 300; tries++) {
+      const a = rand(p);
+      const b = rand(p);
+      if (a === b || distanceMi(a.pt, b.pt) > 3.5) continue;
+      const d = gridY(a.pt, R.gridAngle) - gridY(b.pt, R.gridAngle);
+      if (Math.abs(d) < 0.25) continue;
+      const win = d > 0 ? a : b;
+      remember(win);
+      return { kind: 'north', axis: 'U', m: win, other: win === a ? b : a, diff: Math.abs(d), tricky: false, choices: shuffle([a, b]) };
+    }
+    return makeDir(p);
+  }
+
+  /** Manhattan: "Which way does 7th Ave run?" */
+  function makeAveDir() {
+    const [name, dir] = rand(R.avenues);
+    return { kind: 'avedir', m: { key: `ave:${name}` }, name, dir };
+  }
+
+  /** Manhattan: "Which crossing lands closest to SoHo?" (only when one clearly does) */
+  function makeCrossing(p) {
+    for (let tries = 0; tries < 200; tries++) {
+      const m = pick(p);
+      const ds = R.crossings.map((c, i) => ({ c, i, d: distanceMi(c.pt, m.pt) })).sort((a, b) => a.d - b.d);
+      if (ds[1].d / ds[0].d >= 1.6) return { kind: 'crossing', m, ds, right: ds[0].i };
+    }
+    return makeFind(p);
+  }
+
+  /** Manhattan: "Point uptown." The grid is turned ~29° from true north. */
+  function makeUptown() {
+    return { kind: 'uptown', m: { key: 'uptown' }, angle: null };
+  }
+
   /**
    * "Point to Paterson" from you, one of your places, or a town. Practice with
    * feedback measurably improves spatial skills (Uttal et al., 2013).
@@ -235,7 +284,7 @@ export function initPractice(ctx) {
       const m = pick(p);
       from = { name: m.n, pt: m.pt, m };
     }
-    const near = (list) => list.filter((o) => o !== from.m && distanceMi(from.pt, o.pt) > 3 && distanceMi(from.pt, o.pt) < 30);
+    const near = (list) => list.filter((o) => o !== from.m && distanceMi(from.pt, o.pt) > 3 * SC && distanceMi(from.pt, o.pt) < 30 * SC);
     const cands = near(p).length ? near(p) : near(munis);
     const m = cands.length ? pick(cands) : rand(munis);
     return { kind: 'point', m, from, angle: null };
@@ -283,7 +332,7 @@ export function initPractice(ctx) {
     // (interleaving helps tell similar things apart; Kornell & Bjork, 2008).
     let t = cfg.type;
     if (t === 'mix') {
-      const bag = ['find', 'find', 'name', 'dir', 'dir', 'borders', 'borders', 'confuse', 'section', 'landmark', 'north', 'north', 'point', 'point'];
+      const bag = R.quizTypes.flatMap((k) => Array(WEIGHT[k] || 1).fill(k));
       do t = rand(bag);
       while (t === lastType);
     }
@@ -299,6 +348,9 @@ export function initPractice(ctx) {
       north: makeNorth,
       point: makePoint,
       trip: makeTrip,
+      avedir: makeAveDir,
+      crossing: makeCrossing,
+      uptown: makeUptown,
     }[t](p);
     q.p = p;
     q.answered = false;
@@ -314,15 +366,15 @@ export function initPractice(ctx) {
     const nVisited = Object.keys(ctx.modes.drive.visited).length;
     const areaOpt = (v, label) => `<option value="${v}"${cfg.area === v ? ' selected' : ''}>${esc(label)}</option>`;
     const area =
-      areaOpt('all', 'All of New Jersey') +
-      (ctx.pos ? areaOpt('near', 'Within 15 mi of me') : '') +
-      areaOpt('visited', `Towns I've driven through (${nVisited})`) +
-      `<optgroup label="Regions">${Object.keys(REGIONS).map((r) => areaOpt('region:' + r, r)).join('')}</optgroup>` +
-      `<optgroup label="Counties">${ctx.counties.map((c) => areaOpt('county:' + c, c + ' County')).join('')}</optgroup>`;
+      areaOpt('all', `All of ${R.name}`) +
+      (ctx.pos ? areaOpt('near', `Within ${R.nearMi} mi of me`) : '') +
+      areaOpt('visited', `${R.units[0].toUpperCase() + R.units.slice(1)} I've been through (${nVisited})`) +
+      (R.superGroups ? `<optgroup label="Regions">${Object.keys(R.superGroups).map((r) => areaOpt('region:' + r, r)).join('')}</optgroup>` : '') +
+      `<optgroup label="${R.groupPlural}">${ctx.counties.map((c) => areaOpt('county:' + c, ctx.groupName(c))).join('')}</optgroup>`;
     const pct = score.total ? Math.round((100 * score.right) / score.total) : 0;
     const due = dueCount(pool());
     return `<div class="prow">
-        <select id="qType" aria-label="Question type">${opts(TYPES)}</select>
+        <select id="qType" aria-label="Question type">${opts(Object.fromEntries(allowed.map((k) => [k, TYPES[k]])))}</select>
         <select id="qArea" aria-label="Area">${area}</select>
       </div>
       <div class="score">${due ? `<span class="due">${due} due for review</span> · ` : ''}${score.right}/${score.total}${score.total ? ` · ${pct}%` : ''}${score.streak > 1 ? ` · streak ${score.streak}` : ''}</div>`;
@@ -331,14 +383,14 @@ export function initPractice(ctx) {
   function bindHeader() {
     document.getElementById('qType').addEventListener('change', (e) => {
       cfg.type = e.target.value;
-      store.set('practice', cfg);
+      store.set(CFG_KEY, cfg);
       next();
     });
     document.getElementById('qArea').addEventListener('change', (e) => {
       cfg.area = e.target.value;
-      store.set('practice', cfg);
+      store.set(CFG_KEY, cfg);
       if (cfg.area === 'visited' && Object.keys(ctx.modes.drive.visited).length < 4)
-        alert('Fewer than 4 towns visited so far. Use Drive mode with location on, and towns you pass through will collect here. Using all of NJ for now.');
+        alert(`Fewer than 4 ${R.units} visited so far. Use Drive mode with location on, and the ${R.units} you pass through will collect here. Using all of ${R.name} for now.`);
       next();
     });
   }
@@ -374,10 +426,23 @@ export function initPractice(ctx) {
       ctx.hud(`<div class="qkind">Borders</div><div class="q">Which of these borders ${prompt(m)}?</div>`);
       body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
     } else if (q.kind === 'landmark') {
-      ctx.hud(`<div class="qkind">Landmarks</div><div class="q"><b>${esc(q.landmark.name)}</b> is in which town?</div>`);
+      ctx.hud(`<div class="qkind">Landmarks</div><div class="q"><b>${esc(q.landmark.name)}</b> is in which ${R.unit}?</div>`);
       body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
+    } else if (q.kind === 'avedir') {
+      ctx.hud(`<div class="qkind">Avenues</div><div class="q">Which way does <b>${esc(q.name)}</b> run?</div>`);
+      body = `<div class="choices three">${['uptown', 'downtown', 'two-way']
+        .map((v) => `<button class="choice" data-v="${v}">${v === 'two-way' ? 'Both ways' : v[0].toUpperCase() + v.slice(1)}</button>`)
+        .join('')}</div>`;
+    } else if (q.kind === 'crossing') {
+      ctx.highlight(m.id, 'q');
+      ctx.reveal([{ m, color: L.q }]);
+      ctx.hud(`<div class="qkind">Crossings</div><div class="q">Coming from Jersey, which crossing lands closest to <b>${esc(m.n)}</b>?</div>`);
+      body = `<div class="choices three">${R.crossings.map((c, i) => `<button class="choice" data-v="${i}">${esc(c.short)}</button>`).join('')}</div>`;
+    } else if (q.kind === 'uptown') {
+      ctx.hud(`<div class="qkind">The grid</div><div class="q">Point <b>uptown</b>: the way the avenues run</div>`);
+      body = `${dialSVG()}<button class="primary" id="lockIn" disabled>Lock in</button>`;
     } else if (q.kind === 'north') {
-      const word = q.axis === 'N' ? 'north' : 'east';
+      const word = q.axis === 'N' ? 'north' : q.axis === 'U' ? 'uptown' : 'east';
       ctx.hud(`<div class="qkind">Farther ${word}?</div><div class="q">Which is farther <b>${word}</b>?</div>`);
       body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
     } else if (q.kind === 'point') {
@@ -392,7 +457,7 @@ export function initPractice(ctx) {
       showTripLine(q.trip);
       ctx.reveal(q.towns.map((x, k) => ({ m: x.m, label: `${k + 1}. ${x.m.n}`, color: L.neutral })));
       const when = new Date(q.trip.start).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
-      ctx.hud(`<div class="qkind">My last drive · ${esc(when)}</div><div class="q">${q.towns.length} towns, in order</div>`);
+      ctx.hud(`<div class="qkind">My last drive · ${esc(when)}</div><div class="q">${q.towns.length} ${R.units}, in order</div>`);
       body = `<ol class="triplist">${q.towns
         .map((x, k) => `<li><b>${esc(ctx.name(x.m))}</b> <span class="muted">${esc(x.m.c)}${k && x.h != null ? ` · heading ${compass8(x.h)}` : ''}</span></li>`)
         .join('')}</ol><button class="primary" id="tripQuiz">Quiz me on this drive</button>`;
@@ -420,7 +485,7 @@ export function initPractice(ctx) {
     ctx.sheet(`${header()}<div id="qbody">${body}</div>`);
     bindHeader();
     for (const b of document.querySelectorAll('#qbody .choice')) b.addEventListener('click', () => answer(b));
-    if (q.kind === 'point') bindDial();
+    if (q.kind === 'point' || q.kind === 'uptown') bindDial();
     const tq = document.getElementById('tripQuiz');
     if (tq) tq.addEventListener('click', next);
 
@@ -429,7 +494,9 @@ export function initPractice(ctx) {
       if (q.kind === 'find') ctx.fit([areaBox(q.p)], 12);
       else if (q.kind === 'sec' || q.kind === 'landmark') ctx.fit([{ bbox: countyBox[m.c] }], 12);
       else if (q.kind === 'borders') ctx.fit([m, ...q.choices], 12.5);
-      else if (q.kind === 'north') ctx.fit(q.choices, 12);
+      else if (q.kind === 'north') ctx.fit(q.choices, 15);
+      else if (q.kind === 'crossing') ctx.fit([m, ...R.crossings.map((c) => c.pt)], 14);
+      else if (q.kind === 'avedir' || q.kind === 'uptown') ctx.fit([{ bbox: [R.bounds[0][0], R.bounds[0][1], R.bounds[1][0], R.bounds[1][1]] }], 13);
       else if (q.kind === 'point') ctx.fit([aroundBox(q.from.pt, distanceMi(q.from.pt, m.pt) * 1.3)], 13);
       else if (q.kind.startsWith('trip') && q.trip) ctx.fit([{ bbox: tripBox(q.trip) }], 13);
       else if (q.kind === 'name') ctx.fit(q.group ? q.group.members : [{ bbox: countyBox[m.c] }, m], 12.5);
@@ -472,7 +539,7 @@ export function initPractice(ctx) {
       if (!ok) {
         ctx.highlight(pickd.id, 'bad');
         items.push({ m: pickd, color: L.bad });
-        html += ` ${esc(pickd.n)} is ${ctx.relative(m.pt, pickd.pt).text} of here, in ${esc(pickd.c)} County.`;
+        html += ` ${esc(pickd.n)} is ${ctx.relative(m.pt, pickd.pt).text} of here, in ${esc(ctx.groupName(pickd.c))}.`;
         ctx.line([m.pt, pickd.pt]);
       }
       if (q.group) {
@@ -514,7 +581,7 @@ export function initPractice(ctx) {
       document.querySelector(`#qbody .choice[data-id="${m.id}"]`).classList.add('right');
       ctx.highlight(m.id, 'good');
       const items = [{ m, color: L.good }, { m, pt: l.pt, label: l.name, color: L.place }];
-      let html = `${ok ? '✓' : '✗'} <b>${esc(l.name)}</b> (${esc(l.kind.toLowerCase())}) is in <b>${esc(m.full)}</b>, ${esc(m.c)} County.`;
+      let html = `${ok ? '✓' : '✗'} <b>${esc(l.name)}</b> (${esc(l.kind.toLowerCase())}) is in <b>${esc(m.full)}</b>, ${esc(ctx.groupName(m.c))}.`;
       if (!ok) {
         ctx.highlight(pickd.id, 'bad');
         items.push({ m: pickd, color: L.bad });
@@ -523,10 +590,29 @@ export function initPractice(ctx) {
       ctx.reveal(items);
       feedback(ok, html);
       ctx.fit(ok ? [m] : [m, pickd], 13);
+    } else if (q.kind === 'avedir') {
+      const ok = btn.dataset.v === q.dir;
+      record(m, ok);
+      btn.classList.add(ok ? 'right' : 'wrong');
+      document.querySelector(`#qbody .choice[data-v="${q.dir}"]`).classList.add('right');
+      const said = q.dir === 'two-way' ? 'both ways' : q.dir;
+      feedback(ok, `${ok ? '✓' : '✗'} <b>${esc(q.name)}</b> runs <b>${said}</b>.<div class="note">${esc(R.avenueNote)}</div>`);
+    } else if (q.kind === 'crossing') {
+      const ok = +btn.dataset.v === q.right;
+      record(m, ok);
+      btn.classList.add(ok ? 'right' : 'wrong');
+      document.querySelector(`#qbody .choice[data-v="${q.right}"]`).classList.add('right');
+      ctx.highlight(m.id, 'good');
+      const best = R.crossings[q.right];
+      ctx.reveal([{ m, color: L.good }, ...R.crossings.map((c, i) => ({ m, pt: c.pt, label: c.short, color: i === q.right ? L.good : L.neutral }))]);
+      ctx.line([best.pt, m.pt]);
+      const list = q.ds.map((x) => `${x.c.short} ${x.d.toFixed(1)} mi`).join(' · ');
+      feedback(ok, `${ok ? '✓' : '✗'} The <b>${esc(best.name)}</b>. Distances to ${esc(m.n)}: ${list}.<div class="note">${esc(best.note)}</div>`);
+      ctx.fit([m, ...R.crossings.map((c) => c.pt)], 14);
     } else if (q.kind === 'north') {
       const pickd = munis[+btn.dataset.id];
       const ok = pickd === m;
-      const word = q.axis === 'N' ? 'north' : 'east';
+      const word = q.axis === 'N' ? 'north' : q.axis === 'U' ? 'uptown' : 'east';
       record(m, ok);
       btn.classList.add(ok ? 'right' : 'wrong');
       document.querySelector(`#qbody .choice[data-id="${m.id}"]`).classList.add('right');
@@ -538,12 +624,12 @@ export function initPractice(ctx) {
       ]);
       // Draw the line of latitude (or longitude) through the farther one.
       const o = q.other.pt;
-      ctx.line(q.axis === 'N' ? [[o[0] - 0.08, m.pt[1]], [o[0] + 0.08, m.pt[1]]] : [[m.pt[0], o[1] - 0.06], [m.pt[0], o[1] + 0.06]]);
+      if (q.axis !== 'U') ctx.line(q.axis === 'N' ? [[o[0] - 0.08, m.pt[1]], [o[0] + 0.08, m.pt[1]]] : [[m.pt[0], o[1] - 0.06], [m.pt[0], o[1] + 0.06]]);
       let html = `${ok ? '✓' : '✗'} <b>${esc(m.n)}</b> is ${q.diff.toFixed(1)} mi farther ${word} than ${esc(q.other.n)}.`;
       if (q.tricky)
-        html += `<div class="note">The trap: ${esc(q.other.c)} County as a whole sits farther ${word} than ${esc(m.c)} County, but these two towns don't follow their counties.</div>`;
+        html += `<div class="note">The trap: ${esc(ctx.groupName(q.other.c))} as a whole sits farther ${word} than ${esc(ctx.groupName(m.c))}, but these two don't follow their ${esc(ctx.region.groupPlural.toLowerCase())}.</div>`;
       feedback(ok, html);
-      ctx.fit(q.choices, 12);
+      ctx.fit(q.choices, 15);
     } else if (q.kind === 'triphead') {
       const brg = q.heading;
       const diff = Math.abs(angleDiff(DIR_DEG[btn.dataset.dir], brg));
@@ -579,7 +665,7 @@ export function initPractice(ctx) {
       const items = [{ m, color: L.good }];
       const placed = ctx.placedSections(m).get(name.toLowerCase());
       if (placed) items.push({ m, pt: placed.pt, label: name, color: L.place });
-      let html = `${ok ? '✓' : '✗'} <b>${esc(name)}</b> is part of <b>${esc(m.full)}</b>, ${esc(m.c)} County.`;
+      let html = `${ok ? '✓' : '✗'} <b>${esc(name)}</b> is part of <b>${esc(m.full)}</b>, ${esc(ctx.groupName(m.c))}.`;
       if (!ok) {
         ctx.highlight(pickd.id, 'bad');
         items.push({ m: pickd, color: L.bad });
@@ -676,6 +762,7 @@ export function initPractice(ctx) {
   }
   function answerPoint() {
     if (q.answered || q.angle == null) return;
+    if (q.kind === 'uptown') return answerUptown();
     const m = q.m;
     const truth = bearing(q.from.pt, m.pt);
     const err = Math.abs(angleDiff(q.angle, truth));
@@ -701,6 +788,21 @@ export function initPractice(ctx) {
       `${ok ? '✓' : err <= 45 ? '≈' : '✗'} You were <b>${Math.round(err)}°</b> off. <b>${esc(m.n)}</b> is ${d < 10 ? d.toFixed(1) : Math.round(d)} mi <b>${dirWord(compass16(truth))}</b> (${Math.round(truth)}°) of ${esc(from)}.`
     );
     ctx.fit([m, q.from.pt], 12);
+  }
+
+  function answerUptown() {
+    const truth = R.gridAngle;
+    const err = Math.abs(angleDiff(q.angle, truth));
+    const ok = err <= 12;
+    record(q.m, ok);
+    const t = document.getElementById('truth');
+    t.style.display = '';
+    t.setAttribute('transform', `rotate(${truth})`);
+    document.getElementById('lockIn').remove();
+    feedback(
+      ok,
+      `${ok ? '✓' : '✗'} You were <b>${Math.round(err)}°</b> off. Uptown is about <b>${truth}° east of true north</b> (roughly NNE): the whole street grid is turned that much. So "north" on your phone's compass is not quite "uptown".`
+    );
   }
 
   function contrast(g, m) {

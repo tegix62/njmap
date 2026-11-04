@@ -39,7 +39,7 @@ export function initExplore(ctx) {
     o.value = label;
     list.appendChild(o);
   };
-  for (const m of [...ctx.munis].sort((a, b) => a.n.localeCompare(b.n))) addOption(`${m.full}, ${m.c} County`, { m });
+  for (const m of [...ctx.munis].sort((a, b) => a.n.localeCompare(b.n))) addOption(`${m.full}, ${ctx.groupName(m.c)}`, { m });
   const extra = [];
   for (const m of ctx.munis) for (const s of m.sections) extra.push([`${s.name} — part of ${m.full}, ${m.c} Co.`, { m, section: s.name }]);
   for (const l of ctx.landmarks) extra.push([`${l.name} — ${l.m.n}`, { m: l.m, landmark: l }]);
@@ -100,7 +100,7 @@ export function initExplore(ctx) {
   function compassGrid(m) {
     const cells = Object.fromEntries(GRID.filter(Boolean).map((d) => [d, []]));
     for (const o of m.neighbors) cells[compass8(bearing(m.pt, o.pt))].push(o);
-    return `<div class="ncompass" role="group" aria-label="Bordering towns by direction">${GRID.map((d) => {
+    return `<div class="ncompass" role="group" aria-label="Bordering ${ctx.region.units} by direction">${GRID.map((d) => {
       if (!d) return `<div class="ncell mid">${esc(m.n)}</div>`;
       const os = cells[d].sort((a, b) => b.p - a.p);
       if (!os.length) return `<div class="ncell empty"></div>`;
@@ -140,7 +140,7 @@ export function initExplore(ctx) {
         .map((x) => `<button class="chip${x.label === roadSel ? ' on' : ''}" data-road="${esc(x.label)}">${esc(x.label)}</button>`)
         .join('')}</div>${
         r
-          ? `${noteCards('road', r.label, draftNote(r.label, r.name)) || '<div class="hint muted">No notes yet.</div>'}
+          ? `${noteCards('road', r.label, draftNote(r.label, r.name, ctx.region.roadNotes)) || '<div class="hint muted">No notes yet.</div>'}
              <button class="addnote" data-note="road" data-key="${esc(r.label)}">＋ Note about ${esc(r.label)}</button>`
           : '<div class="hint muted">Tap a road to highlight it and see notes.</div>'
       }`;
@@ -167,10 +167,13 @@ export function initExplore(ctx) {
   }
 
   function render() {
-    const search = `<input id="search" type="search" list="townlist" placeholder="Search a town, village or landmark…" autocomplete="off" enterkeyhint="go">`;
+    const R = ctx.region;
+    const search = `<input id="search" type="search" list="townlist" placeholder="${R.sections ? 'Search a town, village or landmark…' : `Search a ${R.unit} or landmark…`}" autocomplete="off" enterkeyhint="go">`;
     if (!sel) {
       ctx.hud(
-        `${search}<div class="meta">Tap anywhere on the map to see which town it is and what surrounds it. Search also finds villages ("Towaco") and landmarks ("Willowbrook").</div>`
+        `${search}<div class="meta">Tap anywhere on the map to see which ${R.unit} it is and what surrounds it. ${
+          R.sections ? 'Search also finds villages ("Towaco") and landmarks ("Willowbrook").' : 'Search also finds landmarks ("Penn Station").'
+        }</div>`
       );
     } else {
       const m = sel;
@@ -188,7 +191,7 @@ export function initExplore(ctx) {
       ctx.hud(
         `${search}
          <div class="town">${esc(m.n)}</div>
-         <div class="meta">${esc(m.t)} · <b>${esc(m.c)} County</b>${from}</div>
+         <div class="meta">${esc(m.t)} · <b>${esc(ctx.groupName(m.c))}</b>${from}</div>
          ${compassGrid(m)}
          <div class="dtabs">${tabs
            .map(([k, label, n]) => `<button data-tab="${k}" aria-pressed="${tab === k}">${label}${n ? `<span class="n">${n}</span>` : ''}</button>`)
@@ -208,10 +211,10 @@ export function initExplore(ctx) {
       input.blur();
       select(hit.m);
       if (hit.section) {
-        ctx.toast(`${hit.section} is part of ${hit.m.full}, ${hit.m.c} County`);
+        ctx.toast(`${hit.section} is part of ${hit.m.full}, ${ctx.groupName(hit.m.c)}`);
         showSection(hit.m, hit.section);
       } else if (hit.landmark) {
-        ctx.toast(`${hit.landmark.name} is in ${hit.m.full}, ${hit.m.c} County`);
+        ctx.toast(`${hit.landmark.name} is in ${hit.m.full}, ${ctx.groupName(hit.m.c)}`);
         map.once('moveend', () => showLandmark(hit.landmark));
       }
     });

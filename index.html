@@ -55,6 +55,12 @@
 
     <dialog id="settings">
       <h2>Settings</h2>
+      <label class="row regionrow">Map
+        <select id="regionSel" aria-label="Region">
+          <option value="nj">New Jersey (towns)</option>
+          <option value="manhattan">Manhattan (neighborhoods)</option>
+        </select>
+      </label>
       <label class="row"><input type="checkbox" data-setting="voice" /> Speak when I cross into a new town</label>
       <label class="row sub"><input type="checkbox" data-setting="voiceGuess" /> …but ask me first (“New town. Which one?”), pause, then say it</label>
       <label class="row sub"><input type="checkbox" data-setting="voiceHints" /> …and name its sound-alike (“Not Rockaway — that's 19 miles west-northwest”)</label>

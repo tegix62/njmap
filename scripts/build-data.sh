@@ -17,7 +17,7 @@ SRC="$WORK/package/data/new-jersey-municipalities.geojson"
 # - Boundaries are simplified with a 10 m tolerance (keeps "which town am I in"
 #   answers accurate to well under typical phone-GPS error near a border).
 npx --yes mapshaper@0.6 -i "$SRC" name=munis \
-  -each 'if (mun_label=="Pine Valley Borough") {mun_label="Pine Hill Borough"}' \
+  -each 'if (mun_label=="Pine Valley Borough") {mun_label="Pine Hill Borough"; gnis_name="Borough of Pine Hill"}' \
   -dissolve2 fields=mun_label,county copy-fields=mun_type,gnis_name sum-fields=pop2010 \
   -simplify interval=10 keep-shapes \
   -each '

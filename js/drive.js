@@ -2,13 +2,17 @@
 import { bearing, destination, distanceMi, compass8, compass16, dirWord, angleDiff } from './geo.js';
 import { nearbyRoads, alongRoad, travelDir, draftNote } from './roads.js';
 import { editNote } from './notes.js';
+import { gridDir, gridSide, intersection } from './grid.js';
+import { ALL_REGIONS, switchRegion } from './region.js';
 
 const MIN_MOVING_MPS = 2; // ~4.5 mph; below this GPS course is noise
 const LOOK_STEP_MI = 0.08;
 const GUESS_PAUSE_MS = 4000;
 
 export function initDrive(ctx) {
-  const { map, settings, store } = ctx;
+  const { map, settings, store, region } = ctx;
+  const GRID = region.gridAngle; // Manhattan: directions by the street grid
+  const SCALE = GRID ? 0.25 : 1; // city distances are short
   const st = {
     watchId: null,
     cur: null, // municipality we're in
@@ -183,6 +187,7 @@ export function initDrive(ctx) {
     if (now - st.lookAt > 2000) {
       st.look = lookAround(pt, st.heading);
       st.near = nearestSection(pt, st.cur);
+      if (GRID) st.corner = intersection(map, pt);
       updateRoads(pt);
       st.lookAt = now;
     }
@@ -215,14 +220,14 @@ export function initDrive(ctx) {
 
   function announce(m, prev) {
     if (!m) {
-      ctx.speak('Leaving New Jersey.');
+      ctx.speak(region.leaving);
       return;
     }
     let s = `Entering ${m.n}`;
     if (m.dup) s += ` ${m.t}`;
-    if (!prev || prev.c !== m.c) s += `, ${m.c} County`;
+    if (!prev || prev.c !== m.c) s += `, ${region.spokenGroup(m.c)}`;
     s += '.';
-    if (st.heading != null && st.gpsHeading) s += ` Heading ${dirWord(compass8(st.heading))}.`;
+    if (st.heading != null && st.gpsHeading) s += ` Heading ${GRID ? gridDir(st.heading, GRID) : dirWord(compass8(st.heading))}.`;
     if (settings.voiceHints) {
       const twin = confusedWith(m);
       if (twin) s += ` Not ${twin.n} — that's ${ctx.relative(m.pt, twin.pt).words}.`;
@@ -233,7 +238,8 @@ export function initDrive(ctx) {
       // (Ishikawa et al., 2008; Dahmani & Bohbot, 2020).
       clearTimeout(st.guessTimer);
       st.guessing = m;
-      ctx.speak(prev && prev.c !== m.c ? 'New town, and a new county. Which one?' : 'New town. Which one?');
+      const unit = region.unit === 'town' ? 'town' : 'neighborhood';
+      ctx.speak(prev && prev.c !== m.c && !GRID ? `New ${unit}, and a new county. Which one?` : `New ${unit}. Which one?`);
       st.guessTimer = setTimeout(() => {
         st.guessing = null;
         ctx.speak(s);
@@ -251,7 +257,7 @@ export function initDrive(ctx) {
   function confusedWith(m) {
     for (const g of ctx.confusables.byId.get(m.id) || []) {
       if (!g.curated) continue;
-      const others = g.members.filter((o) => o.n !== m.n && distanceMi(m.pt, o.pt) > 3).sort((a, b) => b.p - a.p);
+      const others = g.members.filter((o) => o.n !== m.n && distanceMi(m.pt, o.pt) > 3 * SCALE).sort((a, b) => b.p - a.p);
       if (others.length) return others[0];
     }
     return null;
@@ -260,7 +266,8 @@ export function initDrive(ctx) {
   // ---- what's ahead / left / right -----------------------------------------
   function probe(pt, dir, maxMi) {
     const here = ctx.locate(pt);
-    for (let d = LOOK_STEP_MI; d <= maxMi; d += LOOK_STEP_MI) {
+    const step = LOOK_STEP_MI * SCALE;
+    for (let d = step; d <= maxMi * SCALE; d += step) {
       const m = ctx.locate(destination(pt, dir, d));
       if (m !== here) return { m, d, dir };
     }
@@ -288,7 +295,7 @@ export function initDrive(ctx) {
     const spoken = store.get('spokenRoads', {});
     if (spoken[r.label]) return;
     const mine = ctx.notes.list('road', r.label);
-    const note = mine.length ? mine[mine.length - 1].text : draftNote(r.label, r.name);
+    const note = mine.length ? mine[mine.length - 1].text : draftNote(r.label, r.name, ctx.region.roadNotes);
     if (!note) return;
     spoken[r.label] = Date.now();
     store.set('spokenRoads', spoken);
@@ -389,7 +396,7 @@ export function initDrive(ctx) {
       duration,
       essential: true,
     };
-    if (map.getZoom() < 11) opts.zoom = 12.5;
+    if (map.getZoom() < region.driveZoom - 1.5) opts.zoom = region.driveZoom;
     map.easeTo(opts);
   }
   map.on('dragstart', () => {
@@ -423,7 +430,7 @@ export function initDrive(ctx) {
   const mi = (d) => (d < 0.1 ? '<0.1 mi' : d < 10 ? `${d.toFixed(1)} mi` : `${Math.round(d)} mi`);
   function sideCell(cls, label, r) {
     if (!r) return `<div class="look ${cls}"><span class="k">${label}</span><span class="v muted">—</span></div>`;
-    const name = r.m ? esc(ctx.name(r.m)) : 'NJ line / water';
+    const name = r.m ? esc(ctx.name(r.m)) : esc(region.edgeName);
     return `<div class="look ${cls}"><span class="k">${label} <b>${compass8(r.dir)}</b></span><span class="v">${name}</span><span class="d">${mi(r.d)}</span></div>`;
   }
 
@@ -454,7 +461,7 @@ export function initDrive(ctx) {
       : '';
     const road = st.roads.find((r) => r.label === st.onRoad) || st.roads[0];
     const roadNotes = road
-      ? `<div class="label-sm">${esc(road.label)}</div>${noteCards('road', road.label, draftNote(road.label, road.name))}
+      ? `<div class="label-sm">${esc(road.label)}</div>${noteCards('road', road.label, draftNote(road.label, road.name, ctx.region.roadNotes))}
          <button class="addnote" data-note="road" data-key="${esc(road.label)}">＋ Note about ${esc(road.label)}</button>`
       : '';
     const townNotes = m
@@ -475,7 +482,7 @@ export function initDrive(ctx) {
     if (!tracking) {
       ctx.hud(
         `<div class="town">Where am I?</div>
-         <div class="meta">${st.error ? esc(st.error) : 'Shows the town and county you are in, which way you are heading, and the main road nearby. Your location never leaves this phone.'}</div>
+         <div class="meta">${st.error ? esc(st.error) : `Shows the ${region.unit} you are in, which way you are heading, and the main road nearby. Your location never leaves this phone.`}</div>
          <button class="primary" id="startBtn">Start</button>`
       );
       document.getElementById('startBtn').addEventListener('click', start);
@@ -492,7 +499,10 @@ export function initDrive(ctx) {
     const head =
       h == null
         ? `<div class="heading muted">Heading appears once you start moving</div>`
-        : `<div class="heading">Heading <b>${dirWord(compass8(h)).toUpperCase()}</b> <span class="lr-key">· left <b>${compass8(h - 90)}</b> · right <b>${compass8(h + 90)}</b></span></div>`;
+        : GRID
+          ? // Manhattan: the grid's words, with the true compass direction small
+            `<div class="heading">Heading <b>${gridDir(h, GRID).toUpperCase()}</b> <span class="deg">${compass16(h)}</span> <span class="lr-key">· left <b>${gridSide(h - 90, GRID)}</b> · right <b>${gridSide(h + 90, GRID)}</b></span></div>`
+          : `<div class="heading">Heading <b>${dirWord(compass8(h)).toUpperCase()}</b> <span class="lr-key">· left <b>${compass8(h - 90)}</b> · right <b>${compass8(h + 90)}</b></span></div>`;
     const near = m && st.near ? ` · near <i>${esc(st.near.name)}</i>` : '';
     const handle = `<button class="handle" id="hudToggle" aria-label="${st.expanded ? 'Show less' : 'Show more'}">${st.expanded ? '▴' : '▾'}</button>`;
     ctx.hud(
@@ -502,8 +512,9 @@ export function initDrive(ctx) {
             ? `<div class="town">?</div>
              <div class="meta">New town. Say it before the voice does…</div>`
             : `<div class="town">${esc(m.n)}</div>
-             <div class="meta">${esc(m.t)} · <b>${esc(m.c)} County</b>${near} ${acc}</div>`
-          : `<div class="town">Outside New Jersey</div><div class="meta">or offshore ${acc}</div>`) +
+             <div class="meta">${GRID ? '' : `${esc(m.t)} · `}<b>${esc(ctx.groupName(m.c))}</b>${near} ${acc}</div>
+             ${GRID && st.corner ? `<div class="corner">near <b>${esc(st.corner)}</b></div>` : ''}`
+          : `<div class="town">${esc(region.outside)}</div><div class="meta">${esc(region.outsideSub)} ${acc}</div>${otherRegionButton()}`) +
         head +
         roadLine() +
         (st.expanded ? details(m) : '')
@@ -511,8 +522,21 @@ export function initDrive(ctx) {
     bindHud();
   }
 
+  /** Crossed into the other region's map? Offer to switch. */
+  function otherRegionButton() {
+    const [x, y] = ctx.pos.pt;
+    const other = ALL_REGIONS.find((r) => r !== region && x >= r.bounds[0][0] && x <= r.bounds[1][0] && y >= r.bounds[0][1] && y <= r.bounds[1][1]);
+    return other ? `<button class="primary" id="switchRegion" data-r="${other.id}">Switch to ${esc(other.name)}</button>` : '';
+  }
+
   function bindHud() {
     const hud = document.getElementById('hud');
+    const sw = document.getElementById('switchRegion');
+    if (sw)
+      sw.addEventListener('click', (e) => {
+        e.stopPropagation();
+        switchRegion(sw.dataset.r);
+      });
     document.getElementById('hudToggle').addEventListener('click', (e) => {
       e.stopPropagation();
       toggleExpanded();

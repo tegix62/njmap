@@ -862,3 +862,18 @@ body.picking #map {
   font-size: 15px;
   line-height: 1.5;
 }
+.choices.three {
+  grid-template-columns: repeat(3, 1fr);
+}
+#hud .corner {
+  margin-top: 2px;
+  font-size: 16px;
+}
+#hud .corner b {
+  color: #fde68a;
+}
+#settings .regionrow select {
+  font-size: 16px;
+  padding: 6px 8px;
+  border-radius: 8px;
+}

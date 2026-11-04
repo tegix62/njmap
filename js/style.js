@@ -9,8 +9,6 @@
 //   Street (13+)      villages and sections, local roads, street names
 import { THEME as T } from './theme.js';
 
-export const Z = { region: 8.3, town: 10.3, street: 13 };
-export const MAJOR_TOWN_POP = 20000;
 
 const isClass = (list) => ['match', ['get', 'class'], list, true, false];
 const notTunnel = ['!=', ['get', 'brunnel'], 'tunnel'];
@@ -18,7 +16,7 @@ const roadWidth = (a, b, c) => ['interpolate', ['exponential', 1.5], ['zoom'], 8
 const fadeIn = (z0, z1) => ['interpolate', ['linear'], ['zoom'], z0, 0, z1, 1];
 
 // Background (OpenFreeMap) layers: [layer, basemaps that show it]
-export const BASE_LAYERS = [
+const baseLayers = (Z) => [
   [{ id: 'water', type: 'fill', source: 'omt', 'source-layer': 'water', paint: { 'fill-color': T.water } }, 'streets light'],
   [
     {
@@ -112,7 +110,7 @@ const refLayer = (id, classes, minzoom) => ({
 });
 
 // Background labels: above town fills/lines, below town names
-export const BASE_LABEL_LAYERS = [
+const baseLabelLayers = (Z) => [
   [
     {
       id: 'river-name',
@@ -169,7 +167,7 @@ const withVis = (pairs, key) =>
 // Labels of the focused town + neighbors stay solid; the rest fade (Explore).
 const focusOpacity = ['case', ['boolean', ['global-state', 'focusing'], false], ['case', ['boolean', ['feature-state', 'focus'], false], 1, 0.25], 1];
 
-const muniLabel = (id, minzoom, maxzoom, filter) => ({
+const muniLabel = (Z, id, minzoom, maxzoom, filter) => ({
   id,
   type: 'symbol',
   source: 'labels',
@@ -192,21 +190,27 @@ const muniLabel = (id, minzoom, maxzoom, filter) => ({
 export const MUNI_LABEL_IDS = ['muni-label-major', 'muni-label'];
 export const PLACE_LAYER_IDS = ['landmark-dot', 'landmark-label'];
 
-export function buildStyle({ base, basemap, data, sectionNames }) {
+/**
+ * Returns { style, baseLayers } for a region. `Z` = the region's zoom levels:
+ * { groups, region, town, street }.
+ */
+export function buildStyle({ base, basemap, data, sectionNames, Z, majorSize, groupTint, attribution }) {
+  const BASE_LAYERS = baseLayers(Z);
+  const BASE_LABEL_LAYERS = baseLabelLayers(Z);
   const countyTint = ['match', ['get', 'c']];
-  for (const [c, k] of Object.entries(T.countyKey)) countyTint.push(c, T.countyTint[k]);
+  for (const [c, k] of Object.entries(groupTint)) countyTint.push(c, T.countyTint[k]);
   countyTint.push(T.land);
   const hl = ['match', ['coalesce', ['feature-state', 'hl'], '']];
   for (const [k, v] of Object.entries(T.hl)) hl.push(k, v);
   hl.push('rgba(0,0,0,0)');
 
-  return {
+  const style = {
     version: 8,
     glyphs: base + 'fonts/{fontstack}/{range}.pbf',
     sources: {
       omt: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' },
       munis: { type: 'geojson', data: data.munis },
-      counties: { type: 'geojson', data: data.counties, attribution: 'Boundaries: <a href="https://njogis-newjersey.opendata.arcgis.com/">NJOGIS</a>' },
+      counties: { type: 'geojson', data: data.counties, attribution },
       labels: { type: 'geojson', data: data.labels },
       countylabels: { type: 'geojson', data: data.countyLabels },
       regionlabels: { type: 'geojson', data: data.regionLabels },
@@ -272,7 +276,7 @@ export function buildStyle({ base, basemap, data, sectionNames }) {
         id: 'region-label',
         type: 'symbol',
         source: 'regionlabels',
-        maxzoom: 7.6,
+        maxzoom: Z.groups + 0.2,
         layout: {
           'text-field': ['upcase', ['get', 'name']],
           'text-font': ['Noto Sans Medium'],
@@ -285,19 +289,19 @@ export function buildStyle({ base, basemap, data, sectionNames }) {
           'text-color': T.ink2,
           'text-halo-color': T.halo,
           'text-halo-width': 2,
-          'text-opacity': ['interpolate', ['linear'], ['zoom'], 7.25, 1, 7.55, 0],
+          'text-opacity': ['interpolate', ['linear'], ['zoom'], Z.groups - 0.2, 1, Z.groups + 0.1, 0],
         },
       },
       {
         id: 'county-label',
         type: 'symbol',
         source: 'countylabels',
-        minzoom: 7.3,
+        minzoom: Z.groups - 0.15,
         maxzoom: Z.town,
         layout: {
           'text-field': ['upcase', ['get', 'c']],
           'text-font': ['Noto Sans Medium'],
-          'text-size': ['interpolate', ['linear'], ['zoom'], 6.6, 8.5, Z.region, 11, Z.town - 0.5, 14],
+          'text-size': ['interpolate', ['linear'], ['zoom'], Z.groups, 8.5, Z.region, 11, Z.town - 0.5, 14],
           'text-letter-spacing': 0.22,
         },
         paint: {
@@ -305,7 +309,7 @@ export function buildStyle({ base, basemap, data, sectionNames }) {
           'text-halo-color': T.halo,
           'text-halo-width': 1.5,
           // Whole state: regions only. One step in: counties replace them.
-          'text-opacity': ['interpolate', ['linear'], ['zoom'], 7.3, 0, 7.6, 1, Z.town - 0.4, 1, Z.town, 0],
+          'text-opacity': ['interpolate', ['linear'], ['zoom'], Z.groups - 0.15, 0, Z.groups + 0.15, 1, Z.town - 0.4, 1, Z.town, 0],
         },
       },
       {
@@ -360,8 +364,8 @@ export function buildStyle({ base, basemap, data, sectionNames }) {
         },
         paint: { 'text-color': T.ink2, 'text-halo-color': T.halo, 'text-halo-width': 1.6 },
       },
-      muniLabel('muni-label-major', Z.region, Z.town, ['>=', ['get', 'p'], MAJOR_TOWN_POP]),
-      muniLabel('muni-label', Z.town),
+      muniLabel(Z, 'muni-label-major', Z.region, Z.town, ['>=', ['get', 'p'], majorSize]),
+      muniLabel(Z, 'muni-label', Z.town),
       {
         id: 'anchor-dot',
         type: 'circle',
@@ -398,4 +402,5 @@ export function buildStyle({ base, basemap, data, sectionNames }) {
       },
     ],
   };
+  return { style, baseLayers: [...BASE_LAYERS, ...BASE_LABEL_LAYERS] };
 }
