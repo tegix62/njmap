@@ -49,6 +49,8 @@ export default {
   // "Well-known": towns over 25,000 people, county seats, towns with a
   // landmark, your own sound-alike pairs, plus these: places people name all
   // the time even though they're small. A judgment call; edit freely.
+  // Use "Name|County" when two towns share a name (Harrison by Newark, not
+  // Harrison Township in Gloucester).
   wellKnown: {
     minPop: 25000,
     seats: [
@@ -64,7 +66,7 @@ export default {
       'Long Beach', 'Beach Haven', 'Atlantic City', 'Ocean City', 'Margate City', 'Ventnor City', 'Sea Isle City',
       'Wildwood', 'North Wildwood', 'Cape May', 'Brigantine', 'Avalon', 'Stone Harbor', 'Manasquan', 'Bradley Beach',
       // Hudson waterfront & close-in
-      'Hoboken', 'Weehawken', 'Harrison', 'Secaucus', 'East Rutherford', 'Rutherford', 'Lyndhurst', 'Fort Lee', 'Edgewater',
+      'Hoboken', 'Weehawken', 'Harrison|Hudson', 'Secaucus', 'East Rutherford', 'Rutherford', 'Lyndhurst', 'Fort Lee', 'Edgewater',
       'Englewood', 'Teaneck', 'Nutley', 'Belleville', 'Montclair', 'Maplewood', 'South Orange Village', 'West Orange', 'Orange',
       // Suburban names everyone uses
       'Ridgewood', 'Paramus', 'Mahwah', 'Ramsey', 'Wayne', 'Little Falls', 'Boonton', 'Denville', 'Rockaway', 'Madison',

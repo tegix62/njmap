@@ -85,7 +85,7 @@ async function main() {
     const lmTowns = new Set(region.landmarks.map((l) => l.town));
     const pairs = new Set(region.confusables.filter((g) => g.note).flatMap((g) => g.names));
     for (const m of munis)
-      m.wellKnown = !wk || m.p >= wk.minPop || seats.has(m.key) || names.has(m.n) || lmTowns.has(m.key) || pairs.has(m.n);
+      m.wellKnown = !wk || m.p >= wk.minPop || seats.has(m.key) || names.has(m.n) || names.has(`${m.n}|${m.c}`) || lmTowns.has(m.key) || pairs.has(m.n);
   }
   const confusables = resolveGroups(munis, region.confusables);
   const counties = countiesFC.features.map((f) => f.properties.c).sort();

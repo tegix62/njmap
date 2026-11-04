@@ -543,9 +543,19 @@ export function initPractice(ctx) {
     return { bbox: b };
   }
 
+  /** A town's name in a question. Same-name towns say which one, plainly. */
   function prompt(m) {
-    return `<b>${esc(m.n)}</b>${m.dup ? ` <span class="muted">${esc(m.t)}, ${esc(m.c)} Co.</span>` : ''}`;
+    if (!m.dup) return `<b>${esc(m.n)}</b>`;
+    const others = munis.filter((o) => o !== m && o.n === m.n);
+    const which =
+      others.length > 2
+        ? `${esc(m.c)} County; there are ${others.length + 1} ${esc(m.n)}s`
+        : others.every((o) => o.c !== m.c)
+          ? `${esc(m.c)} County, not the one in ${esc([...new Set(others.map((o) => o.c))].join(' or '))}`
+          : `not the ${esc(others.map((o) => o.t).join(' or '))}`;
+    return `<b>${esc(m.n)} ${esc(m.t)}</b> <span class="which">(${which})</span>`;
   }
+
 
   function show() {
     ctx.clearHighlights();

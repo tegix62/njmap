@@ -1120,3 +1120,8 @@ details.more summary {
   min-height: 0;
   font-size: 14px;
 }
+.q .which {
+  font-size: 0.8em;
+  color: var(--accent);
+  font-weight: 600;
+}
