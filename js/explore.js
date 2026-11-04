@@ -102,7 +102,7 @@ export function initExplore(ctx) {
     const tryFind = () => {
       const hit = ctx.placedSections(m).get(name.toLowerCase());
       if (hit) {
-        ctx.reveal([{ m, pt: hit.pt, label: hit.name, color: L.place }]);
+        ctx.reveal([{ m, pt: hit.pt, label: hit.name, color: L.place, key: true }]);
         map.easeTo({ center: hit.pt, zoom: Math.max(map.getZoom(), 13.5), offset: offset(), duration: 600 });
       }
       return !!hit;
@@ -116,7 +116,7 @@ export function initExplore(ctx) {
   }
 
   function showLandmark(l) {
-    ctx.reveal([{ m: l.m, pt: l.pt, label: l.name, color: L.place }]);
+    ctx.reveal([{ m: l.m, pt: l.pt, label: l.name, color: L.place, key: true }]);
     map.easeTo({ center: l.pt, zoom: Math.max(map.getZoom(), 13.5), offset: offset(), duration: 600 });
   }
 

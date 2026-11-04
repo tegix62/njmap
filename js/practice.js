@@ -1,6 +1,6 @@
 import { bearing, distanceMi, compass8, compass16, angleDiff, dirWord, destination as destinationPt } from './geo.js';
 import { gridY } from './grid.js';
-import { roadsFrom } from './roads.js';
+import { sampleRoads, roadsThrough } from './roads.js';
 
 let L; // label colors of the active theme (set in initPractice)
 
@@ -284,34 +284,48 @@ export function initPractice(ctx) {
     if (ctx.settings.basemap === 'none') return makeBorders(p);
     return { kind: 'roadto', m: pick(p), pending: true, tries: 0 };
   }
-  function buildRoadTo(token) {
-    if (q !== token) return;
-    const A = q.m;
-    const roads = roadsFrom(map, A, ctx.locate, 12 * SC).slice(0, 5);
-    // A target only one of the roads reaches, not right next door
+  /** A road question for town A, or null if A doesn't make a good one. */
+  function roadQuestionFor(samples, A) {
+    const roads = roadsThrough(samples, A, 12 * SC).slice(0, 5);
+    if (roads.length < 2) return null;
+    // A target only one of the roads reaches, and not right next door
     const counts = new Map();
     for (const r of roads) for (const t of r.towns) counts.set(t.m.id, (counts.get(t.m.id) || 0) + 1);
     const opts = [];
     for (const r of roads)
       for (const t of r.towns)
         if (counts.get(t.m.id) === 1 && t.d >= 2.5 * SC && !A.neighbors.includes(t.m)) opts.push({ r, t, w: t.m.wellKnown ? 3 : 1 });
-    if (roads.length < 2 || !opts.length) {
-      if (++q.tries < 4) {
-        q.m = pick(q.p);
+    if (!opts.length) return null;
+    let x = Math.random() * opts.reduce((a, o) => a + o.w, 0);
+    const o = opts.find((y) => (x -= y.w) <= 0) || opts[0];
+    const choices = shuffle(roads.slice(0, 4));
+    if (!choices.includes(o.r)) choices[0] = o.r;
+    return { roads, right: o.r, target: o.t.m, tgt: o.t, choices };
+  }
+  function buildRoadTo(token) {
+    if (q !== token) return;
+    // Sample the roads once, then try the picked town and the others in view:
+    // many small towns have no numbered highway through them.
+    const samples = sampleRoads(map, ctx.locate);
+    const b = map.getBounds();
+    const inView = shuffle(q.p.filter((o) => o !== q.m && b.contains(o.pt)));
+    const order = [q.m, ...inView.filter((o) => o.wellKnown), ...inView.filter((o) => !o.wellKnown)].slice(0, 40);
+    for (const A of order) {
+      const rq = roadQuestionFor(samples, A);
+      if (rq) {
+        Object.assign(q, { m: A, pending: false }, rq);
         return show();
       }
-      q = makeBorders(q.p);
-      q.p = token.p;
-      q.answered = false;
-      ctx.toast('No road question here. Asking another kind.');
+    }
+    if (++q.tries < 3) {
+      q.m = pick(q.p);
       return show();
     }
-    const tot = opts.reduce((a, o) => a + o.w, 0);
-    let x = Math.random() * tot;
-    const o = opts.find((y) => (x -= y.w) <= 0) || opts[0];
-    Object.assign(q, { pending: false, roads, right: o.r, target: o.t.m, tgt: o.t, choices: shuffle(roads.slice(0, 4)) });
-    if (!q.choices.includes(o.r)) q.choices[0] = o.r;
-    show();
+    q = makeBorders(q.p);
+    q.p = token.p;
+    q.answered = false;
+    q.fallback = true;
+    return show();
   }
 
   /** Manhattan: "Point uptown." The grid is turned ~29° from true north. */
@@ -467,7 +481,7 @@ export function initPractice(ctx) {
     ctx.trip(null);
     ctx.focusRoad(null);
     ctx.showLabels(false);
-    ctx.showRoadRefs(q.kind !== 'roadto');
+    ctx.showRoadRefs(false); // fewer labels while answering; shown after a road question
     const m = q.m;
     let body = '';
     if (q.kind === 'find') {
@@ -480,7 +494,7 @@ export function initPractice(ctx) {
     } else if (q.kind === 'borders') {
       ctx.highlight(m.id, 'q');
       ctx.reveal([{ m, color: L.q }]);
-      ctx.hud(`<div class="qkind">Borders</div><div class="q">Which of these borders ${prompt(m)}?</div>`);
+      ctx.hud(`<div class="qkind">Borders${q.fallback ? ' <span class="muted">(no road question nearby)</span>' : ''}</div><div class="q">Which of these borders ${prompt(m)}?</div>`);
       body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
     } else if (q.kind === 'landmark') {
       ctx.hud(`<div class="qkind">Landmarks</div><div class="q"><b>${esc(q.landmark.name)}</b> is in which ${R.unit}?</div>`);
@@ -607,6 +621,8 @@ export function initPractice(ctx) {
     } else score.streak = 0;
     q.answered = true;
     const qb = document.getElementById('qbody');
+    // Once answered, the choices shrink so the map gets the room back
+    for (const g of qb.querySelectorAll('.choices, .rose8')) g.classList.add('answered');
     qb.insertAdjacentHTML('beforeend', `<div class="fb ${ok ? 'ok' : 'no'}">${html}</div><button class="primary" id="nextQ">Next</button>`);
     document.querySelector('#sheet .score').outerHTML = header().match(/<div class="score">.*<\/div>$/s)[0];
     document.getElementById('nextQ').addEventListener('click', next);
@@ -650,15 +666,13 @@ export function initPractice(ctx) {
       ctx.highlight(q.right.id, 'good');
       const items = [{ m, color: L.q }, ...m.neighbors.map((o) => ({ m: o, color: o === q.right ? L.good : L.neutral }))];
       const side = compass8(bearing(m.pt, q.right.pt));
-      let html = `${ok ? '✓' : '✗'} <b>${esc(q.right.n)}</b> borders ${esc(m.n)} on the ${side}.`;
+      let html = `${ok ? '✓' : '✗'} <b>${esc(q.right.n)}</b> borders ${esc(m.n)} (${side}).`;
       if (!ok) {
         ctx.highlight(pickd.id, 'bad');
         items.push({ m: pickd, color: L.bad });
-        html += ` ${esc(pickd.n)} doesn't touch it. It's ${ctx.relative(m.pt, pickd.pt).text} of ${esc(m.n)}.`;
+        html += ` ${esc(pickd.n)} doesn't; it's ${ctx.relative(m.pt, pickd.pt).text} of ${esc(m.n)}.`;
       }
-      html += `<div class="note">All ${m.neighbors.length} neighbors of ${esc(m.n)}: ${esc(
-        [...m.neighbors].sort((a, b) => bearing(m.pt, a.pt) - bearing(m.pt, b.pt)).map((o) => `${o.n} (${compass8(bearing(m.pt, o.pt))})`).join(', ')
-      )}</div>`;
+      html += ` <span class="muted">All ${m.neighbors.length} neighbors are shaded on the map.</span>`;
       ctx.reveal(items);
       feedback(ok, html);
       ctx.fit([m, ...m.neighbors, pickd], 13);
@@ -670,7 +684,7 @@ export function initPractice(ctx) {
       btn.classList.add(ok ? 'right' : 'wrong');
       document.querySelector(`#qbody .choice[data-id="${m.id}"]`).classList.add('right');
       ctx.highlight(m.id, 'good');
-      const items = [{ m, color: L.good }, { m, pt: l.pt, label: l.name, color: L.place }];
+      const items = [{ m, color: L.good }, { m, pt: l.pt, label: l.name, color: L.place, key: true }];
       let html = `${ok ? '✓' : '✗'} <b>${esc(l.name)}</b> (${esc(l.kind.toLowerCase())}) is in <b>${esc(m.full)}</b>, ${esc(ctx.groupName(m.c))}.`;
       if (!ok) {
         ctx.highlight(pickd.id, 'bad');
@@ -708,7 +722,7 @@ export function initPractice(ctx) {
       btn.classList.add(ok ? 'right' : 'wrong');
       document.querySelector(`#qbody .choice[data-v="${q.dir}"]`).classList.add('right');
       const said = q.dir === 'two-way' ? 'both ways' : q.dir;
-      feedback(ok, `${ok ? '✓' : '✗'} <b>${esc(q.name)}</b> runs <b>${said}</b>.<div class="note">${esc(R.avenueNote)}</div>`);
+      feedback(ok, `${ok ? '✓' : '✗'} <b>${esc(q.name)}</b> runs <b>${said}</b>.<details class="more"><summary>The pattern</summary><div class="note">${esc(R.avenueNote)}</div></details>`);
     } else if (q.kind === 'crossing') {
       const ok = +btn.dataset.v === q.right;
       record(m, ok);
@@ -776,7 +790,7 @@ export function initPractice(ctx) {
       ctx.highlight(m.id, 'good');
       const items = [{ m, color: L.good }];
       const placed = ctx.placedSections(m).get(name.toLowerCase());
-      if (placed) items.push({ m, pt: placed.pt, label: name, color: L.place });
+      if (placed) items.push({ m, pt: placed.pt, label: name, color: L.place, key: true });
       let html = `${ok ? '✓' : '✗'} <b>${esc(name)}</b> is part of <b>${esc(m.full)}</b>, ${esc(ctx.groupName(m.c))}.`;
       if (!ok) {
         ctx.highlight(pickd.id, 'bad');

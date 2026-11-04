@@ -227,11 +227,14 @@ async function main() {
       for (const id of [...highlighted.keys()]) if (!except || !except(id, highlighted.get(id))) ctx.highlight(id, null);
     },
     reveal(items) {
+      // priority: right 0, wrong 1, the question 2, everything else 3 (minor)
+      const L = theme.label;
+      const prio = (c) => (c === L.good ? 0 : c === L.bad ? 1 : c === L.q ? 2 : 3);
       map.getSource('reveal').setData({
         type: 'FeatureCollection',
-        features: items.map(({ m, color, label, pt }) => ({
+        features: items.map(({ m, color, label, pt, key }) => ({
           type: 'Feature',
-          properties: { label: label || m.mapLabel, color },
+          properties: { label: label || m.mapLabel, color, prio: key ? 2 : prio(color) },
           geometry: { type: 'Point', coordinates: pt || m.pt },
         })),
       });
@@ -558,6 +561,16 @@ async function main() {
   document.body.classList.add('ready');
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    // When a new version takes over, reload once so you see it right away
+    // (otherwise the offline copy shows the old version until the next open).
+    if (navigator.serviceWorker.controller) {
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (reloaded) return;
+        reloaded = true;
+        location.reload();
+      });
+    }
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 }

@@ -1034,3 +1034,28 @@ body.ink #hud .roadline .on b {
 .leads .label-sm {
   margin: 0 4px 0 0;
 }
+
+/* answered: shrink the choices so the map gets the room back */
+.choices.answered {
+  gap: 5px;
+}
+.choices.answered .choice {
+  padding: 5px 6px;
+  min-height: 0;
+  font-size: 14px;
+  border-width: 1.5px;
+}
+.rose8.answered {
+  grid-template-columns: repeat(3, 46px);
+  grid-template-rows: repeat(3, 32px);
+  gap: 4px;
+}
+.rose8.answered .choice {
+  font-size: 12px;
+}
+details.more summary {
+  cursor: pointer;
+  color: var(--panel-muted);
+  font-size: 13px;
+  margin-top: 6px;
+}

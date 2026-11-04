@@ -410,16 +410,38 @@ export function buildStyle({ base, basemap, data, sectionNames, Z, majorSize, gr
         paint: { 'text-color': T.anchor, 'text-halo-color': '#ffffff', 'text-halo-width': 2 },
       },
       {
+        // Labels revealed by a question. Minor ones (other neighbors) only
+        // where there's room; the key ones (question, right, wrong) are placed
+        // first and slide to a free side instead of stacking on each other.
+        id: 'reveal-minor',
+        type: 'symbol',
+        source: 'reveal',
+        filter: ['==', ['get', 'prio'], 3],
+        layout: {
+          'text-field': ['get', 'label'],
+          'text-font': ['Noto Sans Medium'],
+          'text-size': 13,
+          'text-max-width': 8,
+          'text-variable-anchor': ['center', 'top', 'bottom', 'left', 'right'],
+          'text-radial-offset': 0.4,
+          'text-padding': 3,
+        },
+        paint: { 'text-color': ['coalesce', ['get', 'color'], T.ink], 'text-halo-color': '#ffffff', 'text-halo-width': 2 },
+      },
+      {
         id: 'reveal-label',
         type: 'symbol',
         source: 'reveal',
+        filter: ['<', ['get', 'prio'], 3],
         layout: {
           'text-field': ['get', 'label'],
           'text-font': ['Noto Sans Medium'],
           'text-size': 16,
-          'text-allow-overlap': true,
-          'text-ignore-placement': true,
           'text-max-width': 9,
+          'symbol-sort-key': ['get', 'prio'],
+          'text-variable-anchor': ['center', 'top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right'],
+          'text-radial-offset': 0.5,
+          'text-padding': 2,
         },
         paint: { 'text-color': ['coalesce', ['get', 'color'], T.ink], 'text-halo-color': '#ffffff', 'text-halo-width': 2.2 },
       },

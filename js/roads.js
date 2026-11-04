@@ -151,19 +151,17 @@ export function roadsInTown(map, m, locate) {
 }
 
 /**
- * Roads as connectors: the major roads that pass through town `m`, and the
- * towns each one leads to within `maxMi`, from the tiles currently loaded.
- * [{label, name, raw:[refs], towns:[{m, d, dir}] nearest first}]
+ * Samples every major road in the loaded tiles every ~150 m and records which
+ * town each sample falls in. Done once, then any town can be asked about
+ * cheaply (roadsThrough).
  */
-export function roadsFrom(map, m, locate, maxMi = 12) {
-  const kx = 69.17 * Math.cos((m.pt[1] * Math.PI) / 180);
-  const ky = 69.05;
+export function sampleRoads(map, locate) {
   const roads = new Map();
   for (const f of majorFeatures(map)) {
     const props = f.properties || {};
     const label = normRef(props.ref) || (props.class === 'motorway' && props.name) || null;
     if (!label) continue;
-    const r = roads.get(label) || { label, name: props.name || '', raw: new Set(), through: false, towns: new Map() };
+    const r = roads.get(label) || { label, name: props.name || '', raw: new Set(), towns: new Set() };
     r.raw.add(props.ref);
     if (!r.name && props.name) r.name = props.name;
     for (const line of lines(f.geometry))
@@ -171,25 +169,39 @@ export function roadsFrom(map, m, locate, maxMi = 12) {
         const a = line[i - 1], b = line[i];
         const steps = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.0015));
         for (let k = 0; k <= steps; k++) {
-          const c = [a[0] + ((b[0] - a[0]) * k) / steps, a[1] + ((b[1] - a[1]) * k) / steps];
-          if (Math.hypot((c[0] - m.pt[0]) * kx, (c[1] - m.pt[1]) * ky) > maxMi) continue;
-          const t = locate(c);
-          if (!t) continue;
-          if (t === m) r.through = true;
-          else if (!r.towns.has(t.id)) r.towns.set(t.id, t);
+          const t = locate([a[0] + ((b[0] - a[0]) * k) / steps, a[1] + ((b[1] - a[1]) * k) / steps]);
+          if (t) r.towns.add(t);
         }
       }
     roads.set(label, r);
   }
-  return [...roads.values()]
-    .filter((r) => r.through && r.towns.size)
+  return [...roads.values()];
+}
+
+/**
+ * Roads as connectors: the sampled roads that pass through town `m`, and the
+ * towns each leads to within `maxMi`: [{label, name, raw, towns:[{m, d, dir}]}]
+ */
+export function roadsThrough(samples, m, maxMi = 12) {
+  const kx = 69.17 * Math.cos((m.pt[1] * Math.PI) / 180);
+  const ky = 69.05;
+  return samples
+    .filter((r) => r.towns.has(m))
     .map((r) => ({
       label: r.label,
       name: r.name,
       raw: [...r.raw].filter(Boolean),
-      towns: [...r.towns.values()]
+      towns: [...r.towns]
+        .filter((t) => t !== m)
         .map((t) => ({ m: t, d: Math.hypot((t.pt[0] - m.pt[0]) * kx, (t.pt[1] - m.pt[1]) * ky), dir: compass8(bearing(m.pt, t.pt)) }))
+        .filter((t) => t.d <= maxMi)
         .sort((x, y) => x.d - y.d),
     }))
+    .filter((r) => r.towns.length)
     .sort((x, y) => y.towns.length - x.towns.length);
+}
+
+/** Convenience: roads through `m` from the tiles loaded right now. */
+export function roadsFrom(map, m, locate, maxMi = 12) {
+  return roadsThrough(sampleRoads(map, locate), m, maxMi);
 }
