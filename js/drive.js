@@ -92,8 +92,8 @@ export function initDrive(ctx) {
   el.className = 'me';
   el.innerHTML =
     '<svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true">' +
-    '<circle cx="20" cy="20" r="9" fill="#d97706" stroke="#fff" stroke-width="3"/>' +
-    '<path class="me-arrow" d="M20 2 L27 14 L20 11 L13 14 Z" fill="#d97706" stroke="#fff" stroke-width="1.5"/></svg>';
+    `<circle cx="20" cy="20" r="9" fill="${ctx.theme.you}" stroke="#fff" stroke-width="3"/>` +
+    `<path class="me-arrow" d="M20 2 L27 14 L20 11 L13 14 Z" fill="${ctx.theme.you}" stroke="#fff" stroke-width="1.5"/></svg>`;
   const marker = new maplibregl.Marker({ element: el, rotationAlignment: 'map', pitchAlignment: 'map' });
 
   // ---- geolocation ----------------------------------------------------------
@@ -164,7 +164,7 @@ export function initDrive(ctx) {
 
     ctx.pos = { pt, acc: c.accuracy, speed, heading: st.heading, t: pos.timestamp };
     st.error = null;
-    if (c.accuracy < 100) trips.point(pt);
+    if (settings.rememberPlaces && c.accuracy < 100) trips.point(pt);
 
     // Which town? Require two agreeing fixes before switching, so GPS jitter
     // along a border doesn't flap back and forth.
@@ -207,7 +207,8 @@ export function initDrive(ctx) {
       if (prev) ctx.highlight(prev.id, null);
       if (m) ctx.highlight(m.id, 'cur');
     }
-    if (m) {
+    // Only when you've opted in (Settings → Remember where I've been).
+    if (m && settings.rememberPlaces) {
       visited[m.key] = Date.now();
       store.set('visited', visited);
       trips.town(m, st.gpsHeading ? st.heading : null);

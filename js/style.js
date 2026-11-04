@@ -7,7 +7,9 @@
 //   Region (8.3–10.3) county names, the largest towns, all main highways, landmarks
 //   Town   (10.3–13)  every town name, secondary roads, lakes, landmark names
 //   Street (13+)      villages and sections, local roads, street names
-import { THEME as T } from './theme.js';
+import { THEME } from './theme.js';
+
+let T = THEME; // the active theme; set by buildStyle()
 
 
 const isClass = (list) => ['match', ['get', 'class'], list, true, false];
@@ -194,7 +196,8 @@ export const PLACE_LAYER_IDS = ['landmark-dot', 'landmark-label'];
  * Returns { style, baseLayers } for a region. `Z` = the region's zoom levels:
  * { groups, region, town, street }.
  */
-export function buildStyle({ base, basemap, data, sectionNames, Z, majorSize, groupTint, attribution }) {
+export function buildStyle({ base, basemap, data, sectionNames, Z, majorSize, groupTint, attribution, theme }) {
+  T = theme || THEME;
   const BASE_LAYERS = baseLayers(Z);
   const BASE_LABEL_LAYERS = baseLabelLayers(Z);
   const countyTint = ['match', ['get', 'c']];
@@ -226,7 +229,13 @@ export function buildStyle({ base, basemap, data, sectionNames, Z, majorSize, gr
         id: 'muni-fill',
         type: 'fill',
         source: 'munis',
-        paint: { 'fill-color': countyTint },
+        // Classic: a quiet tint per county. Ink: paper, darkening as you learn each place.
+        paint: T.inkMode
+          ? {
+              'fill-color': T.ink,
+              'fill-opacity': ['match', ['coalesce', ['feature-state', 'know'], 0], 1, T.know[1], 2, T.know[2], 3, T.know[3], 0],
+            }
+          : { 'fill-color': countyTint },
       },
       { id: 'muni-hl', type: 'fill', source: 'munis', paint: { 'fill-color': hl, 'fill-opacity': 0.3 } },
       ...withVis(BASE_LAYERS, basemap),

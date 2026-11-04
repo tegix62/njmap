@@ -1,22 +1,20 @@
-import { bearing, compass8 } from './geo.js';
-import { roadsInTown, draftNote } from './roads.js';
+import { bearing, compass8, ARROWS } from './geo.js';
+import { roadsInTown, roadsFrom, draftNote } from './roads.js';
 import { editNote } from './notes.js';
-import { THEME } from './theme.js';
 
-const L = THEME.label;
+let L; // label colors of the active theme (set in initExplore)
 
 // Explore: tap any town (or search, including village names like "Towaco").
 //
-// Layer 1 (glance): name, county, and a 3×3 "neighbor compass" with the town in
-// the middle and each bordering town in its direction. The map tints the
-// neighbors and fades every other label.
-// Layer 2 (one tap): Villages · Roads · Landmarks · Notes · Sound-alikes, one
-// at a time.
+// Layer 1 (glance): name and county; the map itself shows the neighbors
+// (tinted, labels solid, everything else faded), so the card stays short.
+// Layer 2 (one tap): Borders · Villages · Roads · Landmarks · Notes ·
+// Sound-alikes, one at a time.
 
-const GRID = ['NW', 'N', 'NE', 'W', '', 'E', 'SW', 'S', 'SE'];
 
 export function initExplore(ctx) {
   const { map } = ctx;
+  L = ctx.theme.label;
   let sel = null;
   let tab = null; // which detail panel is open
   let showAllSections = false;
@@ -96,18 +94,6 @@ export function initExplore(ctx) {
     map.easeTo({ center: l.pt, zoom: Math.max(map.getZoom(), 13.5), offset: offset(), duration: 600 });
   }
 
-  // ---- layer 1 ----------------------------------------------------------------
-  function compassGrid(m) {
-    const cells = Object.fromEntries(GRID.filter(Boolean).map((d) => [d, []]));
-    for (const o of m.neighbors) cells[compass8(bearing(m.pt, o.pt))].push(o);
-    return `<div class="ncompass" role="group" aria-label="Bordering ${ctx.region.units} by direction">${GRID.map((d) => {
-      if (!d) return `<div class="ncell mid">${esc(m.n)}</div>`;
-      const os = cells[d].sort((a, b) => b.p - a.p);
-      if (!os.length) return `<div class="ncell empty"></div>`;
-      return `<div class="ncell"><span class="dl">${d}</span>${os.map((o) => `<button data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
-    }).join('')}</div>`;
-  }
-
   // ---- layer 2 ----------------------------------------------------------------
   function noteCards(kind, key, draft) {
     const mine = ctx.notes
@@ -121,6 +107,13 @@ export function initExplore(ctx) {
   }
 
   function panel(m) {
+    if (tab === 'borders') {
+      return `<div class="chips">${[...m.neighbors]
+        .map((o) => ({ o, b: bearing(m.pt, o.pt) }))
+        .sort((x, y) => x.b - y.b)
+        .map(({ o, b }) => `<button class="chip" data-id="${o.id}"><span class="arr">${ARROWS[compass8(b)]}</span>${compass8(b)} ${esc(ctx.name(o))}</button>`)
+        .join('')}</div>`;
+    }
     if (tab === 'villages') {
       const secs = showAllSections ? m.sections : m.sections.slice(0, 12);
       const more = m.sections.length - secs.length;
@@ -136,11 +129,21 @@ export function initExplore(ctx) {
           ctx.settings.basemap === 'none' ? 'Turn on the background map in Settings to see roads.' : 'No major roads found here yet (the map may still be loading).'
         }</div>`;
       const r = roads.find((x) => x.label === roadSel);
+      let leads = '';
+      if (r) {
+        const SC = ctx.region.gridAngle ? 0.12 : 1;
+        const rf = roadsFrom(map, m, ctx.locate, 10 * SC).find((x) => x.label === r.label);
+        if (rf && rf.towns.length)
+          leads = `<div class="leads"><span class="label-sm">${esc(r.label)} leads to</span> ${rf.towns
+            .slice(0, 8)
+            .map((t) => `<button class="chip" data-id="${t.m.id}">${esc(ctx.name(t.m))} <span class="muted">${t.dir} ${t.d < 10 ? t.d.toFixed(1) : Math.round(t.d)} mi</span></button>`)
+            .join('')}</div>`;
+      }
       return `<div class="chips">${roads
         .map((x) => `<button class="chip${x.label === roadSel ? ' on' : ''}" data-road="${esc(x.label)}">${esc(x.label)}</button>`)
         .join('')}</div>${
         r
-          ? `${noteCards('road', r.label, draftNote(r.label, r.name, ctx.region.roadNotes)) || '<div class="hint muted">No notes yet.</div>'}
+          ? `${leads}${noteCards('road', r.label, draftNote(r.label, r.name, ctx.region.roadNotes)) || '<div class="hint muted">No notes yet.</div>'}
              <button class="addnote" data-note="road" data-key="${esc(r.label)}">＋ Note about ${esc(r.label)}</button>`
           : '<div class="hint muted">Tap a road to highlight it and see notes.</div>'
       }`;
@@ -166,6 +169,11 @@ export function initExplore(ctx) {
     return '';
   }
 
+  function starBtn(m) {
+    const on = ctx.myList.has(m);
+    return `<button class="star" id="starBtn" aria-pressed="${on}" title="${on ? 'On your list' : 'Add to your list to practice'}">${on ? '★ My list' : '☆ My list'}</button>`;
+  }
+
   function render() {
     const R = ctx.region;
     const search = `<input id="search" type="search" list="townlist" placeholder="${R.sections ? 'Search a town, village or landmark…' : `Search a ${R.unit} or landmark…`}" autocomplete="off" enterkeyhint="go">`;
@@ -181,6 +189,7 @@ export function initExplore(ctx) {
       const from = (anchor ? ` · ${esc(anchor)}` : '') + (ctx.pos ? ` · ${ctx.relative(ctx.pos.pt, m.pt).text} of you` : '');
       const nAlikes = new Set((ctx.confusables.byId.get(m.id) || []).flatMap((g) => g.members)).size - 1;
       const tabs = [
+        ['borders', 'Borders', m.neighbors.length],
         ['villages', 'Villages', m.sections.length],
         ['roads', 'Roads', 0],
         ['landmarks', 'Landmarks', (landmarksByTown.get(m.id) || []).length],
@@ -190,9 +199,8 @@ export function initExplore(ctx) {
       if (tab && !tabs.some(([k]) => k === tab)) tab = null;
       ctx.hud(
         `${search}
-         <div class="town">${esc(m.n)}</div>
+         <div class="titlerow"><div class="town">${esc(m.n)}</div>${starBtn(m)}</div>
          <div class="meta">${esc(m.t)} · <b>${esc(ctx.groupName(m.c))}</b>${from}</div>
-         ${compassGrid(m)}
          <div class="dtabs">${tabs
            .map(([k, label, n]) => `<button data-tab="${k}" aria-pressed="${tab === k}">${label}${n ? `<span class="n">${n}</span>` : ''}</button>`)
            .join('')}</div>
@@ -219,6 +227,13 @@ export function initExplore(ctx) {
       }
     });
     for (const b of hud.querySelectorAll('[data-id]')) b.addEventListener('click', () => select(ctx.munis[+b.dataset.id]));
+    const star = document.getElementById('starBtn');
+    if (star)
+      star.addEventListener('click', () => {
+        const on = ctx.myList.toggle(sel);
+        ctx.toast(on ? `${sel.n} added to My list. Practice → area → My list.` : `${sel.n} removed from My list`);
+        render();
+      });
     for (const b of hud.querySelectorAll('[data-tab]'))
       b.addEventListener('click', () => {
         tab = tab === b.dataset.tab ? null : b.dataset.tab;

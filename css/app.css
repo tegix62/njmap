@@ -877,3 +877,160 @@ body.picking #map {
   padding: 6px 8px;
   border-radius: 8px;
 }
+.titlerow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.star {
+  flex: none;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: none;
+  color: var(--panel-ink);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 6px;
+  cursor: pointer;
+}
+.star[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1c1917;
+}
+
+/* ==== Ink mode: paper, ink, one accent ===================================== */
+body.ink {
+  --panel: rgba(248, 244, 236, 0.97);
+  --panel-ink: #1f1b16;
+  --panel-muted: #6b6257;
+  --accent: #c2410c;
+  --blue: #1f1b16;
+  --good: #1f1b16;
+  --bad: #c2410c;
+  --ink: #1f1b16;
+  background: #f3eee3;
+}
+body.ink #hud,
+body.ink #sheet {
+  box-shadow: 0 2px 14px rgba(31, 27, 22, 0.16);
+  border: 1px solid rgba(31, 27, 22, 0.1);
+}
+body.ink #hud .meta b,
+body.ink #hud .corner b,
+body.ink .score .due,
+body.ink #hud .warn {
+  color: var(--accent);
+}
+body.ink #hud .near b {
+  color: var(--accent);
+}
+body.ink .q b,
+body.ink .fb b {
+  color: var(--panel-ink);
+}
+body.ink .look,
+body.ink .chip,
+body.ink .choice,
+body.ink .notecard,
+body.ink .dtabs button,
+body.ink .prow select,
+body.ink .chip.sec {
+  background: rgba(31, 27, 22, 0.06);
+  color: var(--panel-ink);
+}
+body.ink .look.ahead,
+body.ink .note,
+body.ink .chip.twin {
+  background: rgba(194, 65, 12, 0.09);
+  color: var(--panel-ink);
+}
+body.ink .dtabs button[aria-pressed='true'] {
+  background: var(--panel-ink);
+  color: #f8f4ec;
+}
+body.ink .prow select option,
+body.ink .prow select optgroup {
+  color: var(--panel-ink);
+}
+body.ink .choice.right {
+  background: rgba(31, 27, 22, 0.14);
+  border-color: var(--panel-ink);
+}
+body.ink .choice.wrong {
+  background: rgba(194, 65, 12, 0.14);
+  border-color: var(--accent);
+}
+body.ink .choice.close {
+  background: rgba(194, 65, 12, 0.06);
+  border-color: rgba(194, 65, 12, 0.5);
+}
+body.ink .fb.ok {
+  color: var(--panel-ink);
+}
+body.ink .fb.no {
+  color: #9a3412;
+}
+body.ink .notecard.mine {
+  background: rgba(31, 27, 22, 0.1);
+}
+body.ink .addnote,
+body.ink .star {
+  border-color: rgba(31, 27, 22, 0.3);
+  color: var(--panel-ink);
+}
+body.ink .star[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+body.ink #hud input[type='search'] {
+  border: 1px solid rgba(31, 27, 22, 0.2);
+}
+body.ink #hud .handle {
+  background: rgba(31, 27, 22, 0.08);
+}
+body.ink .dial-face {
+  fill: rgba(31, 27, 22, 0.04);
+  stroke: rgba(31, 27, 22, 0.4);
+}
+body.ink .dial-ticks line {
+  stroke: rgba(31, 27, 22, 0.45);
+}
+body.ink .dial-n {
+  fill: var(--accent);
+}
+body.ink .dial-needle,
+body.ink .dial-hub {
+  stroke: var(--accent);
+  fill: var(--accent);
+}
+body.ink .dial-truth {
+  stroke: var(--panel-ink);
+}
+body.ink #edges span {
+  background: rgba(31, 27, 22, 0.85);
+}
+body.ink #edges span.n {
+  background: var(--accent);
+}
+body.ink #tabs button[aria-selected='true'] {
+  box-shadow: inset 0 3px 0 var(--accent);
+}
+body.ink #hud .roadline b,
+body.ink #hud .roadline .on b {
+  background: var(--panel-ink);
+  color: #f8f4ec;
+}
+.leads {
+  margin: 8px 0 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.leads .label-sm {
+  margin: 0 4px 0 0;
+}

@@ -68,6 +68,7 @@
       <label class="row"><input type="checkbox" data-setting="driveLabels" /> Show town names on the map while driving</label>
       <label class="row"><input type="checkbox" data-setting="wakeLock" /> Keep screen on while tracking</label>
       <label class="row"><input type="checkbox" data-setting="phoneCompass" /> Use phone compass for heading when stopped</label>
+      <label class="row"><input type="checkbox" data-setting="rememberPlaces" /> Remember where I've been (towns and drive routes, on this phone only). Off: nothing about your location is saved.</label>
       <h3>My places</h3>
       <p class="fine">Home, work, family… Towns are described relative to the nearest one, and Practice asks you to point from them.</p>
       <div id="anchorList"></div>
@@ -77,6 +78,12 @@
         <button id="anchorPick">Tap on map</button>
       </div>
       <h3>Map &amp; voice</h3>
+      <label class="row">Look
+        <select data-setting="mapStyle">
+          <option value="ink">Ink: paper and ink; places darken as you learn them</option>
+          <option value="classic">Classic: soft county colors</option>
+        </select>
+      </label>
       <label class="row">Background map
         <select data-setting="basemap">
           <option value="streets">Streets + road numbers</option>
@@ -87,7 +94,7 @@
       <div class="btnrow">
         <button id="stopTracking">Stop location</button>
         <button id="resetStats">Clear practice scores</button>
-        <button id="resetVisited">Forget visited towns</button>
+        <button id="resetVisited">Forget where I've been</button>
       </div>
       <div class="btnrow">
         <button id="exportNotes">Export my notes</button>

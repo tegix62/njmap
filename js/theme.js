@@ -67,3 +67,51 @@ export const THEME = {
   anchor: '#1c1917',
   trip: '#d97706',
 };
+
+// Ink: three colors. Paper, ink, and one accent (you / what's selected).
+// Towns darken in ink as you learn them in Practice, so the map becomes a
+// picture of what you know.
+export const INK = {
+  ...THEME,
+  inkMode: true,
+  land: '#f3eee3',
+  countyTint: Object.fromEntries(Object.keys(THEME.countyTint).map((k) => [k, '#f3eee3'])),
+  ink: '#1f1b16',
+  ink2: '#3a332b',
+  ink3: '#6b6257',
+  ink4: '#a39a8c',
+  halo: 'rgba(243,238,227,0.92)',
+  water: '#ddd8cd',
+  waterInk: '#6b6257',
+  road: {
+    motorway: '#3a332b',
+    major: '#8a8172',
+    mid: '#d8d1c3',
+    minor: '#e4ded1',
+    ref: '#3a332b',
+    refHalo: '#f3eee3',
+  },
+  accent: '#c2410c',
+  hl: {
+    cur: '#c2410c',
+    sel: '#c2410c',
+    q: '#c2410c',
+    good: '#1f1b16',
+    bad: '#c2410c',
+    near: '#a39a8c',
+  },
+  label: {
+    q: '#9a3412',
+    good: '#1f1b16',
+    bad: '#9a3412',
+    neutral: '#3a332b',
+    place: '#3a332b',
+  },
+  // ink fill by how well you know a place (0 = not practiced yet)
+  know: [0, 0.07, 0.15, 0.26],
+  you: '#c2410c',
+  anchor: '#1f1b16',
+  trip: '#c2410c',
+};
+
+export const THEMES = { classic: THEME, ink: INK };

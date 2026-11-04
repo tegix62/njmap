@@ -153,6 +153,7 @@ export default {
   nearMi: 1.5,
   quizTypes: ['find', 'name', 'dir', 'borders', 'confuse', 'landmark', 'north', 'point', 'avedir', 'crossing', 'uptown'],
   crossings: CROSSINGS,
+  wellKnown: null, // every neighborhood counts
   avenues: AVENUES,
   avenueNote: AVENUE_NOTE,
 };

@@ -7,6 +7,7 @@ import { initExplore } from './explore.js';
 import { initPractice } from './practice.js';
 import { notes } from './notes.js';
 import { buildStyle, MUNI_LABEL_IDS, PLACE_LAYER_IDS } from './style.js';
+import { THEMES } from './theme.js';
 import { activeRegion, switchRegion, ALL_REGIONS } from './region.js';
 import { initAnchors } from './anchors.js';
 
@@ -16,6 +17,8 @@ const DEFAULT_SETTINGS = {
   voice: true,
   voiceHints: true,
   voiceGuess: false,
+  rememberPlaces: false, // opt-in: visited towns + drive routes, on this phone only
+  mapStyle: 'ink',
   basemap: 'streets',
   northUp: false,
   driveLabels: true,
@@ -74,6 +77,16 @@ async function main() {
     (n) => !muniNames.has(n.toLowerCase())
   );
   const byKey = new Map(munis.map((m) => [m.key, m]));
+  // "Well-known" flag (see the region config); every Manhattan neighborhood counts.
+  {
+    const wk = region.wellKnown;
+    const seats = new Set(wk ? wk.seats : []);
+    const names = new Set(wk ? wk.names : []);
+    const lmTowns = new Set(region.landmarks.map((l) => l.town));
+    const pairs = new Set(region.confusables.filter((g) => g.note).flatMap((g) => g.names));
+    for (const m of munis)
+      m.wellKnown = !wk || m.p >= wk.minPop || seats.has(m.key) || names.has(m.n) || lmTowns.has(m.key) || pairs.has(m.n);
+  }
   const confusables = resolveGroups(munis, region.confusables);
   const counties = countiesFC.features.map((f) => f.properties.c).sort();
   if (region.groupOrder) counties.sort((a, b) => region.groupOrder.indexOf(a) - region.groupOrder.indexOf(b));
@@ -115,7 +128,10 @@ async function main() {
     features: list.map((a, i) => ({ type: 'Feature', id: i, properties: { name: a.name }, geometry: { type: 'Point', coordinates: a.pt } })),
   });
 
+  const theme = THEMES[settings.mapStyle] || THEMES.ink;
+  document.body.classList.toggle('ink', !!theme.inkMode);
   const built = buildStyle({
+    theme,
     base,
     basemap: settings.basemap,
     sectionNames,
@@ -174,6 +190,14 @@ async function main() {
     pos: null, // {pt, acc, speed, heading, t}
     mode: null,
     region,
+    theme,
+    /** Ink mode: shade a place by how well you know it (from spaced review). */
+    setKnow(m) {
+      if (!theme.inkMode || !m || m.id == null) return;
+      const r = store.get('srs', {})[m.key];
+      const level = !r ? 0 : r.b >= 3 ? 3 : r.b >= 1 ? 2 : 1;
+      map.setFeatureState({ source: 'munis', id: m.id }, { know: level });
+    },
     sub: (m) => region.sub(m),
     groupName: (c) => region.groupName(c),
     name: (m) => (m.dup ? `${m.n} ${TYPE_ABBR[m.t] || m.t} (${m.c})` : m.n),
@@ -305,6 +329,18 @@ async function main() {
     },
     landmarks,
     notes,
+    /** Places you've starred to learn ("someone mentioned Harrison"). On this phone only. */
+    myList: {
+      has: (m) => !!store.get('mylist', {})[m.key],
+      keys: () => Object.keys(store.get('mylist', {})),
+      toggle(m) {
+        const l = store.get('mylist', {});
+        if (l[m.key]) delete l[m.key];
+        else l[m.key] = Date.now();
+        store.set('mylist', l);
+        return !!l[m.key];
+      },
+    },
     /**
      * Focus a town: tint its neighbors and fade every other town label.
      * Pass null to clear.
@@ -326,6 +362,11 @@ async function main() {
           }
       }
       map.setGlobalStateProperty('focusing', !!m);
+    },
+    /** Hide or show road numbers on the map (hidden while a road question is open). */
+    showRoadRefs(on) {
+      for (const id of ['road-ref-major', 'road-ref'])
+        map.setLayoutProperty(id, 'visibility', on && settings.basemap === 'streets' ? 'visible' : 'none');
     },
     /** Highlight one road (its raw OSM refs) on the map; null clears. */
     focusRoad(raw) {
@@ -379,6 +420,7 @@ async function main() {
   window.addEventListener('resize', updateEdges);
 
   ctx.anchors = initAnchors(ctx); // before the modes, so it can claim map taps
+  for (const m of munis) ctx.setKnow(m);
 
   // ---- modes ----------------------------------------------------------------
   const modes = {
@@ -468,6 +510,7 @@ async function main() {
     settings[k] = el.type === 'checkbox' ? el.checked : el.value;
     ctx.saveSettings();
     if (k === 'basemap') ctx.setBasemap(el.value);
+    if (k === 'mapStyle') location.reload();
     if (k === 'northUp') modes.drive.applyOrientation();
     if (k === 'driveLabels' && ctx.mode === 'drive') ctx.showLabels(settings.driveLabels);
   });
@@ -475,7 +518,10 @@ async function main() {
     if (confirm('Clear practice scores?')) store.del('stats');
   });
   $('#resetVisited').addEventListener('click', () => {
-    if (confirm('Forget the list of towns you have driven through?')) store.del('visited');
+    if (!confirm('Forget every place and drive this phone has remembered?')) return;
+    store.del('visited');
+    store.del('trips');
+    ctx.toast('Forgotten.');
   });
   $('#closeSettings').addEventListener('click', () => dlg.close());
   $('#exportNotes').addEventListener('click', () => {

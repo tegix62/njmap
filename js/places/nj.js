@@ -41,6 +41,32 @@ export default {
   gridAngle: null,
   driveZoom: 12.5,
   nearMi: 15,
-  quizTypes: ['find', 'name', 'dir', 'borders', 'confuse', 'section', 'landmark', 'north', 'point'],
+  quizTypes: ['find', 'roadto', 'name', 'dir', 'borders', 'confuse', 'section', 'landmark', 'north', 'point'],
   crossings: [],
+  // "Well-known": towns over 25,000 people, county seats, towns with a
+  // landmark, your own sound-alike pairs, plus these: places people name all
+  // the time even though they're small. A judgment call; edit freely.
+  wellKnown: {
+    minPop: 25000,
+    seats: [
+      'Hamilton Township|Atlantic', 'Hackensack City|Bergen', 'Mount Holly Township|Burlington', 'Camden City|Camden',
+      'Middle Township|Cape May', 'Bridgeton City|Cumberland', 'Newark City|Essex', 'Woodbury City|Gloucester',
+      'Jersey City|Hudson', 'Flemington Borough|Hunterdon', 'Trenton City|Mercer', 'New Brunswick City|Middlesex',
+      'Freehold Borough|Monmouth', 'Morristown Town|Morris', 'Toms River Township|Ocean', 'Paterson City|Passaic',
+      'Salem City|Salem', 'Somerville Borough|Somerset', 'Newton Town|Sussex', 'Elizabeth City|Union', 'Belvidere Town|Warren',
+    ],
+    names: [
+      // Shore
+      'Asbury Park', 'Belmar', 'Point Pleasant Beach', 'Seaside Heights', 'Long Branch', 'Spring Lake', 'Sea Girt', 'Red Bank',
+      'Long Beach', 'Beach Haven', 'Atlantic City', 'Ocean City', 'Margate City', 'Ventnor City', 'Sea Isle City',
+      'Wildwood', 'North Wildwood', 'Cape May', 'Brigantine', 'Avalon', 'Stone Harbor', 'Manasquan', 'Bradley Beach',
+      // Hudson waterfront & close-in
+      'Hoboken', 'Weehawken', 'Harrison', 'Secaucus', 'East Rutherford', 'Rutherford', 'Lyndhurst', 'Fort Lee', 'Edgewater',
+      'Englewood', 'Teaneck', 'Nutley', 'Belleville', 'Montclair', 'Maplewood', 'South Orange Village', 'West Orange', 'Orange',
+      // Suburban names everyone uses
+      'Ridgewood', 'Paramus', 'Mahwah', 'Ramsey', 'Wayne', 'Little Falls', 'Boonton', 'Denville', 'Rockaway', 'Madison',
+      'Chatham', 'Summit', 'Millburn', 'Westfield', 'Cranford', 'Rahway', 'Metuchen', 'Princeton', 'Hightstown',
+      'Collingswood', 'Haddonfield', 'Moorestown', 'Lambertville', 'Hackettstown', 'Sparta', 'Bernardsville',
+    ],
+  },
 };

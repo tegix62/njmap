@@ -1,8 +1,8 @@
 import { bearing, distanceMi, compass8, compass16, angleDiff, dirWord, destination as destinationPt } from './geo.js';
-import { THEME } from './theme.js';
 import { gridY } from './grid.js';
+import { roadsFrom } from './roads.js';
 
-const L = THEME.label;
+let L; // label colors of the active theme (set in initPractice)
 
 const TYPES = {
   mix: 'Mixed',
@@ -18,17 +18,19 @@ const TYPES = {
   avedir: 'Which way does the avenue run?',
   crossing: 'Which crossing lands closest?',
   uptown: 'Point uptown',
+  roadto: 'Which road gets you there?',
   trip: 'My last drive',
 };
-const WEIGHT = { find: 2, dir: 2, borders: 2, north: 2, point: 2 };
+const WEIGHT = { find: 2, dir: 2, borders: 2, north: 2, point: 2, roadto: 3 };
 const DIR8 = ['NW', 'N', 'NE', 'W', '', 'E', 'SW', 'S', 'SE'];
 const DIR_DEG = { N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315 };
 
 export function initPractice(ctx) {
   const { map, store, munis } = ctx;
   const R = ctx.region;
+  L = ctx.theme.label;
   const CFG_KEY = R.id === 'nj' ? 'practice' : `practice.${R.id}`;
-  const cfg = { type: 'mix', area: 'all', ...store.get(CFG_KEY, {}) };
+  const cfg = { type: 'mix', area: R.wellKnown ? 'known' : 'all', ...store.get(CFG_KEY, {}) };
   const SC = R.gridAngle ? 0.12 : 1; // Manhattan distances are short
   const allowed = ['mix', ...R.quizTypes, 'trip'];
   if (!allowed.includes(cfg.type)) cfg.type = 'mix';
@@ -72,10 +74,16 @@ export function initPractice(ctx) {
     else if (a.startsWith('region:')) {
       const cs = (R.superGroups || {})[a.slice(7)] || [];
       p = munis.filter((m) => cs.includes(m.c));
+    } else if (a === 'known') p = munis.filter((m) => m.wellKnown);
+    else if (a === 'mylist') {
+      const keys = new Set(ctx.myList.keys());
+      p = munis.filter((m) => keys.has(m.key));
     } else if (a === 'visited') {
       const v = ctx.modes.drive.visited;
       p = munis.filter((m) => v[m.key]);
     } else if (a === 'near' && ctx.pos) p = munis.filter((m) => distanceMi(ctx.pos.pt, m.pt) <= R.nearMi);
+    // My list drives the questions even if it's short; wrong answers come from nearby.
+    if (a === 'mylist' && p.length) return p;
     return p.length >= 4 ? p : munis;
   }
 
@@ -100,6 +108,7 @@ export function initPractice(ctx) {
       s[m.key] = { b, due: now + DAYS[b] * DAY };
     } else s[m.key] = { b: 0, due: now + 10 * 60e3 };
     store.set('srs', s);
+    ctx.setKnow(m);
   }
   function dueCount(p) {
     const s = srs();
@@ -266,6 +275,45 @@ export function initPractice(ctx) {
     return makeFind(p);
   }
 
+  /**
+   * "From Wayne, which road gets you to Boonton?" Route knowledge: the bridge
+   * between knowing landmarks and having a mental map. Roads come from the
+   * map tiles, so the question is built after the map has loaded the area.
+   */
+  function makeRoadTo(p) {
+    if (ctx.settings.basemap === 'none') return makeBorders(p);
+    return { kind: 'roadto', m: pick(p), pending: true, tries: 0 };
+  }
+  function buildRoadTo(token) {
+    if (q !== token) return;
+    const A = q.m;
+    const roads = roadsFrom(map, A, ctx.locate, 12 * SC).slice(0, 5);
+    // A target only one of the roads reaches, not right next door
+    const counts = new Map();
+    for (const r of roads) for (const t of r.towns) counts.set(t.m.id, (counts.get(t.m.id) || 0) + 1);
+    const opts = [];
+    for (const r of roads)
+      for (const t of r.towns)
+        if (counts.get(t.m.id) === 1 && t.d >= 2.5 * SC && !A.neighbors.includes(t.m)) opts.push({ r, t, w: t.m.wellKnown ? 3 : 1 });
+    if (roads.length < 2 || !opts.length) {
+      if (++q.tries < 4) {
+        q.m = pick(q.p);
+        return show();
+      }
+      q = makeBorders(q.p);
+      q.p = token.p;
+      q.answered = false;
+      ctx.toast('No road question here. Asking another kind.');
+      return show();
+    }
+    const tot = opts.reduce((a, o) => a + o.w, 0);
+    let x = Math.random() * tot;
+    const o = opts.find((y) => (x -= y.w) <= 0) || opts[0];
+    Object.assign(q, { pending: false, roads, right: o.r, target: o.t.m, tgt: o.t, choices: shuffle(roads.slice(0, 4)) });
+    if (!q.choices.includes(o.r)) q.choices[0] = o.r;
+    show();
+  }
+
   /** Manhattan: "Point uptown." The grid is turned ~29° from true north. */
   function makeUptown() {
     return { kind: 'uptown', m: { key: 'uptown' }, angle: null };
@@ -351,6 +399,7 @@ export function initPractice(ctx) {
       avedir: makeAveDir,
       crossing: makeCrossing,
       uptown: makeUptown,
+      roadto: makeRoadTo,
     }[t](p);
     q.p = p;
     q.answered = false;
@@ -366,6 +415,8 @@ export function initPractice(ctx) {
     const nVisited = Object.keys(ctx.modes.drive.visited).length;
     const areaOpt = (v, label) => `<option value="${v}"${cfg.area === v ? ' selected' : ''}>${esc(label)}</option>`;
     const area =
+      (R.wellKnown ? areaOpt('known', `Well-known ${R.units} (${munis.filter((m) => m.wellKnown).length})`) : '') +
+      areaOpt('mylist', `My list (${ctx.myList.keys().filter((k) => ctx.byKey.has(k)).length})`) +
       areaOpt('all', `All of ${R.name}`) +
       (ctx.pos ? areaOpt('near', `Within ${R.nearMi} mi of me`) : '') +
       areaOpt('visited', `${R.units[0].toUpperCase() + R.units.slice(1)} I've been through (${nVisited})`) +
@@ -390,7 +441,11 @@ export function initPractice(ctx) {
       cfg.area = e.target.value;
       store.set(CFG_KEY, cfg);
       if (cfg.area === 'visited' && Object.keys(ctx.modes.drive.visited).length < 4)
-        alert(`Fewer than 4 ${R.units} visited so far. Use Drive mode with location on, and the ${R.units} you pass through will collect here. Using all of ${R.name} for now.`);
+        alert(
+          ctx.settings.rememberPlaces
+            ? `Fewer than 4 ${R.units} visited so far. Use Drive mode with location on, and the ${R.units} you pass through will collect here. Using all of ${R.name} for now.`
+            : `This uses places you've been, which the app only keeps if you turn on Settings → "Remember where I've been". It's off, so this uses all of ${R.name} for now.`
+        );
       next();
     });
   }
@@ -410,7 +465,9 @@ export function initPractice(ctx) {
     ctx.reveal([]);
     ctx.line(null);
     ctx.trip(null);
+    ctx.focusRoad(null);
     ctx.showLabels(false);
+    ctx.showRoadRefs(q.kind !== 'roadto');
     const m = q.m;
     let body = '';
     if (q.kind === 'find') {
@@ -428,6 +485,32 @@ export function initPractice(ctx) {
     } else if (q.kind === 'landmark') {
       ctx.hud(`<div class="qkind">Landmarks</div><div class="q"><b>${esc(q.landmark.name)}</b> is in which ${R.unit}?</div>`);
       body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
+    } else if (q.kind === 'roadto' && q.pending) {
+      ctx.highlight(m.id, 'q');
+      ctx.reveal([{ m, color: L.q }]);
+      ctx.hud(`<div class="qkind">Roads</div><div class="q">Finding the roads around ${prompt(m)}…</div>`);
+      body = `<div class="hint muted">Reading the road map for this area.</div>`;
+      const token = q;
+      requestAnimationFrame(() => {
+        ctx.fit([aroundBox(m.pt, 9 * SC)], 11.5);
+        let done = false;
+        const go = () => {
+          if (done) return;
+          done = true;
+          buildRoadTo(token);
+        };
+        map.once('idle', go);
+        setTimeout(go, 5000);
+      });
+    } else if (q.kind === 'roadto') {
+      ctx.highlight(m.id, 'q');
+      ctx.highlight(q.target.id, 'near');
+      ctx.reveal([
+        { m, color: L.q },
+        { m: q.target, color: L.neutral },
+      ]);
+      ctx.hud(`<div class="qkind">Roads</div><div class="q">From ${prompt(m)}, which road gets you to ${prompt(q.target)}?</div>`);
+      body = `<div class="choices">${q.choices.map((r, i) => `<button class="choice" data-v="${i}">${esc(r.label)}</button>`).join('')}</div>`;
     } else if (q.kind === 'avedir') {
       ctx.hud(`<div class="qkind">Avenues</div><div class="q">Which way does <b>${esc(q.name)}</b> run?</div>`);
       body = `<div class="choices three">${['uptown', 'downtown', 'two-way']
@@ -451,8 +534,12 @@ export function initPractice(ctx) {
       ctx.hud(`<div class="qkind">Point to it</div><div class="q">From ${from}, point to ${prompt(q.m)}</div>`);
       body = `${dialSVG()}<button class="primary" id="lockIn" disabled>Lock in</button>`;
     } else if (q.kind === 'tripnone') {
-      ctx.hud(`<div class="qkind">My last drive</div><div class="q">No drives recorded yet</div>`);
-      body = `<div class="hint muted">Turn on location in Drive mode. Each drive is saved on this phone, and you can review it here afterwards.</div>`;
+      ctx.hud(`<div class="qkind">My last drive</div><div class="q">No drives saved</div>`);
+      body = `<div class="hint muted">${
+        ctx.settings.rememberPlaces
+          ? 'Drive with location on, and each drive is saved on this phone for a recap here.'
+          : 'Drives are only saved if you turn on Settings → "Remember where I\'ve been". It\'s off, so nothing about your location is kept.'
+      }</div>`;
     } else if (q.kind === 'tripview') {
       showTripLine(q.trip);
       ctx.reveal(q.towns.map((x, k) => ({ m: x.m, label: `${k + 1}. ${x.m.n}`, color: L.neutral })));
@@ -491,10 +578,13 @@ export function initPractice(ctx) {
 
     // Frame the question without giving it away.
     requestAnimationFrame(() => {
-      if (q.kind === 'find') ctx.fit([areaBox(q.p)], 12);
+      if (q.kind === 'find')
+        // A short list would frame the answer itself; show the surroundings instead.
+        ctx.fit([q.p.length < 8 ? aroundBox(destinationPt(m.pt, Math.random() * 360, Math.random() * 8 * SC), 15 * SC) : areaBox(q.p)], 12);
       else if (q.kind === 'sec' || q.kind === 'landmark') ctx.fit([{ bbox: countyBox[m.c] }], 12);
       else if (q.kind === 'borders') ctx.fit([m, ...q.choices], 12.5);
       else if (q.kind === 'north') ctx.fit(q.choices, 15);
+      else if (q.kind === 'roadto' && !q.pending) ctx.fit([m, q.target], 12.5);
       else if (q.kind === 'crossing') ctx.fit([m, ...R.crossings.map((c) => c.pt)], 14);
       else if (q.kind === 'avedir' || q.kind === 'uptown') ctx.fit([{ bbox: [R.bounds[0][0], R.bounds[0][1], R.bounds[1][0], R.bounds[1][1]] }], 13);
       else if (q.kind === 'point') ctx.fit([aroundBox(q.from.pt, distanceMi(q.from.pt, m.pt) * 1.3)], 13);
@@ -590,6 +680,27 @@ export function initPractice(ctx) {
       ctx.reveal(items);
       feedback(ok, html);
       ctx.fit(ok ? [m] : [m, pickd], 13);
+    } else if (q.kind === 'roadto') {
+      const chosen = q.choices[+btn.dataset.v];
+      const ok = chosen === q.right;
+      record(q.target, ok);
+      btn.classList.add(ok ? 'right' : 'wrong');
+      document.querySelector(`#qbody .choice[data-v="${q.choices.indexOf(q.right)}"]`).classList.add('right');
+      ctx.showRoadRefs(true);
+      ctx.focusRoad(q.right.raw);
+      ctx.highlight(q.target.id, 'good');
+      // the towns along the right road, on the target's side
+      const toward = q.right.towns.filter((t) => Math.abs(angleDiff(bearing(m.pt, t.m.pt), bearing(m.pt, q.target.pt))) <= 60 && t.d <= q.tgt.d + 0.05 * SC);
+      let html = `${ok ? '✓' : '✗'} <b>${esc(q.right.label)}</b> runs from ${esc(m.n)} ${dirWord(compass8(bearing(m.pt, q.target.pt)))}: ${esc(
+        toward.map((t) => t.m.n).join(' → ')
+      )}.`;
+      if (!ok) {
+        const other = chosen.towns.slice(0, 5).map((t) => `${t.m.n} (${t.dir})`).join(', ');
+        html += ` ${esc(chosen.label)} goes to ${esc(other)}.`;
+      }
+      ctx.reveal([{ m, color: L.q }, ...toward.map((t) => ({ m: t.m, color: t.m === q.target ? L.good : L.neutral }))]);
+      feedback(ok, html);
+      ctx.fit([m, q.target], 12.5);
     } else if (q.kind === 'avedir') {
       const ok = btn.dataset.v === q.dir;
       record(m, ok);
@@ -780,7 +891,7 @@ export function initPractice(ctx) {
     const d = distanceMi(q.from.pt, m.pt);
     ctx.lines([
       { coords: [q.from.pt, m.pt] },
-      { coords: [q.from.pt, destinationPt(q.from.pt, q.angle, d)], color: THEME.ink4 },
+      { coords: [q.from.pt, destinationPt(q.from.pt, q.angle, d)], color: ctx.theme.ink4 },
     ]);
     const from = q.from.you ? 'you' : q.from.name;
     feedback(
@@ -853,6 +964,8 @@ export function initPractice(ctx) {
       ctx.reveal([]);
       ctx.line(null);
       ctx.trip(null);
+      ctx.showRoadRefs(true);
+      ctx.focusRoad(null);
       ctx.showLabels(true);
     },
   };
