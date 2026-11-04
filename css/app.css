@@ -1059,3 +1059,64 @@ details.more summary {
   font-size: 13px;
   margin-top: 6px;
 }
+.sw {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 5px;
+  vertical-align: 0;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+.sw.big {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  margin-right: 8px;
+  vertical-align: 2px;
+}
+.hwyends {
+  margin-top: 8px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.hwyend .k {
+  display: inline-block;
+  min-width: 46px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--panel-muted);
+}
+.hwymeets {
+  margin-top: 6px;
+  font-size: 14px;
+}
+.hwymeets .label-sm {
+  margin-right: 6px;
+}
+/* left / right / ahead / behind pad */
+.lrpad {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas: 'ahead ahead' 'left right' 'behind behind';
+  gap: 6px;
+  margin-top: 6px;
+}
+.lrpad .lr-ahead {
+  grid-area: ahead;
+}
+.lrpad .lr-left {
+  grid-area: left;
+}
+.lrpad .lr-right {
+  grid-area: right;
+}
+.lrpad .lr-behind {
+  grid-area: behind;
+}
+.lrpad.answered .choice {
+  padding: 5px;
+  min-height: 0;
+  font-size: 14px;
+}

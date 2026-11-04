@@ -77,6 +77,10 @@ export function initExplore(ctx) {
   }
 
   function select(m, fly = true) {
+    if (hwySel) {
+      hwySel = null;
+      ctx.focusRoad(null);
+    }
     if (sel) ctx.highlight(sel.id, null);
     if (m !== sel) {
       showAllSections = false;
@@ -166,7 +170,7 @@ export function initExplore(ctx) {
             .join('')}</div>`;
       }
       return `<div class="chips">${roads
-        .map((x) => `<button class="chip${x.label === roadSel ? ' on' : ''}" data-road="${esc(x.label)}">${esc(x.label)}</button>`)
+        .map((x) => `<button class="chip${x.label === roadSel ? ' on' : ''}" data-road="${esc(x.label)}">${ctx.swatch(x.label)}${esc(x.label)}</button>`)
         .join('')}</div>${
         r
           ? `${leads}${noteCards('road', r.label, draftNote(r.label, r.name, ctx.region.roadNotes)) || '<div class="hint muted">No notes yet.</div>'}
@@ -195,6 +199,50 @@ export function initExplore(ctx) {
     return '';
   }
 
+  // ---- highways -------------------------------------------------------------
+  let hwySel = null;
+  function highwayChips() {
+    const hs = ctx.region.highways;
+    if (!hs.length) return '';
+    return `<div class="label-sm">Highways</div><div class="chips">${hs
+      .map((h) => `<button class="chip" data-hwy="${esc(h.label)}">${ctx.swatch(h.label)}${esc(h.label)}</button>`)
+      .join('')}</div>`;
+  }
+  function highwayCard(h) {
+    const town = (key) => {
+      const m = ctx.byKey.get(key);
+      return m ? m.n : '';
+    };
+    const ends = h.ends
+      .map((e) => `<div class="hwyend"><span class="k">${e.side}</span> ${esc(e.name)}${town(e.town) && !e.name.includes(town(e.town)) ? ` <span class="muted">(${esc(town(e.town))})</span>` : ''}</div>`)
+      .join('');
+    const meets = (ctx.region.junctions || [])
+      .filter((j) => j.a === h.label || j.b === h.label)
+      .map((j) => `${ctx.swatch(j.a === h.label ? j.b : j.a)}${esc(j.a === h.label ? j.b : j.a)} at ${esc(town(j.town))}`)
+      .join(' · ');
+    const others = ctx.region.highways
+      .filter((o) => o !== h)
+      .map((o) => `<button class="chip" data-hwy="${esc(o.label)}">${ctx.swatch(o.label)}${esc(o.label)}</button>`)
+      .join('');
+    return `<div class="titlerow"><div class="town">${ctx.swatch(h.label).replace('class="sw"', 'class="sw big"')}${esc(h.label)}</div><button class="star" id="hwyBack">✕ Close</button></div>
+      <div class="meta">${esc(h.full)} · runs ${esc(h.runs)}</div>
+      <div class="hwyends">${ends}</div>
+      ${meets ? `<div class="hwymeets"><span class="label-sm">Meets</span> ${meets}</div>` : ''}
+      <div class="note">${esc(h.note)}</div>
+      ${h.exits ? `<div class="hint muted">${esc(h.exits)}</div>` : ''}
+      <div class="chips" style="margin-top:8px">${others}</div>`;
+  }
+  function showHighway(h) {
+    hwySel = h;
+    if (sel) ctx.highlight(sel.id, null);
+    sel = null;
+    ctx.focus(null);
+    ctx.reveal(h.ends.map((e) => ({ m: null, pt: e.pt, label: e.name.replace(/^the /, ''), color: L.neutral, key: true })));
+    ctx.focusHighway(h);
+    render();
+    requestAnimationFrame(() => ctx.fit(h.ends.map((e) => e.pt), 11));
+  }
+
   function starBtn(m) {
     const on = ctx.myList.has(m);
     return `<button class="star" id="starBtn" aria-pressed="${on}" title="${on ? 'On your list' : 'Add to your list to practice'}">${on ? '★ My list' : '☆ My list'}</button>`;
@@ -203,11 +251,13 @@ export function initExplore(ctx) {
   function render() {
     const R = ctx.region;
     const search = `<input id="search" type="search" list="townlist" placeholder="${R.sections ? 'Search a town, village or landmark…' : `Search a ${R.unit} or landmark…`}" autocomplete="off" enterkeyhint="go">`;
-    if (!sel) {
+    if (hwySel) {
+      ctx.hud(`${search}${highwayCard(hwySel)}`);
+    } else if (!sel) {
       ctx.hud(
         `${search}<div class="meta">Tap anywhere on the map to see which ${R.unit} it is and what surrounds it. ${
           R.sections ? 'Search also finds villages ("Towaco") and landmarks ("Willowbrook").' : 'Search also finds landmarks ("Penn Station").'
-        }</div>`
+        }</div>${highwayChips()}`
       );
     } else {
       const m = sel;
@@ -253,6 +303,15 @@ export function initExplore(ctx) {
       }
     });
     for (const b of hud.querySelectorAll('[data-id]')) b.addEventListener('click', () => select(ctx.munis[+b.dataset.id]));
+    for (const b of hud.querySelectorAll('[data-hwy]')) b.addEventListener('click', () => showHighway(ctx.hwy(b.dataset.hwy)));
+    const back = document.getElementById('hwyBack');
+    if (back)
+      back.addEventListener('click', () => {
+        hwySel = null;
+        ctx.focusRoad(null);
+        ctx.reveal([]);
+        render();
+      });
     const star = document.getElementById('starBtn');
     if (star)
       star.addEventListener('click', () => {
@@ -275,7 +334,7 @@ export function initExplore(ctx) {
       b.addEventListener('click', () => {
         roadSel = roadSel === b.dataset.road ? null : b.dataset.road;
         const r = roadSel && roadsInTown(map, sel, ctx.locate).find((x) => x.label === roadSel);
-        ctx.focusRoad(r ? r.raw : null);
+        ctx.focusRoad(r ? r.raw : null, r && ctx.hwy(r.label) ? ctx.hwy(r.label).color : null);
         render();
       });
     for (const b of hud.querySelectorAll('.addnote'))

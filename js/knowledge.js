@@ -80,3 +80,123 @@ export const LANDMARKS = [
   { name: 'Cape May Lighthouse', kind: 'Lighthouse', pt: [-74.96, 38.933], town: 'Lower Township|Cape May' },
   { name: 'High Point Monument', kind: 'Park', pt: [-74.6617, 41.3209], town: 'Montague Township|Sussex' },
 ];
+
+/**
+ * The big highways, each with its own color everywhere in the app, so the
+ * Turnpike always looks like the Turnpike. Colors avoid the blue / green /
+ * red that mean "selected / right / wrong".
+ * `match` is the OpenStreetMap route ref that identifies the road.
+ * End points are checked against the town boundaries by the test script.
+ */
+export const HIGHWAYS = [
+  {
+    label: 'Turnpike',
+    full: 'New Jersey Turnpike',
+    match: 'NJTP',
+    color: '#7b5ea7',
+    runs: 'southwest–northeast',
+    ends: [
+      { side: 'south', name: 'the Delaware Memorial Bridge', pt: [-75.475, 39.69], town: 'Carneys Point Township|Salem' },
+      { side: 'north', name: 'the George Washington Bridge', pt: [-73.968, 40.851], town: 'Fort Lee Borough|Bergen' },
+    ],
+    exits: 'Exits are numbered in order, 1 to 18 (with lettered ones like 15W and 16E), so the number doesn’t tell you mileage.',
+    note: 'It crosses the Parkway at Woodbridge, like an X. North of Woodbridge the Turnpike is the eastern one (Newark Airport, the Meadowlands). South of it, the Turnpike cuts southwest toward Trenton and Delaware while the Parkway heads down the Shore.',
+  },
+  {
+    label: 'Parkway',
+    full: 'Garden State Parkway',
+    match: 'GSP',
+    color: '#2e8b82',
+    runs: 'south–north',
+    ends: [
+      { side: 'south', name: 'Cape May', pt: [-74.905, 38.955], town: 'Lower Township|Cape May' },
+      { side: 'north', name: 'the New York line at Montvale', pt: [-74.045, 41.06], town: 'Montvale Borough|Bergen' },
+    ],
+    exits: 'Exit numbers are mileposts counted from Cape May: Exit 105 is about 105 miles up.',
+    note: 'It crosses the Turnpike at Woodbridge, like an X. North of Woodbridge the Parkway swings inland through Union, the Oranges, Clifton and Paramus. South of it, the Parkway is the Shore road.',
+  },
+  {
+    label: 'I-80',
+    full: 'Interstate 80',
+    match: 'I 80',
+    color: '#c48a1e',
+    runs: 'west–east',
+    ends: [
+      { side: 'west', name: 'the Delaware Water Gap', pt: [-75.105, 40.958], town: 'Knowlton Township|Warren' },
+      { side: 'east', name: 'Teaneck (at I-95, toward the GWB)', pt: [-74.005, 40.885], town: 'Teaneck Township|Bergen' },
+    ],
+    exits: 'Exit numbers count miles from the Delaware River.',
+    note: 'North Jersey’s east–west spine: Paterson, Wayne, Parsippany, Rockaway.',
+  },
+  {
+    label: 'I-287',
+    full: 'Interstate 287',
+    match: 'I 287',
+    color: '#9a5b2e',
+    runs: 'an arc, south to north',
+    ends: [
+      { side: 'south', name: 'Edison (at the Turnpike)', pt: [-74.385, 40.53], town: 'Edison Township|Middlesex' },
+      { side: 'north', name: 'the New York line at Mahwah', pt: [-74.165, 41.105], town: 'Mahwah Township|Bergen' },
+    ],
+    exits: 'Exit numbers count miles from Edison.',
+    note: 'A ring around the metro area: Piscataway, Bridgewater, Morristown, Parsippany, then north through Oakland to Mahwah.',
+  },
+  {
+    label: 'I-78',
+    full: 'Interstate 78',
+    match: 'I 78',
+    color: '#7a8a2a',
+    runs: 'west–east',
+    ends: [
+      { side: 'west', name: 'Phillipsburg (at the Delaware River)', pt: [-75.19, 40.69], town: 'Phillipsburg Town|Warren' },
+      { side: 'east', name: 'the Holland Tunnel', pt: [-74.04, 40.727], town: 'Jersey City|Hudson' },
+    ],
+    exits: 'Exit numbers count miles from the Delaware River.',
+    note: 'Central Jersey’s east–west spine: Clinton, Bridgewater, Union County, Newark.',
+  },
+  {
+    label: 'I-295',
+    full: 'Interstate 295',
+    match: 'I 295',
+    color: '#b0607e',
+    runs: 'southwest–northeast, along the Delaware',
+    ends: [
+      { side: 'south', name: 'the Delaware Memorial Bridge', pt: [-75.47, 39.69], town: 'Carneys Point Township|Salem' },
+      { side: 'north', name: 'the Trenton area', pt: [-74.82, 40.27], town: 'Ewing Township|Mercer' },
+    ],
+    exits: 'Exit numbers count miles from the Delaware Memorial Bridge.',
+    note: 'The free alternative to the Turnpike on the Philadelphia side of South Jersey.',
+  },
+  {
+    label: 'AC Expressway',
+    full: 'Atlantic City Expressway',
+    match: 'ACE',
+    color: '#5f7286',
+    runs: 'northwest–southeast',
+    ends: [
+      { side: 'west', name: 'Turnersville', pt: [-75.06, 39.77], town: 'Washington Township|Gloucester' },
+      { side: 'east', name: 'Atlantic City', pt: [-74.44, 39.365], town: 'Atlantic City|Atlantic' },
+    ],
+    exits: '',
+    note: 'The Philadelphia side’s road to Atlantic City. It meets the Parkway in Egg Harbor Township.',
+  },
+];
+
+/** Where the big highways meet, checked against the boundaries. */
+export const JUNCTIONS = [
+  { a: 'Parkway', b: 'Turnpike', town: 'Woodbridge Township|Middlesex' },
+  { a: 'I-287', b: 'Turnpike', town: 'Edison Township|Middlesex' },
+  { a: 'I-80', b: 'Turnpike', town: 'Teaneck Township|Bergen' },
+  { a: 'I-78', b: 'Turnpike', town: 'Newark City|Essex' },
+  { a: 'I-195', b: 'Turnpike', town: 'Robbinsville Township|Mercer' },
+  { a: 'AC Expressway', b: 'Parkway', town: 'Egg Harbor Township|Atlantic' },
+];
+
+/** Far-off places worth always being able to point to. */
+export const BIG_PLACES = [
+  { name: 'Manhattan (Midtown)', pt: [-73.9857, 40.7484] },
+  { name: 'Philadelphia', pt: [-75.1636, 39.9526] },
+  { name: 'Atlantic City', pt: [-74.4229, 39.3643] },
+  { name: 'Newark Airport', pt: [-74.1745, 40.6895] },
+  { name: 'Trenton', pt: [-74.7699, 40.2204] },
+];

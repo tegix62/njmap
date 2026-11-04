@@ -1,5 +1,5 @@
 // New Jersey: 564 municipalities, grouped by county.
-import { LANDMARKS, ROAD_NOTES } from '../knowledge.js';
+import { LANDMARKS, ROAD_NOTES, HIGHWAYS, JUNCTIONS, BIG_PLACES } from '../knowledge.js';
 import { GROUPS } from '../confusables.js';
 import { REGIONS } from '../regions.js';
 import { THEME } from '../theme.js';
@@ -41,8 +41,11 @@ export default {
   gridAngle: null,
   driveZoom: 12.5,
   nearMi: 15,
-  quizTypes: ['find', 'roadto', 'name', 'dir', 'borders', 'confuse', 'section', 'landmark', 'north', 'point'],
+  quizTypes: ['find', 'roadto', 'leftright', 'name', 'dir', 'borders', 'confuse', 'section', 'landmark', 'north', 'point', 'bigpoint', 'hwydir', 'hwyfact'],
   crossings: [],
+  highways: HIGHWAYS,
+  junctions: JUNCTIONS,
+  bigPlaces: BIG_PLACES,
   // "Well-known": towns over 25,000 people, county seats, towns with a
   // landmark, your own sound-alike pairs, plus these: places people name all
   // the time even though they're small. A judgment call; edit freely.

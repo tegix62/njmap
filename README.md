@@ -26,6 +26,10 @@ The screen is built in two layers. The first is what you can take in at a glance
   - *Name the highlighted town*
   - *Which direction is B from A?*
   - *Which of these borders Wayne?* (the wrong answers are nearby towns that don't touch it)
+  - *Left or right?* "You're in Clifton heading north. Is Paterson ahead, left, right or behind?" The map turns to your heading, which drills turning a compass direction into a turn.
+  - *Point to the big places:* from a town, point the dial at Manhattan, Philadelphia, Atlantic City, Newark Airport or Trenton.
+  - *Which way does the highway run?* Point the dial along it (either direction counts).
+  - *Highway ends & crossings:* "Where does the Parkway end in the north?" "Where do the Parkway and the Turnpike meet?"
   - *Which road gets you there?* "From Wayne, which road gets you to Boonton?" Road numbers are hidden on the map until you answer; then the road is highlighted along with the towns it passes.
   - *Which town is this village in?*
   - *Where is this landmark?*
@@ -35,6 +39,7 @@ The screen is built in two layers. The first is what you can take in at a glance
   - *Sound-alikes* (Clifton/Rockaway, Mahwah/Rahway/Matawan, Montclair/Montvale/Montville…)
 
   Practice starts with the **169 well-known towns**: those over 25,000 people, the county seats, towns with a landmark, your sound-alike pairs, and a hand-picked list of places people name all the time (Shore towns, Hoboken, Montclair, Red Bank, Harrison…), editable in `js/places/nj.js`. You can also limit questions to **My list**, all of NJ, a region, a county, towns near you, or towns you've been through. Review is spaced over days: a right answer pushes a town's next review out to 1, 3, 7, 16, then 35 days, and a miss brings it back within 10 minutes. Mixed mode never asks the same type of question twice in a row.
+- **Highways have identities.** The seven big ones each keep one color everywhere in the app: on the map, in Drive's road line, on Explore's road chips, in quiz answers. The Turnpike is purple, the Parkway teal, I-80 amber, I-287 rust, I-78 olive, I-295 rose and the AC Expressway slate. These colors stay clear of the blue, green and red used for selections and answers. Explore → **Highways** lights one up across the state and shows a card: where it starts and ends, which way it runs, how its exits are numbered, and where it meets the others. The key fact for telling the two toll roads apart: **the Parkway and the Turnpike cross at Woodbridge, like an X.** North of there the Turnpike is the eastern one; south of there the Parkway takes the Shore.
 - **Your notes**: add a note to any town or road, e.g. *"Use 23 instead of 287 at rush hour"*. Notes show up in Drive and Explore. They stay on your phone; Settings can export and import them as a file.
 - **On the map**: river and lake names, and 31 landmarks (stadiums, malls, train stations, parks, colleges).
 

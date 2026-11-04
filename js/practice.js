@@ -19,9 +19,13 @@ const TYPES = {
   crossing: 'Which crossing lands closest?',
   uptown: 'Point uptown',
   roadto: 'Which road gets you there?',
+  leftright: 'Left or right?',
+  bigpoint: 'Point to the big places',
+  hwydir: 'Which way does the highway run?',
+  hwyfact: 'Highway ends & crossings',
   trip: 'My last drive',
 };
-const WEIGHT = { find: 2, dir: 2, borders: 2, north: 2, point: 2, roadto: 3 };
+const WEIGHT = { find: 2, dir: 2, borders: 2, north: 2, point: 2, roadto: 3, leftright: 3, bigpoint: 2 };
 const DIR8 = ['NW', 'N', 'NE', 'W', '', 'E', 'SW', 'S', 'SE'];
 const DIR_DEG = { N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315 };
 
@@ -352,6 +356,71 @@ export function initPractice(ctx) {
     return { kind: 'point', m, from, angle: null };
   }
 
+  /**
+   * "You're in Clifton heading north. Is Paterson ahead, left, right or
+   * behind?" The map turns to your heading: turning a compass direction into
+   * a left or right turn.
+   */
+  function makeLeftRight(p) {
+    const SIDES = { ahead: [0, 35], right: [55, 125], behind: [145, 180], left: [-125, -55] };
+    for (let tries = 0; tries < 200; tries++) {
+      const a = pick(p);
+      const heading = 45 * Math.floor(Math.random() * 8);
+      const pool2 = munis.filter((o) => o !== a && distanceMi(a.pt, o.pt) > 2 * SC && distanceMi(a.pt, o.pt) < 14 * SC);
+      if (!pool2.length) continue;
+      const b = rand(pool2.filter((o) => o.wellKnown).length ? pool2.filter((o) => o.wellKnown) : pool2);
+      const rel = angleDiff(bearing(a.pt, b.pt), heading);
+      const side = Object.keys(SIDES).find((k) => {
+        const [lo, hi] = SIDES[k];
+        return k === 'behind' ? Math.abs(rel) >= lo : k === 'ahead' ? Math.abs(rel) <= hi : rel >= lo && rel <= hi;
+      });
+      if (!side) continue; // too close to a diagonal to be fair
+      return { kind: 'leftright', m: b, from: a, heading, side, rel };
+    }
+    return makeDir(p);
+  }
+
+  /** Point from a town (or you) to Manhattan, Philadelphia, Atlantic City… */
+  function makeBigPoint(p) {
+    const origins = [];
+    if (ctx.pos && Date.now() - ctx.pos.t < 5 * 60e3) origins.push({ name: 'you', pt: ctx.pos.pt, you: true });
+    let from = origins.length && Math.random() < 0.4 ? origins[0] : null;
+    if (!from) {
+      const m = pick(p);
+      from = { name: m.n, pt: m.pt, m };
+    }
+    const far = R.bigPlaces.filter((b) => distanceMi(from.pt, b.pt) > 6);
+    if (!far.length) return makePoint(p);
+    const b = rand(far);
+    return { kind: 'point', big: true, m: { key: `big:${b.name}`, n: b.name, pt: b.pt }, from, angle: null };
+  }
+
+  /** "the Turnpike", "the Parkway", "the AC Expressway", but just "I-80" */
+  const theHwy = (label) => (/^I-|^Route /.test(label) ? label : `the ${label}`);
+  const TheHwy = (label) => theHwy(label).replace(/^the /, 'The ');
+
+  /** "Which way does the Turnpike run?": point along it (either end counts). */
+  function makeHwyDir() {
+    const h = rand(R.highways);
+    return { kind: 'hwydir', h, m: { key: `hwy:${h.label}` }, angle: null };
+  }
+
+  /** "Where does the Parkway end in the north?" / "Where do the Parkway and Turnpike cross?" */
+  function makeHwyFact() {
+    const town = (key) => ctx.byKey.get(key);
+    if (Math.random() < 0.4 && R.junctions.length >= 4) {
+      const j = rand(R.junctions);
+      const right = town(j.town);
+      const wrong = shuffle(R.junctions.filter((x) => x.town !== j.town).map((x) => town(x.town))).slice(0, 3);
+      return { kind: 'hwyfact', sub: 'cross', j, m: right, key: `cross:${j.a}|${j.b}`, choices: shuffle([right, ...wrong]) };
+    }
+    const h = rand(R.highways);
+    const e = rand(h.ends);
+    const right = e;
+    const others = shuffle(R.highways.flatMap((o) => o.ends).filter((x) => x.name !== e.name)).slice(0, 3);
+    return { kind: 'hwyfact', sub: 'end', h, e, m: { key: `end:${h.label}:${e.side}` }, choices: shuffle([right, ...others]) };
+  }
+
   /** Recap of your most recent drive, then questions about it. */
   function makeTrip() {
     const trip = ctx.modes.drive.trips().filter((t) => t.towns.length >= 2).pop();
@@ -414,6 +483,10 @@ export function initPractice(ctx) {
       crossing: makeCrossing,
       uptown: makeUptown,
       roadto: makeRoadTo,
+      leftright: makeLeftRight,
+      bigpoint: makeBigPoint,
+      hwydir: makeHwyDir,
+      hwyfact: makeHwyFact,
     }[t](p);
     q.p = p;
     q.answered = false;
@@ -482,6 +555,7 @@ export function initPractice(ctx) {
     ctx.focusRoad(null);
     ctx.showLabels(false);
     ctx.showRoadRefs(false); // fewer labels while answering; shown after a road question
+    if (q.kind !== 'leftright' && map.getBearing() !== 0) map.jumpTo({ bearing: 0 });
     const m = q.m;
     let body = '';
     if (q.kind === 'find') {
@@ -499,6 +573,28 @@ export function initPractice(ctx) {
     } else if (q.kind === 'landmark') {
       ctx.hud(`<div class="qkind">Landmarks</div><div class="q"><b>${esc(q.landmark.name)}</b> is in which ${R.unit}?</div>`);
       body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
+    } else if (q.kind === 'leftright') {
+      const a = q.from;
+      ctx.highlight(a.id, 'q');
+      ctx.reveal([{ m: a, color: L.q }]);
+      map.jumpTo({ bearing: q.heading });
+      ctx.hud(
+        `<div class="qkind">Left or right?</div><div class="q">You're in ${prompt(a)}, heading <b>${dirWord(compass8(q.heading))}</b>. Which way is ${prompt(m)}?</div>`
+      );
+      body = `<div class="lrpad">${['ahead', 'left', 'right', 'behind']
+        .map((v) => `<button class="choice lr-${v}" data-v="${v}">${{ ahead: '▲ Ahead', left: '◀ Left', right: 'Right ▶', behind: '▼ Behind' }[v]}</button>`)
+        .join('')}</div>`;
+    } else if (q.kind === 'hwydir') {
+      ctx.hud(`<div class="qkind">Highways</div><div class="q">Which way does ${ctx.swatch(q.h.label)}<b>${esc(theHwy(q.h.label))}</b> run? Point along it.</div>`);
+      body = `${dialSVG()}<button class="primary" id="lockIn" disabled>Lock in</button>`;
+    } else if (q.kind === 'hwyfact' && q.sub === 'cross') {
+      ctx.hud(
+        `<div class="qkind">Highways</div><div class="q">Where do ${ctx.swatch(q.j.a)}<b>${esc(theHwy(q.j.a))}</b> and ${ctx.swatch(q.j.b)}<b>${esc(theHwy(q.j.b))}</b> meet?</div>`
+      );
+      body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
+    } else if (q.kind === 'hwyfact') {
+      ctx.hud(`<div class="qkind">Highways</div><div class="q">Where does ${ctx.swatch(q.h.label)}<b>${esc(theHwy(q.h.label))}</b> end in the <b>${q.e.side}</b>?</div>`);
+      body = `<div class="choices">${q.choices.map((e, i) => `<button class="choice" data-v="${i}">${esc(e.name.replace(/^the /, ''))}</button>`).join('')}</div>`;
     } else if (q.kind === 'roadto' && q.pending) {
       ctx.highlight(m.id, 'q');
       ctx.reveal([{ m, color: L.q }]);
@@ -524,7 +620,7 @@ export function initPractice(ctx) {
         { m: q.target, color: L.neutral },
       ]);
       ctx.hud(`<div class="qkind">Roads</div><div class="q">From ${prompt(m)}, which road gets you to ${prompt(q.target)}?</div>`);
-      body = `<div class="choices">${q.choices.map((r, i) => `<button class="choice" data-v="${i}">${esc(r.label)}</button>`).join('')}</div>`;
+      body = `<div class="choices">${q.choices.map((r, i) => `<button class="choice" data-v="${i}">${ctx.swatch(r.label)}${esc(r.label)}</button>`).join('')}</div>`;
     } else if (q.kind === 'avedir') {
       ctx.hud(`<div class="qkind">Avenues</div><div class="q">Which way does <b>${esc(q.name)}</b> run?</div>`);
       body = `<div class="choices three">${['uptown', 'downtown', 'two-way']
@@ -545,7 +641,7 @@ export function initPractice(ctx) {
     } else if (q.kind === 'point') {
       const from = q.from.you ? 'where you are' : `<b>${esc(q.from.name)}</b>`;
       if (!q.from.you) ctx.reveal([{ m: q.m, pt: q.from.pt, label: q.from.name, color: L.q }]);
-      ctx.hud(`<div class="qkind">Point to it</div><div class="q">From ${from}, point to ${prompt(q.m)}</div>`);
+      ctx.hud(`<div class="qkind">Point to it</div><div class="q">From ${from}, point to ${q.big ? `<b>${esc(q.m.n)}</b>` : prompt(q.m)}</div>`);
       body = `${dialSVG()}<button class="primary" id="lockIn" disabled>Lock in</button>`;
     } else if (q.kind === 'tripnone') {
       ctx.hud(`<div class="qkind">My last drive</div><div class="q">No drives saved</div>`);
@@ -586,7 +682,7 @@ export function initPractice(ctx) {
     ctx.sheet(`${header()}<div id="qbody">${body}</div>`);
     bindHeader();
     for (const b of document.querySelectorAll('#qbody .choice')) b.addEventListener('click', () => answer(b));
-    if (q.kind === 'point' || q.kind === 'uptown') bindDial();
+    if (q.kind === 'point' || q.kind === 'uptown' || q.kind === 'hwydir') bindDial();
     const tq = document.getElementById('tripQuiz');
     if (tq) tq.addEventListener('click', next);
 
@@ -601,7 +697,10 @@ export function initPractice(ctx) {
       else if (q.kind === 'roadto' && !q.pending) ctx.fit([m, q.target], 12.5);
       else if (q.kind === 'crossing') ctx.fit([m, ...R.crossings.map((c) => c.pt)], 14);
       else if (q.kind === 'avedir' || q.kind === 'uptown') ctx.fit([{ bbox: [R.bounds[0][0], R.bounds[0][1], R.bounds[1][0], R.bounds[1][1]] }], 13);
+      else if (q.kind === 'point' && q.big) ctx.fit([aroundBox(q.from.pt, 8 * SC)], 12);
       else if (q.kind === 'point') ctx.fit([aroundBox(q.from.pt, distanceMi(q.from.pt, m.pt) * 1.3)], 13);
+      else if (q.kind === 'leftright') ctx.fit([aroundBox(q.from.pt, distanceMi(q.from.pt, m.pt) * 1.2)], 13);
+      else if (q.kind === 'hwydir' || q.kind === 'hwyfact') ctx.fit([{ bbox: [R.bounds[0][0], R.bounds[0][1], R.bounds[1][0], R.bounds[1][1]] }], 9);
       else if (q.kind.startsWith('trip') && q.trip) ctx.fit([{ bbox: tripBox(q.trip) }], 13);
       else if (q.kind === 'name') ctx.fit(q.group ? q.group.members : [{ bbox: countyBox[m.c] }, m], 12.5);
       else if (q.kind === 'dir') {
@@ -622,7 +721,7 @@ export function initPractice(ctx) {
     q.answered = true;
     const qb = document.getElementById('qbody');
     // Once answered, the choices shrink so the map gets the room back
-    for (const g of qb.querySelectorAll('.choices, .rose8')) g.classList.add('answered');
+    for (const g of qb.querySelectorAll('.choices, .rose8, .lrpad')) g.classList.add('answered');
     qb.insertAdjacentHTML('beforeend', `<div class="fb ${ok ? 'ok' : 'no'}">${html}</div><button class="primary" id="nextQ">Next</button>`);
     document.querySelector('#sheet .score').outerHTML = header().match(/<div class="score">.*<\/div>$/s)[0];
     document.getElementById('nextQ').addEventListener('click', next);
@@ -694,6 +793,42 @@ export function initPractice(ctx) {
       ctx.reveal(items);
       feedback(ok, html);
       ctx.fit(ok ? [m] : [m, pickd], 13);
+    } else if (q.kind === 'leftright') {
+      const ok = btn.dataset.v === q.side;
+      record(m, ok);
+      btn.classList.add(ok ? 'right' : 'wrong');
+      document.querySelector(`#qbody .choice[data-v="${q.side}"]`).classList.add('right');
+      ctx.highlight(m.id, 'good');
+      ctx.reveal([{ m: q.from, color: L.q }, { m, color: L.good }]);
+      ctx.line([q.from.pt, m.pt]);
+      const rel = ctx.relative(q.from.pt, m.pt);
+      const sideWord = { ahead: 'ahead of you', behind: 'behind you', left: 'on your left', right: 'on your right' }[q.side];
+      const lr = `facing ${dirWord(compass8(q.heading))}, your left is ${dirWord(compass8(q.heading - 90))} and your right is ${dirWord(compass8(q.heading + 90))}`;
+      feedback(ok, `${ok ? '✓' : '✗'} <b>${esc(ctx.name(m))}</b> is ${sideWord}: it's ${rel.text} of ${esc(q.from.n)}, and ${lr}.`);
+      ctx.fit([q.from, m], 13);
+    } else if (q.kind === 'hwyfact' && q.sub === 'cross') {
+      const pickd = munis[+btn.dataset.id];
+      const ok = pickd === m;
+      record({ key: q.key }, ok);
+      btn.classList.add(ok ? 'right' : 'wrong');
+      document.querySelector(`#qbody .choice[data-id="${m.id}"]`).classList.add('right');
+      ctx.highlight(m.id, 'good');
+      if (!ok) ctx.highlight(pickd.id, 'bad');
+      ctx.reveal([{ m, color: L.good }, ...(ok ? [] : [{ m: pickd, color: L.bad }])]);
+      const ha = ctx.hwy(q.j.a);
+      feedback(ok, `${ok ? '✓' : '✗'} They meet in <b>${esc(m.full)}</b>, ${esc(ctx.groupName(m.c))}.${ha && q.j.b === 'Turnpike' && q.j.a === 'Parkway' ? `<div class="note">${esc(ha.note)}</div>` : ''}`);
+      ctx.fit(ok ? [m] : [m, pickd], 11);
+    } else if (q.kind === 'hwyfact') {
+      const chosen = q.choices[+btn.dataset.v];
+      const ok = chosen === q.e;
+      record(q.m, ok);
+      btn.classList.add(ok ? 'right' : 'wrong');
+      document.querySelector(`#qbody .choice[data-v="${q.choices.indexOf(q.e)}"]`).classList.add('right');
+      ctx.focusHighway(q.h);
+      ctx.reveal(q.h.ends.map((e) => ({ m: null, pt: e.pt, label: e.name.replace(/^the /, ''), color: e === q.e ? L.good : L.neutral, key: e === q.e })));
+      const other = q.h.ends.find((e) => e !== q.e);
+      feedback(ok, `${ok ? '✓' : '✗'} ${esc(TheHwy(q.h.label))} ends in the ${q.e.side} at <b>${esc(q.e.name)}</b>; its ${other.side} end is ${esc(other.name)}. It runs ${esc(q.h.runs)}.`);
+      ctx.fit(q.h.ends.map((e) => e.pt), 11);
     } else if (q.kind === 'roadto') {
       const chosen = q.choices[+btn.dataset.v];
       const ok = chosen === q.right;
@@ -889,6 +1024,7 @@ export function initPractice(ctx) {
   function answerPoint() {
     if (q.answered || q.angle == null) return;
     if (q.kind === 'uptown') return answerUptown();
+    if (q.kind === 'hwydir') return answerHwyDir();
     const m = q.m;
     const truth = bearing(q.from.pt, m.pt);
     const err = Math.abs(angleDiff(q.angle, truth));
@@ -898,10 +1034,10 @@ export function initPractice(ctx) {
     t.style.display = '';
     t.setAttribute('transform', `rotate(${truth})`);
     document.getElementById('lockIn').remove();
-    ctx.highlight(m.id, 'good');
+    if (!q.big) ctx.highlight(m.id, 'good');
     ctx.reveal([
       ...(q.from.you ? [] : [{ m, pt: q.from.pt, label: q.from.name, color: L.q }]),
-      { m, color: L.good },
+      q.big ? { m: null, pt: m.pt, label: m.n, color: L.good } : { m, color: L.good },
     ]);
     const d = distanceMi(q.from.pt, m.pt);
     ctx.lines([
@@ -913,7 +1049,28 @@ export function initPractice(ctx) {
       ok,
       `${ok ? '✓' : err <= 45 ? '≈' : '✗'} You were <b>${Math.round(err)}°</b> off. <b>${esc(m.n)}</b> is ${d < 10 ? d.toFixed(1) : Math.round(d)} mi <b>${dirWord(compass16(truth))}</b> (${Math.round(truth)}°) of ${esc(from)}.`
     );
-    ctx.fit([m, q.from.pt], 12);
+    ctx.fit([q.big ? m.pt : m, q.from.pt], 12);
+  }
+
+  function answerHwyDir() {
+    const h = q.h;
+    const [a, b] = h.ends.map((e) => e.pt);
+    const axis = bearing(a, b);
+    // pointing toward either end counts
+    const err = Math.min(Math.abs(angleDiff(q.angle, axis)), Math.abs(angleDiff(q.angle, axis + 180)));
+    const ok = err <= 20;
+    record(q.m, ok);
+    const t = document.getElementById('truth');
+    t.style.display = '';
+    t.setAttribute('transform', `rotate(${Math.abs(angleDiff(q.angle, axis)) <= 90 ? axis : axis + 180})`);
+    document.getElementById('lockIn').remove();
+    ctx.focusHighway(h);
+    ctx.reveal(h.ends.map((e) => ({ m: null, pt: e.pt, label: e.name.replace(/^the /, ''), color: L.neutral, key: true })));
+    feedback(
+      ok,
+      `${ok ? '✓' : '✗'} You were <b>${Math.round(err)}°</b> off. ${ctx.swatch(h.label)}${esc(TheHwy(h.label))} runs ${esc(h.runs)}, from ${esc(h.ends[0].name)} to ${esc(h.ends[1].name)}.`
+    );
+    ctx.fit([a, b], 11);
   }
 
   function answerUptown() {

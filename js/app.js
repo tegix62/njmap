@@ -140,6 +140,7 @@ async function main() {
     majorSize: region.majorSize,
     groupTint: region.groupTint,
     attribution: region.attribution,
+    highways: region.highways,
     data: {
       munis: munisData,
       counties: countiesFC,
@@ -366,6 +367,19 @@ async function main() {
           }
       }
       map.setGlobalStateProperty('focusing', !!m);
+    },
+    /** The big highway with this label (Turnpike, Parkway, I-80…), if any. */
+    hwy: (label) => region.highways.find((h) => h.label === label) || null,
+    /** A small color swatch for a highway label ('' for ordinary roads). */
+    swatch(label) {
+      const h = ctx.hwy(label);
+      return h ? `<span class="sw" style="background:${h.color}"></span>` : '';
+    },
+    /** Light up one whole highway across the map, in its own color. */
+    focusHighway(h) {
+      if (!h) return ctx.focusRoad(null);
+      map.setFilter('road-focus', ['>=', ['index-of', h.match, ['coalesce', ['get', 'ref'], '']], 0]);
+      map.setPaintProperty('road-focus', 'line-color', h.color);
     },
     /** Hide or show road numbers on the map (hidden while a road question is open). */
     showRoadRefs(on) {

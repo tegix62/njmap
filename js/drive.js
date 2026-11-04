@@ -435,15 +435,19 @@ export function initDrive(ctx) {
     return `<div class="look ${cls}"><span class="k">${label} <b>${compass8(r.dir)}</b></span><span class="v">${name}</span><span class="d">${mi(r.d)}</span></div>`;
   }
 
+  const hwyStyle = (label) => {
+    const h = ctx.hwy(label);
+    return h ? ` style="background:${h.color};color:#fff"` : '';
+  };
   function roadLine() {
     if (!st.roads.length) return '';
     if (st.onRoad && st.heading != null)
-      return `<div class="roadline"><span class="on">On <b>${esc(st.onRoad)} ${travelDir(st.heading)}</b></span>${
+      return `<div class="roadline"><span class="on">On <b${hwyStyle(st.onRoad)}>${esc(st.onRoad)} ${travelDir(st.heading)}</b></span>${
         st.roads[1] ? ` · ${esc(st.roads[1].label)} ${mi(st.roads[1].d)} ${st.roads[1].dir}` : ''
       }</div>`;
     return `<div class="roadline">${st.roads
       .slice(0, 2)
-      .map((r) => `<b>${esc(r.label)}</b> ${mi(r.d)} ${r.dir}`)
+      .map((r) => `<b${hwyStyle(r.label)}>${esc(r.label)}</b> ${mi(r.d)} ${r.dir}`)
       .join(' · ')}</div>`;
   }
 

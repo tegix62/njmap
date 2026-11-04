@@ -151,8 +151,11 @@ export default {
   gridAngle: GRID_ANGLE,
   driveZoom: 15,
   nearMi: 1.5,
-  quizTypes: ['find', 'name', 'dir', 'borders', 'confuse', 'landmark', 'north', 'point', 'avedir', 'crossing', 'uptown'],
+  quizTypes: ['find', 'leftright', 'name', 'dir', 'borders', 'confuse', 'landmark', 'north', 'point', 'avedir', 'crossing', 'uptown'],
   crossings: CROSSINGS,
+  highways: [],
+  junctions: [],
+  bigPlaces: [],
   wellKnown: null, // every neighborhood counts
   avenues: AVENUES,
   avenueNote: AVENUE_NOTE,

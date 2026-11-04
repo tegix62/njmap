@@ -10,6 +10,7 @@
 import { THEME } from './theme.js';
 
 let T = THEME; // the active theme; set by buildStyle()
+let HWYS = []; // the region's highways with their colors; set by buildStyle()
 
 
 const isClass = (list) => ['match', ['get', 'class'], list, true, false];
@@ -74,6 +75,27 @@ const baseLayers = (Z) => [
           16, ['match', ['get', 'class'], 'motorway', 14, 12]],
         // State level: interstates/Turnpike/Parkway only; the rest fade in at region level.
         'line-opacity': ['interpolate', ['linear'], ['zoom'], Z.region - 0.6, ['match', ['get', 'class'], 'motorway', 1, 0], Z.region, 1],
+      },
+    },
+    'streets light',
+  ],
+  [
+    {
+      // Each big highway in its own color (Turnpike purple, Parkway teal…)
+      id: 'hwy-color',
+      type: 'line',
+      source: 'omt',
+      'source-layer': 'transportation_name',
+      minzoom: 6,
+      filter: HWYS.length
+        ? ['all', ['==', ['get', 'class'], 'motorway'], ['any', ...HWYS.map((h) => ['>=', ['index-of', h.match, ['coalesce', ['get', 'ref'], '']], 0])]]
+        : ['==', ['get', 'ref'], '__none__'],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': HWYS.length
+          ? ['case', ...HWYS.flatMap((h) => [['>=', ['index-of', h.match, ['coalesce', ['get', 'ref'], '']], 0], h.color]), T.road.motorway]
+          : T.road.motorway,
+        'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], 6, 1.4, 9, 2.4, 12, 3.6, 16, 14],
       },
     },
     'streets light',
@@ -238,8 +260,9 @@ export const PLACE_LAYER_IDS = ['landmark-dot', 'landmark-label'];
  * Returns { style, baseLayers } for a region. `Z` = the region's zoom levels:
  * { groups, region, town, street }.
  */
-export function buildStyle({ base, basemap, data, sectionNames, Z, majorSize, groupTint, attribution, theme }) {
+export function buildStyle({ base, basemap, data, sectionNames, Z, majorSize, groupTint, attribution, theme, highways }) {
   T = theme || THEME;
+  HWYS = highways || [];
   const BASE_LAYERS = baseLayers(Z);
   const BASE_LABEL_LAYERS = baseLabelLayers(Z);
   const countyTint = ['match', ['get', 'c']];
