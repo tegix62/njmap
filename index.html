@@ -64,6 +64,15 @@
       <label class="row"><input type="checkbox" data-setting="voice" /> Speak when I cross into a new town</label>
       <label class="row sub"><input type="checkbox" data-setting="voiceGuess" /> …but ask me first (“New town. Which one?”), pause, then say it</label>
       <label class="row sub"><input type="checkbox" data-setting="voiceHints" /> …and name its sound-alike (“Not Rockaway — that's 19 miles west-northwest”)</label>
+      <label class="row"><input type="checkbox" data-setting="driveQuiz" /> Quiz me while I drive: a spoken question every few minutes ("Paterson: left, right, ahead or behind?"), a pause, then the answer. Nothing to tap.</label>
+      <label class="row sub">How often
+        <select data-setting="driveQuizMin">
+          <option value="2">every 2 min</option>
+          <option value="4">every 4 min</option>
+          <option value="7">every 7 min</option>
+          <option value="12">every 12 min</option>
+        </select>
+      </label>
       <label class="row"><input type="checkbox" data-setting="northUp" /> North-up map while driving (off = map turns with you)</label>
       <label class="row"><input type="checkbox" data-setting="driveLabels" /> Show town names on the map while driving</label>
       <label class="row"><input type="checkbox" data-setting="wakeLock" /> Keep screen on while tracking</label>

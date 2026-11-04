@@ -12,6 +12,7 @@ The screen is built in two layers. The first is what you can take in at a glance
   - *At a glance:* the town and county you're in, the village you're near ("near Towaco"), your heading with which way is left and right (*"Heading EAST · left N · right S"*), and the main road: *"On I-80 E"* or *"I-80 0.4 mi N · Route 46 1.1 mi S"*. Roads are named the way people say them: I-80, Route 46, Route 23, Route 1&9, the Turnpike, the Parkway.
   - *Tap the card for more:* which towns lie to your left, ahead and right; notes on the road you're on; your notes on the town.
   - *Voice:* speaks when you cross a town line (*"Entering Clifton, Passaic County. Heading west. Not Rockaway — that's 19 miles west-northwest."*). The first time you drive a road that has a note, it reads the note once.
+  - *Quiz me while I drive* (Settings): every few minutes, one spoken question about where you are right now, using your real heading: "Paterson: left, right, ahead or behind?", "What's the next town ahead?", "Which county are you in?", "What road are you on, and which direction?", "You're near Towaco. What town is that part of?", or where Home is. A pause to answer in your head, then the answer. Nothing to tap. Town announcements wait until the answer is out. (Like everything here, it only runs while the app is on screen.)
   - *Guess first* (Settings): *"New town. Which one?"*, a 4-second pause, then the answer. The card shows "?" until then.
   - *Your places:* home, work, and so on, with distance and direction from you (*"Home 7.2 mi NW · behind-left"*).
   - *Trips:* each drive's route and the towns you passed are saved on your phone for a recap afterwards.
@@ -22,6 +23,7 @@ The screen is built in two layers. The first is what you can take in at a glance
   - *One tap:* tabs for Borders (the neighbors as a list, with directions), Villages, Roads, Landmarks, My notes and Sound-alikes, one open at a time. Tapping a road highlights it on the map and lists where it **leads to** ("I-80 → Passaic (SE 1.9 mi), Little Falls (W 2.8 mi)…").
   - *★ My list:* star a town to learn it, e.g. when someone mentions they're from Harrison. Practice can then quiz only your list.
   - *Search:* finds towns, villages ("Towaco") and landmarks ("Willowbrook").
+- **☀ Today** (Practice opens on it once a day until it's done): about 10 quick questions, roughly two minutes. Places due for review come first, then two or three new places, and each new place comes back three times from different angles (find it, its borders, left or right of somewhere), spread through the set. A place you're reviewing gets a different kind of question than last time. Dots show progress; the finish screen shows what you practiced and your streak of days.
 - **Practice**: quiz types:
   - *Find it on the map*
   - *Name the highlighted town*

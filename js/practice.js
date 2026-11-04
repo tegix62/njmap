@@ -25,6 +25,7 @@ const TYPES = {
   hwyfact: 'Highway ends & crossings',
   naturept: 'Point to the lake or mountain',
   findpt: 'Find the lake or mountain',
+  today: '☀ Today (2 min)',
   rapid: '⚡ Rapid round',
   dropin: '🧩 Drop in (county puzzle)',
   trip: 'My last drive',
@@ -42,13 +43,14 @@ export function initPractice(ctx) {
   const R = ctx.region;
   L = ctx.theme.label;
   const CFG_KEY = R.id === 'nj' ? 'practice' : `practice.${R.id}`;
-  const cfg = { type: 'mix', area: R.wellKnown ? 'known' : 'all', ...store.get(CFG_KEY, {}) };
+  const cfg = { type: 'today', area: R.wellKnown ? 'known' : 'all', ...store.get(CFG_KEY, {}) };
   const SC = R.gridAngle ? 0.12 : 1; // Manhattan distances are short
-  const allowed = ['mix', 'rapid', 'dropin', ...R.quizTypes, 'trip'];
+  const allowed = ['today', 'mix', 'rapid', 'dropin', ...R.quizTypes, 'trip'];
   if (!allowed.includes(cfg.type)) cfg.type = 'mix';
   const score = { right: 0, total: 0, streak: 0 };
   let q = null;
   const recent = [];
+  let forced = null;
   const recentGroups = [];
   let lastType = null;
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -117,8 +119,8 @@ export function initPractice(ctx) {
     const now = Date.now();
     if (ok) {
       const b = Math.min(cur.b + 1, DAYS.length - 1);
-      s[m.key] = { b, due: now + DAYS[b] * DAY };
-    } else s[m.key] = { b: 0, due: now + 10 * 60e3 };
+      s[m.key] = { b, due: now + DAYS[b] * DAY, f: q && q.fmt };
+    } else s[m.key] = { b: 0, due: now + 10 * 60e3, f: q && q.fmt };
     store.set('srs', s);
     ctx.setKnow(m);
   }
@@ -128,6 +130,7 @@ export function initPractice(ctx) {
     return p.filter((m) => s[m.key] && s[m.key].due <= now).length;
   }
   function pick(p) {
+    if (forced) return remember(forced); // Today: the place this question is about
     const s = srs();
     const now = Date.now();
     const ws = p.map((m) => {
@@ -355,7 +358,8 @@ export function initPractice(ctx) {
     for (const a of ctx.anchors.list()) origins.push({ name: a.name, pt: a.pt });
     let from = origins.length && Math.random() < 0.7 ? rand(origins) : null;
     if (!from) {
-      const m = pick(p);
+      const others = forced ? p.filter((o) => o !== forced && distanceMi(o.pt, forced.pt) > 3 * SC && distanceMi(o.pt, forced.pt) < 30 * SC) : [];
+      const m = forced ? rand(others.length ? others : munis.filter((o) => o !== forced)) : pick(p);
       from = { name: m.n, pt: m.pt, m };
     }
     const near = (list) => list.filter((o) => o !== from.m && distanceMi(from.pt, o.pt) > 3 * SC && distanceMi(from.pt, o.pt) < 30 * SC);
@@ -481,6 +485,7 @@ export function initPractice(ctx) {
   }
   function next() {
     stopRapidTimer();
+    if (cfg.type === 'today') return nextToday();
     if (cfg.type === 'rapid') return nextRapid();
     if (cfg.type === 'dropin') return startDropIn();
     ctx.dropin.stop();
@@ -496,6 +501,7 @@ export function initPractice(ctx) {
     lastType = t;
     q = MAKERS[t](p);
     q.p = p;
+    q.fmt = t;
     q.answered = false;
     show();
   }
@@ -522,6 +528,100 @@ export function initPractice(ctx) {
     naturept: makeNaturePoint,
     findpt: makeFindPt,
   };
+
+  // ---- Today ----------------------------------------------------------------------
+  // A short daily set (~2 minutes) you can always come back to: places due for
+  // review first, then a few new ones. Each new place comes back three times,
+  // spread through the set, from different angles (find it, its borders, left or
+  // right of somewhere), so it's learned as part of a web rather than one fact.
+  // A place you're reviewing gets a different question than last time.
+  const TODAY_KEY = `today.${R.id}`;
+  const SET_SIZE = 10;
+  const ANGLES = ['find', 'borders', 'leftright', 'name', 'dir', 'point'];
+  const dayStr = (t = Date.now()) => new Date(t).toLocaleDateString('en-CA');
+  function buildToday() {
+    const p = pool();
+    const s = srs();
+    const now = Date.now();
+    const angles = ANGLES.filter((a) => R.quizTypes.includes(a));
+    const due = p.filter((m) => s[m.key] && s[m.key].due <= now).sort((a, b) => s[a.key].due - s[b.key].due).slice(0, 6);
+    const listed = new Set(ctx.myList.keys());
+    const fresh = shuffle(p.filter((m) => !s[m.key])).sort((a, b) => (listed.has(b.key) ? 2 : b.wellKnown ? 1 : 0) - (listed.has(a.key) ? 2 : a.wellKnown ? 1 : 0));
+    const nNew = Math.max(2, Math.min(3, Math.ceil((SET_SIZE - due.length) / 3)));
+    const news = fresh.slice(0, nNew);
+    const reviewItems = due.map((m) => ({ key: m.key, fmt: rand(angles.filter((a) => a !== (s[m.key] && s[m.key].f))) }));
+    // three angles per new place, in rounds so the repeats are spread out
+    const rounds = [0, 1, 2].map((r) => news.map((m) => ({ key: m.key, fmt: shuffle([...angles]).find((a, i) => i === r) || rand(angles), isNew: r === 0 })));
+    const fixAngles = news.map(() => shuffle(['find', 'borders', 'leftright'].filter((a) => angles.includes(a))));
+    rounds.forEach((round, r) => round.forEach((it, i) => (it.fmt = fixAngles[i][r] || rand(angles))));
+    const items = [];
+    const queue = [...reviewItems];
+    for (const round of rounds) {
+      for (const it of round) {
+        items.push(it);
+        if (queue.length) items.push(queue.shift());
+      }
+    }
+    items.push(...queue);
+    // top up with well-known places in a format they haven't had lately
+    while (items.length < SET_SIZE) {
+      const m = rand(p.filter((x) => x.wellKnown).length ? p.filter((x) => x.wellKnown) : p);
+      items.push({ key: m.key, fmt: rand(angles) });
+    }
+    return { date: dayStr(), items: items.slice(0, Math.max(SET_SIZE, items.length)).slice(0, 12), i: 0, right: 0, done: false };
+  }
+  function todayState() {
+    let t = store.get(TODAY_KEY, null);
+    if (!t || t.date !== dayStr()) {
+      t = buildToday();
+      store.set(TODAY_KEY, t);
+    }
+    return t;
+  }
+  function streak() {
+    const log = store.get('todayLog', {});
+    let n = 0;
+    for (let d = new Date(); log[dayStr(d)]; d.setDate(d.getDate() - 1)) n++;
+    return n;
+  }
+  function nextToday() {
+    const t = todayState();
+    // the Next button after an answered Today question advances the set
+    if (q && q.today && q.answered) {
+      t.i++;
+      store.set(TODAY_KEY, t);
+    }
+    if (t.i >= t.items.length) {
+      if (!t.done) {
+        t.done = true;
+        store.set(TODAY_KEY, t);
+        const log = store.get('todayLog', {});
+        log[dayStr()] = true;
+        store.set('todayLog', log);
+      }
+      q = { kind: 'todaydone', m: null, answered: false, t };
+      return show();
+    }
+    const it = t.items[t.i];
+    const m = ctx.byKey.get(it.key);
+    const p = pool();
+    if (!m || !MAKERS[it.fmt]) {
+      t.i++;
+      return nextToday();
+    }
+    forced = m;
+    try {
+      q = MAKERS[it.fmt](p);
+    } finally {
+      forced = null;
+    }
+    q.p = p;
+    q.fmt = it.fmt;
+    q.today = true;
+    q.isNew = it.isNew;
+    q.answered = false;
+    show();
+  }
 
   // ---- Rapid round ------------------------------------------------------------
   // One-tap questions against a shrinking clock, 3 lives, faster as you go.
@@ -584,7 +684,7 @@ export function initPractice(ctx) {
     const qb = document.getElementById('qbody');
     for (const g of qb.querySelectorAll('.choices, .rose8, .lrpad')) g.classList.add('answered');
     qb.insertAdjacentHTML('beforeend', `<div class="flash ${ok ? 'ok' : 'no'}">${mark || (ok ? '✓' : '✗')}</div>`);
-    document.querySelector('#sheet .score').outerHTML = header().match(/<div class="score">.*<\/div>$/s)[0];
+    document.querySelector('#sheet .score').outerHTML = header().match(/<div class="score[^"]*">.*<\/div>$/s)[0];
     // a quick beat on a hit, a longer look at the answer on a miss
     rapid.advance = setTimeout(nextRapid, ok ? 450 : 1300);
   }
@@ -617,6 +717,14 @@ export function initPractice(ctx) {
       `<optgroup label="${R.groupPlural}">${ctx.counties.map((c) => areaOpt('county:' + c, ctx.groupName(c))).join('')}</optgroup>`;
     const pct = score.total ? Math.round((100 * score.right) / score.total) : 0;
     const due = dueCount(pool());
+    if (cfg.type === 'today') {
+      const t = todayState();
+      const dots = t.items.map((_, k) => `<span class="${k < t.i ? 'd done' : k === t.i && !t.done ? 'd now' : 'd'}"></span>`).join('');
+      return `<div class="prow">
+        <select id="qType" aria-label="Question type">${opts(Object.fromEntries(allowed.map((k) => [k, TYPES[k]])))}</select>
+        <select id="qArea" aria-label="Area">${area}</select>
+      </div><div class="score todaybar"><span class="dots">${dots}</span>${streak() ? `<span>🔥 ${streak()} day${streak() === 1 ? '' : 's'}</span>` : ''}</div>`;
+    }
     if ((cfg.type === 'rapid' && !rapid.on) || cfg.type === 'dropin')
       return `<div class="prow">
         <select id="qType" aria-label="Question type">${opts(Object.fromEntries(allowed.map((k) => [k, TYPES[k]])))}</select>
@@ -643,6 +751,10 @@ export function initPractice(ctx) {
     document.getElementById('qArea').addEventListener('change', (e) => {
       cfg.area = e.target.value;
       store.set(CFG_KEY, cfg);
+      if (cfg.type === 'today') {
+        store.set(TODAY_KEY, buildToday());
+        q = null;
+      }
       if (cfg.area === 'visited' && Object.keys(ctx.modes.drive.visited).length < 4)
         alert(
           ctx.settings.rememberPlaces
@@ -701,6 +813,13 @@ export function initPractice(ctx) {
     } else if (q.kind === 'findpt') {
       ctx.hud(`<div class="qkind">${esc(q.n.kind)}</div><div class="q">Tap <b>${esc(q.n.name)}</b> on the map</div>`);
       body = `<div class="hint muted">Close counts: within about ${q.n.r} mi.</div>`;
+    } else if (q.kind === 'todaydone') {
+      const t = q.t;
+      const places = [...new Set(t.items.map((it) => it.key))].map((k) => ctx.byKey.get(k)).filter(Boolean);
+      ctx.hud(`<div class="qkind">☀ Today</div><div class="q">Done: ${t.right} of ${t.items.length} right</div>`);
+      body = `<div class="hint">${streak() > 1 ? `🔥 ${streak()} days in a row. ` : ''}These are now darker on the map:</div>
+        <div class="chips">${places.map((m) => `<span class="chip">${esc(m.n)}</span>`).join('')}</div>
+        <div class="btnrow2"><button class="primary" id="todayMore">10 more</button><button class="primary ghost" id="todayFree">Free practice</button></div>`;
     } else if (q.kind === 'rapidstart') {
       ctx.hud(`<div class="qkind">⚡ Rapid round</div><div class="q">Quick questions, back to back</div>`);
       body = `<div class="hint">One tap each, against the clock. Three lives, and it speeds up as you go. Misses go to your review pile.</div>
@@ -820,6 +939,25 @@ export function initPractice(ctx) {
     bindHeader();
     for (const b of document.querySelectorAll('#qbody .choice')) b.addEventListener('click', () => answer(b));
     if (q.kind === 'point' || q.kind === 'uptown' || q.kind === 'hwydir') bindDial();
+    const tm = document.getElementById('todayMore');
+    if (tm)
+      tm.addEventListener('click', () => {
+        const t = buildToday();
+        store.set(TODAY_KEY, t);
+        q = null;
+        nextToday();
+      });
+    const tf = document.getElementById('todayFree');
+    if (tf)
+      tf.addEventListener('click', () => {
+        cfg.type = 'mix';
+        store.set(CFG_KEY, cfg);
+        next();
+      });
+    if (q.today) {
+      const k = document.querySelector('#hud .qkind');
+      if (k && q.isNew) k.insertAdjacentHTML('beforeend', ' <span class="newtag">new place</span>');
+    }
     const rg = document.getElementById('rapidGo');
     if (rg)
       rg.addEventListener('click', () => {
@@ -867,6 +1005,11 @@ export function initPractice(ctx) {
 
   function feedback(ok, html) {
     if (q.rapid) return rapidResult(ok);
+    if (q.today && ok) {
+      const t = todayState();
+      t.right++;
+      store.set(TODAY_KEY, t);
+    }
     score.total++;
     if (ok) {
       score.right++;
@@ -877,7 +1020,7 @@ export function initPractice(ctx) {
     // Once answered, the choices shrink so the map gets the room back
     for (const g of qb.querySelectorAll('.choices, .rose8, .lrpad')) g.classList.add('answered');
     qb.insertAdjacentHTML('beforeend', `<div class="fb ${ok ? 'ok' : 'no'}">${html}</div><button class="primary" id="nextQ">Next</button>`);
-    document.querySelector('#sheet .score').outerHTML = header().match(/<div class="score">.*<\/div>$/s)[0];
+    document.querySelector('#sheet .score').outerHTML = header().match(/<div class="score[^"]*">.*<\/div>$/s)[0];
     document.getElementById('nextQ').addEventListener('click', next);
     ctx.updateEdges();
   }
@@ -1302,6 +1445,15 @@ export function initPractice(ctx) {
   return {
     enter() {
       ctx.clearHighlights();
+      // Easy to come back to: once a day, Practice opens on Today until it's done
+      const offered = store.get('todayOffered', '');
+      if (offered !== dayStr() && !todayState().done && cfg.type !== 'today') {
+        store.set('todayOffered', dayStr());
+        cfg.type = 'today';
+        store.set(CFG_KEY, cfg);
+        q = null;
+        return next();
+      }
       if (q && !q.answered && !q.rapid && q.kind !== 'dropin' && q.kind !== 'rapidend') show();
       else next();
     },

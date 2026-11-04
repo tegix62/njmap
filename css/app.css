@@ -1227,3 +1227,57 @@ body.dropping #edges {
   vertical-align: 2px;
   color: var(--accent);
 }
+
+/* Today */
+.todaybar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.todaybar .dots {
+  display: flex;
+  gap: 4px;
+}
+.todaybar .d {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(127, 127, 127, 0.3);
+}
+.todaybar .d.done {
+  background: var(--panel-ink);
+}
+.todaybar .d.now {
+  background: var(--accent);
+  box-shadow: 0 0 0 2px rgba(127, 127, 127, 0.25);
+}
+.newtag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+.btnrow2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+button.primary.ghost {
+  background: transparent;
+  color: var(--panel-ink);
+  border: 1.5px solid rgba(127, 127, 127, 0.5);
+}
+#hud .quizline {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(43, 79, 179, 0.12);
+  font-size: 15px;
+}
+#hud .quizline.ans {
+  background: rgba(21, 128, 61, 0.12);
+}

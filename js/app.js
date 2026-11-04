@@ -19,6 +19,8 @@ const DEFAULT_SETTINGS = {
   voiceHints: true,
   voiceGuess: false,
   rememberPlaces: false, // opt-in: visited towns + drive routes, on this phone only
+  driveQuiz: false, // spoken questions while driving (no tapping)
+  driveQuizMin: 4, // minutes between them
   mapStyle: 'ink',
   basemap: 'streets',
   northUp: false,
@@ -325,6 +327,7 @@ async function main() {
       if (!settings.voice || !('speechSynthesis' in window)) return;
       const u = new SpeechSynthesisUtterance(text);
       u.lang = 'en-US';
+      ctx.lastSpokenAt = Date.now();
       speechSynthesis.speak(u);
     },
     setBasemap(key) {
@@ -560,7 +563,7 @@ async function main() {
     const el = e.target;
     const k = el.dataset.setting;
     if (!k) return;
-    settings[k] = el.type === 'checkbox' ? el.checked : el.value;
+    settings[k] = el.type === 'checkbox' ? el.checked : k === 'driveQuizMin' ? +el.value : el.value;
     ctx.saveSettings();
     if (k === 'basemap') ctx.setBasemap(el.value);
     if (k === 'mapStyle') location.reload();

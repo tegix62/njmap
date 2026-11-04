@@ -29,6 +29,9 @@ export function initDrive(ctx) {
     error: null,
     active: false,
     roads: [], // nearby major roads, nearest first
+    nextQuizAt: 0, // hands-free quiz
+    quizLine: null,
+    recentQuiz: [],
     onRoad: null, // label of the road you're driving on, once it's been steady for a few seconds
     onCand: null,
     onCount: 0,
@@ -190,6 +193,7 @@ export function initDrive(ctx) {
       if (GRID) st.corner = intersection(map, pt);
       updateRoads(pt);
       st.lookAt = now;
+      maybeQuiz(now);
     }
     if (ctx.mode === 'drive') {
       if (st.follow) camera();
@@ -219,7 +223,105 @@ export function initDrive(ctx) {
     if (!first) announce(m, prev);
   }
 
+  // ---- hands-free quiz ------------------------------------------------------------
+  // Every few minutes (Settings), one spoken question about where you are right
+  // now; a pause to answer in your head; then the answer. No tapping. Questions
+  // use your live heading, so "left" and "right" are your real left and right.
+  const QUIZ_PAUSE_MS = 5500;
+  function relPhrase(rel) {
+    const a = Math.abs(rel);
+    const side = rel > 0 ? 'right' : 'left';
+    if (a <= 25) return 'straight ahead';
+    if (a <= 65) return `ahead, to your ${side}`;
+    if (a <= 115) return `to your ${side}`;
+    if (a <= 155) return `behind you, to your ${side}`;
+    return 'behind you';
+  }
+  const miles = (d) => (d < 10 ? d.toFixed(1).replace(/\.0$/, '') : String(Math.round(d)));
+  function quizCandidates(pt, h) {
+    const out = [];
+    // where is a known place, relative to the way you're facing?
+    const places = [
+      ...ctx.munis
+        .filter((o) => o.wellKnown && o !== st.cur)
+        .map((o) => ({ name: o.n.replace(/ Village$/, ''), pt: o.pt })) // "South Orange", as people say it
+        .filter((o) => {
+          const d = distanceMi(pt, o.pt);
+          return GRID ? d > 0.6 && d < 6 : d > 2.5 && d < 20;
+        }),
+      ...ctx.anchors.list().map((a) => ({ name: a.name, pt: a.pt })),
+      ...(region.bigPlaces || []).map((b) => ({ name: b.name.replace(/ \(.*\)$/, ''), pt: b.pt })),
+      ...(region.crossings || []).map((c) => ({ name: `the ${c.name}`.replace('the George', 'the George'), pt: c.pt })),
+    ].filter((o) => !st.recentQuiz.includes(o.name) && distanceMi(pt, o.pt) > 1);
+    if (places.length) {
+      const o = places[Math.floor(Math.random() * places.length)];
+      const b = bearing(pt, o.pt);
+      const d = distanceMi(pt, o.pt);
+      out.push({
+        key: o.name,
+        q: `Quick one. ${o.name}: left, right, ahead, or behind?`,
+        a: `${o.name} is ${relPhrase(angleDiff(b, h))}, about ${miles(d)} miles ${dirWord(compass8(b))}.`,
+        w: 3,
+      });
+    }
+    const ahead = st.look && st.look.ahead;
+    if (ahead && ahead.m && ahead.d > (GRID ? 0.15 : 0.3))
+      out.push({ key: 'ahead', q: `What ${region.unit} is coming up ahead?`, a: `${ahead.m.n}, about ${miles(ahead.d)} miles ahead.`, w: 2 });
+    if (st.cur && !GRID) out.push({ key: 'county', q: 'Which county are you in right now?', a: `${st.cur.c} County. You're in ${st.cur.n}.`, w: 1 });
+    if (st.cur && GRID) out.push({ key: 'area', q: 'Downtown, Midtown, Uptown, or Upper Manhattan?', a: `${st.cur.c}. You're in ${st.cur.n}.`, w: 1 });
+    out.push({
+      key: 'heading',
+      q: 'Which way are you heading?',
+      a: GRID ? `${gridDir(h, GRID)}, so ${dirWord(compass16(h))} on a compass.` : `${dirWord(compass8(h))}. Your left is ${dirWord(compass8(h - 90))}.`,
+      w: 1,
+    });
+    if (st.onRoad)
+      out.push({
+        key: 'road',
+        q: 'What road are you on, and which direction?',
+        a: `${sayRoad(st.onRoad)} ${{ N: 'north', E: 'east', S: 'south', W: 'west' }[travelDir(h)]}.`,
+        w: 2,
+      });
+    if (st.near && st.cur) out.push({ key: 'village', q: `You're near ${st.near.name}. What ${region.unit} is that part of?`, a: `${st.cur.n}.`, w: 2 });
+    return out.filter((c) => !st.recentQuiz.includes(c.key));
+  }
+  function maybeQuiz(now) {
+    if (!settings.driveQuiz || !settings.voice || st.watchId == null || !ctx.pos) return;
+    if (st.heading == null || !st.gpsHeading || st.guessing) return;
+    if (!st.nextQuizAt) st.nextQuizAt = now + Math.min(90e3, settings.driveQuizMin * 60e3);
+    if (now < st.nextQuizAt || now - (ctx.lastSpokenAt || 0) < 15e3) return;
+    const cands = quizCandidates(ctx.pos.pt, st.heading);
+    if (!cands.length) return;
+    let x = Math.random() * cands.reduce((s, c) => s + c.w, 0);
+    const c = cands.find((y) => (x -= y.w) <= 0) || cands[0];
+    st.recentQuiz.push(c.key);
+    if (st.recentQuiz.length > 6) st.recentQuiz.shift();
+    st.nextQuizAt = now + settings.driveQuizMin * 60e3 + (Math.random() - 0.5) * 40e3;
+    ctx.speak(c.q);
+    st.quizPendingUntil = Date.now() + QUIZ_PAUSE_MS + 3000;
+    st.quizLine = { text: c.q, answered: false };
+    render();
+    clearTimeout(st.quizTimer);
+    st.quizTimer = setTimeout(() => {
+      ctx.speak(c.a);
+      st.quizLine = { text: c.a, answered: true, until: Date.now() + 12e3 };
+      render();
+      setTimeout(() => {
+        if (st.quizLine && st.quizLine.until <= Date.now()) {
+          st.quizLine = null;
+          render();
+        }
+      }, 12.5e3);
+    }, QUIZ_PAUSE_MS);
+  }
+
   function announce(m, prev) {
+    // Don't talk over your thinking pause: hold it until the quiz answer is out.
+    const wait = (st.quizPendingUntil || 0) - Date.now();
+    if (wait > 0) {
+      setTimeout(() => st.cur === m && announce(m, prev), wait + 900);
+      return;
+    }
     if (!m) {
       ctx.speak(region.leaving);
       return;
@@ -522,6 +624,7 @@ export function initDrive(ctx) {
           : `<div class="town">${esc(region.outside)}</div><div class="meta">${esc(region.outsideSub)} ${acc}</div>${otherRegionButton()}`) +
         head +
         roadLine() +
+        (st.quizLine ? `<div class="quizline${st.quizLine.answered ? ' ans' : ''}">🎧 ${esc(st.quizLine.text)}</div>` : '') +
         (st.expanded ? details(m) : '')
     );
     bindHud();
