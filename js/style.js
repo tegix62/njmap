@@ -105,6 +105,35 @@ const baseLayers = (Z) => [
   ],
 ];
 
+// Route numbers on the map, said the way people say them (same rules as
+// roads.js normRef): "I 80" -> "I-80", "US 46" / "NJ 23" -> "Route 46" /
+// "Route 23", "US 1;US 9" -> "Route 1&9", NJTP -> Turnpike, GSP -> Parkway.
+const routeWord = (v) => [
+  'case',
+  ['==', ['slice', v, 0, 2], 'I '], ['concat', 'I-', ['slice', v, 2]],
+  ['in', ['slice', v, 0, 3], ['literal', ['US ', 'NJ ', 'NY ']]], ['concat', 'Route ', ['slice', v, 3]],
+  v,
+];
+const REF_LABEL = [
+  'let', 'r', ['get', 'ref'],
+  ['let', 'i', ['index-of', ';', ['var', 'r']],
+    ['case',
+      ['>=', ['index-of', 'NJTP', ['var', 'r']], 0], 'Turnpike',
+      ['==', ['var', 'r'], 'GSP'], 'Parkway',
+      ['==', ['var', 'r'], 'ACE'], 'AC Expressway',
+      ['==', ['var', 'r'], 'PIP'], 'Palisades Pkwy',
+      ['<', ['var', 'i'], 0], routeWord(['var', 'r']),
+      // two routes on one road: "Route 1&9"
+      ['let', 'a', ['slice', ['var', 'r'], 0, ['var', 'i']], 'b', ['slice', ['var', 'r'], ['+', ['var', 'i'], 1]],
+        ['case',
+          ['all',
+            ['in', ['slice', ['var', 'a'], 0, 3], ['literal', ['US ', 'NJ ', 'NY ']]],
+            ['in', ['slice', ['var', 'b'], 0, 3], ['literal', ['US ', 'NJ ', 'NY ']]],
+            ['<', ['index-of', ';', ['var', 'b']], 0]],
+          ['concat', 'Route ', ['slice', ['var', 'a'], 3], '&', ['slice', ['var', 'b'], 3]],
+          routeWord(['var', 'a'])]]]],
+];
+
 const refLayer = (id, classes, minzoom) => ({
   id,
   type: 'symbol',
@@ -115,7 +144,7 @@ const refLayer = (id, classes, minzoom) => ({
   layout: {
     'symbol-placement': 'line',
     'symbol-spacing': 350,
-    'text-field': ['get', 'ref'],
+    'text-field': REF_LABEL,
     'text-font': ['Noto Sans Medium'],
     'text-size': 11,
     'text-rotation-alignment': 'viewport',
