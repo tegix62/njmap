@@ -747,3 +747,118 @@ button.primary.inline {
   padding: 8px 14px;
   cursor: pointer;
 }
+#settings h3 {
+  margin: 16px 0 4px;
+  font-size: 15px;
+}
+.anchorrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #eaecf0;
+}
+.anchorrow span:first-child {
+  font-weight: 600;
+}
+.anchorrow .muted2 {
+  color: #667085;
+  font-size: 13px;
+  flex: 1;
+}
+.anchorrow button {
+  border: 0;
+  background: none;
+  font-size: 18px;
+  color: #667085;
+  cursor: pointer;
+}
+.anchoradd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.anchoradd input {
+  flex: 1 1 140px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #d0d5dd;
+  font-size: 16px;
+}
+.anchoradd button {
+  border: 1px solid #d0d5dd;
+  background: #fff;
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+#hud .placeline {
+  font-size: 14px;
+  margin-top: 2px;
+}
+body.picking #map {
+  cursor: crosshair;
+}
+.score .due {
+  color: #fcd34d;
+}
+
+/* pointing dial */
+.dialwrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 4px;
+}
+#dial {
+  width: 200px;
+  height: 200px;
+  touch-action: none;
+  cursor: crosshair;
+}
+.dial-face {
+  fill: rgba(255, 255, 255, 0.06);
+  stroke: rgba(255, 255, 255, 0.35);
+  stroke-width: 2;
+}
+.dial-ticks line {
+  stroke: rgba(255, 255, 255, 0.45);
+  stroke-width: 2;
+}
+.dial-n,
+.dial-l {
+  text-anchor: middle;
+  font-weight: 800;
+  font-size: 15px;
+  fill: var(--panel-ink);
+}
+.dial-n {
+  fill: #f87171;
+}
+.dial-needle {
+  stroke: #fbbf24;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.dial-hub {
+  fill: #fbbf24;
+}
+.dial-truth {
+  stroke: #4ade80;
+  stroke-width: 3;
+  stroke-dasharray: 6 5;
+}
+.dial-read {
+  font-size: 13px;
+  color: var(--panel-muted);
+}
+.triplist {
+  margin: 6px 0 0;
+  padding-left: 22px;
+  max-height: 24vh;
+  overflow-y: auto;
+  font-size: 15px;
+  line-height: 1.5;
+}

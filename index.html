@@ -56,11 +56,21 @@
     <dialog id="settings">
       <h2>Settings</h2>
       <label class="row"><input type="checkbox" data-setting="voice" /> Speak when I cross into a new town</label>
+      <label class="row sub"><input type="checkbox" data-setting="voiceGuess" /> …but ask me first (“New town. Which one?”), pause, then say it</label>
       <label class="row sub"><input type="checkbox" data-setting="voiceHints" /> …and name its sound-alike (“Not Rockaway — that's 19 miles west-northwest”)</label>
       <label class="row"><input type="checkbox" data-setting="northUp" /> North-up map while driving (off = map turns with you)</label>
       <label class="row"><input type="checkbox" data-setting="driveLabels" /> Show town names on the map while driving</label>
       <label class="row"><input type="checkbox" data-setting="wakeLock" /> Keep screen on while tracking</label>
       <label class="row"><input type="checkbox" data-setting="phoneCompass" /> Use phone compass for heading when stopped</label>
+      <h3>My places</h3>
+      <p class="fine">Home, work, family… Towns are described relative to the nearest one, and Practice asks you to point from them.</p>
+      <div id="anchorList"></div>
+      <div class="anchoradd">
+        <input id="anchorName" type="text" placeholder="Name, e.g. Home" maxlength="24" autocomplete="off" />
+        <button id="anchorHere">Use my location</button>
+        <button id="anchorPick">Tap on map</button>
+      </div>
+      <h3>Map &amp; voice</h3>
       <label class="row">Background map
         <select data-setting="basemap">
           <option value="streets">Streets + road numbers</option>

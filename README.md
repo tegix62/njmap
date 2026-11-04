@@ -8,6 +8,9 @@ The screen is built in two layers. The first is what you can take in at a glance
   - *At a glance:* the town and county you're in, the village you're near ("near Towaco"), your heading with which way is left and right (*"Heading EAST · left N · right S"*), and the main road: *"On I-80 E"* or *"I-80 0.4 mi N · US 46 1.1 mi S"*.
   - *Tap the card for more:* which towns lie to your left, ahead and right; notes on the road you're on; your notes on the town.
   - *Voice:* speaks when you cross a town line (*"Entering Clifton, Passaic County. Heading west. Not Rockaway — that's 19 miles west-northwest."*). The first time you drive a road that has a note, it reads the note once.
+  - *Guess first* (Settings): *"New town. Which one?"*, a 4-second pause, then the answer. The card shows "?" until then.
+  - *Your places:* home, work, and so on, with distance and direction from you (*"Home 7.2 mi NW · behind-left"*).
+  - *Trips:* each drive's route and the towns you passed are saved on your phone for a recap afterwards.
 - **Heading-up or north-up**: tap the compass button. N/E/S/W markers stay on the edges of the map either way.
 - **Explore**
   - *At a glance:* a neighbor compass, a 3×3 grid with the town in the middle and each bordering town placed in its direction. The map tints those neighbors and fades every other label.
@@ -20,11 +23,45 @@ The screen is built in two layers. The first is what you can take in at a glance
   - *Which of these borders Wayne?* (the wrong answers are nearby towns that don't touch it)
   - *Which town is this village in?*
   - *Where is this landmark?*
+  - *Which is farther north / east?* Built from town pairs where the county is misleading: West Caldwell is north of Chester, even though Morris County as a whole sits north of Essex.
+  - *Point to it:* from you, one of your places, or a town, drag a dial toward the target and see how many degrees off you were.
+  - *My last drive:* a north-up replay of your route with the towns in order, then questions about it.
   - *Sound-alikes* (Clifton/Rockaway, Mahwah/Rahway/Matawan, Montclair/Montvale/Montville…)
 
-  Limit questions to a county, a region, towns within 15 miles of you, or **towns you've actually driven through**. Towns you miss come up more often.
+  Limit questions to a county, a region, towns within 15 miles of you, or **towns you've actually driven through**. Review is spaced over days: a right answer pushes a town's next review out to 1, 3, 7, 16, then 35 days, and a miss brings it back within 10 minutes. Mixed mode never asks the same type of question twice in a row.
 - **Your notes**: add a note to any town or road, e.g. *"Use 23 instead of 287 at rush hour"*. Notes show up in Drive and Explore. They stay on your phone; Settings can export and import them as a file.
 - **On the map**: river and lake names, and 31 landmarks (stadiums, malls, train stations, parks, colleges).
+
+## Design notes
+
+**Color is reserved for meaning.** Large areas stay near-neutral, and saturated color only appears on small things that carry a message (Eduard Imhof's rule, as discussed by Edward Tufte in *Envisioning Information*):
+- **Amber:** you, and the town you're in
+- **Blue:** what you selected or are being asked about, and water
+- **Green / red:** right / wrong answers
+- **One warm tan:** highways, which get more important by getting wider, not by changing color
+
+Every color lives in `js/theme.js`, so trying another scheme is a change to that one file.
+
+**Four zoom levels, each adding one kind of thing.** These loosely follow Kevin Lynch's elements of a mental map in *The Image of the City*: paths, edges, districts, nodes and landmarks.
+
+| Level | What appears |
+| --- | --- |
+| Whole state | North / Central / South Jersey, interstates, the Turnpike and the Parkway |
+| One step in | The 21 counties |
+| Region | The largest towns, all main highways, landmark dots, big rivers |
+| Town | Every town, secondary roads, lakes, landmark names |
+| Street | Villages and sections, local roads, street names |
+
+The level breakpoints are in `js/style.js`.
+
+**Practice follows learning research:**
+- Being quizzed beats re-reading (Roediger & Karpicke, 2006), and reviews spread over days beat cramming (Cepeda et al., 2006).
+- Mixing similar items helps you tell them apart (Kornell & Bjork, 2008).
+- People misjudge where places are based on the larger region they belong to (Stevens & Coupe, 1978).
+- Spatial skills improve with practice and feedback (Uttal et al., 2013).
+- People organize what they know about a place around a few personal anchor points (Couclelis et al., 1987).
+- Following GPS directions passively weakens spatial learning (Ishikawa et al., 2008; Dahmani & Bohbot, 2020). Hence *guess first*.
+- A heading-up map helps you decide turns, while north-up helps you understand the area (Aretz & Wickens, 1992). Hence heading-up while driving, and north-up for Explore, Practice and the trip recap.
 
 Everything runs on your phone: no account, no tracking, and nothing is sent anywhere. Once it has loaded, it works with no signal. Only the background street map needs a connection; set the background to *None* and nothing goes over the network.
 
@@ -67,6 +104,10 @@ Location only works over HTTPS (or on `localhost`). To try it on a computer, run
 | `js/knowledge.js` | Draft road notes and landmarks |
 | `js/roads.js` | Reads major roads from the map tiles: nearest road, roads through a town |
 | `js/notes.js` | Your notes (on-device, export/import) |
+| `js/theme.js` | Every color |
+| `js/style.js` | Map layers and zoom levels |
+| `js/anchors.js` | Your places |
+| `js/regions.js` | North / Central / South Jersey by county |
 | `js/geo.js` | Distance, bearing, point-in-polygon |
 | `data/nj.topo.json` | 564 municipalities + 21 counties (TopoJSON) |
 | `data/sections.json` | Villages, sections and local names, by municipality |

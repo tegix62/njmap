@@ -1,6 +1,9 @@
 import { bearing, compass8 } from './geo.js';
 import { roadsInTown, draftNote } from './roads.js';
 import { editNote } from './notes.js';
+import { THEME } from './theme.js';
+
+const L = THEME.label;
 
 // Explore: tap any town (or search, including village names like "Towaco").
 //
@@ -44,7 +47,7 @@ export function initExplore(ctx) {
   document.body.appendChild(list);
 
   map.on('click', (e) => {
-    if (ctx.mode !== 'explore') return;
+    if (ctx.mode !== 'explore' || e.handledByAnchor) return;
     select(ctx.locate([e.lngLat.lng, e.lngLat.lat]), false);
   });
 
@@ -75,7 +78,7 @@ export function initExplore(ctx) {
     const tryFind = () => {
       const hit = ctx.placedSections(m).get(name.toLowerCase());
       if (hit) {
-        ctx.reveal([{ m, pt: hit.pt, label: hit.name, color: '#3730a3' }]);
+        ctx.reveal([{ m, pt: hit.pt, label: hit.name, color: L.place }]);
         map.easeTo({ center: hit.pt, zoom: Math.max(map.getZoom(), 13.5), offset: offset(), duration: 600 });
       }
       return !!hit;
@@ -89,7 +92,7 @@ export function initExplore(ctx) {
   }
 
   function showLandmark(l) {
-    ctx.reveal([{ m: l.m, pt: l.pt, label: l.name, color: '#9f1239' }]);
+    ctx.reveal([{ m: l.m, pt: l.pt, label: l.name, color: L.place }]);
     map.easeTo({ center: l.pt, zoom: Math.max(map.getZoom(), 13.5), offset: offset(), duration: 600 });
   }
 
@@ -171,7 +174,8 @@ export function initExplore(ctx) {
       );
     } else {
       const m = sel;
-      const from = ctx.pos ? ` · ${ctx.relative(ctx.pos.pt, m.pt).text} of you` : '';
+      const anchor = ctx.anchors.phrase(m.pt);
+      const from = (anchor ? ` · ${esc(anchor)}` : '') + (ctx.pos ? ` · ${ctx.relative(ctx.pos.pt, m.pt).text} of you` : '');
       const nAlikes = new Set((ctx.confusables.byId.get(m.id) || []).flatMap((g) => g.members)).size - 1;
       const tabs = [
         ['villages', 'Villages', m.sections.length],

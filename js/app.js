@@ -7,200 +7,16 @@ import { initExplore } from './explore.js';
 import { initPractice } from './practice.js';
 import { LANDMARKS } from './knowledge.js';
 import { notes } from './notes.js';
-
-// Hand-assigned so that bordering counties never share a color.
-const PALETTE = {
-  A: '#f4a261', B: '#8ecae6', C: '#a7c957', D: '#cdb4db', E: '#ffd166', F: '#f28482', G: '#84a59d',
-};
-const COUNTY_COLOR = {
-  Sussex: 'A', Warren: 'B', Passaic: 'C', Bergen: 'D', Morris: 'E', Essex: 'F', Hudson: 'A',
-  Union: 'B', Hunterdon: 'C', Somerset: 'D', Middlesex: 'G', Mercer: 'F', Monmouth: 'E',
-  Burlington: 'B', Ocean: 'C', Atlantic: 'D', Camden: 'A', Gloucester: 'E', Salem: 'C',
-  Cumberland: 'B', 'Cape May': 'F',
-};
-
-// Background map: OpenFreeMap vector tiles (OpenStreetMap data, no API key,
-// no usage limits). Only water and roads are drawn; OSM place names are left
-// out on purpose so the only town names on screen are the official ones.
-const OMT_SOURCE = {
-  type: 'vector',
-  url: 'https://tiles.openfreemap.org/planet',
-};
-const ROAD_CLASSES = {
-  major: ['motorway', 'trunk', 'primary'],
-  mid: ['secondary', 'tertiary'],
-  minor: ['minor'],
-};
-const isClass = (list) => ['match', ['get', 'class'], list, true, false];
-const notTunnel = ['!=', ['get', 'brunnel'], 'tunnel'];
-const roadWidth = (a, b, c) => ['interpolate', ['exponential', 1.5], ['zoom'], 8, a, 12, b, 16, c];
-// [layer, which basemaps show it]
-const BASE_LAYERS = [
-  [{ id: 'water', type: 'fill', source: 'omt', 'source-layer': 'water', paint: { 'fill-color': '#a9cbe3' } }, 'streets light'],
-  [
-    {
-      id: 'river',
-      type: 'line',
-      source: 'omt',
-      'source-layer': 'waterway',
-      filter: ['==', ['get', 'class'], 'river'],
-      paint: { 'line-color': '#a9cbe3', 'line-width': roadWidth(0.6, 1.5, 4) },
-    },
-    'streets light',
-  ],
-  [
-    {
-      id: 'road-minor',
-      type: 'line',
-      source: 'omt',
-      'source-layer': 'transportation',
-      minzoom: 12,
-      filter: ['all', isClass(ROAD_CLASSES.minor), notTunnel],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#ffffff', 'line-width': roadWidth(0.3, 0.8, 7) },
-    },
-    'streets',
-  ],
-  [
-    {
-      id: 'road-mid',
-      type: 'line',
-      source: 'omt',
-      'source-layer': 'transportation',
-      minzoom: 9,
-      filter: ['all', isClass(ROAD_CLASSES.mid), notTunnel],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#fffdf5', 'line-width': roadWidth(0.4, 1.4, 9) },
-    },
-    'streets',
-  ],
-  [
-    {
-      id: 'road-major-casing',
-      type: 'line',
-      source: 'omt',
-      'source-layer': 'transportation',
-      minzoom: 6,
-      filter: ['all', isClass(ROAD_CLASSES.major), notTunnel],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#9a6a2f', 'line-opacity': 0.5, 'line-width': roadWidth(1.2, 3.6, 16) },
-    },
-    'streets light',
-  ],
-  [
-    {
-      id: 'road-major',
-      type: 'line',
-      source: 'omt',
-      'source-layer': 'transportation',
-      minzoom: 6,
-      filter: ['all', isClass(ROAD_CLASSES.major), notTunnel],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': ['match', ['get', 'class'], 'motorway', '#f6b26b', 'trunk', '#fcd38a', '#fde9a9'],
-        'line-width': roadWidth(0.7, 2.4, 13),
-      },
-    },
-    'streets light',
-  ],
-  [
-    {
-      id: 'road-focus',
-      type: 'line',
-      source: 'omt',
-      'source-layer': 'transportation_name',
-      filter: ['==', ['get', 'ref'], '__none__'],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#2563eb', 'line-opacity': 0.75, 'line-width': roadWidth(3, 6, 18) },
-    },
-    'streets light',
-  ],
-];
-// Drawn above the town fills/lines, below the town names.
-const BASE_LABEL_LAYERS = [
-  [
-    {
-      id: 'river-name',
-      type: 'symbol',
-      source: 'omt',
-      'source-layer': 'waterway',
-      minzoom: 9.5,
-      filter: ['all', ['==', ['get', 'class'], 'river'], ['has', 'name']],
-      layout: {
-        'symbol-placement': 'line',
-        'symbol-spacing': 400,
-        'text-field': ['get', 'name'],
-        'text-font': ['Noto Sans Italic'],
-        'text-size': 12,
-        'text-letter-spacing': 0.05,
-      },
-      paint: { 'text-color': '#2b6cb0', 'text-halo-color': 'rgba(255,255,255,0.85)', 'text-halo-width': 1.4 },
-    },
-    'streets light',
-  ],
-  [
-    {
-      id: 'lake-name',
-      type: 'symbol',
-      source: 'omt',
-      'source-layer': 'water_name',
-      minzoom: 9.5,
-      filter: ['match', ['get', 'class'], ['lake', 'bay', 'reservoir'], true, false],
-      layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Italic'], 'text-size': 12, 'text-max-width': 7 },
-      paint: { 'text-color': '#2b6cb0', 'text-halo-color': 'rgba(255,255,255,0.85)', 'text-halo-width': 1.4 },
-    },
-    'streets light',
-  ],
-  [
-    {
-      id: 'road-ref',
-      type: 'symbol',
-      source: 'omt',
-      'source-layer': 'transportation_name',
-      minzoom: 9,
-      filter: ['all', isClass(['motorway', 'trunk', 'primary']), ['has', 'ref']],
-      layout: {
-        'symbol-placement': 'line',
-        'symbol-spacing': 350,
-        'text-field': ['get', 'ref'],
-        'text-font': ['Noto Sans Medium'],
-        'text-size': 11,
-        'text-rotation-alignment': 'viewport',
-        'text-padding': 4,
-      },
-      paint: { 'text-color': '#7c4a03', 'text-halo-color': '#fff7e6', 'text-halo-width': 2 },
-    },
-    'streets',
-  ],
-  [
-    {
-      id: 'road-name',
-      type: 'symbol',
-      source: 'omt',
-      'source-layer': 'transportation_name',
-      minzoom: 14,
-      filter: isClass(['primary', 'secondary', 'tertiary', 'minor']),
-      layout: {
-        'symbol-placement': 'line',
-        'text-field': ['get', 'name'],
-        'text-font': ['Noto Sans Italic'],
-        'text-size': 11,
-        'text-padding': 4,
-      },
-      paint: { 'text-color': '#475467', 'text-halo-color': '#ffffff', 'text-halo-width': 1.5 },
-    },
-    'streets',
-  ],
-];
-const withVis = (pairs, key) =>
-  pairs.map(([l, modes]) => ({ ...l, layout: { ...(l.layout || {}), visibility: modes.split(' ').includes(key) ? 'visible' : 'none' } }));
+import { buildStyle, BASE_LAYERS, BASE_LABEL_LAYERS, MUNI_LABEL_IDS, PLACE_LAYER_IDS } from './style.js';
+import { REGIONS } from './regions.js';
+import { initAnchors } from './anchors.js';
 
 const TYPE_ABBR = { Township: 'Twp', Borough: 'Boro', City: 'City', Town: 'Town', Village: 'Vlg' };
-const HL_COLORS = { cur: '#f59e0b', sel: '#2563eb', good: '#16a34a', bad: '#dc2626', q: '#7c3aed', near: '#94a3b8' };
 
 const DEFAULT_SETTINGS = {
   voice: true,
   voiceHints: true,
+  voiceGuess: false,
   basemap: 'streets',
   northUp: false,
   driveLabels: true,
@@ -262,13 +78,6 @@ async function main() {
 
   // ---- map ------------------------------------------------------------------
   const base = location.href.replace(/[#?].*$/, '').replace(/[^/]*$/, '');
-  const countyColorExpr = ['match', ['get', 'c']];
-  for (const [c, k] of Object.entries(COUNTY_COLOR)) countyColorExpr.push(c, PALETTE[k]);
-  countyColorExpr.push('#dddddd');
-  const hlColorExpr = ['match', ['coalesce', ['feature-state', 'hl'], '']];
-  for (const [k, v] of Object.entries(HL_COLORS)) hlColorExpr.push(k, v);
-  hlColorExpr.push('rgba(0,0,0,0)');
-
   const munisData = {
     type: 'FeatureCollection',
     features: munisFC.features.map((f, i) => ({ type: 'Feature', id: i, properties: { c: f.properties.c }, geometry: f.geometry })),
@@ -289,6 +98,18 @@ async function main() {
     features: landmarks.map((l) => ({ type: 'Feature', id: l.id, properties: { name: l.name }, geometry: { type: 'Point', coordinates: l.pt } })),
   };
   if (!['streets', 'light', 'none'].includes(settings.basemap)) settings.basemap = 'streets';
+  const regionLabels = {
+    type: 'FeatureCollection',
+    features: Object.entries(REGIONS).map(([name, cs]) => {
+      const ms = munis.filter((m) => cs.includes(m.c));
+      const pt = [ms.reduce((a, m) => a + m.pt[0], 0) / ms.length, ms.reduce((a, m) => a + m.pt[1], 0) / ms.length];
+      return { type: 'Feature', properties: { name }, geometry: { type: 'Point', coordinates: pt } };
+    }),
+  };
+  const anchorsData = (list) => ({
+    type: 'FeatureCollection',
+    features: list.map((a, i) => ({ type: 'Feature', id: i, properties: { name: a.name }, geometry: { type: 'Point', coordinates: a.pt } })),
+  });
 
   const map = new maplibregl.Map({
     container: 'map',
@@ -305,181 +126,21 @@ async function main() {
     dragRotate: true,
     pitchWithRotate: false,
     touchPitch: false,
-    style: {
-      version: 8,
-      glyphs: base + 'fonts/{fontstack}/{range}.pbf',
-      sources: {
-        omt: OMT_SOURCE,
-        munis: { type: 'geojson', data: munisData },
-        counties: { type: 'geojson', data: countiesFC, attribution: 'Boundaries: <a href="https://njogis-newjersey.opendata.arcgis.com/">NJOGIS</a>' },
-        labels: { type: 'geojson', data: labelsData },
-        countylabels: { type: 'geojson', data: countyLabelsFC },
-        landmarks: { type: 'geojson', data: landmarksData },
-        reveal: { type: 'geojson', data: empty },
-        qline: { type: 'geojson', data: empty },
+    style: buildStyle({
+      base,
+      basemap: settings.basemap,
+      sectionNames,
+      data: {
+        munis: munisData,
+        counties: countiesFC,
+        labels: labelsData,
+        countyLabels: countyLabelsFC,
+        regionLabels,
+        landmarks: landmarksData,
+        anchors: anchorsData(store.get('anchors', [])),
+        empty,
       },
-      layers: [
-        { id: 'bg', type: 'background', paint: { 'background-color': '#e9ede6' } },
-        {
-          id: 'muni-fill',
-          type: 'fill',
-          source: 'munis',
-          paint: {
-            'fill-color': countyColorExpr,
-            'fill-opacity': ['interpolate', ['linear'], ['zoom'], 7, 0.45, 11, 0.22, 14, 0.12],
-          },
-        },
-        {
-          id: 'muni-hl',
-          type: 'fill',
-          source: 'munis',
-          paint: { 'fill-color': hlColorExpr, 'fill-opacity': 0.42 },
-        },
-        // Water and roads sit above the county tint so they stay crisp.
-        ...withVis(BASE_LAYERS, settings.basemap),
-        {
-          id: 'muni-line',
-          type: 'line',
-          source: 'munis',
-          paint: {
-            'line-color': '#344054',
-            'line-opacity': 0.75,
-            'line-width': ['interpolate', ['linear'], ['zoom'], 7, 0.25, 10, 0.8, 13, 1.6, 16, 2.5],
-          },
-        },
-        {
-          id: 'county-line',
-          type: 'line',
-          source: 'counties',
-          layout: { 'line-join': 'round' },
-          paint: {
-            'line-color': '#101828',
-            'line-width': ['interpolate', ['linear'], ['zoom'], 7, 1.2, 10, 2.2, 13, 3.5, 16, 5],
-          },
-        },
-        {
-          id: 'muni-hl-line',
-          type: 'line',
-          source: 'munis',
-          layout: { 'line-join': 'round' },
-          paint: {
-            'line-color': hlColorExpr,
-            'line-width': ['interpolate', ['linear'], ['zoom'], 7, 1.5, 12, 3.5, 16, 5],
-          },
-        },
-        {
-          id: 'qline',
-          type: 'line',
-          source: 'qline',
-          layout: { 'line-cap': 'round' },
-          paint: { 'line-color': '#101828', 'line-width': 3, 'line-dasharray': [1.5, 1.5] },
-        },
-        ...withVis(BASE_LABEL_LAYERS, settings.basemap),
-        {
-          id: 'county-label',
-          type: 'symbol',
-          source: 'countylabels',
-          maxzoom: 10.5,
-          layout: {
-            'text-field': ['upcase', ['get', 'c']],
-            'text-font': ['Noto Sans Italic'],
-            'text-size': ['interpolate', ['linear'], ['zoom'], 6, 10, 9, 15],
-            'text-letter-spacing': 0.15,
-            'symbol-sort-key': 0,
-          },
-          paint: { 'text-color': '#7a2e0e', 'text-halo-color': 'rgba(255,255,255,0.85)', 'text-halo-width': 1.5 },
-        },
-        {
-          // Villages & sections (Towaco, Pompton Plains…): position from
-          // OpenStreetMap place points in the background tiles, shown only when
-          // the name is on the official local-names list.
-          id: 'section-label',
-          type: 'symbol',
-          source: 'omt',
-          'source-layer': 'place',
-          minzoom: 11.5,
-          filter: [
-            'all',
-            ['match', ['get', 'class'], ['town', 'village', 'hamlet', 'suburb', 'quarter', 'neighbourhood'], true, false],
-            ['in', ['get', 'name'], ['literal', sectionNames]],
-          ],
-          layout: {
-            visibility: settings.basemap === 'none' ? 'none' : 'visible',
-            'text-field': ['get', 'name'],
-            'text-font': ['Noto Sans Italic'],
-            'text-size': ['interpolate', ['linear'], ['zoom'], 11.5, 11, 16, 14],
-            'text-padding': 4,
-            'text-max-width': 8,
-            'text-rotation-alignment': 'viewport',
-          },
-          paint: { 'text-color': '#55606f', 'text-halo-color': 'rgba(255,255,255,0.9)', 'text-halo-width': 1.4 },
-        },
-        {
-          id: 'landmark-dot',
-          type: 'circle',
-          source: 'landmarks',
-          minzoom: 8.5,
-          paint: {
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 8.5, 3, 13, 5.5],
-            'circle-color': '#9f1239',
-            'circle-stroke-color': '#ffffff',
-            'circle-stroke-width': 1.5,
-          },
-        },
-        {
-          id: 'landmark-label',
-          type: 'symbol',
-          source: 'landmarks',
-          minzoom: 10,
-          layout: {
-            'text-field': ['get', 'name'],
-            'text-font': ['Noto Sans Medium'],
-            'text-size': 11.5,
-            'text-anchor': 'top',
-            'text-offset': [0, 0.6],
-            'text-max-width': 8,
-            'text-optional': true,
-          },
-          paint: { 'text-color': '#9f1239', 'text-halo-color': '#ffffff', 'text-halo-width': 1.6 },
-        },
-        {
-          id: 'muni-label',
-          type: 'symbol',
-          source: 'labels',
-          minzoom: 8.3,
-          layout: {
-            'text-field': ['get', 'label'],
-            'text-font': ['Noto Sans Medium'],
-            'text-size': ['interpolate', ['linear'], ['zoom'], 8.3, 10, 11, 12.5, 14, 15, 16, 18],
-            'text-max-width': 7,
-            'text-padding': 3,
-            'symbol-sort-key': ['-', 0, ['get', 'p']],
-            'text-rotation-alignment': 'viewport',
-          },
-          paint: {
-            'text-color': '#101828',
-            'text-halo-color': 'rgba(255,255,255,0.92)',
-            'text-halo-width': 1.6,
-            // Explore "focus": the selected town and its neighbors stay solid.
-            'text-opacity': ['case', ['boolean', ['global-state', 'focusing'], false], ['case', ['boolean', ['feature-state', 'focus'], false], 1, 0.28], 1],
-          },
-        },
-        {
-          id: 'reveal-label',
-          type: 'symbol',
-          source: 'reveal',
-          layout: {
-            'text-field': ['get', 'label'],
-            'text-font': ['Noto Sans Medium'],
-            'text-size': 16,
-            'text-allow-overlap': true,
-            'text-ignore-placement': true,
-            'text-max-width': 9,
-          },
-          paint: { 'text-color': ['coalesce', ['get', 'color'], '#101828'], 'text-halo-color': '#ffffff', 'text-halo-width': 2.2 },
-        },
-      ],
-    },
+    }),
   });
   map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
   map.addControl(new maplibregl.ScaleControl({ unit: 'imperial', maxWidth: 90 }), 'bottom-left');
@@ -545,6 +206,17 @@ async function main() {
         })),
       });
     },
+    /** Several lines at once: [{coords, color?}] */
+    lines(list) {
+      map.getSource('qline').setData({
+        type: 'FeatureCollection',
+        features: list.map((l) => ({ type: 'Feature', properties: l.color ? { color: l.color } : {}, geometry: { type: 'LineString', coordinates: l.coords } })),
+      });
+    },
+    /** Draw a recorded trip's route (or clear it with null). */
+    trip(coords) {
+      map.getSource('trip').setData(coords ? { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } } : empty);
+    },
     line(coords) {
       map.getSource('qline').setData(
         coords ? { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } } : empty
@@ -552,9 +224,9 @@ async function main() {
     },
     showLabels(on) {
       labelsOn = on;
-      map.setLayoutProperty('muni-label', 'visibility', on ? 'visible' : 'none');
+      for (const id of MUNI_LABEL_IDS) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
       map.setLayoutProperty('section-label', 'visibility', on && settings.basemap !== 'none' ? 'visible' : 'none');
-      for (const id of ['landmark-dot', 'landmark-label']) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+      for (const id of PLACE_LAYER_IDS) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
     },
     padding() {
       const top = hudEl.hidden ? 12 : hudEl.getBoundingClientRect().bottom + 12;
@@ -660,6 +332,7 @@ async function main() {
       clearTimeout(toastTimer);
       toastTimer = setTimeout(() => (t.hidden = true), ms);
     },
+    anchorsData,
     updateEdges: () => updateEdges(),
   };
   window.njtf = ctx; // handy for debugging from the console
@@ -699,6 +372,8 @@ async function main() {
   map.on('move', updateEdges);
   window.addEventListener('resize', updateEdges);
 
+  ctx.anchors = initAnchors(ctx); // before the modes, so it can claim map taps
+
   // ---- modes ----------------------------------------------------------------
   const modes = {
     drive: initDrive(ctx),
@@ -731,7 +406,46 @@ async function main() {
 
   // ---- settings dialog ------------------------------------------------------
   const dlg = $('#settings');
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  function renderAnchors() {
+    const list = ctx.anchors.list();
+    $('#anchorList').innerHTML = list.length
+      ? list.map((a, i) => `<div class="anchorrow"><span>${esc(a.name)}</span><span class="muted2">in ${esc(townOf(a.pt))}</span><button data-i="${i}" aria-label="Remove ${esc(a.name)}">×</button></div>`).join('')
+      : '<p class="fine">None yet.</p>';
+    for (const b of $('#anchorList').querySelectorAll('button')) b.addEventListener('click', () => {
+      ctx.anchors.remove(+b.dataset.i);
+      renderAnchors();
+    });
+  }
+  const townOf = (pt) => {
+    const m = ctx.locate(pt);
+    return m ? m.n : 'outside NJ';
+  };
+  const anchorName = () => {
+    const n = $('#anchorName').value.trim();
+    if (!n) {
+      $('#anchorName').focus();
+      ctx.toast('Give the place a name first');
+    }
+    return n;
+  };
+  $('#anchorHere').addEventListener('click', () => {
+    const n = anchorName();
+    if (!n) return;
+    if (!ctx.pos) return ctx.toast('No location yet. Start Drive mode first, or tap on the map instead.');
+    ctx.anchors.add(n, ctx.pos.pt);
+    $('#anchorName').value = '';
+    renderAnchors();
+  });
+  $('#anchorPick').addEventListener('click', () => {
+    const n = anchorName();
+    if (!n) return;
+    $('#anchorName').value = '';
+    dlg.close();
+    ctx.anchors.startPick(n);
+  });
   $('#settingsBtn').addEventListener('click', () => {
+    renderAnchors();
     for (const el of dlg.querySelectorAll('[data-setting]')) {
       const k = el.dataset.setting;
       if (el.type === 'checkbox') el.checked = !!settings[k];

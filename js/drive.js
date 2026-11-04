@@ -5,6 +5,7 @@ import { editNote } from './notes.js';
 
 const MIN_MOVING_MPS = 2; // ~4.5 mph; below this GPS course is noise
 const LOOK_STEP_MI = 0.08;
+const GUESS_PAUSE_MS = 4000;
 
 export function initDrive(ctx) {
   const { map, settings, store } = ctx;
@@ -31,13 +32,64 @@ export function initDrive(ctx) {
   };
   let visited = store.get('visited', {});
 
+  // ---- trip recording -----------------------------------------------------------
+  // Each drive's route and the towns you entered, in order, kept for a
+  // north-up recap afterwards (map study after route experience is what turns
+  // a sequence of turns into a mental map; Thorndyke & Hayes-Roth, 1982).
+  const MAX_TRIPS = 8;
+  const MAX_PTS = 4000;
+  const NEW_TRIP_AFTER = 30 * 60e3;
+  const trips = (() => {
+    let list = store.get('trips', []);
+    let cur = null;
+    let dirty = 0;
+    const save = (force) => {
+      if (!cur) return;
+      if (!force && ++dirty < 10) return;
+      dirty = 0;
+      store.set('trips', list);
+    };
+    const ensure = () => {
+      const now = Date.now();
+      if (!cur || now - cur.last > NEW_TRIP_AFTER) {
+        cur = { start: now, last: now, pts: [], towns: [] };
+        list = [...list.filter((t) => t.towns.length >= 2), cur].slice(-MAX_TRIPS);
+      }
+      cur.last = now;
+      return cur;
+    };
+    return {
+      point(pt) {
+        const t = ensure();
+        const lastPt = t.pts[t.pts.length - 1];
+        if (lastPt && distanceMi(lastPt, pt) < 0.08) return;
+        t.pts.push([+pt[0].toFixed(5), +pt[1].toFixed(5)]);
+        if (t.pts.length > MAX_PTS) t.pts = t.pts.filter((_, i) => i % 2 === 0);
+        save();
+      },
+      town(m, h) {
+        const t = ensure();
+        const lastTown = t.towns[t.towns.length - 1];
+        if (lastTown && lastTown.key === m.key) return;
+        t.towns.push({ key: m.key, t: Date.now(), h: h == null ? null : Math.round(h) });
+        save(true);
+      },
+      current: () => cur,
+      end() {
+        save(true);
+        cur = null;
+      },
+      list: () => list,
+    };
+  })();
+
   // ---- position marker ------------------------------------------------------
   const el = document.createElement('div');
   el.className = 'me';
   el.innerHTML =
     '<svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true">' +
-    '<circle cx="20" cy="20" r="9" fill="#2563eb" stroke="#fff" stroke-width="3"/>' +
-    '<path class="me-arrow" d="M20 2 L27 14 L20 11 L13 14 Z" fill="#2563eb" stroke="#fff" stroke-width="1.5"/></svg>';
+    '<circle cx="20" cy="20" r="9" fill="#d97706" stroke="#fff" stroke-width="3"/>' +
+    '<path class="me-arrow" d="M20 2 L27 14 L20 11 L13 14 Z" fill="#d97706" stroke="#fff" stroke-width="1.5"/></svg>';
   const marker = new maplibregl.Marker({ element: el, rotationAlignment: 'map', pitchAlignment: 'map' });
 
   // ---- geolocation ----------------------------------------------------------
@@ -68,6 +120,9 @@ export function initDrive(ctx) {
   function stop() {
     if (st.watchId != null) navigator.geolocation.clearWatch(st.watchId);
     st.watchId = null;
+    const t = trips.current();
+    if (t && t.towns.length >= 2) ctx.toast(`Drive saved: ${t.towns.length} towns. See Practice → My last drive.`, 5000);
+    trips.end();
     store.set('tracking', false);
     releaseWake();
     render();
@@ -105,6 +160,7 @@ export function initDrive(ctx) {
 
     ctx.pos = { pt, acc: c.accuracy, speed, heading: st.heading, t: pos.timestamp };
     st.error = null;
+    if (c.accuracy < 100) trips.point(pt);
 
     // Which town? Require two agreeing fixes before switching, so GPS jitter
     // along a border doesn't flap back and forth.
@@ -149,6 +205,7 @@ export function initDrive(ctx) {
     if (m) {
       visited[m.key] = Date.now();
       store.set('visited', visited);
+      trips.town(m, st.gpsHeading ? st.heading : null);
     }
     // Speak on every change after the first fix.
     const first = !st.hadFix;
@@ -169,6 +226,21 @@ export function initDrive(ctx) {
     if (settings.voiceHints) {
       const twin = confusedWith(m);
       if (twin) s += ` Not ${twin.n} — that's ${ctx.relative(m.pt, twin.pt).words}.`;
+    }
+    if (settings.voiceGuess && settings.voice) {
+      // Guess first: ask, pause, then answer. Recalling it yourself is what
+      // builds the memory; being told passively (GPS-style) mostly doesn't
+      // (Ishikawa et al., 2008; Dahmani & Bohbot, 2020).
+      clearTimeout(st.guessTimer);
+      st.guessing = m;
+      ctx.speak(prev && prev.c !== m.c ? 'New town, and a new county. Which one?' : 'New town. Which one?');
+      st.guessTimer = setTimeout(() => {
+        st.guessing = null;
+        ctx.speak(s);
+        render();
+      }, GUESS_PAUSE_MS);
+      render();
+      return;
     }
     ctx.speak(s);
   }
@@ -389,7 +461,12 @@ export function initDrive(ctx) {
       ? `<div class="label-sm">${esc(m.n)}</div>${noteCards('town', m.key)}
          <button class="addnote" data-note="town" data-key="${esc(m.key)}">＋ Note about ${esc(m.n)}</button>`
       : '';
-    return `<div class="detail">${look}${roadNotes}${townNotes}</div>`;
+    const places = ctx.anchors
+      .fromYou(ctx.pos.pt, st.heading)
+      .slice(0, 3)
+      .map((x) => `<div class="placeline"><b>${esc(x.a.name)}</b> ${mi(x.d)} ${x.dir}${x.rel ? ` <span class="muted">· ${x.rel}</span>` : ''}</div>`)
+      .join('');
+    return `<div class="detail">${look}${places ? `<div class="label-sm">Your places</div>${places}` : ''}${roadNotes}${townNotes}</div>`;
   }
 
   function render() {
@@ -421,7 +498,10 @@ export function initDrive(ctx) {
     ctx.hud(
       `${handle}` +
         (m
-          ? `<div class="town">${esc(m.n)}</div>
+          ? st.guessing === m
+            ? `<div class="town">?</div>
+             <div class="meta">New town. Say it before the voice does…</div>`
+            : `<div class="town">${esc(m.n)}</div>
              <div class="meta">${esc(m.t)} · <b>${esc(m.c)} County</b>${near} ${acc}</div>`
           : `<div class="town">Outside New Jersey</div><div class="meta">or offshore ${acc}</div>`) +
         head +
@@ -488,6 +568,7 @@ export function initDrive(ctx) {
     get visited() {
       return (visited = store.get('visited', {}));
     },
+    trips: () => trips.list(),
     get tracking() {
       return st.watchId != null;
     },
