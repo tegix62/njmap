@@ -17,17 +17,136 @@ const COUNTY_COLOR = {
   Cumberland: 'B', 'Cape May': 'F',
 };
 
-const BASEMAPS = {
-  streets: {
-    label: 'Streets',
-    tiles: ['a', 'b', 'c', 'd'].map((s) => `https://${s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}@2x.png`),
-  },
-  light: {
-    label: 'Light',
-    tiles: ['a', 'b', 'c', 'd'].map((s) => `https://${s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}@2x.png`),
-  },
-  none: { label: 'None (works offline)', tiles: null },
+// Background map: OpenFreeMap vector tiles (OpenStreetMap data, no API key,
+// no usage limits). Only water and roads are drawn; OSM place names are left
+// out on purpose so the only town names on screen are the official ones.
+const OMT_SOURCE = {
+  type: 'vector',
+  url: 'https://tiles.openfreemap.org/planet',
 };
+const ROAD_CLASSES = {
+  major: ['motorway', 'trunk', 'primary'],
+  mid: ['secondary', 'tertiary'],
+  minor: ['minor'],
+};
+const isClass = (list) => ['match', ['get', 'class'], list, true, false];
+const notTunnel = ['!=', ['get', 'brunnel'], 'tunnel'];
+const roadWidth = (a, b, c) => ['interpolate', ['exponential', 1.5], ['zoom'], 8, a, 12, b, 16, c];
+// [layer, which basemaps show it]
+const BASE_LAYERS = [
+  [{ id: 'water', type: 'fill', source: 'omt', 'source-layer': 'water', paint: { 'fill-color': '#a9cbe3' } }, 'streets light'],
+  [
+    {
+      id: 'river',
+      type: 'line',
+      source: 'omt',
+      'source-layer': 'waterway',
+      filter: ['==', ['get', 'class'], 'river'],
+      paint: { 'line-color': '#a9cbe3', 'line-width': roadWidth(0.6, 1.5, 4) },
+    },
+    'streets light',
+  ],
+  [
+    {
+      id: 'road-minor',
+      type: 'line',
+      source: 'omt',
+      'source-layer': 'transportation',
+      minzoom: 12,
+      filter: ['all', isClass(ROAD_CLASSES.minor), notTunnel],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#ffffff', 'line-width': roadWidth(0.3, 0.8, 7) },
+    },
+    'streets',
+  ],
+  [
+    {
+      id: 'road-mid',
+      type: 'line',
+      source: 'omt',
+      'source-layer': 'transportation',
+      minzoom: 9,
+      filter: ['all', isClass(ROAD_CLASSES.mid), notTunnel],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#fffdf5', 'line-width': roadWidth(0.4, 1.4, 9) },
+    },
+    'streets',
+  ],
+  [
+    {
+      id: 'road-major-casing',
+      type: 'line',
+      source: 'omt',
+      'source-layer': 'transportation',
+      minzoom: 6,
+      filter: ['all', isClass(ROAD_CLASSES.major), notTunnel],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#9a6a2f', 'line-opacity': 0.5, 'line-width': roadWidth(1.2, 3.6, 16) },
+    },
+    'streets light',
+  ],
+  [
+    {
+      id: 'road-major',
+      type: 'line',
+      source: 'omt',
+      'source-layer': 'transportation',
+      minzoom: 6,
+      filter: ['all', isClass(ROAD_CLASSES.major), notTunnel],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': ['match', ['get', 'class'], 'motorway', '#f6b26b', 'trunk', '#fcd38a', '#fde9a9'],
+        'line-width': roadWidth(0.7, 2.4, 13),
+      },
+    },
+    'streets light',
+  ],
+];
+// Drawn above the town fills/lines, below the town names.
+const BASE_LABEL_LAYERS = [
+  [
+    {
+      id: 'road-ref',
+      type: 'symbol',
+      source: 'omt',
+      'source-layer': 'transportation_name',
+      minzoom: 9,
+      filter: ['all', isClass(['motorway', 'trunk', 'primary']), ['has', 'ref']],
+      layout: {
+        'symbol-placement': 'line',
+        'symbol-spacing': 350,
+        'text-field': ['get', 'ref'],
+        'text-font': ['Noto Sans Medium'],
+        'text-size': 11,
+        'text-rotation-alignment': 'viewport',
+        'text-padding': 4,
+      },
+      paint: { 'text-color': '#7c4a03', 'text-halo-color': '#fff7e6', 'text-halo-width': 2 },
+    },
+    'streets',
+  ],
+  [
+    {
+      id: 'road-name',
+      type: 'symbol',
+      source: 'omt',
+      'source-layer': 'transportation_name',
+      minzoom: 14,
+      filter: isClass(['primary', 'secondary', 'tertiary', 'minor']),
+      layout: {
+        'symbol-placement': 'line',
+        'text-field': ['get', 'name'],
+        'text-font': ['Noto Sans Italic'],
+        'text-size': 11,
+        'text-padding': 4,
+      },
+      paint: { 'text-color': '#475467', 'text-halo-color': '#ffffff', 'text-halo-width': 1.5 },
+    },
+    'streets',
+  ],
+];
+const withVis = (pairs, key) =>
+  pairs.map(([l, modes]) => ({ ...l, layout: { ...(l.layout || {}), visibility: modes.split(' ').includes(key) ? 'visible' : 'none' } }));
 
 const TYPE_ABBR = { Township: 'Twp', Borough: 'Boro', City: 'City', Town: 'Town', Village: 'Vlg' };
 const HL_COLORS = { cur: '#f59e0b', sel: '#2563eb', good: '#16a34a', bad: '#dc2626', q: '#7c3aed', near: '#64748b' };
@@ -102,7 +221,7 @@ async function main() {
     })),
   };
   const empty = { type: 'FeatureCollection', features: [] };
-  const bm = BASEMAPS[settings.basemap] || BASEMAPS.streets;
+  if (!['streets', 'light', 'none'].includes(settings.basemap)) settings.basemap = 'streets';
 
   const map = new maplibregl.Map({
     container: 'map',
@@ -123,13 +242,7 @@ async function main() {
       version: 8,
       glyphs: base + 'fonts/{fontstack}/{range}.pbf',
       sources: {
-        basemap: {
-          type: 'raster',
-          tiles: bm.tiles || BASEMAPS.streets.tiles,
-          tileSize: 256,
-          maxzoom: 19,
-          attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
-        },
+        omt: OMT_SOURCE,
         munis: { type: 'geojson', data: munisData },
         counties: { type: 'geojson', data: countiesFC, attribution: 'Boundaries: <a href="https://njogis-newjersey.opendata.arcgis.com/">NJOGIS</a>' },
         labels: { type: 'geojson', data: labelsData },
@@ -139,13 +252,6 @@ async function main() {
       },
       layers: [
         { id: 'bg', type: 'background', paint: { 'background-color': '#e9ede6' } },
-        {
-          id: 'basemap',
-          type: 'raster',
-          source: 'basemap',
-          layout: { visibility: bm.tiles ? 'visible' : 'none' },
-          paint: { 'raster-opacity': 0.9 },
-        },
         {
           id: 'muni-fill',
           type: 'fill',
@@ -161,6 +267,8 @@ async function main() {
           source: 'munis',
           paint: { 'fill-color': hlColorExpr, 'fill-opacity': 0.42 },
         },
+        // Water and roads sit above the county tint so they stay crisp.
+        ...withVis(BASE_LAYERS, settings.basemap),
         {
           id: 'muni-line',
           type: 'line',
@@ -198,6 +306,7 @@ async function main() {
           layout: { 'line-cap': 'round' },
           paint: { 'line-color': '#101828', 'line-width': 3, 'line-dasharray': [1.5, 1.5] },
         },
+        ...withVis(BASE_LABEL_LAYERS, settings.basemap),
         {
           id: 'county-label',
           type: 'symbol',
@@ -348,14 +457,10 @@ async function main() {
       speechSynthesis.speak(u);
     },
     setBasemap(key) {
-      const b = BASEMAPS[key] || BASEMAPS.streets;
       settings.basemap = key;
       ctx.saveSettings();
-      if (b.tiles) {
-        const src = map.getSource('basemap');
-        src.setTiles(b.tiles);
-        map.setLayoutProperty('basemap', 'visibility', 'visible');
-      } else map.setLayoutProperty('basemap', 'visibility', 'none');
+      for (const [l, modes] of [...BASE_LAYERS, ...BASE_LABEL_LAYERS])
+        map.setLayoutProperty(l.id, 'visibility', modes.split(' ').includes(key) ? 'visible' : 'none');
     },
     updateEdges: () => updateEdges(),
   };

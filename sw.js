@@ -1,7 +1,7 @@
 // Offline support: the app shell, boundary data, libraries and fonts are
 // cached, so "which town am I in" keeps working with no signal. Background map
 // tiles are only cached opportunistically.
-const VERSION = 'njtf-v1';
+const VERSION = 'njtf-v2';
 const SHELL = [
   './',
   'index.html',
@@ -23,7 +23,7 @@ const SHELL = [
   'icon.svg',
 ];
 const TILES = 'njtf-tiles';
-const MAX_TILES = 1500;
+const MAX_TILES = 3000;
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -60,7 +60,7 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  if (url.hostname.endsWith('basemaps.cartocdn.com')) {
+  if (url.hostname === 'tiles.openfreemap.org') {
     e.respondWith(
       fetch(req)
         .then(async (r) => {
