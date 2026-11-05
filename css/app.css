@@ -1425,3 +1425,192 @@ body[data-mode='drive'] .look .v {
   text-underline-offset: 2px;
   cursor: pointer;
 }
+
+/* ---- Drive the grid -------------------------------------------------------- */
+#gridgame {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background: #f3eee3;
+  touch-action: none;
+}
+#gridgame svg {
+  display: block;
+}
+body.gridding #edges,
+body.gridding #fabs,
+body.gridding .maplibregl-ctrl-bottom-left,
+body.gridding .maplibregl-ctrl-bottom-right {
+  display: none;
+}
+#gridgame .st {
+  stroke: #b9b0a2;
+  stroke-width: 26;
+}
+#gridgame .st.two {
+  stroke: #8f8577;
+  stroke-width: 46;
+}
+#gridgame .av {
+  stroke: #8f8577;
+  stroke-width: 44;
+}
+#gridgame .av.two {
+  stroke-width: 60;
+}
+#gridgame .park {
+  fill: #cfe1c4;
+}
+#gridgame .bldg {
+  fill: #ddd5c6;
+}
+#gridgame .gg-parkname {
+  font-size: 70px;
+  font-weight: 700;
+  fill: #6b6257;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+#gridgame .gg-arrows path {
+  fill: none;
+  stroke: #1f1b16;
+  stroke-width: 14;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.55;
+}
+#gridgame .gg-arrows.flash path {
+  stroke: #b91c1c;
+  opacity: 0.9;
+}
+#gridgame .gg-path {
+  fill: none;
+  stroke: #2b4fb3;
+  stroke-width: 40;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.55;
+}
+#gridgame .gg-best {
+  fill: none;
+  stroke: #15803d;
+  stroke-width: 30;
+  stroke-dasharray: 70 60;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+#gridgame .gg-flag {
+  fill: #b91c1c;
+  stroke: #fff;
+  stroke-width: 24;
+}
+#gridgame .gg-flaglabel {
+  font-size: 105px;
+  font-weight: 800;
+  fill: #b91c1c;
+  paint-order: stroke;
+  stroke: #f3eee3;
+  stroke-width: 26px;
+  stroke-linejoin: round;
+}
+#gridgame .gg-car path {
+  fill: #2b4fb3;
+  stroke: #fff;
+  stroke-width: 14;
+  stroke-linejoin: round;
+}
+#gridgame .gg-car .blink {
+  fill: #f59e0b;
+  display: none;
+}
+#gridgame .gg-car.sigL .blink.L,
+#gridgame .gg-car.sigR .blink.R {
+  display: block;
+  animation: gg-blink 0.6s steps(2, start) infinite;
+}
+@keyframes gg-blink {
+  to {
+    visibility: hidden;
+  }
+}
+#gridgame .gg-labels text {
+  font-size: 12px;
+  font-weight: 700;
+  fill: #1f1b16;
+  paint-order: stroke;
+  stroke: #f3eee3;
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+#gridgame .gg-labels .gg-ave {
+  text-anchor: middle;
+}
+#gridgame .gg-labels .gg-st {
+  font-size: 11px;
+  font-weight: 600;
+  fill: #6b6257;
+}
+#gridgame .gg-labels .gg-st.two {
+  fill: #1f1b16;
+  font-weight: 800;
+}
+#gridgame .gg-north path {
+  fill: #b91c1c;
+}
+#gridgame .gg-north text {
+  font-size: 11px;
+  font-weight: 800;
+  fill: #b91c1c;
+  text-anchor: middle;
+}
+#gridgame .gg-offscreen circle {
+  fill: #b91c1c;
+  stroke: #fff;
+  stroke-width: 2;
+}
+#gridgame .gg-offscreen polygon {
+  fill: #fff;
+}
+.ggctl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 8px;
+}
+.ggturn {
+  font: inherit;
+  font-size: 22px;
+  font-weight: 800;
+  padding: 18px 0;
+  border-radius: 14px;
+  border: 2px solid transparent;
+  background: rgba(31, 27, 22, 0.07);
+  color: var(--panel-ink);
+  touch-action: manipulation;
+}
+.ggturn.on {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.18);
+}
+.ggmsg {
+  margin-top: 8px;
+  font-size: 14px;
+  min-height: 2.6em;
+}
+.ggopts {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--panel-muted);
+}
+.ggopts select,
+.ggopts button {
+  font: inherit;
+  border-radius: 8px;
+  border: 1px solid rgba(31, 27, 22, 0.2);
+  background: transparent;
+  color: var(--panel-ink);
+  padding: 4px 8px;
+}
