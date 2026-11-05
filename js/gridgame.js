@@ -453,6 +453,7 @@ export function initGridGame(ctx) {
     if (!g || g.done || g.loading) return;
     if (e.key === 'ArrowLeft') press('L');
     else if (e.key === 'ArrowRight') press('R');
+    else if (e.key === 'ArrowUp') press('S');
     else if (e.key === ' ') togglePause();
   };
 
@@ -605,6 +606,17 @@ export function initGridGame(ctx) {
     if (g.msg && performance.now() - g.msgAt > 3500) g.msg = '';
     if (n === g.target.node) return finish();
     if (g.goTo === n) {
+      const cc = choices(e);
+      const onlyWay = !cc.decision ? cc.only : !cc.left && !cc.right ? cc.straight : null;
+      if (onlyWay && !cc.uturn) {
+        // nothing to decide at this corner: say so and keep going
+        g.goTo = null;
+        setData('gg-goto', EMPTY);
+        g.msg = `At ${G.label(n)} the only way on is straight ahead, so the car keeps going.`;
+        g.msgAt = performance.now();
+        go(onlyWay);
+        return;
+      }
       g.msg = ''; // the tapped corner: say where you are, not an older note
       return stopHere();
     }
@@ -654,7 +666,9 @@ export function initGridGame(ctx) {
       g.msgAt = performance.now();
     }
     if (!g.msg) {
-      g.msg = `At ${G.label(g.e.to)}. Turn left or right, or tap a corner further ahead.`;
+      const c0 = choices(g.e);
+      const ways = [c0.left && 'left', (c0.straight || (!c0.decision && c0.only)) && 'straight', c0.right && 'right'].filter(Boolean);
+      g.msg = `At ${G.label(g.e.to)}. You can go ${ways.join(' or ') || 'nowhere'} from here.`;
       g.msgAt = performance.now();
     }
     render();
@@ -686,8 +700,18 @@ export function initGridGame(ctx) {
   }
   function press(side) {
     if (!g || g.done || g.loading) return;
-    if (g.check) return answerCheck(side);
+    if (g.check) return side === 'S' ? undefined : answerCheck(side);
     go0();
+    if (side === 'S') {
+      if (!g.waiting) return;
+      const c = choices(g.e);
+      const nx = c.straight || (!c.decision ? c.only : null);
+      if (!nx) return;
+      g.msg = '';
+      go(nx);
+      render();
+      return;
+    }
     if (g.waiting) {
       const c = choices(g.e);
       const nx = side === 'L' ? c.left : c.right;
@@ -882,10 +906,13 @@ export function initGridGame(ctx) {
     const lvl = g.check ? 'hide' : fstats.hint(gridDir(hb));
     const hint = (dir) => (lvl === 'hide' ? '' : `<span class="dirhint${lvl === 'faint' ? ' faint' : ''}">${WORD[dir]}</span>`);
     const btn = (side, label) =>
-      `<button class="ggturn${g.queued === side ? ' on' : ''}${g.check ? ' check' : ''}" data-side="${side}" ${g.done ? 'disabled' : ''}>${label}${hint(gridDir(hb + (side === 'L' ? -90 : 90)))}</button>`;
+      `<button class="ggturn${g.queued === side ? ' on' : ''}${g.check ? ' check' : ''}" data-side="${side}" ${g.done ? 'disabled' : ''}>${label}${side === 'S' ? '' : hint(gridDir(hb + (side === 'L' ? -90 : 90)))}</button>`;
+    // stopped at a corner where straight on is possible: offer it
+    const cw = g.waiting && !g.done && !g.check ? choices(g.e) : null;
+    const canStraight = !!(cw && (cw.straight || (!cw.decision && cw.only)));
     ctx.sheet(
       `${g.opts.header()}<div id="qbody">
-        ${g.done ? g.result : `<div class="ggctl">${btn('L', '◀ Left')}${btn('R', 'Right ▶')}</div>
+        ${g.done ? g.result : `<div class="ggctl${canStraight ? ' three' : ''}">${btn('L', '◀ Left')}${canStraight ? btn('S', '▲ Straight') : ''}${btn('R', 'Right ▶')}</div>
         <div class="ggmsg${g.msg || g.check || g.startCard ? '' : ' muted'}${g.startCard ? ' startcard' : ''}">${
           g.startCard
             ? `${startCard()} <span class="muted">Starting… tap to go now.</span>`

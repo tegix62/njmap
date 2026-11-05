@@ -1802,3 +1802,6 @@ body.gridding .maplibregl-canvas {
   font-size: 15px;
   line-height: 1.35;
 }
+.ggctl.three {
+  grid-template-columns: 1fr 0.85fr 1fr;
+}
