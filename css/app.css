@@ -1614,3 +1614,11 @@ body.gridding .maplibregl-ctrl-bottom-right {
   color: var(--panel-ink);
   padding: 4px 8px;
 }
+#gridgame .gg-arrows path.exc {
+  stroke: #c47a00;
+  opacity: 0.95;
+}
+#gridgame .gg-north circle {
+  fill: #f3eee3;
+  stroke: rgba(31, 27, 22, 0.25);
+}

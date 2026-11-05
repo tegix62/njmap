@@ -5,10 +5,13 @@
 // avenues alternate. Wrong-way turns are refused and explained. At the end
 // your route is drawn next to the shortest legal one.
 //
-// The one-way rules here are the grid's rules plus a few well-known
-// blockages (Bryant Park, Madison Square Park, Union Square, Madison Square
-// Garden, Park Ave around Grand Central). Real streets have more exceptions
-// (construction, bus lanes, a few streets that break the odd/even rule).
+// Every block's direction is the real one, from NYC's street centerline
+// (js/midtowngrid.js, built by tools/build_grid.py). Refusals explain the
+// rule when the block follows it, and name the exception when it doesn't, so
+// you learn the rule and the blocks that break it. Construction and bus lanes
+// change week to week and aren't modeled.
+
+import { GRID_DATA } from './midtowngrid.js';
 
 const FT_PER_STREET = 264; // ~20 streets to the mile
 const S_MIN = 14;
@@ -101,7 +104,19 @@ const blockedWhy = (s, a, b) => {
   const hit = BLOCKED.find(([bs, bw, be]) => bs === s && bw === w && be === e);
   return hit ? hit[3] : null;
 };
-const streetDir = (s) => (TWO_WAY_STREETS.has(s) ? 'two' : s % 2 ? 'W' : 'E');
+/** The rule of thumb for a street: odd west, even east, the big crosstown ones both ways. */
+const ruleStreet = (s) => (TWO_WAY_STREETS.has(s) ? 'two' : s % 2 ? 'W' : 'E');
+const ruleAve = (ai) => (AVES[ai].dir === 'two' ? 'two' : AVES[ai].dir === 'up' ? 'U' : 'D');
+/** Real direction of the street block between avenue ai and the next one east: 'E' | 'W' | 'two' | null. */
+const streetBlock = (s, westAi) => GRID_DATA.streets[s]?.[westAi] ?? null;
+/** Real direction of avenue ai between street s and s + 1: 'U' | 'D' | 'two' | null. */
+function aveBlock(ai, s) {
+  // Park Ave rides the viaduct around Grand Central (41st-46th): both ways, no turns
+  if (ai === PARK && s >= 41 && s <= 45) return 'two';
+  return GRID_DATA.aves[AVES[ai].name]?.[s - S_MIN] ?? null;
+}
+const WORD = { E: 'east', W: 'west', U: 'uptown', D: 'downtown' };
+const streetRuleText = (s) => (s % 2 ? 'odd streets usually go west' : 'even streets usually go east');
 
 /**
  * Where driving from (ai, s) toward d leads: {ai, s, len} or {why} when you
@@ -111,20 +126,47 @@ function step(ai, s, d, turning) {
   if (turning && NO_TURN.has(key(ai, s))) return { why: 'No turns here: Park Ave runs on the viaduct around Grand Central.' };
   if (d === 'U' || d === 'D') {
     const s2 = s + (d === 'U' ? 1 : -1);
-    if (!exists(ai, s2)) return { why: s2 > S_MAX || s2 < S_MIN ? 'That leaves the practice area.' : `${aveName(ai, s)} doesn't continue past ${streetName(s)}.`, edge: true };
-    const dir = AVES[ai].dir;
-    if (dir !== 'two' && (dir === 'up') !== (d === 'U'))
-      return { why: `${aveName(ai, s)} runs ${dir === 'up' ? 'uptown' : 'downtown'} only.`, wrong: true };
-    return { ai, s: s2, len: FT_PER_STREET };
+    if (s2 > S_MAX || s2 < S_MIN) return { why: 'That leaves the practice area.', edge: true };
+    const real = aveBlock(ai, Math.min(s, s2));
+    const name = aveName(ai, s);
+    if (!real || !exists(ai, s2)) return { why: `${name} doesn't continue past ${streetName(s)}.`, edge: true };
+    if (real !== 'two' && real !== d) {
+      const rule = ruleAve(ai);
+      return {
+        why:
+          rule === real
+            ? `${name} runs ${WORD[real]} only.`
+            : `${name} runs ${WORD[real]} only on this stretch (an exception: ${rule === 'two' ? 'it runs both ways elsewhere' : `it runs ${WORD[rule]} elsewhere`}).`,
+        wrong: true,
+      };
+    }
+    const r = { ai, s: s2, len: FT_PER_STREET };
+    const rule = ruleAve(ai);
+    if (real !== rule && !(ai === PARK && s >= 41 && s <= 45))
+      r.note = `${name} runs ${real === 'two' ? 'both ways' : `${WORD[real]} only`} here: an exception (${rule === 'two' ? 'both ways' : `${WORD[rule]}`} elsewhere).`;
+    return r;
   }
   const aj = nextAve(ai, s, d === 'E' ? 1 : -1);
   if (aj < 0) return { why: 'That leaves the practice area.', edge: true };
-  const sd = streetDir(s);
-  if (sd !== 'two' && sd !== d)
-    return { why: `${streetName(s)} runs ${sd === 'E' ? 'east' : 'west'} only (${sd === 'E' ? 'even streets go east' : 'odd streets go west'}).`, wrong: true };
-  const why = blockedWhy(s, ai, aj);
-  if (why) return { why: `${streetName(s)} doesn't go through here: ${why}.` };
-  return { ai: aj, s, len: Math.abs(AVES[aj].x - AVES[ai].x) };
+  const west = Math.min(ai, aj), east = Math.max(ai, aj);
+  const real = streetBlock(s, west);
+  const where = `between ${aveName(west, s)} and ${aveName(east, s)}`;
+  if (!real) {
+    const why = blockedWhy(s, ai, aj);
+    return { why: `${streetName(s)} doesn't go through ${where}${why ? `: ${why}` : ''}.` };
+  }
+  const rule = ruleStreet(s);
+  if (real !== 'two' && real !== d)
+    return {
+      why:
+        real === rule
+          ? `${streetName(s)} runs ${WORD[real]} only (${s % 2 ? 'odd streets go west' : 'even streets go east'}).`
+          : `${streetName(s)} runs ${WORD[real]} ${where}: an exception (${streetRuleText(s)}).`,
+      wrong: true,
+    };
+  const r = { ai: aj, s, len: Math.abs(AVES[aj].x - AVES[ai].x) };
+  if (real !== rule) r.note = `Heads up: ${streetName(s)} runs ${real === 'two' ? 'both ways' : WORD[real]} ${where}, an exception (${rule === 'two' ? 'it runs both ways elsewhere' : streetRuleText(s)}).`;
+  return r;
 }
 
 /** Shortest legal route from a moving car (no U-turns). Returns [{ai,s,d}] states. */
@@ -218,14 +260,17 @@ export function initGridGame(ctx) {
       for (let ai = 0; ai < AVES.length; ai++) {
         if (!exists(ai, s)) continue;
         const aj = nextAve(ai, s, 1);
-        if (aj < 0 || blockedWhy(s, ai, aj)) continue;
+        if (aj < 0 || !streetBlock(s, ai)) continue;
         roads.append(el('line', { x1: X(ai), y1: Y(s), x2: X(aj), y2: Y(s), class: TWO_WAY_STREETS.has(s) ? 'st two' : 'st' }));
       }
     }
-    // avenues
+    // avenues, block by block (some have gaps)
     for (let ai = 0; ai < AVES.length; ai++) {
-      const s0 = Math.max(S_MIN, AVES[ai].from || S_MIN);
-      roads.append(el('line', { x1: X(ai), y1: Y(s0), x2: X(ai), y2: Y(S_MAX), class: `av ${AVES[ai].dir === 'two' ? 'two' : ''}` }));
+      for (let s = Math.max(S_MIN, AVES[ai].from || S_MIN); s < S_MAX; s++) {
+        const v = aveBlock(ai, s);
+        if (!v) continue;
+        roads.append(el('line', { x1: X(ai), y1: Y(s) + 12, x2: X(ai), y2: Y(s + 1) - 12, class: `av${v === 'two' ? ' two' : ''}` }));
+      }
     }
     arrowsG = el('g', { class: 'gg-arrows' });
     bestEl = el('polyline', { class: 'gg-best', points: '' });
@@ -239,7 +284,7 @@ export function initGridGame(ctx) {
     world.append(parksG, roads, arrowsG, bestEl, pathEl, flag, flagLabel, car);
     labelsG = el('g', { class: 'gg-labels' });
     northEl = el('g', { class: 'gg-north' });
-    northEl.append(el('path', { d: 'M0 -16 L6 6 L0 2 L-6 6 Z' }), el('text', { y: 20 }, 'N'));
+    northEl.append(el('circle', { r: 19 }), el('path', { d: 'M0 -14 L6 6 L0 2 L-6 6 Z' }), el('text', { y: 17 }, 'N'));
     offscreen = el('g', { class: 'gg-offscreen' });
     offscreen.append(el('circle', { r: 13 }), el('polygon'));
     svg.append(world, labelsG, northEl, offscreen);
@@ -247,37 +292,45 @@ export function initGridGame(ctx) {
     document.body.append(wrap);
   }
 
-  /** One-way chevrons on every block (shown when Arrows is on, or briefly after a wrong turn). */
+  /**
+   * One-way chevrons on every block (shown when Arrows is on, or briefly after
+   * a wrong turn). Blocks that break the rule are drawn in amber.
+   */
   function drawArrows(onlyStreet = null, onlyAve = null) {
     arrowsG.replaceChildren();
-    const chev = (x, y, rot) => arrowsG.append(el('path', { d: 'M-34 22 L0 -18 L34 22', transform: `translate(${x} ${y}) rotate(${rot})` }));
-    for (let s = S_MIN; s <= S_MAX; s++) {
-      if (onlyStreet != null && s !== onlyStreet) continue;
-      if (onlyAve != null && onlyStreet == null) continue;
-      const sd = streetDir(s);
+    const chev = (x, y, rot, exc) =>
+      arrowsG.append(el('path', { d: 'M-34 22 L0 -18 L34 22', transform: `translate(${x} ${y}) rotate(${rot})`, class: exc ? 'exc' : '' }));
+    if (onlyAve == null)
+      for (let s = S_MIN; s <= S_MAX; s++) {
+        if (onlyStreet != null && s !== onlyStreet) continue;
+        for (let ai = 0; ai < AVES.length; ai++) {
+          if (!exists(ai, s)) continue;
+          const aj = nextAve(ai, s, 1);
+          const v = aj < 0 ? null : streetBlock(s, ai);
+          if (!v) continue;
+          const exc = v !== ruleStreet(s);
+          const mx = (X(ai) + X(aj)) / 2;
+          if (v === 'two') {
+            chev(mx - 60, Y(s), 90, exc);
+            chev(mx + 60, Y(s), 270, exc);
+          } else chev(mx, Y(s), v === 'E' ? 90 : 270, exc);
+        }
+      }
+    if (onlyStreet == null)
       for (let ai = 0; ai < AVES.length; ai++) {
-        if (!exists(ai, s)) continue;
-        const aj = nextAve(ai, s, 1);
-        if (aj < 0 || blockedWhy(s, ai, aj)) continue;
-        const mx = (X(ai) + X(aj)) / 2;
-        if (sd === 'two') {
-          chev(mx - 60, Y(s), 90);
-          chev(mx + 60, Y(s), 270);
-        } else chev(mx, Y(s), sd === 'E' ? 90 : 270);
+        if (onlyAve != null && ai !== onlyAve) continue;
+        for (let s = Math.max(S_MIN, AVES[ai].from || S_MIN); s < S_MAX; s++) {
+          const v = aveBlock(ai, s);
+          if (!v) continue;
+          const exc = v !== ruleAve(ai) && !(ai === PARK && s >= 41 && s <= 45);
+          if (s % 2 && !exc) continue; // every other block is enough, unless it's an exception
+          const my = (Y(s) + Y(s + 1)) / 2;
+          if (v === 'two') {
+            chev(X(ai) - 40, my, 0, exc);
+            chev(X(ai) + 40, my, 180, exc);
+          } else chev(X(ai), my, v === 'U' ? 0 : 180, exc);
+        }
       }
-    }
-    for (let ai = 0; ai < AVES.length; ai++) {
-      if (onlyAve != null && ai !== onlyAve) continue;
-      if (onlyStreet != null && onlyAve == null) continue;
-      const d = AVES[ai].dir;
-      for (let s = Math.max(S_MIN, AVES[ai].from || S_MIN); s < S_MAX; s += 2) {
-        const my = (Y(s) + Y(s + 1)) / 2;
-        if (d === 'two') {
-          chev(X(ai) - 40, my, 0);
-          chev(X(ai) + 40, my, 180);
-        } else chev(X(ai), my, d === 'up' ? 0 : 180);
-      }
-    }
   }
   let flashTimer = 0;
   function flashArrows(st) {
@@ -318,7 +371,7 @@ export function initGridGame(ctx) {
     }
     labelsG.replaceChildren(...lab);
     // true north: the grid is turned ~29° clockwise, so with uptown up, north points up-left
-    northEl.setAttribute('transform', `translate(${W - 20} ${top + 46}) rotate(-29)`);
+    northEl.setAttribute('transform', `translate(${W - 30} ${bottom - 30}) rotate(-29)`);
     // the target, pinned to the edge when it's off screen
     const fx = tx + X(g.target.ai) * k, fy = ty + Y(g.target.s) * k;
     const inView = fx > 12 && fx < W - 12 && fy > top + 20 && fy < bottom - 12;
@@ -426,6 +479,12 @@ export function initGridGame(ctx) {
     g.next = r.why ? null : { ai: r.ai, s: r.s, len: r.len };
     g.t = 0;
     g.waiting = !g.next;
+    // driving onto a block that breaks the rule: say so (once per stretch)
+    if (r.note && r.note !== g.lastNote) {
+      g.msg = `ℹ ${r.note}`;
+      g.msgAt = performance.now();
+    }
+    g.lastNote = r.note || null;
   }
 
   const blockSeconds = (len) => (0.55 + len / 550) * PACE[prefs.pace];
