@@ -1657,3 +1657,13 @@ body.gridding .maplibregl-ctrl-bottom-right {
   border-top: 4px dashed #15803d;
   opacity: 1;
 }
+#gridgame .gg-parkname.big {
+  font-size: 120px;
+  fill: #5d7a4d;
+  opacity: 0.8;
+}
+#gridgame .gg-parkname.tv {
+  font-size: 62px;
+  font-style: italic;
+  fill: #5d7a4d;
+}

@@ -14,78 +14,88 @@
 import { GRID_DATA } from './midtowngrid.js';
 
 const FT_PER_STREET = 264; // ~20 streets to the mile
-const S_MIN = 14;
-const S_MAX = 57;
-const TWO_WAY_STREETS = new Set([14, 23, 34, 42, 57]);
+const S_MIN = GRID_DATA.sMin;
+const S_MAX = GRID_DATA.sMax;
+const TWO_WAY_STREETS = new Set(GRID_DATA.twoWay);
 
-// West to east; x in feet from 5th Ave (long blocks on the West Side, short on the East)
-const AVES = [
-  // Route 9A along the Hudson: 12th Ave in Midtown; below 24th St, 11th Ave is the riverside road
-  { name: 'West Side Hwy', x: -5700, dir: 'two', from: 24, short: 'W Side Hwy' },
-  { name: '11th Ave', x: -4960, dir: 'two' },
-  { name: '10th Ave', x: -4160, dir: 'up' },
-  { name: '9th Ave', x: -3360, dir: 'down' },
-  { name: '8th Ave', x: -2560, dir: 'up' },
-  { name: '7th Ave', x: -1760, dir: 'down' },
-  { name: '6th Ave', x: -920, dir: 'up' },
-  { name: '5th Ave', x: 0, dir: 'down' },
-  { name: 'Madison Ave', x: 420, dir: 'up', from: 23 },
-  { name: 'Park Ave', x: 840, dir: 'two' },
-  { name: 'Lexington Ave', x: 1260, dir: 'down', from: 21 },
-  { name: '3rd Ave', x: 1660, dir: 'up' },
-  { name: '2nd Ave', x: 2310, dir: 'down' },
-  { name: '1st Ave', x: 2960, dir: 'up' },
-];
-const PARK = AVES.findIndex((a) => a.name === 'Park Ave');
-const aveName = (ai, s) => (ai === PARK ? (s >= 32 ? 'Park Ave' : 'Park Ave S') : AVES[ai].name);
+// Avenue columns west to east, from the data: {key, x (feet from 5th Ave), from,
+// to, ranges: [[first street, name, short label, rule-of-thumb direction]]}
+const AVES = GRID_DATA.columns;
+const col = (k) => AVES.findIndex((a) => a.key === k);
+const rangeAt = (ai, s) => {
+  const rs = AVES[ai].ranges;
+  let r = rs[0];
+  for (const x of rs) if (x[0] <= s) r = x;
+  return r;
+};
+const aveName = (ai, s) => rangeAt(ai, s)[1];
+const aveShort = (ai, s) => rangeAt(ai, s)[2];
+const PARK = col('park');
 const ord = (n) => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
-const streetName = (s) => `${ord(s)} St`;
+const streetName = (s) => (s === 59 ? '59th St (Central Park South)' : s === 110 ? '110th St' : `${ord(s)} St`);
 
-// Street blocks that don't go through: [street, west avenue, east avenue, why]
-const ave = (n) => AVES.findIndex((a) => a.name === n);
+// Why a street block doesn't go through, where it's worth saying: [street, west col, east col, why]
 const BLOCKED = [
-  [41, ave('6th Ave'), ave('5th Ave'), 'Bryant Park and the Library'],
-  [32, ave('8th Ave'), ave('7th Ave'), 'Madison Square Garden and Penn Station'],
-  [24, ave('5th Ave'), ave('Madison Ave'), 'Madison Square Park'],
-  [25, ave('5th Ave'), ave('Madison Ave'), 'Madison Square Park'],
-  [15, ave('5th Ave'), PARK, 'Union Square'],
-  [16, ave('5th Ave'), PARK, 'Union Square'],
-  [43, ave('Madison Ave'), PARK, 'Grand Central'],
-  [44, ave('Madison Ave'), PARK, 'Grand Central'],
-  [45, ave('Madison Ave'), PARK, 'Grand Central'],
-  [43, PARK, ave('Lexington Ave'), 'Grand Central'],
-  [44, PARK, ave('Lexington Ave'), 'Grand Central'],
-  [45, PARK, ave('Lexington Ave'), 'Grand Central'],
+  [41, col('6'), col('5'), 'Bryant Park and the Library'],
+  [32, col('8'), col('7'), 'Madison Square Garden and Penn Station'],
+  [24, col('5'), col('madison'), 'Madison Square Park'],
+  [25, col('5'), col('madison'), 'Madison Square Park'],
+  [15, col('5'), PARK, 'Union Square'],
+  [16, col('5'), PARK, 'Union Square'],
+  [43, col('madison'), PARK, 'Grand Central'],
+  [44, col('madison'), PARK, 'Grand Central'],
+  [45, col('madison'), PARK, 'Grand Central'],
+  [43, PARK, col('lex'), 'Grand Central'],
+  [44, PARK, col('lex'), 'Grand Central'],
+  [45, PARK, col('lex'), 'Grand Central'],
 ];
 // Park Ave rides the viaduct around Grand Central: no turns on or off here
 const NO_TURN = new Set([41, 42, 43, 44, 45].map((s) => `${PARK}:${s}`));
+const TRANSVERSES = { 65: '65th St transverse', 79: '79th St transverse', 86: '86th St transverse', 97: '97th St transverse' };
 const PARKS = [
-  { name: 'Bryant Park', s0: 40, s1: 42, a0: ave('6th Ave'), a1: ave('5th Ave'), green: true },
-  { name: 'Madison Sq Park', s0: 23, s1: 26, a0: ave('5th Ave'), a1: ave('Madison Ave'), green: true },
-  { name: 'Union Square', s0: 14, s1: 17, a0: ave('5th Ave'), a1: PARK, green: true, inset: 0.35 },
-  { name: 'MSG', s0: 31, s1: 33, a0: ave('8th Ave'), a1: ave('7th Ave') },
-  { name: 'Grand Central', s0: 42, s1: 46, a0: ave('Madison Ave'), a1: ave('Lexington Ave'), inset: 0.18 },
+  { name: 'Central Park', s0: 59, s1: 110, a0: col('8'), a1: col('5'), green: true, big: true },
+  { name: 'Bryant Park', s0: 40, s1: 42, a0: col('6'), a1: col('5'), green: true },
+  { name: 'Madison Sq Park', s0: 23, s1: 26, a0: col('5'), a1: col('madison'), green: true },
+  { name: 'Union Square', s0: 14, s1: 17, a0: col('5'), a1: PARK, green: true, inset: 0.35 },
+  { name: 'MSG', s0: 31, s1: 33, a0: col('8'), a1: col('7') },
+  { name: 'Grand Central', s0: 42, s1: 46, a0: col('madison'), a1: col('lex'), inset: 0.18 },
 ];
 
 const PLACES = [
+  // Midtown and below
   { name: 'Grand Central', ai: PARK, s: 42 },
-  { name: 'Empire State Building', ai: ave('5th Ave'), s: 34 },
-  { name: 'Madison Square Garden', ai: ave('7th Ave'), s: 33 },
-  { name: 'Port Authority', ai: ave('8th Ave'), s: 42 },
-  { name: 'Times Square', ai: ave('7th Ave'), s: 46 },
-  { name: 'Radio City', ai: ave('6th Ave'), s: 50 },
-  { name: 'the Library (Bryant Park)', ai: ave('5th Ave'), s: 42 },
-  { name: 'MoMA', ai: ave('5th Ave'), s: 53 },
-  { name: 'Carnegie Hall', ai: ave('7th Ave'), s: 57 },
-  { name: 'the Flatiron Building', ai: ave('5th Ave'), s: 23 },
-  { name: 'Chelsea Market', ai: ave('9th Ave'), s: 15 },
-  { name: 'the Javits Center', ai: ave('11th Ave'), s: 36 },
-  { name: 'the UN', ai: ave('1st Ave'), s: 45 },
-  { name: 'Bellevue', ai: ave('1st Ave'), s: 27 },
-  { name: 'Hudson Yards', ai: ave('10th Ave'), s: 33 },
-  { name: "Macy's (Herald Square)", ai: ave('6th Ave'), s: 34 },
-  { name: 'the Chrysler Building', ai: ave('Lexington Ave'), s: 42 },
+  { name: 'Empire State Building', ai: col('5'), s: 34 },
+  { name: 'Madison Square Garden', ai: col('7'), s: 33 },
+  { name: 'Port Authority', ai: col('8'), s: 42 },
+  { name: 'Times Square', ai: col('7'), s: 46 },
+  { name: 'Radio City', ai: col('6'), s: 50 },
+  { name: 'the Library (Bryant Park)', ai: col('5'), s: 42 },
+  { name: 'MoMA', ai: col('5'), s: 53 },
+  { name: 'Carnegie Hall', ai: col('7'), s: 57 },
+  { name: 'the Flatiron Building', ai: col('5'), s: 23 },
+  { name: 'Chelsea Market', ai: col('9'), s: 15 },
+  { name: 'the Javits Center', ai: col('11'), s: 36 },
+  { name: 'the UN', ai: col('1'), s: 45 },
+  { name: 'Bellevue', ai: col('1'), s: 27 },
+  { name: 'Hudson Yards', ai: col('10'), s: 33 },
+  { name: "Macy's (Herald Square)", ai: col('6'), s: 34 },
+  { name: 'the Chrysler Building', ai: col('lex'), s: 42 },
+  // Uptown
+  { name: 'Columbus Circle', ai: col('8'), s: 59 },
+  { name: 'Lincoln Center', ai: col('9'), s: 65 },
+  { name: 'the Natural History Museum', ai: col('8'), s: 79 },
+  { name: 'the Met', ai: col('5'), s: 82 },
+  { name: 'the Guggenheim', ai: col('5'), s: 88 },
+  { name: 'Bloomingdale\'s', ai: col('lex'), s: 59 },
+  { name: 'Hunter College', ai: col('lex'), s: 68 },
+  { name: 'the Beacon Theatre', ai: col('bway'), s: 74 },
+  { name: "Zabar's", ai: col('bway'), s: 80 },
+  { name: 'Mount Sinai Hospital', ai: col('madison'), s: 100 },
+  { name: 'the Museum of the City of New York', ai: col('5'), s: 103 },
+  { name: 'NewYork-Presbyterian / Weill Cornell', ai: col('york'), s: 68 },
+  { name: 'Columbia (south end, Cathedral Pkwy)', ai: col('bway'), s: 110 },
 ];
+const AREAS = { all: [S_MIN, S_MAX], midtown: [S_MIN, 59], uptown: [57, S_MAX] };
 
 // grid directions: U uptown, D downtown, E east, W west
 const LEFT = { U: 'W', W: 'D', D: 'E', E: 'U' };
@@ -94,7 +104,7 @@ const DIR_WORD = { U: 'uptown', D: 'downtown', E: 'east', W: 'west' };
 const ROT = { U: 0, E: 90, D: 180, W: 270 };
 const PACE = { easy: 1, normal: 0.72, fast: 0.5 };
 
-const exists = (ai, s) => s >= S_MIN && s <= S_MAX && s >= (AVES[ai].from || S_MIN);
+const exists = (ai, s) => s >= S_MIN && s <= S_MAX && s >= AVES[ai].from && s <= AVES[ai].to;
 const key = (ai, s) => `${ai}:${s}`;
 /** The next avenue east/west of ai that exists on street s. */
 function nextAve(ai, s, step) {
@@ -103,19 +113,20 @@ function nextAve(ai, s, step) {
 }
 const blockedWhy = (s, a, b) => {
   const [w, e] = a < b ? [a, b] : [b, a];
+  if (w === col('8') && e === col('5') && s > 59 && s < 110) return 'Central Park (only the transverse roads at 65th, 79th, 86th and 97th cross it)';
   const hit = BLOCKED.find(([bs, bw, be]) => bs === s && bw === w && be === e);
   return hit ? hit[3] : null;
 };
 /** The rule of thumb for a street: odd west, even east, the big crosstown ones both ways. */
 const ruleStreet = (s) => (TWO_WAY_STREETS.has(s) ? 'two' : s % 2 ? 'W' : 'E');
-const ruleAve = (ai) => (AVES[ai].dir === 'two' ? 'two' : AVES[ai].dir === 'up' ? 'U' : 'D');
+const ruleAve = (ai, s) => rangeAt(ai, s)[3];
 /** Real direction of the street block between avenue ai and the next one east: 'E' | 'W' | 'two' | null. */
 const streetBlock = (s, westAi) => GRID_DATA.streets[s]?.[westAi] ?? null;
 /** Real direction of avenue ai between street s and s + 1: 'U' | 'D' | 'two' | null. */
 function aveBlock(ai, s) {
   // Park Ave rides the viaduct around Grand Central (41st-46th): both ways, no turns
   if (ai === PARK && s >= 41 && s <= 45) return 'two';
-  return GRID_DATA.aves[AVES[ai].name]?.[s - S_MIN] ?? null;
+  return GRID_DATA.aves[AVES[ai].key]?.[s - S_MIN] ?? null;
 }
 const WORD = { E: 'east', W: 'west', U: 'uptown', D: 'downtown' };
 const streetRuleText = (s) => (s % 2 ? 'odd streets usually go west' : 'even streets usually go east');
@@ -139,7 +150,7 @@ function rawStep(ai, s, d, turning) {
     const name = aveName(ai, s);
     if (!real || !exists(ai, s2)) return { why: `${name} doesn't continue past ${streetName(s)}.`, edge: true };
     if (real !== 'two' && real !== d) {
-      const rule = ruleAve(ai);
+      const rule = ruleAve(ai, s);
       return {
         why:
           rule === real
@@ -149,7 +160,7 @@ function rawStep(ai, s, d, turning) {
       };
     }
     const r = { ai, s: s2, len: FT_PER_STREET };
-    const rule = ruleAve(ai);
+    const rule = ruleAve(ai, s);
     if (real !== rule && !(ai === PARK && s >= 41 && s <= 45))
       r.note = `${name} runs ${real === 'two' ? 'both ways' : `${WORD[real]} only`} here: an exception (${rule === 'two' ? 'both ways' : `${WORD[rule]}`} elsewhere).`;
     return r;
@@ -164,6 +175,12 @@ function rawStep(ai, s, d, turning) {
     return { why: `${streetName(s)} doesn't go through ${where}${why ? `: ${why}` : ''}.` };
   }
   const rule = ruleStreet(s);
+  if (TRANSVERSES[s] && west === col('8') && east === col('5')) {
+    // through Central Park on a transverse road (both ways)
+    const r = { ai: aj, s, len: Math.abs(AVES[aj].x - AVES[ai].x) };
+    r.note = `Through Central Park on the ${TRANSVERSES[s]}.`;
+    return r;
+  }
   if (real !== 'two' && real !== d)
     return {
       why:
@@ -206,15 +223,53 @@ const TRAPS = new Set();
   }
 })();
 
+/** Min-heap on .c */
+class Heap {
+  constructor() {
+    this.a = [];
+  }
+  get size() {
+    return this.a.length;
+  }
+  push(x) {
+    const a = this.a;
+    a.push(x);
+    for (let i = a.length - 1; i > 0; ) {
+      const p = (i - 1) >> 1;
+      if (a[p].c <= a[i].c) break;
+      [a[p], a[i]] = [a[i], a[p]];
+      i = p;
+    }
+  }
+  pop() {
+    const a = this.a;
+    const top = a[0];
+    const last = a.pop();
+    if (a.length) {
+      a[0] = last;
+      for (let i = 0; ; ) {
+        const l = 2 * i + 1, r = l + 1;
+        let m = i;
+        if (l < a.length && a[l].c < a[m].c) m = l;
+        if (r < a.length && a[r].c < a[m].c) m = r;
+        if (m === i) break;
+        [a[m], a[i]] = [a[i], a[m]];
+        i = m;
+      }
+    }
+    return top;
+  }
+}
+
 /** Shortest legal route from a moving car (no U-turns). Returns [{ai,s,d}] states. */
 function shortest(start, target) {
   const sk = (st) => `${st.ai}:${st.s}:${st.d}`;
   const dist = new Map([[sk(start), 0]]);
   const prev = new Map();
-  const open = [{ ...start, c: 0 }];
-  while (open.length) {
-    open.sort((a, b) => a.c - b.c);
-    const cur = open.shift();
+  const open = new Heap();
+  open.push({ ...start, c: 0 });
+  while (open.size) {
+    const cur = open.pop();
     if (cur.c > dist.get(sk(cur))) continue;
     if (cur.ai === target.ai && cur.s === target.s) {
       const path = [cur];
@@ -266,7 +321,7 @@ export function initGridGame(ctx) {
   // mapFirst: show the whole grid before driving. Off by default: working out
   // where the address is from the street and avenue alone is the harder,
   // more useful skill (it's all you have in a real car).
-  const prefs = { pace: 'easy', arrows: false, mapFirst: false, ...ctx.store.get('gridPrefs', {}) };
+  const prefs = { pace: 'easy', arrows: false, mapFirst: false, area: 'all', ...ctx.store.get('gridPrefs', {}) };
   const savePrefs = () => ctx.store.set('gridPrefs', prefs);
 
   // ---- picture ------------------------------------------------------------
@@ -292,8 +347,13 @@ export function initGridGame(ctx) {
       const i = (p.inset || 0) * FT_PER_STREET;
       const x0 = X(p.a0) + 40 + i, x1 = X(p.a1) - 40 - i, y0 = Y(p.s1) + 40, y1 = Y(p.s0) - 40;
       parksG.append(el('rect', { x: x0, y: y0, width: x1 - x0, height: y1 - y0, rx: 30, class: p.green ? 'park' : 'bldg' }));
-      parksG.append(el('text', { x: (x0 + x1) / 2, y: (y0 + y1) / 2, class: 'gg-parkname' }, p.name));
+      if (p.big) {
+        // a big park: repeat the name down its length so it's visible at any zoom
+        for (let s0 = p.s0 + 4; s0 < p.s1; s0 += 12) parksG.append(el('text', { x: (x0 + x1) / 2, y: Y(s0 + 2), class: 'gg-parkname big' }, p.name));
+      } else parksG.append(el('text', { x: (x0 + x1) / 2, y: (y0 + y1) / 2, class: 'gg-parkname' }, p.name));
     }
+    for (const [ts, tname] of Object.entries(TRANSVERSES))
+      parksG.append(el('text', { x: (X(col('8')) + X(col('5'))) / 2, y: Y(+ts) - 50, class: 'gg-parkname tv' }, tname));
     const roads = el('g', { class: 'gg-roads' });
     // streets
     for (let s = S_MIN; s <= S_MAX; s++) {
@@ -306,7 +366,7 @@ export function initGridGame(ctx) {
     }
     // avenues, block by block (some have gaps)
     for (let ai = 0; ai < AVES.length; ai++) {
-      for (let s = Math.max(S_MIN, AVES[ai].from || S_MIN); s < S_MAX; s++) {
+      for (let s = AVES[ai].from; s < AVES[ai].to; s++) {
         const v = aveBlock(ai, s);
         if (!v) continue;
         roads.append(el('line', { x1: X(ai), y1: Y(s) + 12, x2: X(ai), y2: Y(s + 1) - 12, class: `av${v === 'two' ? ' two' : ''}` }));
@@ -364,10 +424,10 @@ export function initGridGame(ctx) {
     if (onlyStreet == null)
       for (let ai = 0; ai < AVES.length; ai++) {
         if (onlyAve != null && ai !== onlyAve) continue;
-        for (let s = Math.max(S_MIN, AVES[ai].from || S_MIN); s < S_MAX; s++) {
+        for (let s = AVES[ai].from; s < AVES[ai].to; s++) {
           const v = aveBlock(ai, s);
           if (!v) continue;
-          const exc = v !== ruleAve(ai) && !(ai === PARK && s >= 41 && s <= 45);
+          const exc = v !== ruleAve(ai, s) && !(ai === PARK && s >= 41 && s <= 45);
           if (s % 2 && !exc) continue; // every other block is enough, unless it's an exception
           const my = (Y(s) + Y(s + 1)) / 2;
           if (v === 'two') {
@@ -455,11 +515,13 @@ export function initGridGame(ctx) {
       const x = tx + X(ai) * k;
       if (x < 16 || x > W - 16) continue;
       const s = Math.round(-((top + 40 - ty) / k) / FT_PER_STREET);
-      const text = AVES[ai].short || aveName(ai, Math.min(S_MAX, Math.max(S_MIN, s))).replace(' Ave', '');
+      const sv = Math.min(AVES[ai].to, Math.max(AVES[ai].from, s));
+      if (Math.abs(sv - s) > 6) continue; // this avenue isn't on screen up here
+      const text = aveShort(ai, sv);
       const half = text.length * 3.4;
       if (x - half < lastRight + 4) continue; // would overlap the one before
       lastRight = x + half;
-      lab.push(el('text', { x, y: top + 12, class: `gg-ave ${AVES[ai].dir}` }, text));
+      lab.push(el('text', { x, y: top + 12, class: 'gg-ave' }, text));
     }
     const every = FT_PER_STREET * k >= 13 ? 1 : FT_PER_STREET * k * 5 >= 13 ? 5 : 10;
     for (let s = S_MIN; s <= S_MAX; s++) {
@@ -495,18 +557,19 @@ export function initGridGame(ctx) {
 
   // ---- game -----------------------------------------------------------------
   function pickRoute() {
+    const [a0, a1] = AREAS[prefs.area] || AREAS.all;
+    const places = PLACES.filter((p) => p.s >= a0 && p.s <= a1 && exists(p.ai, p.s));
+    const corner = () => ({ ai: Math.floor(Math.random() * AVES.length), s: a0 + Math.floor(Math.random() * (a1 - a0 + 1)) });
     for (let tries = 0; tries < 400; tries++) {
-      const named = Math.random() < 0.7;
-      const target = named ? rand(PLACES) : { name: null, ai: Math.floor(Math.random() * AVES.length), s: S_MIN + Math.floor(Math.random() * (S_MAX - S_MIN + 1)) };
+      const target = places.length && Math.random() < 0.7 ? rand(places) : { name: null, ...corner() };
       if (!exists(target.ai, target.s)) continue;
-      const ai = Math.floor(Math.random() * AVES.length);
-      const s = S_MIN + 2 + Math.floor(Math.random() * (S_MAX - S_MIN - 3));
-      if (!exists(ai, s)) continue;
+      const { ai, s } = corner();
+      if (!exists(ai, s) || s <= a0 || s >= a1) continue;
+      const blocks = Math.abs(target.s - s) + Math.abs(X(target.ai) - X(ai)) / 700;
+      if (blocks < 8 || blocks > 30) continue;
       const ds = ['U', 'D', 'E', 'W'].filter((d) => !step(ai, s, d, false).why);
       if (!ds.length) continue;
       const start = { ai, s, d: rand(ds) };
-      const blocks = Math.abs(target.s - s) + Math.abs(X(target.ai) - X(ai)) / 700;
-      if (blocks < 8 || blocks > 26) continue;
       const best = shortest(start, target);
       if (!best || best.path.length < 6) continue;
       return { start, target, best };
@@ -847,6 +910,7 @@ export function initGridGame(ctx) {
         ${g.done ? g.result : `<div class="ggctl">${btn('L', '◀ Left')}${btn('R', 'Right ▶')}</div>
         <div class="ggmsg${g.msg ? '' : ' muted'}">${g.msg ? esc(g.msg) : g.waiting ? 'Stopped at the corner: pick a way.' : 'Left/Right turn at the next corner. Tap a corner ahead to zip straight there; hold the map to speed up.'}</div>`}
         <div class="ggopts">
+          <select id="ggArea" aria-label="Area">${[['all', '14th–110th'], ['midtown', 'Midtown (14th–59th)'], ['uptown', 'Uptown (57th–110th)']].map(([k, v]) => `<option value="${k}"${prefs.area === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggPace" aria-label="Speed">${Object.keys(PACE).map((p) => `<option value="${p}"${prefs.pace === p ? ' selected' : ''}>${p[0].toUpperCase() + p.slice(1)}</option>`).join('')}</select>
           <label><input type="checkbox" id="ggArrows"${prefs.arrows ? ' checked' : ''}/> One-way arrows</label>
           <label><input type="checkbox" id="ggMapFirst"${prefs.mapFirst ? ' checked' : ''}/> Map first</label>
@@ -861,6 +925,11 @@ export function initGridGame(ctx) {
     document.getElementById('ggPace').addEventListener('change', (e) => {
       prefs.pace = e.target.value;
       savePrefs();
+    });
+    document.getElementById('ggArea').addEventListener('change', (e) => {
+      prefs.area = e.target.value;
+      savePrefs();
+      start(g.opts); // a new route in the chosen area
     });
     document.getElementById('ggMapFirst').addEventListener('change', (e) => {
       prefs.mapFirst = e.target.checked;

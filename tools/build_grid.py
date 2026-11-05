@@ -1,72 +1,106 @@
-"""Build js/midtowngrid.js: the real legal direction of every block in the game's
-grid, from NYC's street centerline (CSCL, via cscl2osm.py's output).
+"""Build js/midtowngrid.js for Drive the grid: the legal direction of every
+block of Manhattan's grid from 14th to 110th St, from NYC's street centerline
+(CSCL, NYC Open Data). The avenue columns (names along each stretch, rule-of-
+thumb direction, where they start and end) are defined here and written into
+the output, so the game and the data can't disagree.
 
 usage:
-  1. Download Manhattan's centerline around Midtown from NYC Open Data (CSCL, dataset inkn-q76z):
-     curl -G -o cscl.geojson https://data.cityofnewyork.us/resource/inkn-q76z.geojson \
-       --data-urlencode "$select=full_street_name,trafdir,rw_type,segment_type,the_geom,modified_date" \
-       --data-urlencode "$where=boroughcode='1' AND within_box(the_geom, 40.775, -74.02, 40.725, -73.955)" \
+  1. Download the centerline (dataset inkn-q76z) for the area:
+     curl -G -o cscl.geojson https://data.cityofnewyork.us/resource/inkn-q76z.geojson \\
+       --data-urlencode "$select=full_street_name,trafdir,rw_type,segment_type,the_geom,modified_date" \\
+       --data-urlencode "$where=boroughcode='1' AND within_box(the_geom, 40.808, -74.02, 40.725, -73.93)" \\
        --data-urlencode "$limit=50000"
-  2. python3 -I tools/cscl2osm.py cscl.geojson cscl-osm.json
-  3. python3 -I tools/build_grid.py cscl-osm.json cscl.geojson js/midtowngrid.js report.txt
+  2. python3 -I tools/build_grid.py cscl.geojson js/midtowngrid.js report.txt
      (report.txt lists every block that differs from the rules of thumb)
+
+trafdir: FT = traffic flows the way the line is drawn, TF = against it,
+TW = both ways, NV = not for vehicles (ignored).
 """
 import json, math, re, sys
 
-src, raw, out_js, report = sys.argv[1:5]
-d = json.load(open(src))
-ways = [e for e in d['elements'] if e.get('type') == 'way']
+src, out_js, report = sys.argv[1:4]
+raw = json.load(open(src))
 
-# Gramercy Park's sides carry 20th and 21st St
-rawd = json.load(open(raw))
-for i, f in enumerate(rawd['features']):
-    p = f['properties']
-    n = re.sub(r'\s+', ' ', p.get('full_street_name') or '').strip()
-    if n in ('GRAMERCY PARK S', 'GRAMERCY PARK N') and p.get('trafdir') in ('FT', 'TF', 'TW'):
-        g = f['geometry']
-        for line in (g['coordinates'] if g['type'] == 'MultiLineString' else [g['coordinates']]):
-            ways.append({'type': 'way', 'tags': {'name': 'East 20th Street' if n.endswith('S') else 'East 21st Street',
-                                                  'oneway': {'FT': 'yes', 'TF': '-1', 'TW': 'no'}[p['trafdir']]},
-                         'geometry': [{'lon': c[0], 'lat': c[1]} for c in line]})
+S_MIN, S_MAX = 14, 110
+# Rule of thumb: odd streets west, even east, except these, which run both ways
+TWO_WAY = [14, 23, 34, 42, 57, 59, 72, 79, 86, 96, 106, 110]
 
-LAT0 = 40.755
+# Avenue columns, west to east. x: feet from 5th Ave in the straightened grid.
+# ranges: [first street, name, short label, rule-of-thumb direction]
+COLS = [
+    dict(key='west', x=-5700, frm=24, to=110, names={'12 AVE', 'RIVERSIDE BLVD', 'RIVERSIDE DR'},
+         ranges=[[24, 'West Side Hwy', 'W Side Hwy', 'two'], [59, 'Riverside Blvd', 'Riverside Blvd', 'two'], [72, 'Riverside Dr', 'Riverside', 'two']]),
+    dict(key='11', x=-4960, frm=14, to=107, names={'11 AVE', 'W END AVE', 'WEST END AVE'},
+         ranges=[[14, '11th Ave', '11th', 'two'], [59, 'West End Ave', 'West End', 'two']]),
+    dict(key='bway', x=-4560, frm=73, to=110, names={'BROADWAY'},
+         ranges=[[73, 'Broadway', 'Bway', 'two']]),
+    dict(key='10', x=-4160, frm=14, to=110, names={'10 AVE', 'AMSTERDAM AVE'},
+         ranges=[[14, '10th Ave', '10th', 'U'], [59, 'Amsterdam Ave', 'Amsterdam', 'U']]),
+    dict(key='9', x=-3360, frm=14, to=110, names={'9 AVE', 'COLUMBUS AVE'},
+         ranges=[[14, '9th Ave', '9th', 'D'], [59, 'Columbus Ave', 'Columbus', 'D']]),
+    dict(key='8', x=-2560, frm=14, to=110, names={'8 AVE', 'CENTRAL PARK W', 'COLUMBUS CIR', 'FREDERICK DOUGLASS CIR'},
+         ranges=[[14, '8th Ave', '8th', 'U'], [59, 'Central Park West', 'CPW', 'two']]),
+    dict(key='7', x=-1760, frm=14, to=59, names={'7 AVE'}, ranges=[[14, '7th Ave', '7th', 'D']]),
+    dict(key='6', x=-920, frm=14, to=59, names={'AVE OF THE AMERICAS', '6 AVE'}, ranges=[[14, '6th Ave', '6th', 'U']]),
+    dict(key='5', x=0, frm=14, to=110, names={'5 AVE'}, ranges=[[14, '5th Ave', '5th', 'D']]),
+    dict(key='madison', x=420, frm=23, to=110, names={'MADISON AVE'}, ranges=[[23, 'Madison Ave', 'Madison', 'U']]),
+    dict(key='park', x=840, frm=14, to=110, names={'PARK AVE', 'PARK AVE S', 'UNION SQ E'},
+         ranges=[[14, 'Park Ave S', 'Park S', 'two'], [32, 'Park Ave', 'Park', 'two']]),
+    dict(key='lex', x=1260, frm=21, to=110, names={'LEXINGTON AVE'}, ranges=[[21, 'Lexington Ave', 'Lexington', 'D']]),
+    dict(key='3', x=1660, frm=14, to=110, names={'3 AVE'}, ranges=[[14, '3rd Ave', '3rd', 'U']]),
+    dict(key='2', x=2310, frm=14, to=110, names={'2 AVE'}, ranges=[[14, '2nd Ave', '2nd', 'D']]),
+    dict(key='1', x=2960, frm=14, to=110, names={'1 AVE'}, ranges=[[14, '1st Ave', '1st', 'U']]),
+    dict(key='york', x=3610, frm=59, to=92, names={'YORK AVE'}, ranges=[[59, 'York Ave', 'York', 'two']]),
+]
+KEYS = [c['key'] for c in COLS]
+CI = {k: i for i, k in enumerate(KEYS)}
+# Roads through Central Park, drawn on one row of the grid
+TRANSVERSES = {65: '65 ST TRANSVERSE', 79: '79 ST TRANSVERSE', 86: '86 ST TRANSVERSE', 97: '97 ST TRANSVERSE'}
+# Blocks the sampling can't read: Columbus Circle is wider than the search
+# radius; you drive around it to get from 8th Ave to Central Park West.
+AVE_OVERRIDES = {('8', 59): 'two'}
+STREET_ALIASES = {
+    'CENTRAL PARK S': 59, 'CENTRAL PARK N': 110, 'CATHEDRAL PKWY': 110,
+    'GRAMERCY PARK S': 20, 'GRAMERCY PARK N': 21,
+}
+
+LAT0 = 40.765
 KX = 111320 * math.cos(math.radians(LAT0))
 KY = 110540
-def xy(p):
-    return ((p['lon'] + 73.98) * KX, (p['lat'] - LAT0) * KY)
+def xy(c):
+    return ((c[0] + 73.97) * KX, (c[1] - LAT0) * KY)
 ANG = math.radians(29)
 UP = (math.sin(ANG), math.cos(ANG))
 EAST = (math.cos(ANG), -math.sin(ANG))
 
-# must match js/gridgame.js AVES order. The West Side Highway (Route 9A: 12th
-# Ave in Midtown, 11th Ave / West St further south) is the edge road: two-way
-# all along; a street reaches it if the street continues west of 11th Ave.
-WSH = 'West Side Hwy'
-AVES = [WSH, '11th Ave', '10th Ave', '9th Ave', '8th Ave', '7th Ave', '6th Ave', '5th Ave', 'Madison Ave', 'Park Ave', 'Lexington Ave', '3rd Ave', '2nd Ave', '1st Ave']
-FROM = {'Madison Ave': 23, 'Lexington Ave': 21, 'West Side Hwy': 24}
-NAMES = {
-    '11th Ave': {'11th Avenue'}, '10th Ave': {'10th Avenue'}, '9th Ave': {'9th Avenue'}, '8th Ave': {'8th Avenue'},
-    '7th Ave': {'7th Avenue'}, '6th Ave': {'Avenue of the Americas', '6th Avenue'}, '5th Ave': {'5th Avenue'},
-    'Madison Ave': {'Madison Avenue'}, 'Park Ave': {'Park Avenue', 'Park Avenue South', 'Union Square East'},
-    'Lexington Ave': {'Lexington Avenue'}, '3rd Ave': {'3rd Avenue'}, '2nd Ave': {'2nd Avenue'}, '1st Ave': {'1st Avenue'},
-}
-n2a = {n: a for a, ns in NAMES.items() for n in ns}
-st_re = re.compile(r'^(West|East) (\d+)(st|nd|rd|th) Street$')
-streets, aves = {}, {a: [] for a in AVES}
-for w in ways:
-    n = w['tags']['name']
-    m = st_re.match(n)
-    if m:
-        streets.setdefault(int(m.group(2)), []).append(w)
-    elif n in n2a:
-        aves[n2a[n]].append(w)
+# ---- read the centerline ----------------------------------------------------------
+streets, cols, transverse_ways = {}, {k: [] for k in KEYS}, {}
+name2col = {n: c['key'] for c in COLS for n in c['names']}
+latest = ''
+for f in raw['features']:
+    p = f['properties']
+    latest = max(latest, p.get('modified_date') or '')
+    td = p.get('trafdir')
+    if td not in ('FT', 'TF', 'TW'):
+        continue
+    name = re.sub(r'\s+', ' ', p.get('full_street_name') or '').strip()
+    g = f['geometry']
+    lines = g['coordinates'] if g['type'] == 'MultiLineString' else [g['coordinates']]
+    for line in lines:
+        w = {'pts': [xy(c) for c in line], 'ow': {'FT': 1, 'TF': -1, 'TW': 0}[td], 'name': name}
+        m = re.match(r'^[EW] (\d+) ST$', name)
+        if m and S_MIN <= int(m.group(1)) <= S_MAX:
+            streets.setdefault(int(m.group(1)), []).append(w)
+        elif name in STREET_ALIASES:
+            streets.setdefault(STREET_ALIASES[name], []).append(w)
+        elif name in name2col:
+            cols[name2col[name]].append(w)
+        for s, tn in TRANSVERSES.items():
+            if name == tn:
+                transverse_ways.setdefault(s, []).append(w)
 
 def segs(w):
-    pts = [xy(p) for p in w['geometry']]
-    return list(zip(pts, pts[1:]))
-def ow(w):
-    o = w['tags'].get('oneway')
-    return 1 if o == 'yes' else -1 if o == '-1' else 0
+    return list(zip(w['pts'], w['pts'][1:]))
 
 def near(ws, q):
     best = None
@@ -81,137 +115,167 @@ def near(ws, q):
                 best = (dd, p)
     return best
 
-def crossing(s, a):
-    if s not in streets or not aves[a]:
+def crossing(s, k):
+    if s not in streets or not cols[k]:
         return None
     best = None
     for w in streets[s]:
         for p0, p1 in segs(w):
-            for k in range(5):
-                q = (p0[0] + (p1[0] - p0[0]) * k / 4, p0[1] + (p1[1] - p0[1]) * k / 4)
-                r = near(aves[a], q)
+            for t in range(5):
+                q = (p0[0] + (p1[0] - p0[0]) * t / 4, p0[1] + (p1[1] - p0[1]) * t / 4)
+                r = near(cols[k], q)
                 if r and (best is None or r[0] < best[0]):
                     best = (r[0], ((q[0] + r[1][0]) / 2, (q[1] + r[1][1]) / 2))
     return best[1] if best and best[0] < 30 else None
 
-S = range(14, 58)
-real = {(s, a): crossing(s, a) for s in S for a in AVES if a != WSH}
-def pos(s, a):
-    """Where street s meets avenue a: the real crossing, or interpolated along the avenue."""
-    if real[(s, a)]:
-        return real[(s, a)]
-    lo = next((k for k in range(s - 1, 13, -1) if real.get((k, a))), None)
-    hi = next((k for k in range(s + 1, 58) if real.get((k, a))), None)
-    if lo is None or hi is None:
-        base = lo if hi is None else hi
-        if base is None:
-            return None
-        other = next((k for k in (range(base - 1, 13, -1) if hi is None else range(base + 1, 58)) if real.get((k, a))), None)
-        if other is None:
-            return None
-        p, q = real[(base, a)], real[(other, a)]
-        t = (s - base) / (other - base)
-        return (p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t)
-    p, q = real[(lo, a)], real[(hi, a)]
-    t = (s - lo) / (hi - lo)
+def in_col(c, s):
+    return c['frm'] <= s <= c['to']
+
+real = {}
+for c in COLS:
+    for s in range(S_MIN, S_MAX + 1):
+        if in_col(c, s) and c['key'] != 'west':
+            real[(s, c['key'])] = crossing(s, c['key'])
+        elif in_col(c, s) and s >= 59:
+            real[(s, 'west')] = crossing(s, 'west')
+
+def pos(s, k):
+    """Where street s meets column k: the real crossing, or interpolated along the column."""
+    if real.get((s, k)):
+        return real[(s, k)]
+    have = sorted(t for (t, kk), v in real.items() if kk == k and v)
+    lo = [t for t in have if t < s]
+    hi = [t for t in have if t > s]
+    if lo and hi:
+        a, b = lo[-1], hi[0]
+    elif len(lo) >= 2:
+        a, b = lo[-2], lo[-1]
+    elif len(hi) >= 2:
+        a, b = hi[0], hi[1]
+    else:
+        return None
+    p, q = real[(a, k)], real[(b, k)]
+    t = (s - a) / (b - a)
     return (p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t)
 
-def dirs(ws, q, axis, maxd=22):
+def dirs(ws, q, axis, maxd=22, interior=False):
+    """Directions allowed on the ways near q. interior: count a way only if q lies
+    alongside one of its segments (so a wide search can't bridge a real gap)."""
     found, hit = set(), False
     for w in ws:
         for a, b in segs(w):
             dx, dy = b[0] - a[0], b[1] - a[1]
             L = dx * dx + dy * dy or 1e-9
-            t = max(0, min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / L))
+            t0 = ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / L
+            if interior and not (0 <= t0 <= 1):
+                continue
+            t = max(0, min(1, t0))
             p = (a[0] + t * dx, a[1] + t * dy)
             if math.hypot(p[0] - q[0], p[1] - q[1]) > maxd:
                 continue
             hit = True
             sgn = 1 if dx * axis[0] + dy * axis[1] > 0 else -1
-            o = ow(w)
-            found |= {1, -1} if o == 0 else {sgn * o}
+            found |= {1, -1} if w['ow'] == 0 else {sgn * w['ow']}
     return found if hit else None
 
-def block(ws, p, q, axis, names):
-    """Direction over a whole block: sampled at three points; any gap = doesn't go through."""
+def block(ws, p, q, axis, words, maxd=22, interior=False):
     acc = set()
     for t in (0.25, 0.5, 0.75):
-        r = dirs(ws, (p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t), axis)
+        r = dirs(ws, (p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t), axis, maxd, interior)
         if r is None:
             return None
         acc |= r
-    return 'two' if acc == {1, -1} else names[1] if acc == {1} else names[-1]
+    return 'two' if acc == {1, -1} else words[0] if acc == {1} else words[1]
 
-exists = lambda a, s: s >= FROM.get(a, 14)
+# ---- street blocks ------------------------------------------------------------------
 st_out, av_out, cross_out = {}, {}, {}
-for s in S:
+for s in range(S_MIN, S_MAX + 1):
     row = []
-    # the stub of street s west of 11th Ave, toward the highway
-    p = pos(s, '11th Ave')
-    stub = None
-    if p:
-        acc = set()
-        for dist in (45, 75):
-            r = dirs(streets.get(s, []), (p[0] - EAST[0] * dist, p[1] - EAST[1] * dist), EAST)
-            if r is None:
-                acc = None
-                break
-            acc |= r
-        stub = None if not acc else 'two' if acc == {1, -1} else 'E' if acc == {1} else 'W'
-    for i, a in enumerate(AVES):
-        if a == WSH:
-            row.append(stub)
-            continue
-        if not exists(a, s):
+    present = [i for i, c in enumerate(COLS) if in_col(c, s)]
+    for i, c in enumerate(COLS):
+        if i not in present or present[-1] == i:
             row.append(None)
             continue
-        j = next((k for k in range(i + 1, len(AVES)) if exists(AVES[k], s)), None)
-        if j is None:
-            row.append(None)
+        j = present[present.index(i) + 1]
+        if c['key'] == 'west' and s < 59:
+            # below 59th the edge road is the West Side Highway: a street reaches it
+            # if it continues west of 11th Ave
+            p = pos(s, '11')
+            acc = set() if p else None
+            for dist in (45, 75):
+                r = dirs(streets.get(s, []), (p[0] - EAST[0] * dist, p[1] - EAST[1] * dist), EAST) if p else None
+                if r is None:
+                    acc = None
+                    break
+                acc |= r
+            row.append(None if not acc else 'two' if acc == {1, -1} else 'E' if acc == {1} else 'W')
             continue
-        p, q = pos(s, a), pos(s, AVES[j])
-        row.append(block(streets.get(s, []), p, q, EAST, {1: 'E', -1: 'W'}) if p and q else None)
+        if s in TRANSVERSES and c['key'] == '8' and KEYS[j] == '5':
+            # through Central Park on the transverse road
+            tw = transverse_ways.get(s, [])
+            acc = set()
+            for w in tw:
+                acc |= {1, -1} if w['ow'] == 0 else {1 if (w['pts'][-1][0] - w['pts'][0][0]) * w['ow'] > 0 else -1}
+            row.append('two' if acc == {1, -1} else 'E' if acc == {1} else 'W' if acc else None)
+            continue
+        p, q = pos(s, c['key']), pos(s, KEYS[j])
+        row.append(block(streets.get(s, []), p, q, EAST, 'EW') if p and q else None)
     st_out[s] = row
-    cross_out[s] = [(1 if row[0] else 0) if a == WSH else 1 if real[(s, a)] else 0 for a in AVES]
-for a in AVES:
-    if a == WSH:
-        # below 24th St, 11th Ave itself is the riverside highway
-        av_out[a] = [None] * 10 + ['two'] * 33
-        continue
+    cross_out[s] = [1 if real.get((s, c['key'])) or (c['key'] == 'west' and s < 59 and row[0]) else 0 for c in COLS]
+
+# ---- avenue blocks ------------------------------------------------------------------
+for c in COLS:
     col = []
-    for s in range(14, 57):
-        if not exists(a, s):
+    for s in range(S_MIN, S_MAX):
+        if not (in_col(c, s) and in_col(c, s + 1)):
             col.append(None)
             continue
-        p, q = pos(s, a), pos(s + 1, a)
-        col.append(block(aves[a], p, q, UP, {1: 'U', -1: 'D'}) if p and q else None)
-    av_out[a] = col
+        if c['key'] == 'west' and s < 59:
+            col.append('two')  # Route 9A runs both ways
+            continue
+        if (c['key'], s) in AVE_OVERRIDES:
+            col.append(AVE_OVERRIDES[(c['key'], s)])
+            continue
+        p, q = pos(s, c['key']), pos(s + 1, c['key'])
+        # wider search: some avenues have two roadways (Park Ave beside the railroad viaduct)
+        col.append(block(cols[c['key']], p, q, UP, 'UD', maxd=45, interior=True) if p and q else None)
+    av_out[c['key']] = col
 
-src_note = d.get('osm3s', {}).get('timestamp_osm_base', '')
-js = f"""// Generated by tools/build_grid.py from NYC's street centerline (CSCL, NYC Open
-// Data, {src_note.replace('NYC CSCL ', 'last edited ')}): the legal direction of every block in Drive the grid.
-// streets[s][i]: the block of street s from AVES[i] to the next avenue east
-// ('E', 'W', 'two', or null = doesn't go through). aves[name][s - 14]: the
-// block of the avenue from street s to s + 1 ('U', 'D', 'two', null).
-// crosses[s][i]: 1 if street s actually meets avenue i (0 = the avenue passes by).
-export const GRID_DATA = {json.dumps({'streets': st_out, 'aves': av_out, 'crosses': cross_out}, separators=(',', ':'))};
-"""
-open(out_js, 'w').write(js)
+columns = [{'key': c['key'], 'x': c['x'], 'from': c['frm'], 'to': c['to'], 'ranges': c['ranges']} for c in COLS]
+data = {'source': f"NYC street centerline (CSCL), NYC Open Data, last edited {latest[:10]}", 'sMin': S_MIN, 'sMax': S_MAX,
+        'twoWay': TWO_WAY, 'columns': columns, 'streets': st_out, 'aves': av_out, 'crosses': cross_out}
+open(out_js, 'w').write(
+    "// Generated by tools/build_grid.py from NYC's street centerline (NYC Open Data).\n"
+    "// columns: the avenues west to east (names along each stretch, rule-of-thumb direction).\n"
+    "// streets[s][i]: street s from column i to the next column east: 'E' | 'W' | 'two' | null (doesn't go through).\n"
+    "// aves[key][s - sMin]: that avenue from street s to s + 1: 'U' | 'D' | 'two' | null.\n"
+    "// crosses[s][i]: 1 if street s actually meets column i.\n"
+    f"export const GRID_DATA = {json.dumps(data, separators=(',', ':'))};\n")
 
-TWO = {14, 23, 34, 42, 57}
-RULE_AVE = {WSH: 'two', '11th Ave': 'two', '10th Ave': 'U', '9th Ave': 'D', '8th Ave': 'U', '7th Ave': 'D', '6th Ave': 'U', '5th Ave': 'D',
-            'Madison Ave': 'U', 'Park Ave': 'two', 'Lexington Ave': 'D', '3rd Ave': 'U', '2nd Ave': 'D', '1st Ave': 'U'}
-lines = [f'source: {src_note}']
-for s in S:
-    rule = 'two' if s in TWO else 'W' if s % 2 else 'E'
-    for i, v in enumerate(st_out[s]):
-        if v != rule and exists(AVES[i], s) and any(exists(AVES[k], s) for k in range(i + 1, len(AVES))):
-            j = next(k for k in range(i + 1, len(AVES)) if exists(AVES[k], s))
-            lines.append(f'street {s} {AVES[i]}->{AVES[j]}: real {v}, rule {rule}')
-for a in AVES:
-    for k, v in enumerate(av_out[a]):
-        s = 14 + k
-        if exists(a, s) and v != RULE_AVE[a]:
-            lines.append(f'avenue {a} {s}-{s + 1}: real {v}, rule {RULE_AVE[a]}')
+# ---- report: blocks that break the rules of thumb ----------------------------------------
+def rule_ave(c, s):
+    r = [x for x in c['ranges'] if x[0] <= s][-1]
+    return r[3]
+lines = [data['source']]
+n_st = n_av = d_st = d_av = 0
+for s in range(S_MIN, S_MAX + 1):
+    rule = 'two' if s in TWO_WAY else 'W' if s % 2 else 'E'
+    present = [i for i, c in enumerate(COLS) if in_col(c, s)]
+    for i in present[:-1]:
+        j = present[present.index(i) + 1]
+        n_st += 1
+        v = st_out[s][i]
+        if v != rule:
+            d_st += 1
+            lines.append(f'street {s} {KEYS[i]}->{KEYS[j]}: real {v}, rule {rule}')
+for c in COLS:
+    for s in range(S_MIN, S_MAX):
+        if in_col(c, s) and in_col(c, s + 1):
+            n_av += 1
+            v = av_out[c['key']][s - S_MIN]
+            if v != rule_ave(c, s):
+                d_av += 1
+                lines.append(f"avenue {c['key']} {s}-{s + 1}: real {v}, rule {rule_ave(c, s)}")
+lines.append(f'street blocks differing: {d_st} of {n_st}; avenue blocks differing: {d_av} of {n_av}')
 open(report, 'w').write('\n'.join(lines) + '\n')
-print(len(lines) - 1, 'differences')
+print(lines[-1])

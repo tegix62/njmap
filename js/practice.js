@@ -759,7 +759,12 @@ export function initPractice(ctx) {
         <select id="qArea" aria-label="Area">${area}</select>
       </div><div class="score todaybar"><span class="dots">${dots}</span>${streak() ? `<span>🔥 ${streak()} day${streak() === 1 ? '' : 's'}</span>` : ''}</div>`;
     }
-    if ((cfg.type === 'rapid' && !rapid.on) || cfg.type === 'dropin' || cfg.type === 'gridgame')
+    if (cfg.type === 'gridgame')
+      // the game has its own area choice; the neighborhood list doesn't apply
+      return `<div class="prow">
+        <select id="qType" aria-label="Question type">${opts(Object.fromEntries(allowed.map((k) => [k, TYPES[k]])))}</select>
+      </div><div class="score"></div>`;
+    if ((cfg.type === 'rapid' && !rapid.on) || cfg.type === 'dropin')
       return `<div class="prow">
         <select id="qType" aria-label="Question type">${opts(Object.fromEntries(allowed.map((k) => [k, TYPES[k]])))}</select>
         <select id="qArea" aria-label="Area">${area}</select>
@@ -782,7 +787,7 @@ export function initPractice(ctx) {
       store.set(CFG_KEY, cfg);
       next();
     });
-    document.getElementById('qArea').addEventListener('change', (e) => {
+    document.getElementById('qArea')?.addEventListener('change', (e) => {
       cfg.area = e.target.value;
       store.set(CFG_KEY, cfg);
       if (cfg.type === 'today') {
