@@ -13,7 +13,10 @@
 // end once you're on the destination's road heading toward it. At the end the
 // map shows your route next to the shortest legal one.
 
+import { framesStats } from './frames.js';
+
 const DATA_URL = 'data/manhattan-streets.json';
+const CHECK_EVERY_MS = 35000; // a check-in at most this often
 const GRID = 29; // the grid is turned ~29° clockwise from north
 const ZOOM = 15.7; // driving zoom
 const PACE = { easy: 1, normal: 1.35, fast: 1.9 }; // speed multipliers
@@ -62,7 +65,9 @@ export function initGridGame(ctx) {
   // mapFirst: a look at the start and destination before driving (off by default:
   // working out where the address is is the useful part).
   // from: 'both' (half the rounds start at a tunnel or bridge), 'entries', 'anywhere'
-  const prefs = { pace: 'easy', arrows: false, mapFirst: false, area: 'all', from: 'both', optsOpen: false, ...ctx.store.get('gridPrefs', {}) };
+  // checkins: now and then the car pauses and asks which side the Hudson (or uptown) is
+  const prefs = { pace: 'easy', arrows: false, mapFirst: false, area: 'all', from: 'both', optsOpen: false, checkins: true, ...ctx.store.get('gridPrefs', {}) };
+  const fstats = framesStats(ctx.store);
   if (!AREAS[prefs.area]) prefs.area = 'all';
   const savePrefs = () => ctx.store.set('gridPrefs', prefs);
 
@@ -399,6 +404,7 @@ export function initGridGame(ctx) {
       waiting: false, queued: null, goTo: null, home: false, boost: false, paused: false, done: false,
       driven: 0, wrong: 0, trail: [G.nodes[r.e0.from]], msg: '', msgAt: 0, lastNote: null,
       last: performance.now(), raf: 0, view: prefs.mapFirst && ctx.dur(1) ? 'intro' : 'follow',
+      check: null, lastCheck: performance.now() - CHECK_EVERY_MS / 2, checks: 0, checksRight: 0, resumeAt: 0,
     };
     const tp = G.nodes[r.target.node];
     setData('gg-target', point(tp, { name: r.target.name || r.target.label }));
@@ -462,6 +468,38 @@ export function initGridGame(ctx) {
     }
   }
 
+  // ---- check-ins: "You're heading downtown. Which side is the Hudson?" ----------------------
+  function maybeCheckIn(now) {
+    if (!prefs.checkins || g.auto || g.check || g.done || g.waiting || g.home || g.goTo != null || g.queued || g.paused || g.view !== 'follow') return;
+    if (now - g.lastCheck < CHECK_EVERY_MS || !isCore(g.e.from) || g.e.len < 60 || g.s < g.e.len * 0.25 || g.s > g.e.len * 0.6) return;
+    const h = gridDir(g.bnow);
+    let thing, dir;
+    if (h === 'U' || h === 'D') {
+      const harlem = G.gy[g.e.from] > G.areas['110'] + 800;
+      [thing, dir] = Math.random() < 0.5 ? ['the Hudson', 'W'] : [harlem ? 'the Harlem River' : 'the East River', 'E'];
+    } else [thing, dir] = Math.random() < 0.5 ? ['uptown', 'U'] : ['downtown', 'D'];
+    // which hand that direction is on, facing h
+    const order = ['U', 'E', 'D', 'W'];
+    const steps = (order.indexOf(dir) - order.indexOf(h) + 4) % 4;
+    g.check = { h, thing, dir, answer: steps === 1 ? 'R' : 'L' };
+    g.msg = '';
+    render();
+  }
+  function answerCheck(side) {
+    const c = g.check;
+    const ok = side === c.answer;
+    fstats.record(c.h, ok);
+    g.checks++;
+    if (ok) g.checksRight++;
+    g.check = null;
+    g.lastCheck = performance.now();
+    g.resumeAt = performance.now() + 900;
+    const where = `${c.thing}${c.thing.startsWith('the') ? ` (${WORD[c.dir]})` : ''}`;
+    g.msg = `${ok ? '✓' : '✗'} Heading ${WORD[c.h]}, ${where} is on your ${c.answer === 'L' ? 'left' : 'right'}.`;
+    g.msgAt = performance.now();
+    render();
+  }
+
   function speedNow() {
     const base = SPEED * PACE[prefs.pace];
     if (g.home) return base * HOME_SPEED;
@@ -476,7 +514,7 @@ export function initGridGame(ctx) {
     if (!g || g.loading) return;
     const dt = Math.min(0.1, (now - g.last) / 1000);
     g.last = now;
-    if (!g.paused && !g.done && !g.waiting && g.view !== 'intro') {
+    if (!g.paused && !g.done && !g.waiting && g.view !== 'intro' && !g.check && now >= g.resumeAt) {
       g.s += dt * speedNow();
       let guard = 0;
       while (g && !g.done && !g.waiting && g.s >= g.e.len && guard++ < 50) {
@@ -488,6 +526,13 @@ export function initGridGame(ctx) {
     if (!g) return;
     const { p, b } = g.waiting || g.done ? { p: G.nodes[g.e.to], b: g.e.b1 } : posOnEdge(g.e, g.s);
     g.pos = p;
+    g.bnow = b;
+    const hc = gridDir(b);
+    if (hc !== g.lastHC) {
+      g.lastHC = hc;
+      render(); // the compass words on Left / Right follow your heading
+    }
+    maybeCheckIn(now);
     carMk.setLngLat(p);
     carMk.setRotation(b);
     carEl.classList.toggle('sigL', g.queued === 'L');
@@ -585,6 +630,7 @@ export function initGridGame(ctx) {
   }
   function press(side) {
     if (!g || g.done || g.loading) return;
+    if (g.check) return answerCheck(side);
     if (g.waiting) {
       const c = choices(g.e);
       const nx = side === 'L' ? c.left : c.right;
@@ -647,7 +693,7 @@ export function initGridGame(ctx) {
     const wasBoost = g && g.boost;
     if (g) g.boost = false;
     carEl.classList.remove('boost');
-    if (!cancel && down && !down.moved && !wasBoost && active() && !g.paused) tapAt(e.clientX, e.clientY);
+    if (!cancel && down && !down.moved && !wasBoost && active() && !g.paused && !g.check) tapAt(e.clientX, e.clientY);
     down = null;
   };
   cont.addEventListener('pointerup', (e) => up(e, false));
@@ -717,7 +763,7 @@ export function initGridGame(ctx) {
     ctx.store.set('gridRuns', runs);
     g.result = `<div class="fb ${ok ? 'ok' : 'no'}">${ok ? '✓' : '•'} You made it: ${mi(g.driven)} mi${
       g.wrong ? `, ${g.wrong} wrong-way ${g.wrong === 1 ? 'try' : 'tries'}` : ''
-    }. Shortest legal route: ${mi(g.best.cost)} mi${ratio <= 1.03 ? ' (that was it)' : ''}.</div>
+    }. Shortest legal route: ${mi(g.best.cost)} mi${ratio <= 1.03 ? ' (that was it)' : ''}.${g.checks ? ` Check-ins: ${g.checksRight} of ${g.checks}.` : ''}</div>
       <div class="hint"><span class="gg-key you"></span> your route · <span class="gg-key best"></span> shortest: ${esc(describe(g.best.path))}</div>
       <button class="primary" id="ggAgain">Another route</button>`;
     render();
@@ -767,11 +813,22 @@ export function initGridGame(ctx) {
       `<div class="qkind">🚕 Drive Manhattan${g.entry ? ` · from ${esc(g.entry.from)}` : ''}</div><div class="q">Get to ${tgt}</div>
        ${g.done ? '' : `<div class="hint">${where}${g.queued ? ` · turning <b>${g.queued === 'L' ? 'left' : 'right'}</b> at the next corner` : ''} · ${esc(toGo())}</div>`}`
     );
-    const btn = (side, label) => `<button class="ggturn${g.queued === side ? ' on' : ''}" data-side="${side}" ${g.done ? 'disabled' : ''}>${label}</button>`;
+    // the compass word for each hand, fading as this heading becomes solid (none during a check-in: it'd give it away)
+    const hb = g.bnow ?? g.e.b0;
+    const lvl = g.check ? 'hide' : fstats.hint(gridDir(hb));
+    const hint = (dir) => (lvl === 'hide' ? '' : `<span class="dirhint${lvl === 'faint' ? ' faint' : ''}">${WORD[dir]}</span>`);
+    const btn = (side, label) =>
+      `<button class="ggturn${g.queued === side ? ' on' : ''}${g.check ? ' check' : ''}" data-side="${side}" ${g.done ? 'disabled' : ''}>${label}${hint(gridDir(hb + (side === 'L' ? -90 : 90)))}</button>`;
     ctx.sheet(
       `${g.opts.header()}<div id="qbody">
         ${g.done ? g.result : `<div class="ggctl">${btn('L', '◀ Left')}${btn('R', 'Right ▶')}</div>
-        <div class="ggmsg${g.msg ? '' : ' muted'}">${g.msg ? esc(g.msg) : 'Left/Right turn at the next intersection. Tap a corner ahead to zip there; hold the map to speed up.'}</div>`}
+        <div class="ggmsg${g.msg || g.check ? '' : ' muted'}">${
+          g.check
+            ? `<b>Check-in:</b> you're heading <b>${WORD[g.check.h]}</b>. Which side is <b>${esc(g.check.thing)}</b>?`
+            : g.msg
+              ? esc(g.msg)
+              : 'Left/Right turn at the next intersection. Tap a corner ahead to zip there; hold the map to speed up.'
+        }</div>`}
         <div class="ggbar">
           ${g.done ? '' : `<button id="ggPause">${g.paused ? '▶ Go' : '⏸ Pause'}</button>`}
           <button id="ggOptsBtn" aria-expanded="${!!prefs.optsOpen}">Options ${prefs.optsOpen ? '▴' : '▾'}</button>
@@ -782,6 +839,7 @@ export function initGridGame(ctx) {
           <select id="ggPace" aria-label="Speed">${Object.keys(PACE).map((p) => `<option value="${p}"${prefs.pace === p ? ' selected' : ''}>${p[0].toUpperCase() + p.slice(1)}</option>`).join('')}</select>
           <label><input type="checkbox" id="ggArrows"${prefs.arrows ? ' checked' : ''}/> One-way arrows</label>
           <label><input type="checkbox" id="ggMapFirst"${prefs.mapFirst ? ' checked' : ''}/> Map first</label>
+          <label><input type="checkbox" id="ggChecks"${prefs.checkins ? ' checked' : ''}/> Check-ins</label>
         </div>
       </div>`
     );
@@ -808,6 +866,10 @@ export function initGridGame(ctx) {
     });
     document.getElementById('ggMapFirst').addEventListener('change', (e) => {
       prefs.mapFirst = e.target.checked;
+      savePrefs();
+    });
+    document.getElementById('ggChecks').addEventListener('change', (e) => {
+      prefs.checkins = e.target.checked;
       savePrefs();
     });
     document.getElementById('ggArrows').addEventListener('change', (e) => {

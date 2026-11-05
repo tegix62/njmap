@@ -1735,3 +1735,63 @@ body.gridding .maplibregl-canvas {
   -webkit-touch-callout: none;
   touch-action: none;
 }
+
+/* ---- Left, right & compass drill ---------------------------------------------- */
+.fpad {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-areas: '. n .' 'w . e' '. s .';
+  gap: 8px;
+  margin: 10px 0 6px;
+}
+.fpad-b {
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  padding: 14px 4px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background: rgba(31, 27, 22, 0.07);
+  color: var(--panel-ink);
+  touch-action: manipulation;
+}
+.fpad .n { grid-area: n; }
+.fpad .w { grid-area: w; }
+.fpad .e { grid-area: e; }
+.fpad .s { grid-area: s; }
+.fpad-b.right {
+  background: rgba(21, 128, 61, 0.14);
+  border-color: #15803d;
+}
+.fpad-b.wrong {
+  background: rgba(185, 28, 28, 0.12);
+  border-color: #b91c1c;
+}
+.fstats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--panel-muted);
+}
+.fstats .weak {
+  color: #b91c1c;
+  font-weight: 700;
+}
+/* Drive Manhattan: compass word under Left / Right, fading as you learn it */
+.ggturn .dirhint {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--panel-muted);
+  margin-top: 2px;
+  letter-spacing: 0.02em;
+}
+.ggturn .dirhint.faint {
+  opacity: 0.35;
+}
+.ggturn.check {
+  border-color: #2b4fb3;
+  background: rgba(43, 79, 179, 0.1);
+}

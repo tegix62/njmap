@@ -13,6 +13,7 @@ import { activeRegion, switchRegion, ALL_REGIONS } from './region.js';
 import { initAnchors } from './anchors.js';
 import { initDropIn } from './dropin.js';
 import { initGridGame } from './gridgame.js';
+import { initFrames } from './frames.js';
 
 /** Map filter for one road, by the label people use ("I-287", "Columbia Turnpike"). */
 const roadFilter = (label) => (label ? ['==', LABEL_EXPR, label] : ['==', ['get', 'ref'], '__none__']);
@@ -516,6 +517,7 @@ async function main() {
   ctx.anchors = initAnchors(ctx); // before the modes, so it can claim map taps
   ctx.dropin = initDropIn(ctx);
   ctx.gridgame = initGridGame(ctx);
+  ctx.frames = initFrames(ctx);
   for (const m of munis) ctx.setKnow(m);
 
   // ---- modes ----------------------------------------------------------------

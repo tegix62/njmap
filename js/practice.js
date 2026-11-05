@@ -29,6 +29,7 @@ const TYPES = {
   rapid: '⚡ Rapid round',
   dropin: '🧩 Drop in (county puzzle)',
   gridgame: '🚕 Drive Manhattan (one-ways)',
+  frames: '🧭 Left, right & compass',
   trip: 'My last drive',
 };
 // How long the map takes to turn and move to the next question
@@ -46,7 +47,7 @@ export function initPractice(ctx) {
   const CFG_KEY = R.id === 'nj' ? 'practice' : `practice.${R.id}`;
   const cfg = { type: 'today', area: R.wellKnown ? 'known' : 'all', ...store.get(CFG_KEY, {}) };
   const SC = R.gridAngle ? 0.12 : 1; // Manhattan distances are short
-  const allowed = ['today', 'mix', 'rapid', ...(R.gridAngle ? ['gridgame'] : []), 'dropin', ...R.quizTypes, 'trip'];
+  const allowed = ['today', 'mix', 'rapid', ...(R.gridAngle ? ['gridgame'] : []), 'frames', 'dropin', ...R.quizTypes, 'trip'];
   if (!allowed.includes(cfg.type)) cfg.type = 'mix';
   const score = { right: 0, total: 0, streak: 0 };
   let q = null;
@@ -513,6 +514,11 @@ export function initPractice(ctx) {
     ctx.dropin.stop();
     if (cfg.type === 'gridgame') return startGridGame();
     ctx.gridgame.stop();
+    if (cfg.type === 'frames') {
+      q = { kind: 'frames', m: null, answered: false };
+      return ctx.frames.start({ header: () => header(), bindHeader: () => bindHeader() });
+    }
+    ctx.frames.stop();
     const p = pool();
     // Mixed mode interleaves question types and never repeats one back to back
     // (interleaving helps tell similar things apart; Kornell & Bjork, 2008).
@@ -759,8 +765,8 @@ export function initPractice(ctx) {
         <select id="qArea" aria-label="Area">${area}</select>
       </div><div class="score todaybar"><span class="dots">${dots}</span>${streak() ? `<span>🔥 ${streak()} day${streak() === 1 ? '' : 's'}</span>` : ''}</div>`;
     }
-    if (cfg.type === 'gridgame')
-      // the game has its own area choice; the neighborhood list doesn't apply
+    if (cfg.type === 'gridgame' || cfg.type === 'frames')
+      // these have no use for the neighborhood/town list
       return `<div class="prow">
         <select id="qType" aria-label="Question type">${opts(Object.fromEntries(allowed.map((k) => [k, TYPES[k]])))}</select>
       </div><div class="score"></div>`;
@@ -1513,7 +1519,7 @@ export function initPractice(ctx) {
         q = null;
         return next();
       }
-      if (q && !q.answered && !q.rapid && q.kind !== 'dropin' && q.kind !== 'gridgame' && q.kind !== 'rapidend') show();
+      if (q && !q.answered && !q.rapid && q.kind !== 'dropin' && q.kind !== 'gridgame' && q.kind !== 'frames' && q.kind !== 'rapidend') show();
       else next();
     },
     leave() {
@@ -1521,6 +1527,7 @@ export function initPractice(ctx) {
       rapid.on = false;
       ctx.dropin.stop();
       ctx.gridgame.stop();
+      ctx.frames.stop();
       ctx.clearHighlights();
       ctx.reveal([]);
       ctx.line(null);
