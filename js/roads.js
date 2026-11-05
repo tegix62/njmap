@@ -1,61 +1,10 @@
 // Major roads, read from the OpenFreeMap tiles already loaded for the
 // background map (OpenStreetMap data, OpenMapTiles schema).
 import { bearing, compass8, angleDiff } from './geo.js';
+import { labelOf } from './roadlabel.js';
 
 const MAJOR = ['motorway', 'trunk', 'primary'];
-const NAMED_REFS = {
-  NJTP: 'Turnpike',
-  GSP: 'Parkway',
-  ACE: 'AC Expressway',
-  PIP: 'Palisades Pkwy',
-};
-
-/**
- * OSM route refs ("I 80", "US 1;US 9", "NJ 23", "I 95;NJTP") -> the label people
- * use ("I-80", "Route 1&9", "Route 23", "Turnpike"). County routes and unknown
- * refs -> null.
- */
-export function normRef(raw) {
-  if (!raw) return null;
-  const parts = [];
-  for (const p of String(raw).split(/\s*;\s*/)) {
-    let m;
-    if (NAMED_REFS[p]) parts.push(NAMED_REFS[p]);
-    else if ((m = p.match(/^I[ -]?(\d+)$/))) parts.push(`I-${m[1]}`);
-    // People say "Route 46" for US 46 and "Route 23" for NJ 23, so both read that way
-    else if ((m = p.match(/^(US|NJ|NY)[ -]?(\d+\w?)$/))) parts.push(`Route ${m[2]}`);
-  }
-  if (!parts.length) return null;
-  // The Turnpike is also I-95 in places: call it the Turnpike.
-  if (parts.includes('Turnpike')) return 'Turnpike';
-  // "Route 1&9" for roads carrying two routes
-  const rt = [...new Set(parts)].filter((p) => p.startsWith('Route '));
-  if (rt.length > 1 && rt.length === new Set(parts).size) return 'Route ' + rt.map((p) => p.slice(6)).join('&');
-  return [...new Set(parts)].join(' / ');
-}
-
-/** The county route number in a ref ("CR 510" -> "510"), or null. */
-export function countyNum(raw) {
-  for (const p of String(raw || '').split(/\s*;\s*/)) {
-    const m = p.match(/^CR[ -]?(\d+\w?)$/);
-    if (m) return m[1];
-  }
-  return null;
-}
-
-/**
- * What people call a road: the route number for interstates, US and state
- * routes ("Route 46"); the street name for county routes, since nobody says
- * "CR 510" for Columbia Turnpike; the name for unnumbered highways.
- */
-export function roadLabel(props) {
-  return normRef(props.ref) || (countyNum(props.ref) && props.name) || (props.class === 'motorway' && props.name) || null;
-}
-
-/** A road known by its name, not a route number: highlight it by name too, not every road with the same ref. */
-export function byName(r) {
-  return r && !normRef([...(r.raw || [])].join(';')) ? r.label : null;
-}
+export { normRef, countyNum, labelOf } from './roadlabel.js';
 
 /** Draft note for a road, by name first ("Pulaski Skyway"), then each part of its label. */
 export function draftNote(label, name, notes) {
@@ -111,7 +60,7 @@ export function nearbyRoads(map, pt, maxMi = 3, limit = 3) {
   const best = new Map();
   for (const f of majorFeatures(map)) {
     const props = f.properties || {};
-    const label = roadLabel(props);
+    const label = labelOf(props);
     if (!label) continue;
     for (const line of lines(f.geometry)) {
       for (let i = 1; i < line.length; i++) {
@@ -153,7 +102,7 @@ export function roadsInTown(map, m, locate) {
   const hits = new Map();
   for (const f of majorFeatures(map)) {
     const props = f.properties || {};
-    const label = roadLabel(props);
+    const label = labelOf(props);
     if (!label) continue;
     // Sample along each segment (~150 m apart): a straight highway can cross a
     // whole town without a single vertex inside it.
@@ -188,7 +137,7 @@ export function sampleRoads(map, locate) {
   const roads = new Map();
   for (const f of majorFeatures(map)) {
     const props = f.properties || {};
-    const label = roadLabel(props);
+    const label = labelOf(props);
     if (!label) continue;
     const r = roads.get(label) || { label, name: props.name || '', raw: new Set(), towns: new Set() };
     r.raw.add(props.ref);

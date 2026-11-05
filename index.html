@@ -19,6 +19,7 @@
     <div id="map" aria-label="Map of New Jersey municipalities"></div>
 
     <div id="edges" aria-hidden="true">
+      <svg id="northline" hidden><line /></svg>
       <span data-d="0" class="n">N</span><span data-d="90">E</span><span data-d="180">S</span><span data-d="270">W</span>
     </div>
 
@@ -74,6 +75,9 @@
         </select>
       </label>
       <label class="row"><input type="checkbox" data-setting="northUp" /> North-up map while driving (off = map turns with you)</label>
+      <label class="row"><input type="checkbox" data-setting="northLine" /> Line from you to north (the N on the map edge)</label>
+      <label class="row"><input type="checkbox" data-setting="driveInset" /> Overview circle: your town and its neighbors, zoomed out</label>
+      <label class="row"><input type="checkbox" data-setting="sayCardinal" /> Say “Heading north” when I settle onto north, east, south or west</label>
       <label class="row"><input type="checkbox" data-setting="driveLabels" /> Show town names on the map while driving</label>
       <label class="row"><input type="checkbox" data-setting="wakeLock" /> Keep screen on while tracking</label>
       <label class="row"><input type="checkbox" data-setting="phoneCompass" /> Use phone compass for heading when stopped</label>

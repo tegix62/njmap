@@ -6,18 +6,15 @@ import { initDrive } from './drive.js';
 import { initExplore } from './explore.js';
 import { initPractice } from './practice.js';
 import { notes, migrateRoadKeys } from './notes.js';
+import { LABEL_EXPR } from './roadlabel.js';
 import { buildStyle, MUNI_LABEL_IDS, PLACE_LAYER_IDS } from './style.js';
 import { THEMES } from './theme.js';
 import { activeRegion, switchRegion, ALL_REGIONS } from './region.js';
 import { initAnchors } from './anchors.js';
 import { initDropIn } from './dropin.js';
 
-/** Map filter for one road: its OSM refs, narrowed to one name for roads known by name. */
-const roadFilter = (raw, name) => {
-  if (!raw || !raw.length) return ['==', ['get', 'ref'], '__none__'];
-  const f = ['in', ['get', 'ref'], ['literal', raw]];
-  return name ? ['all', f, ['==', ['get', 'name'], name]] : f;
-};
+/** Map filter for one road, by the label people use ("I-287", "Columbia Turnpike"). */
+const roadFilter = (label) => (label ? ['==', LABEL_EXPR, label] : ['==', ['get', 'ref'], '__none__']);
 
 const TYPE_ABBR = { Township: 'Twp', Borough: 'Boro', City: 'City', Town: 'Town', Village: 'Vlg' };
 
@@ -31,6 +28,9 @@ const DEFAULT_SETTINGS = {
   mapStyle: 'ink',
   basemap: 'streets',
   northUp: false,
+  northLine: true, // Drive: a line from you to the N on the map edge
+  driveInset: true, // Drive: overview circle of your town and its neighbors
+  sayCardinal: true, // Drive: "Heading north." when you settle onto N/E/S/W
   driveLabels: true,
   wakeLock: true,
   phoneCompass: true,
@@ -214,6 +214,7 @@ async function main() {
     munis,
     byKey,
     counties,
+    countyShapes: countiesFC,
     confusables,
     settings,
     store,
@@ -416,7 +417,7 @@ async function main() {
     /** Light up one whole highway across the map, in its own color. */
     focusHighway(h) {
       if (!h) return ctx.focusRoad(null);
-      map.setFilter('road-focus', ['>=', ['index-of', h.match, ['coalesce', ['get', 'ref'], '']], 0]);
+      map.setFilter('road-focus', roadFilter(h.label));
       map.setPaintProperty('road-focus', 'line-color', h.color);
     },
     /** Hide or show road numbers on the map (hidden while a road question is open). */
@@ -424,15 +425,15 @@ async function main() {
       for (const id of ['road-ref-major', 'road-ref'])
         map.setLayoutProperty(id, 'visibility', on && settings.basemap === 'streets' ? 'visible' : 'none');
     },
-    /** Highlight one road (its raw OSM refs, plus its name for roads known by name) on the map; null clears. */
-    focusRoad(raw, color, name = null) {
-      map.setFilter('road-focus', roadFilter(raw, name));
+    /** Highlight one road by its label on the map; null clears. */
+    focusRoad(label, color) {
+      map.setFilter('road-focus', roadFilter(label));
       map.setPaintProperty('road-focus', 'line-color', color || theme.hl.sel);
-      if (!raw) map.setFilter('road-focus-bad', ['==', ['get', 'ref'], '__none__']);
+      if (!label) map.setFilter('road-focus-bad', roadFilter(null));
     },
     /** The road you picked when it was wrong (drawn in the "wrong" color). */
-    focusRoadBad(raw, name = null) {
-      map.setFilter('road-focus-bad', roadFilter(raw, name));
+    focusRoadBad(label) {
+      map.setFilter('road-focus-bad', roadFilter(label));
     },
     toast(msg, ms = 3200) {
       const t = $('#toast');
@@ -450,6 +451,7 @@ async function main() {
   // N/E/S/W letters pinned to the edges of the visible map, rotated with it, so
   // in heading-up mode you can see at a glance that "north is to my left".
   const edgeEls = [...document.querySelectorAll('#edges span')];
+  const northLine = document.getElementById('northline');
   function updateEdges() {
     const W = window.innerWidth;
     const top = hudEl.hidden ? 8 : hudEl.getBoundingClientRect().bottom + 4;
@@ -458,13 +460,16 @@ async function main() {
     const inset = 16;
     let cx = W / 2;
     let cy = (top + bottom) / 2;
+    let car = false;
     if (ctx.pos && ctx.mode === 'drive') {
       const p = map.project(ctx.pos.pt);
       if (p.x > inset && p.x < W - inset && p.y > top + inset && p.y < bottom - inset) {
         cx = p.x;
         cy = p.y;
+        car = true;
       }
     }
+    let nx = 0, ny = 0;
     const b = map.getBearing();
     for (const el of edgeEls) {
       const a = (((+el.dataset.d - b) % 360) + 360) % 360;
@@ -475,6 +480,20 @@ async function main() {
       const ty = dy > 0 ? (bottom - inset - cy) / dy : dy < 0 ? (top + inset - cy) / dy : Infinity;
       const t = Math.max(0, Math.min(tx, ty));
       el.style.transform = `translate(${cx + dx * t}px, ${cy + dy * t}px) translate(-50%, -50%)`;
+      if (el.dataset.d === '0') [nx, ny] = [cx + dx * t, cy + dy * t];
+    }
+    // Drive: a straight line from you to the N, so north is always one glance away
+    const show = car && settings.northLine;
+    northLine.hidden = !show;
+    if (show) {
+      const len = Math.hypot(nx - cx, ny - cy) || 1;
+      const sx = cx + ((nx - cx) / len) * 18; // start just outside your marker
+      const sy = cy + ((ny - cy) / len) * 18;
+      const ln = northLine.firstElementChild;
+      ln.setAttribute('x1', sx);
+      ln.setAttribute('y1', sy);
+      ln.setAttribute('x2', nx);
+      ln.setAttribute('y2', ny);
     }
     $('#compass .rose').style.transform = `rotate(${-b}deg)`;
   }
@@ -498,6 +517,7 @@ async function main() {
     if (ctx.mode) modes[ctx.mode].leave();
     ctx.mode = m;
     document.body.dataset.mode = m;
+    map.setGlobalStateProperty('quiet', m === 'practice');
     for (const b of document.querySelectorAll('#tabs [data-mode]')) b.setAttribute('aria-selected', b.dataset.mode === m);
     store.set('mode', m);
     // Study modes are north-up; Drive re-applies its own orientation.
@@ -575,6 +595,8 @@ async function main() {
     if (k === 'basemap') ctx.setBasemap(el.value);
     if (k === 'mapStyle') location.reload();
     if (k === 'northUp') modes.drive.applyOrientation();
+    if (k === 'driveInset') modes.drive.updateInset();
+    if (k === 'northLine') updateEdges();
     if (k === 'driveLabels' && ctx.mode === 'drive') ctx.showLabels(settings.driveLabels);
   });
   $('#resetStats').addEventListener('click', () => {

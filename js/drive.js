@@ -1,13 +1,17 @@
 /* global maplibregl */
 import { bearing, destination, distanceMi, compass8, compass16, dirWord, angleDiff } from './geo.js';
 import { nearbyRoads, alongRoad, travelDir, draftNote } from './roads.js';
-import { editNote } from './notes.js';
+import { initInset } from './inset.js';
 import { gridDir, gridSide, intersection } from './grid.js';
 import { ALL_REGIONS, switchRegion } from './region.js';
 
 const MIN_MOVING_MPS = 2; // ~4.5 mph; below this GPS course is noise
 const LOOK_STEP_MI = 0.08;
 const GUESS_PAUSE_MS = 4000;
+const TYPE_ABBR = { Township: 'Twp', Borough: 'Boro', City: 'City', Town: 'Town', Village: 'Village' };
+const CARDINAL_TOL = 20; // degrees either side of N/E/S/W that count as "facing" it
+const CARDINAL_HOLD_MS = 4000; // hold it this long before it's said
+const CARDINAL_GAP_MS = 20000; // and never more often than this
 
 export function initDrive(ctx) {
   const { map, settings, store, region } = ctx;
@@ -99,6 +103,32 @@ export function initDrive(ctx) {
     `<path class="me-arrow" d="M20 2 L27 14 L20 11 L13 14 Z" fill="${ctx.theme.you}" stroke="#fff" stroke-width="1.5"/></svg>`;
   const marker = new maplibregl.Marker({ element: el, rotationAlignment: 'map', pitchAlignment: 'map' });
 
+  // ---- overview circle (zoomed-out view of this town and its neighbors) -----
+  const inset = initInset(ctx);
+  function updateInset() {
+    if (ctx.mode === 'drive' && settings.driveInset && st.watchId != null && ctx.pos && st.cur)
+      inset.update(ctx.pos.pt, st.heading, st.cur, !!settings.northUp);
+    else inset.hide();
+  }
+
+  // ---- "Heading north." when you settle onto N, E, S or W -------------------
+  function checkCardinal(now) {
+    if (!settings.voice || !settings.sayCardinal || GRID || !st.gpsHeading || st.heading == null) return;
+    const i = Math.round(st.heading / 90) % 4;
+    const c = Math.abs(angleDiff(st.heading, i * 90)) <= CARDINAL_TOL ? i : null;
+    if (c !== st.cardCand) {
+      st.cardCand = c;
+      st.cardSince = now;
+      return;
+    }
+    if (c == null || c === st.cardSaid || now - st.cardSince < CARDINAL_HOLD_MS) return;
+    if (now - (st.cardSaidAt || 0) < CARDINAL_GAP_MS || now - (ctx.lastSpokenAt || 0) < 3000) return;
+    if ((st.quizPendingUntil || 0) > now || st.guessing) return;
+    st.cardSaid = c;
+    st.cardSaidAt = now;
+    ctx.speak(`Heading ${['north', 'east', 'south', 'west'][c]}.`);
+  }
+
   // ---- geolocation ----------------------------------------------------------
   function start() {
     if (!('geolocation' in navigator)) {
@@ -132,6 +162,7 @@ export function initDrive(ctx) {
     trips.end();
     store.set('tracking', false);
     releaseWake();
+    updateInset();
     render();
   }
 
@@ -195,10 +226,12 @@ export function initDrive(ctx) {
       st.lookAt = now;
       maybeQuiz(now);
     }
+    checkCardinal(now);
     if (ctx.mode === 'drive') {
       if (st.follow) camera();
       render();
     }
+    updateInset();
     ctx.updateEdges();
   }
 
@@ -444,6 +477,7 @@ export function initDrive(ctx) {
             marker.setRotation(st.heading);
             el.classList.remove('no-heading');
             if (ctx.mode === 'drive' && st.follow && !settings.northUp) camera(0);
+            updateInset();
             throttledRender();
           }
         }
@@ -519,6 +553,7 @@ export function initDrive(ctx) {
   function applyOrientation() {
     document.body.classList.toggle('north-up', !!settings.northUp);
     if (ctx.mode === 'drive' && st.follow) camera(400);
+    updateInset();
   }
   function toggleOrientation() {
     settings.northUp = !settings.northUp;
@@ -541,46 +576,35 @@ export function initDrive(ctx) {
     const h = ctx.hwy(label);
     return h ? ` style="background:${h.color};color:#fff"` : '';
   };
-  function roadLine() {
-    if (!st.roads.length) return '';
-    if (st.onRoad && st.heading != null)
-      return `<div class="roadline"><span class="on">On <b${hwyStyle(st.onRoad)}>${esc(st.onRoad)} ${travelDir(st.heading)}</b></span>${
-        st.roads[1] ? ` · ${esc(st.roads[1].label)} ${mi(st.roads[1].d)} ${st.roads[1].dir}` : ''
-      }</div>`;
-    return `<div class="roadline">${st.roads
-      .slice(0, 2)
-      .map((r) => `<b${hwyStyle(r.label)}>${esc(r.label)}</b> ${mi(r.d)} ${r.dir}`)
-      .join(' · ')}</div>`;
+  /** Where something is from you: left/right/ahead when the map turns with you, compass words when it's north-up. */
+  function whereFrom(b) {
+    if (settings.northUp || st.heading == null) return `${compass8(b)} of you`;
+    const rel = angleDiff(b, st.heading);
+    const a = Math.abs(rel);
+    const side = rel > 0 ? 'right' : 'left';
+    return a <= 30 ? 'ahead' : a <= 70 ? `ahead ${side}` : a <= 110 ? `on your ${side}` : a <= 150 ? `behind ${side}` : 'behind';
+  }
+  /** "Montville Twp (Morris)": the name big, type and county small. */
+  function townTitle(m) {
+    const sub = GRID ? `(${m.c})` : `${TYPE_ABBR[m.t] || m.t} (${m.c})`;
+    return `${esc(m.n)} <span class="ty">${esc(sub)}</span>`;
   }
 
-  function noteCards(kind, key, draft) {
-    const mine = ctx.notes
-      .list(kind, key)
-      .map((n) => `<div class="notecard mine"><span class="tag">your note</span>${esc(n.text)}</div>`)
-      .join('');
-    return (draft ? `<div class="notecard"><span class="tag">draft note</span>${esc(draft)}</div>` : '') + mine;
-  }
-
-  /** Second layer: only rendered when the card is expanded. */
-  function details(m) {
-    const look = st.look
-      ? `<div class="looks">${sideCell('left', '◀ Left', st.look.left)}${sideCell('ahead', '▲ Ahead', st.look.ahead)}${sideCell('right', 'Right ▶', st.look.right)}</div>`
-      : '';
-    const road = st.roads.find((r) => r.label === st.onRoad) || st.roads[0];
-    const roadNotes = road
-      ? `<div class="label-sm">${esc(road.label)}</div>${noteCards('road', road.label, draftNote(road.label, road.name, ctx.region.roadNotes))}
-         <button class="addnote" data-note="road" data-key="${esc(road.label)}">＋ Note about ${esc(road.label)}</button>`
-      : '';
-    const townNotes = m
-      ? `<div class="label-sm">${esc(m.n)}</div>${noteCards('town', m.key)}
-         <button class="addnote" data-note="town" data-key="${esc(m.key)}">＋ Note about ${esc(m.n)}</button>`
-      : '';
+  /** Second layer, behind the ▾: your places and the main roads around you. */
+  function details() {
     const places = ctx.anchors
       .fromYou(ctx.pos.pt, st.heading)
       .slice(0, 3)
-      .map((x) => `<div class="placeline"><b>${esc(x.a.name)}</b> ${mi(x.d)} ${x.dir}${x.rel ? ` <span class="muted">· ${x.rel}</span>` : ''}</div>`)
+      .map((x) => `<div class="placeline"><b>${esc(x.a.name)}</b> ${mi(x.d)} · ${whereFrom(bearing(ctx.pos.pt, x.a.pt))}</div>`)
       .join('');
-    return `<div class="detail">${look}${places ? `<div class="label-sm">Your places</div>${places}` : ''}${roadNotes}${townNotes}</div>`;
+    const roads = st.roads
+      .filter((r) => r.label !== st.onRoad)
+      .map((r) => `<div class="placeline"><b${hwyStyle(r.label)} class="rd">${esc(r.label)}</b> ${mi(r.d)} · ${whereFrom(bearing(ctx.pos.pt, r.pt))}</div>`)
+      .join('');
+    if (!places && !roads) return '';
+    return `<div class="detail">${places ? `<div class="label-sm">Your places</div>${places}` : ''}${
+      roads ? `<div class="label-sm">Main roads nearby</div>${roads}` : ''
+    }</div>`;
   }
 
   function render() {
@@ -602,30 +626,39 @@ export function initDrive(ctx) {
     const m = st.cur;
     const h = st.heading;
     const acc = ctx.pos.acc > 150 ? `<span class="warn">GPS ±${Math.round(ctx.pos.acc)} m</span>` : '';
-    // Layer 1, readable at a glance: town, county, heading (+ which way is left/right), the main road.
+    // Layer 1, readable at a glance: where you are, which way you're going, what's around you.
+    const on = st.onRoad && h != null ? ` · on <b class="rd"${hwyStyle(st.onRoad)}>${esc(st.onRoad)} ${travelDir(h)}</b>` : '';
     const head =
       h == null
         ? `<div class="heading muted">Heading appears once you start moving</div>`
         : GRID
           ? // Manhattan: the grid's words, with the true compass direction small
-            `<div class="heading">Heading <b>${gridDir(h, GRID).toUpperCase()}</b> <span class="deg">${compass16(h)}</span> <span class="lr-key">· left <b>${gridSide(h - 90, GRID)}</b> · right <b>${gridSide(h + 90, GRID)}</b></span></div>`
-          : `<div class="heading">Heading <b>${dirWord(compass8(h)).toUpperCase()}</b> <span class="lr-key">· left <b>${compass8(h - 90)}</b> · right <b>${compass8(h + 90)}</b></span></div>`;
-    const near = m && st.near ? ` · near <i>${esc(st.near.name)}</i>` : '';
-    const handle = `<button class="handle" id="hudToggle" aria-label="${st.expanded ? 'Show less' : 'Show more'}">${st.expanded ? '▴' : '▾'}</button>`;
+            `<div class="heading">Heading <b>${gridDir(h, GRID).toUpperCase()}</b> <span class="deg">${compass16(h)}</span>${on}</div>`
+          : `<div class="heading">Heading <b>${dirWord(compass8(h)).toUpperCase()}</b>${on}</div>`;
+    const look = st.look
+      ? `<div class="looks">${sideCell('left', '◀ Left', st.look.left)}${sideCell('ahead', '▲ Ahead', st.look.ahead)}${sideCell('right', 'Right ▶', st.look.right)}</div>`
+      : '';
+    const near = m && st.near ? `near <i>${esc(st.near.name)}</i> <span class="muted">(village)</span>` : '';
+    const more = st.expanded ? details() : '';
+    const hasMore = !!(st.expanded ? more : details());
+    st.hasMore = hasMore;
+    const handle = hasMore
+      ? `<button class="handle" id="hudToggle" aria-label="${st.expanded ? 'Show less' : 'Show more'}">${st.expanded ? '▴' : '▾'}</button>`
+      : '';
     ctx.hud(
       `${handle}` +
         (m
           ? st.guessing === m
             ? `<div class="town">?</div>
              <div class="meta">New town. Say it before the voice does…</div>`
-            : `<div class="town">${esc(m.n)}</div>
-             <div class="meta">${GRID ? '' : `${esc(m.t)} · `}<b>${esc(ctx.groupName(m.c))}</b>${near} ${acc}</div>
+            : `<div class="town">${townTitle(m)}</div>
+             ${near || acc ? `<div class="meta">${near} ${acc}</div>` : ''}
              ${GRID && st.corner ? `<div class="corner">near <b>${esc(st.corner)}</b></div>` : ''}`
           : `<div class="town">${esc(region.outside)}</div><div class="meta">${esc(region.outsideSub)} ${acc}</div>${otherRegionButton()}`) +
         head +
-        roadLine() +
+        look +
         (st.quizLine ? `<div class="quizline${st.quizLine.answered ? ' ans' : ''}">🎧 ${esc(st.quizLine.text)}</div>` : '') +
-        (st.expanded ? details(m) : '')
+        more
     );
     bindHud();
   }
@@ -645,19 +678,11 @@ export function initDrive(ctx) {
         e.stopPropagation();
         switchRegion(sw.dataset.r);
       });
-    document.getElementById('hudToggle').addEventListener('click', (e) => {
-      e.stopPropagation();
-      toggleExpanded();
-    });
-    for (const b of hud.querySelectorAll('.addnote'))
-      b.addEventListener('click', async (e) => {
+    const tg = hud.querySelector('#hudToggle');
+    if (tg)
+      tg.addEventListener('click', (e) => {
         e.stopPropagation();
-        const label = b.dataset.note === 'town' ? ctx.byKey.get(b.dataset.key).n : b.dataset.key;
-        const text = await editNote(`Note about ${label}`);
-        if (text) {
-          ctx.notes.add(b.dataset.note, b.dataset.key, text);
-          render();
-        }
+        toggleExpanded();
       });
   }
   function toggleExpanded() {
@@ -668,7 +693,7 @@ export function initDrive(ctx) {
   }
   // Tapping the card itself (not a button) also expands/collapses it.
   document.getElementById('hud').addEventListener('click', (e) => {
-    if (ctx.mode !== 'drive' || st.watchId == null || e.target.closest('button, a, input')) return;
+    if (ctx.mode !== 'drive' || st.watchId == null || !st.hasMore || e.target.closest('button, a, input')) return;
     toggleExpanded();
   });
 
@@ -686,14 +711,17 @@ export function initDrive(ctx) {
       document.body.classList.remove('unfollowed');
       render();
       if (ctx.pos) camera(0);
+      updateInset();
     },
     leave() {
       if (st.cur) ctx.highlight(st.cur.id, null);
+      inset.hide();
     },
     recenter,
     stop,
     toggleOrientation,
     applyOrientation,
+    updateInset,
     get current() {
       return st.cur;
     },

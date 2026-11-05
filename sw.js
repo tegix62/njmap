@@ -1,13 +1,15 @@
 // Offline support: the app shell, boundary data, libraries and fonts are
 // cached, so "which town am I in" keeps working with no signal. Background map
 // tiles are only cached opportunistically.
-const VERSION = 'njtf-v20';
+const VERSION = 'njtf-v21';
 const SHELL = [
   './',
   'index.html',
   'css/app.css',
   'js/app.js',
   'js/geo.js',
+  'js/inset.js',
+  'js/roadlabel.js',
   'js/drive.js',
   'js/explore.js',
   'js/practice.js',

@@ -3,7 +3,7 @@
 // separately and never overwrite this file).
 
 /**
- * Road notes keyed by the short label the app shows (see roads.js normRef):
+ * Road notes keyed by the short label the app shows (see roadlabel.js):
  * "I-80", "Route 46", "Route 23", "Turnpike", "Parkway", … or by a road's name.
  */
 export const ROAD_NOTES = {
@@ -85,14 +85,12 @@ export const LANDMARKS = [
  * The big highways, each with its own color everywhere in the app, so the
  * Turnpike always looks like the Turnpike. Colors avoid the blue / green /
  * red that mean "selected / right / wrong".
- * `match` is the OpenStreetMap route ref that identifies the road.
  * End points are checked against the town boundaries by the test script.
  */
 export const HIGHWAYS = [
   {
     label: 'Turnpike',
     full: 'New Jersey Turnpike',
-    match: 'NJTP',
     color: '#7b5ea7',
     runs: 'southwest–northeast',
     ends: [
@@ -105,7 +103,6 @@ export const HIGHWAYS = [
   {
     label: 'Parkway',
     full: 'Garden State Parkway',
-    match: 'GSP',
     color: '#2e8b82',
     runs: 'south–north',
     ends: [
@@ -118,7 +115,6 @@ export const HIGHWAYS = [
   {
     label: 'I-80',
     full: 'Interstate 80',
-    match: 'I 80',
     color: '#c48a1e',
     runs: 'west–east',
     ends: [
@@ -131,7 +127,6 @@ export const HIGHWAYS = [
   {
     label: 'I-287',
     full: 'Interstate 287',
-    match: 'I 287',
     color: '#9a5b2e',
     runs: 'an arc, south to north',
     ends: [
@@ -144,7 +139,6 @@ export const HIGHWAYS = [
   {
     label: 'I-78',
     full: 'Interstate 78',
-    match: 'I 78',
     color: '#7a8a2a',
     runs: 'west–east',
     ends: [
@@ -157,7 +151,6 @@ export const HIGHWAYS = [
   {
     label: 'I-295',
     full: 'Interstate 295',
-    match: 'I 295',
     color: '#b0607e',
     runs: 'southwest–northeast, along the Delaware',
     ends: [
@@ -170,7 +163,6 @@ export const HIGHWAYS = [
   {
     label: 'AC Expressway',
     full: 'Atlantic City Expressway',
-    match: 'ACE',
     color: '#5f7286',
     runs: 'northwest–southeast',
     ends: [

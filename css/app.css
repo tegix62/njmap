@@ -1296,3 +1296,122 @@ button.primary.ghost {
   bottom: 0;
   box-shadow: 0 -8px 12px var(--panel);
 }
+
+/* ---- Drive: tidier card, north line, overview circle ----------------------- */
+#hud .town .ty {
+  font-size: 0.5em;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--panel-muted);
+  white-space: nowrap;
+}
+#hud .heading b.rd,
+#hud .placeline b.rd {
+  color: #f8f4ec;
+  background: var(--panel-ink);
+  border-radius: 6px;
+  padding: 0 6px;
+  letter-spacing: 0;
+}
+body[data-mode='drive'] .looks {
+  margin-top: 8px;
+}
+body[data-mode='drive'] .look .v {
+  font-size: 14px;
+}
+#hud .detail .placeline {
+  margin-top: 3px;
+}
+#northline {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+#northline line {
+  stroke: #b91c1c;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  opacity: 0.7;
+}
+#inset {
+  position: fixed;
+  left: 10px;
+  bottom: calc(var(--tabs-h) + var(--safe-b) + 92px);
+  z-index: 2;
+  color: var(--panel-ink);
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.25));
+  pointer-events: none;
+}
+#inset svg {
+  display: block;
+}
+#inset .bg {
+  fill: var(--panel);
+}
+#inset .rim {
+  fill: none;
+  stroke: currentColor;
+  stroke-opacity: 0.35;
+  stroke-width: 1.5;
+}
+#inset .towns .other {
+  fill: currentColor;
+  fill-opacity: 0.03;
+  stroke: currentColor;
+  stroke-opacity: 0.45;
+  stroke-width: 0.8;
+}
+#inset .towns .cur {
+  fill: #2b4fb3;
+  fill-opacity: 0.3;
+  stroke: #2b4fb3;
+  stroke-width: 1.8;
+}
+#inset .county {
+  fill: none;
+  stroke: currentColor;
+  stroke-opacity: 0.8;
+  stroke-width: 1.6;
+}
+#inset .labels text {
+  font-size: 9.5px;
+  font-weight: 700;
+  fill: currentColor;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  paint-order: stroke;
+  stroke: var(--panel);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+#inset .labels text.far {
+  fill-opacity: 0.55;
+}
+#inset .me path {
+  fill: #2b4fb3;
+  stroke: #fff;
+  stroke-width: 1.5;
+}
+#inset .me.no-heading path {
+  display: none;
+}
+#inset .north circle {
+  fill: #b91c1c;
+}
+#inset .north text {
+  fill: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  text-anchor: middle;
+}
+#inset .me .dot {
+  display: none;
+  fill: #2b4fb3;
+  stroke: #fff;
+  stroke-width: 1.5;
+}
+#inset .me.no-heading .dot {
+  display: block;
+}

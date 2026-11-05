@@ -8,6 +8,7 @@
 //   Town   (10.3–13)  every town name, secondary roads, lakes, landmark names
 //   Street (13+)      villages and sections, local roads, street names
 import { THEME } from './theme.js';
+import { LABEL_EXPR } from './roadlabel.js';
 
 let T = THEME; // the active theme; set by buildStyle()
 let HWYS = []; // the region's highways with their colors; set by buildStyle()
@@ -16,7 +17,9 @@ let HWYS = []; // the region's highways with their colors; set by buildStyle()
 const isClass = (list) => ['match', ['get', 'class'], list, true, false];
 const notTunnel = ['!=', ['get', 'brunnel'], 'tunnel'];
 const roadWidth = (a, b, c) => ['interpolate', ['exponential', 1.5], ['zoom'], 8, a, 12, b, 16, c];
-const fadeIn = (z0, z1) => ['interpolate', ['linear'], ['zoom'], z0, 0, z1, 1];
+// Practice quiets the street network so the question's places stand out.
+const QUIET = ['case', ['boolean', ['global-state', 'quiet'], false], 0.35, 1];
+const fadeIn = (z0, z1) => ['interpolate', ['linear'], ['zoom'], z0, 0, z1, QUIET];
 
 // Background (OpenFreeMap) layers: [layer, basemaps that show it]
 const baseLayers = (Z) => [
@@ -74,7 +77,7 @@ const baseLayers = (Z) => [
           12, ['match', ['get', 'class'], 'motorway', 3, 2.2],
           16, ['match', ['get', 'class'], 'motorway', 14, 12]],
         // State level: interstates/Turnpike/Parkway only; the rest fade in at region level.
-        'line-opacity': ['interpolate', ['linear'], ['zoom'], Z.region - 0.6, ['match', ['get', 'class'], 'motorway', 1, 0], Z.region, 1],
+        'line-opacity': ['interpolate', ['linear'], ['zoom'], Z.region - 0.6, ['*', ['match', ['get', 'class'], 'motorway', 1, 0], QUIET], Z.region, QUIET],
       },
     },
     'streets light',
@@ -88,12 +91,12 @@ const baseLayers = (Z) => [
       'source-layer': 'transportation_name',
       minzoom: 6,
       filter: HWYS.length
-        ? ['all', ['==', ['get', 'class'], 'motorway'], ['any', ...HWYS.map((h) => ['>=', ['index-of', h.match, ['coalesce', ['get', 'ref'], '']], 0])]]
+        ? ['all', ['==', ['get', 'class'], 'motorway'], ['in', LABEL_EXPR, ['literal', HWYS.map((h) => h.label)]]]
         : ['==', ['get', 'ref'], '__none__'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
         'line-color': HWYS.length
-          ? ['case', ...HWYS.flatMap((h) => [['>=', ['index-of', h.match, ['coalesce', ['get', 'ref'], '']], 0], h.color]), T.road.motorway]
+          ? ['match', LABEL_EXPR, ...HWYS.flatMap((h) => [h.label, h.color]), T.road.motorway]
           : T.road.motorway,
         'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], 6, 1.4, 9, 2.4, 12, 3.6, 16, 14],
       },
@@ -127,38 +130,6 @@ const baseLayers = (Z) => [
   ],
 ];
 
-// Route numbers on the map, said the way people say them (same rules as
-// roads.js normRef): "I 80" -> "I-80", "US 46" / "NJ 23" -> "Route 46" /
-// "Route 23", "US 1;US 9" -> "Route 1&9", NJTP -> Turnpike, GSP -> Parkway,
-// "CR 510" -> its street name.
-const routeWord = (v) => [
-  'case',
-  ['==', ['slice', v, 0, 2], 'I '], ['concat', 'I-', ['slice', v, 2]],
-  ['in', ['slice', v, 0, 3], ['literal', ['US ', 'NJ ', 'NY ']]], ['concat', 'Route ', ['slice', v, 3]],
-  // county routes go by their street name ("Columbia Turnpike", not "CR 510")
-  ['all', ['==', ['slice', v, 0, 3], 'CR '], ['has', 'name']], ['get', 'name'],
-  v,
-];
-const REF_LABEL = [
-  'let', 'r', ['get', 'ref'],
-  ['let', 'i', ['index-of', ';', ['var', 'r']],
-    ['case',
-      ['>=', ['index-of', 'NJTP', ['var', 'r']], 0], 'Turnpike',
-      ['==', ['var', 'r'], 'GSP'], 'Parkway',
-      ['==', ['var', 'r'], 'ACE'], 'AC Expressway',
-      ['==', ['var', 'r'], 'PIP'], 'Palisades Pkwy',
-      ['<', ['var', 'i'], 0], routeWord(['var', 'r']),
-      // two routes on one road: "Route 1&9"
-      ['let', 'a', ['slice', ['var', 'r'], 0, ['var', 'i']], 'b', ['slice', ['var', 'r'], ['+', ['var', 'i'], 1]],
-        ['case',
-          ['all',
-            ['in', ['slice', ['var', 'a'], 0, 3], ['literal', ['US ', 'NJ ', 'NY ']]],
-            ['in', ['slice', ['var', 'b'], 0, 3], ['literal', ['US ', 'NJ ', 'NY ']]],
-            ['<', ['index-of', ';', ['var', 'b']], 0]],
-          ['concat', 'Route ', ['slice', ['var', 'a'], 3], '&', ['slice', ['var', 'b'], 3]],
-          routeWord(['var', 'a'])]]]],
-];
-
 const refLayer = (id, classes, minzoom) => ({
   id,
   type: 'symbol',
@@ -169,7 +140,7 @@ const refLayer = (id, classes, minzoom) => ({
   layout: {
     'symbol-placement': 'line',
     'symbol-spacing': 350,
-    'text-field': REF_LABEL,
+    'text-field': LABEL_EXPR,
     'text-font': ['Noto Sans Medium'],
     'text-size': 11,
     'text-rotation-alignment': 'viewport',
@@ -523,6 +494,20 @@ export function buildStyle({ base, basemap, data, sectionNames, Z, majorSize, gr
         paint: { 'text-color': T.anchor, 'text-halo-color': '#ffffff', 'text-halo-width': 2 },
       },
       {
+        // A dot on each key place, so even a tiny town (Harrison) is easy to
+        // find; its name sits beside the dot, not on top of the town.
+        id: 'reveal-dot',
+        type: 'circle',
+        source: 'reveal',
+        filter: ['<', ['get', 'prio'], 3],
+        paint: {
+          'circle-radius': 5.5,
+          'circle-color': ['coalesce', ['get', 'color'], T.ink],
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 2,
+        },
+      },
+      {
         // Labels revealed by a question. Minor ones (other neighbors) only
         // where there's room; the key ones (question, right, wrong) are placed
         // first and slide to a free side instead of stacking on each other.
@@ -552,8 +537,8 @@ export function buildStyle({ base, basemap, data, sectionNames, Z, majorSize, gr
           'text-size': 16,
           'text-max-width': 9,
           'symbol-sort-key': ['get', 'prio'],
-          'text-variable-anchor': ['center', 'top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right'],
-          'text-radial-offset': 0.5,
+          'text-variable-anchor': ['left', 'right', 'top', 'bottom', 'top-left', 'top-right', 'bottom-left', 'bottom-right'],
+          'text-radial-offset': 0.75,
           'text-padding': 2,
         },
         paint: { 'text-color': ['coalesce', ['get', 'color'], T.ink], 'text-halo-color': '#ffffff', 'text-halo-width': 2.2 },

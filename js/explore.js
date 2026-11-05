@@ -1,5 +1,5 @@
 import { bearing, compass8, ARROWS } from './geo.js';
-import { roadsInTown, roadsFrom, draftNote, countyNum, byName } from './roads.js';
+import { roadsInTown, roadsFrom, draftNote, countyNum } from './roads.js';
 import { editNote } from './notes.js';
 
 let L; // label colors of the active theme (set in initExplore)
@@ -395,7 +395,7 @@ export function initExplore(ctx) {
       b.addEventListener('click', () => {
         roadSel = roadSel === b.dataset.road ? null : b.dataset.road;
         const r = roadSel && roadsInTown(map, sel, ctx.locate).find((x) => x.label === roadSel);
-        ctx.focusRoad(r ? r.raw : null, r && ctx.hwy(r.label) ? ctx.hwy(r.label).color : null, byName(r));
+        ctx.focusRoad(r ? r.label : null, r && ctx.hwy(r.label) ? ctx.hwy(r.label).color : null);
         render();
       });
     for (const b of hud.querySelectorAll('.addnote'))
