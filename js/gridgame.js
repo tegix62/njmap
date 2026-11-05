@@ -263,7 +263,10 @@ export function initGridGame(ctx) {
   let g = null;
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const rand = (a) => a[Math.floor(Math.random() * a.length)];
-  const prefs = { pace: 'easy', arrows: false, ...ctx.store.get('gridPrefs', {}) };
+  // mapFirst: show the whole grid before driving. Off by default: working out
+  // where the address is from the street and avenue alone is the harder,
+  // more useful skill (it's all you have in a real car).
+  const prefs = { pace: 'easy', arrows: false, mapFirst: false, ...ctx.store.get('gridPrefs', {}) };
   const savePrefs = () => ctx.store.set('gridPrefs', prefs);
 
   // ---- picture ------------------------------------------------------------
@@ -547,7 +550,7 @@ export function initGridGame(ctx) {
     else arrowsG.replaceChildren();
     beginBlock();
     // a quick look at the whole grid first, then zoom in (skipped with reduced motion)
-    g.view = ctx.dur(1) ? 'intro' : 'follow';
+    g.view = prefs.mapFirst && ctx.dur(1) ? 'intro' : 'follow';
     g.introUntil = null; // set on the first frame drawn, so a slow page load doesn't eat the intro
     g.camNow = null;
     render();
@@ -846,6 +849,7 @@ export function initGridGame(ctx) {
         <div class="ggopts">
           <select id="ggPace" aria-label="Speed">${Object.keys(PACE).map((p) => `<option value="${p}"${prefs.pace === p ? ' selected' : ''}>${p[0].toUpperCase() + p.slice(1)}</option>`).join('')}</select>
           <label><input type="checkbox" id="ggArrows"${prefs.arrows ? ' checked' : ''}/> One-way arrows</label>
+          <label><input type="checkbox" id="ggMapFirst"${prefs.mapFirst ? ' checked' : ''}/> Map first</label>
           ${g.done ? '' : `<button id="ggPause">${g.paused ? '▶ Go' : '⏸ Pause'}</button>`}
         </div>
       </div>`
@@ -856,6 +860,10 @@ export function initGridGame(ctx) {
     document.getElementById('ggAgain')?.addEventListener('click', () => start(g.opts));
     document.getElementById('ggPace').addEventListener('change', (e) => {
       prefs.pace = e.target.value;
+      savePrefs();
+    });
+    document.getElementById('ggMapFirst').addEventListener('change', (e) => {
+      prefs.mapFirst = e.target.checked;
       savePrefs();
     });
     document.getElementById('ggArrows').addEventListener('change', (e) => {
