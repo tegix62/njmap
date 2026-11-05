@@ -38,9 +38,12 @@ ANG = math.radians(29)
 UP = (math.sin(ANG), math.cos(ANG))
 EAST = (math.cos(ANG), -math.sin(ANG))
 
-# must match js/gridgame.js AVES order
-AVES = ['11th Ave', '10th Ave', '9th Ave', '8th Ave', '7th Ave', '6th Ave', '5th Ave', 'Madison Ave', 'Park Ave', 'Lexington Ave', '3rd Ave', '2nd Ave', '1st Ave']
-FROM = {'Madison Ave': 23, 'Lexington Ave': 21}
+# must match js/gridgame.js AVES order. The West Side Highway (Route 9A: 12th
+# Ave in Midtown, 11th Ave / West St further south) is the edge road: two-way
+# all along; a street reaches it if the street continues west of 11th Ave.
+WSH = 'West Side Hwy'
+AVES = [WSH, '11th Ave', '10th Ave', '9th Ave', '8th Ave', '7th Ave', '6th Ave', '5th Ave', 'Madison Ave', 'Park Ave', 'Lexington Ave', '3rd Ave', '2nd Ave', '1st Ave']
+FROM = {'Madison Ave': 23, 'Lexington Ave': 21, 'West Side Hwy': 24}
 NAMES = {
     '11th Ave': {'11th Avenue'}, '10th Ave': {'10th Avenue'}, '9th Ave': {'9th Avenue'}, '8th Ave': {'8th Avenue'},
     '7th Ave': {'7th Avenue'}, '6th Ave': {'Avenue of the Americas', '6th Avenue'}, '5th Ave': {'5th Avenue'},
@@ -92,7 +95,7 @@ def crossing(s, a):
     return best[1] if best and best[0] < 30 else None
 
 S = range(14, 58)
-real = {(s, a): crossing(s, a) for s in S for a in AVES}
+real = {(s, a): crossing(s, a) for s in S for a in AVES if a != WSH}
 def pos(s, a):
     """Where street s meets avenue a: the real crossing, or interpolated along the avenue."""
     if real[(s, a)]:
@@ -143,7 +146,22 @@ exists = lambda a, s: s >= FROM.get(a, 14)
 st_out, av_out, cross_out = {}, {}, {}
 for s in S:
     row = []
+    # the stub of street s west of 11th Ave, toward the highway
+    p = pos(s, '11th Ave')
+    stub = None
+    if p:
+        acc = set()
+        for dist in (45, 75):
+            r = dirs(streets.get(s, []), (p[0] - EAST[0] * dist, p[1] - EAST[1] * dist), EAST)
+            if r is None:
+                acc = None
+                break
+            acc |= r
+        stub = None if not acc else 'two' if acc == {1, -1} else 'E' if acc == {1} else 'W'
     for i, a in enumerate(AVES):
+        if a == WSH:
+            row.append(stub)
+            continue
         if not exists(a, s):
             row.append(None)
             continue
@@ -154,8 +172,12 @@ for s in S:
         p, q = pos(s, a), pos(s, AVES[j])
         row.append(block(streets.get(s, []), p, q, EAST, {1: 'E', -1: 'W'}) if p and q else None)
     st_out[s] = row
-    cross_out[s] = [1 if real[(s, a)] else 0 for a in AVES]
+    cross_out[s] = [(1 if row[0] else 0) if a == WSH else 1 if real[(s, a)] else 0 for a in AVES]
 for a in AVES:
+    if a == WSH:
+        # below 24th St, 11th Ave itself is the riverside highway
+        av_out[a] = [None] * 10 + ['two'] * 33
+        continue
     col = []
     for s in range(14, 57):
         if not exists(a, s):
@@ -177,7 +199,7 @@ export const GRID_DATA = {json.dumps({'streets': st_out, 'aves': av_out, 'crosse
 open(out_js, 'w').write(js)
 
 TWO = {14, 23, 34, 42, 57}
-RULE_AVE = {'11th Ave': 'two', '10th Ave': 'U', '9th Ave': 'D', '8th Ave': 'U', '7th Ave': 'D', '6th Ave': 'U', '5th Ave': 'D',
+RULE_AVE = {WSH: 'two', '11th Ave': 'two', '10th Ave': 'U', '9th Ave': 'D', '8th Ave': 'U', '7th Ave': 'D', '6th Ave': 'U', '5th Ave': 'D',
             'Madison Ave': 'U', 'Park Ave': 'two', 'Lexington Ave': 'D', '3rd Ave': 'U', '2nd Ave': 'D', '1st Ave': 'U'}
 lines = [f'source: {src_note}']
 for s in S:

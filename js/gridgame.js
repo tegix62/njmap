@@ -20,6 +20,8 @@ const TWO_WAY_STREETS = new Set([14, 23, 34, 42, 57]);
 
 // West to east; x in feet from 5th Ave (long blocks on the West Side, short on the East)
 const AVES = [
+  // Route 9A along the Hudson: 12th Ave in Midtown; below 24th St, 11th Ave is the riverside road
+  { name: 'West Side Hwy', x: -5700, dir: 'two', from: 24, short: 'W Side Hwy' },
   { name: '11th Ave', x: -4960, dir: 'two' },
   { name: '10th Ave', x: -4160, dir: 'up' },
   { name: '9th Ave', x: -3360, dir: 'down' },
@@ -123,6 +125,12 @@ const streetRuleText = (s) => (s % 2 ? 'odd streets usually go west' : 'even str
  * can't (wrong way, dead end, blocked).
  */
 function step(ai, s, d, turning) {
+  const r = rawStep(ai, s, d, turning);
+  if (r.why || !TRAPS.has(`${r.ai}:${r.s}:${d}`)) return r;
+  return { why: `${d === 'U' || d === 'D' ? aveName(ai, s) : streetName(s)} leads into a dead end that way: there's no legal way on from ${aveName(r.ai, r.s)} & ${ord(r.s)}${r.s === S_MAX || r.s === S_MIN || r.ai === 0 || r.ai === AVES.length - 1 ? ' inside the practice area' : ''}.`, edge: true };
+}
+
+function rawStep(ai, s, d, turning) {
   if (turning && NO_TURN.has(key(ai, s))) return { why: 'No turns here: Park Ave runs on the viaduct around Grand Central.' };
   if (d === 'U' || d === 'D') {
     const s2 = s + (d === 'U' ? 1 : -1);
@@ -168,6 +176,35 @@ function step(ai, s, d, turning) {
   if (real !== rule) r.note = `Heads up: ${streetName(s)} runs ${real === 'two' ? 'both ways' : WORD[real]} ${where}, an exception (${rule === 'two' ? 'it runs both ways elsewhere' : streetRuleText(s)}).`;
   return r;
 }
+
+/**
+ * Corners you could arrive at (heading a given way) with no legal way on:
+ * straight, left and right all refused. Found once, repeatedly until nothing
+ * changes (blocking one can trap another); step() refuses moves into them.
+ */
+const TRAPS = new Set();
+(function findTraps() {
+  const L = { U: 'W', W: 'D', D: 'E', E: 'U' }, R = { U: 'E', E: 'D', D: 'W', W: 'U' };
+  const ok = (ai, s, d, t) => {
+    const r = rawStep(ai, s, d, t);
+    return !r.why && !TRAPS.has(`${r.ai}:${r.s}:${d}`);
+  };
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (let ai = 0; ai < AVES.length; ai++)
+      for (let s = S_MIN; s <= S_MAX; s++) {
+        if (!exists(ai, s)) continue;
+        for (const d of ['U', 'D', 'E', 'W']) {
+          const k = `${ai}:${s}:${d}`;
+          if (TRAPS.has(k)) continue;
+          if (!ok(ai, s, d, false) && !ok(ai, s, L[d], true) && !ok(ai, s, R[d], true)) {
+            TRAPS.add(k);
+            changed = true;
+          }
+        }
+      }
+  }
+})();
 
 /** Shortest legal route from a moving car (no U-turns). Returns [{ai,s,d}] states. */
 function shortest(start, target) {
@@ -366,7 +403,7 @@ export function initGridGame(ctx) {
       const x = tx + X(ai) * k;
       if (x < 16 || x > W - 16) continue;
       const s = Math.round(-((top + 40 - ty) / k) / FT_PER_STREET);
-      lab.push(el('text', { x, y: top + 12, class: `gg-ave ${AVES[ai].dir}` }, aveName(ai, Math.min(S_MAX, Math.max(S_MIN, s))).replace(' Ave', '')));
+      lab.push(el('text', { x, y: top + 12, class: `gg-ave ${AVES[ai].dir}` }, (AVES[ai].short || aveName(ai, Math.min(S_MAX, Math.max(S_MIN, s))).replace(' Ave', ''))));
     }
     for (let s = S_MIN; s <= S_MAX; s++) {
       const y = ty + Y(s) * k;
