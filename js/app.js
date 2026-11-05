@@ -75,8 +75,16 @@ async function main() {
       pt: labelsFC.features[i].geometry.coordinates,
     };
   });
+  // A town entirely inside another ("doughnut" towns: Sussex in Wantage,
+  // Freehold Boro in Freehold Twp): one neighbor, and every edge of its
+  // outline shared with it (so not a shore or river town with one neighbor).
+  const flatArcs = (a) => (Array.isArray(a) ? a.flatMap(flatArcs) : [a < 0 ? ~a : a]);
+  const geoms = topo.objects.munis.geometries;
+  const arcUse = new Map();
+  for (const g of geoms) for (const a of new Set(flatArcs(g.arcs))) arcUse.set(a, (arcUse.get(a) || 0) + 1);
   munis.forEach((m, i) => {
     m.neighbors = nbIdx[i].map((j) => munis[j]);
+    m.enclosedBy = m.neighbors.length === 1 && flatArcs(geoms[i].arcs).every((a) => arcUse.get(a) > 1) ? m.neighbors[0] : null;
     // Villages / sections inside this municipality: [{name, known}], well-known first
     m.sections = (sectionsByKey[m.key] || []).map(([name, known, cands]) => ({ name, known: !!known, cands: cands || [] }));
   });

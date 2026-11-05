@@ -326,10 +326,19 @@ export function initExplore(ctx) {
         ['alikes', 'Sound-alikes', Math.max(0, nAlikes)],
       ].filter(([k, , n]) => k === 'roads' || k === 'notes' || n > 0);
       if (tab && !tabs.some(([k]) => k === tab)) tab = null;
+      const enclosure = (t) => {
+        const inside = ctx.munis.filter((o) => o.enclosedBy === t);
+        return t.enclosedBy
+          ? `<div class="hint">Entirely surrounded by <button class="linkbtn" data-id="${t.enclosedBy.id}">${esc(ctx.name(t.enclosedBy))}</button></div>`
+          : inside.length
+            ? `<div class="hint">Surrounds ${inside.map((o) => `<button class="linkbtn" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join(', ')}</div>`
+            : '';
+      };
       ctx.hud(
         `${search}
          <div class="titlerow"><div class="town">${esc(m.n)}</div>${starBtn(m)}</div>
          <div class="meta">${esc(m.t)} · <b>${esc(ctx.groupName(m.c))}</b>${from}</div>
+         ${enclosure(m)}
          <div class="dtabs">${tabs
            .map(([k, label, n]) => `<button data-tab="${k}" aria-pressed="${tab === k}">${label}${n ? `<span class="n">${n}</span>` : ''}</button>`)
            .join('')}</div>

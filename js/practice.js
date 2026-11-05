@@ -1067,15 +1067,28 @@ export function initPractice(ctx) {
       // Show the whole ring of neighbors so the answer sits in context.
       for (const o of m.neighbors) ctx.highlight(o.id, 'near');
       ctx.highlight(q.right.id, 'good');
-      const items = [{ m, color: L.q }, ...m.neighbors.map((o) => ({ m: o, color: o === q.right ? L.good : L.neutral }))];
+      const items = [{ m, color: L.q }, ...m.neighbors.map((o) => ({ m: o, color: o === q.right ? L.good : L.neutral, key: o !== q.right && m.neighbors.length <= 4 }))];
+      // (with only a few neighbors, each gets a dot and a full-size name, so
+      // a real neighbor never looks smaller than the wrong pick)
       const side = compass8(bearing(m.pt, q.right.pt));
       let html = `${ok ? '✓' : '✗'} <b>${esc(q.right.n)}</b> borders ${esc(m.n)} (${side}).`;
       if (!ok) {
         ctx.highlight(pickd.id, 'bad');
         items.push({ m: pickd, color: L.bad });
-        html += ` ${esc(pickd.n)} doesn't; it's ${ctx.relative(m.pt, pickd.pt).text} of ${esc(m.n)}.`;
+        // A town entirely inside another (Sussex inside Wantage) looks, at this
+        // zoom, like the bigger town around it: say so.
+        const host = pickd.enclosedBy;
+        if (host)
+          html += ` ${esc(pickd.n)} doesn't: it's a small ${esc(pickd.t.toLowerCase())} entirely surrounded by <b>${esc(host.n)}</b>${
+            host === m ? '' : m.neighbors.includes(host) ? `, and it's ${esc(host.n)} that borders ${esc(m.n)}` : `, ${ctx.relative(m.pt, pickd.pt).text} of ${esc(m.n)}`
+          }.`;
+        else html += ` ${esc(pickd.n)} doesn't; it's ${ctx.relative(m.pt, pickd.pt).text} of ${esc(m.n)}.`;
       }
-      html += ` <span class="muted">All ${m.neighbors.length} neighbors are shaded on the map.</span>`;
+      const ring = m.neighbors.map((o) => ctx.name(o));
+      html +=
+        ring.length <= 8
+          ? ` <span class="muted">${esc(m.n)}'s neighbors: ${esc(ring.join(', '))}.</span>`
+          : ` <span class="muted">All ${ring.length} neighbors are shaded on the map.</span>`;
       ctx.reveal(items);
       feedback(ok, html);
       ctx.fit([m, ...m.neighbors, pickd], 13);
