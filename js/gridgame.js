@@ -240,7 +240,7 @@ export function initGridGame(ctx) {
   // world coordinates: x feet east of 5th Ave, y feet *down* (uptown is up)
   const X = (ai) => AVES[ai].x;
   const Y = (s) => -s * FT_PER_STREET;
-  let wrap, svg, world, labelsG, arrowsG, pathEl, bestEl, car, flag, flagLabel, northEl, offscreen;
+  let wrap, svg, world, labelsG, arrowsG, pathEl, bestEl, car, flag, flagLabel, northEl, offscreen, gotoEl;
 
   function buildPicture() {
     wrap = document.createElement('div');
@@ -281,7 +281,10 @@ export function initGridGame(ctx) {
     car.append(el('path', { d: 'M0 -95 L62 70 L0 38 L-62 70 Z' }));
     car.append(el('circle', { class: 'blink L', cx: -70, cy: -40, r: 26 }));
     car.append(el('circle', { class: 'blink R', cx: 70, cy: -40, r: 26 }));
-    world.append(parksG, roads, arrowsG, bestEl, pathEl, flag, flagLabel, car);
+    gotoEl = el('circle', { r: 85, class: 'gg-goto' });
+    gotoEl.style.display = 'none';
+    world.append(parksG, roads, arrowsG, bestEl, pathEl, flag, flagLabel, gotoEl, car);
+    bindPointer();
     labelsG = el('g', { class: 'gg-labels' });
     northEl = el('g', { class: 'gg-north' });
     northEl.append(el('circle', { r: 19 }), el('path', { d: 'M0 -14 L6 6 L0 2 L-6 6 Z' }), el('text', { y: 17 }, 'N'));
@@ -355,6 +358,7 @@ export function initGridGame(ctx) {
     const cy = pad.top + (H - pad.top - pad.bottom) * 0.55;
     const tx = cx - g.pos.x * k, ty = cy - g.pos.y * k;
     world.setAttribute('transform', `translate(${tx} ${ty}) scale(${k})`);
+    g.cam = { tx, ty, k };
     // sticky labels: avenue names along the top of the open area, street numbers on the left
     const top = pad.top + 4, left = 4, bottom = H - pad.bottom;
     const lab = [];
@@ -449,6 +453,7 @@ export function initGridGame(ctx) {
     flagLabel.textContent = target.name || `${aveName(target.ai, target.s).replace(' Ave', '')} & ${ord(target.s)}`;
     bestEl.setAttribute('points', '');
     pathEl.setAttribute('points', '');
+    gotoEl.style.display = 'none';
     if (prefs.arrows) drawArrows();
     else arrowsG.replaceChildren();
     beginBlock();
@@ -488,13 +493,101 @@ export function initGridGame(ctx) {
   }
 
   const blockSeconds = (len) => (0.55 + len / 550) * PACE[prefs.pace];
+  const GOTO_SPEED = 0.18; // fraction of the normal block time when heading to a tapped corner
+  const HOLD_SPEED = 0.25; // … and while the map is held down
+
+  // ---- tap a corner ahead to drive straight there; hold the map to speed up ----
+  function bindPointer() {
+    let down = null;
+    let holdTimer = 0;
+    wrap.addEventListener('pointerdown', (e) => {
+      if (!g || g.done) return;
+      down = { x: e.clientX, y: e.clientY, moved: false };
+      clearTimeout(holdTimer);
+      holdTimer = setTimeout(() => {
+        if (down && g && !g.done) {
+          g.boost = true;
+          wrap.classList.add('boost');
+        }
+      }, 260);
+    });
+    wrap.addEventListener('pointermove', (e) => {
+      if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 14) down.moved = true;
+    });
+    const up = (e, cancel) => {
+      clearTimeout(holdTimer);
+      const wasBoost = g && g.boost;
+      if (g) g.boost = false;
+      wrap.classList.remove('boost');
+      if (!cancel && down && !down.moved && !wasBoost && g && !g.done && !g.paused) tapAt(e.clientX, e.clientY);
+      down = null;
+    };
+    wrap.addEventListener('pointerup', (e) => up(e, false));
+    wrap.addEventListener('pointercancel', (e) => up(e, true));
+  }
+
+  /** The corner on your road nearest a tap, if it's ahead of you: drive straight there and stop. */
+  function tapAt(sx, sy) {
+    if (!g.cam) return;
+    const { tx, ty, k } = g.cam;
+    const wx = (sx - tx) / k, wy = (sy - ty) / k;
+    const d = g.cur.d;
+    // the first corner you could still stop at: the one you're driving to, or the one you're at
+    const base = g.next && !g.waiting ? { ai: g.next.ai, s: g.next.s } : { ai: g.cur.ai, s: g.cur.s };
+    let want;
+    if (d === 'U' || d === 'D') {
+      const sw = Math.round(-wy / FT_PER_STREET);
+      if (d === 'U' ? sw < base.s : sw > base.s) return note('Tap a corner ahead of you on this road.');
+      want = { ai: base.ai, s: Math.max(S_MIN, Math.min(S_MAX, sw)) };
+    } else {
+      let best = -1;
+      for (let ai = 0; ai < AVES.length; ai++) if (exists(ai, base.s) && (best < 0 || Math.abs(X(ai) - wx) < Math.abs(X(best) - wx))) best = ai;
+      if (d === 'E' ? best < base.ai : best > base.ai) return note('Tap a corner ahead of you on this road.');
+      want = { ai: best, s: base.s };
+    }
+    // follow the road straight from base; stop early if it doesn't go through
+    let at = { ...base };
+    let why = null;
+    while (at.ai !== want.ai || at.s !== want.s) {
+      const r = step(at.ai, at.s, d, false);
+      if (r.why) {
+        why = r.why;
+        break;
+      }
+      at = { ai: r.ai, s: r.s };
+    }
+    g.goTo = at;
+    g.queued = null;
+    g.msg = why ? `The road stops before there: ${why}` : '';
+    g.msgAt = performance.now();
+    gotoEl.setAttribute('cx', X(at.ai));
+    gotoEl.setAttribute('cy', Y(at.s));
+    gotoEl.style.display = '';
+    if (g.waiting && (at.ai !== g.cur.ai || at.s !== g.cur.s)) beginBlock();
+    else if (g.waiting) stopAtGoTo();
+    render();
+  }
+  function note(text) {
+    g.msg = text;
+    g.msgAt = performance.now();
+    render();
+  }
+  function stopAtGoTo() {
+    g.goTo = null;
+    gotoEl.style.display = 'none';
+    g.waiting = true;
+    g.next = null;
+    const corner = `${aveName(g.cur.ai, g.cur.s)} & ${ord(g.cur.s)}`;
+    g.msg = g.msg || `At ${corner}. Turn left or right, or tap a corner further ahead.`;
+    g.msgAt = performance.now();
+  }
 
   function tick(now) {
     if (!g) return;
     const dt = Math.min(0.1, (now - g.last) / 1000);
     g.last = now;
     if (!g.paused && !g.done && !g.waiting && g.next) {
-      g.t += dt / blockSeconds(g.next.len);
+      g.t += dt / (blockSeconds(g.next.len) * (g.goTo ? GOTO_SPEED : g.boost ? HOLD_SPEED : 1));
       if (g.t >= 1) arrive();
     }
     if (g && g.next && !g.waiting) {
@@ -518,6 +611,11 @@ export function initGridGame(ctx) {
     pathEl.setAttribute('points', g.trail.map((p) => p.join(',')).join(' '));
     g.cur = { ai: n.ai, s: n.s, d: g.cur.d };
     if (n.ai === g.target.ai && n.s === g.target.s) return finish();
+    if (g.goTo && n.ai === g.goTo.ai && n.s === g.goTo.s) {
+      stopAtGoTo();
+      render();
+      return;
+    }
     if (g.auto) {
       // test autopilot: follow the shortest legal route from this corner
       const r = shortest({ ai: n.ai, s: n.s, d: g.cur.d, free: true }, g.target);
@@ -577,6 +675,10 @@ export function initGridGame(ctx) {
       return;
     }
     g.queued = g.queued === side ? null : side;
+    if (g.goTo) {
+      g.goTo = null;
+      gotoEl.style.display = 'none';
+    }
     render();
   }
   function togglePause() {
@@ -630,7 +732,7 @@ export function initGridGame(ctx) {
     ctx.sheet(
       `${g.opts.header()}<div id="qbody">
         ${g.done ? g.result : `<div class="ggctl">${btn('L', '◀ Left')}${btn('R', 'Right ▶')}</div>
-        <div class="ggmsg${g.msg ? '' : ' muted'}">${g.msg ? esc(g.msg) : g.waiting ? 'Stopped at the corner: pick a way.' : 'Tap before the corner to turn there. The car keeps going straight otherwise.'}</div>`}
+        <div class="ggmsg${g.msg ? '' : ' muted'}">${g.msg ? esc(g.msg) : g.waiting ? 'Stopped at the corner: pick a way.' : 'Left/Right turn at the next corner. Tap a corner ahead to zip straight there; hold the map to speed up.'}</div>`}
         <div class="ggopts">
           <select id="ggPace" aria-label="Speed">${Object.keys(PACE).map((p) => `<option value="${p}"${prefs.pace === p ? ' selected' : ''}>${p[0].toUpperCase() + p.slice(1)}</option>`).join('')}</select>
           <label><input type="checkbox" id="ggArrows"${prefs.arrows ? ' checked' : ''}/> One-way arrows</label>
@@ -662,6 +764,11 @@ export function initGridGame(ctx) {
     },
     // for tests
     _model: { step, shortest, describe, AVES, PLACES },
+    _state: () => g,
+    _screen(ai, s) {
+      const { tx, ty, k } = g.cam;
+      return [tx + AVES[ai].x * k, ty + -s * FT_PER_STREET * k];
+    },
     _autopilot() {
       if (g) g.auto = true;
     },

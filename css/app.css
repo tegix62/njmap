@@ -1622,3 +1622,13 @@ body.gridding .maplibregl-ctrl-bottom-right {
   fill: #f3eee3;
   stroke: rgba(31, 27, 22, 0.25);
 }
+#gridgame .gg-goto {
+  fill: none;
+  stroke: #2b4fb3;
+  stroke-width: 22;
+  stroke-dasharray: 40 28;
+}
+#gridgame.boost .gg-car path {
+  fill: #1d3a8a;
+  filter: drop-shadow(0 0 6px rgba(43, 79, 179, 0.6));
+}
