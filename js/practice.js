@@ -399,11 +399,22 @@ export function initPractice(ctx) {
   function makeLeftRight(p) {
     const SIDES = { ahead: [0, 35], right: [55, 125], behind: [145, 180], left: [-125, -55] };
     for (let tries = 0; tries < 200; tries++) {
-      const a = pick(p);
       const heading = 45 * Math.floor(Math.random() * 8);
-      const pool2 = munis.filter((o) => o !== a && distanceMi(a.pt, o.pt) > 2 * SC && distanceMi(a.pt, o.pt) < 14 * SC);
-      if (!pool2.length) continue;
-      const b = R.groupOrder ? pick(pool2) : rand(pool2.filter((o) => o.wellKnown).length ? pool2.filter((o) => o.wellKnown) : pool2);
+      const inRange = (x, o) => o !== x && distanceMi(x.pt, o.pt) > 2 * SC && distanceMi(x.pt, o.pt) < 14 * SC;
+      let a, b;
+      if (forced) {
+        // Today: the question is about the fixed place (b); start from somewhere near it
+        b = forced;
+        const from = munis.filter((o) => inRange(b, o));
+        if (!from.length) continue;
+        a = rand(from.filter((o) => o.wellKnown).length ? from.filter((o) => o.wellKnown) : from);
+      } else {
+        a = pick(p);
+        const pool2 = munis.filter((o) => inRange(a, o));
+        if (!pool2.length) continue;
+        b = R.groupOrder ? pick(pool2) : rand(pool2.filter((o) => o.wellKnown).length ? pool2.filter((o) => o.wellKnown) : pool2);
+      }
+      if (a === b) continue;
       const rel = angleDiff(bearing(a.pt, b.pt), heading);
       const side = Object.keys(SIDES).find((k) => {
         const [lo, hi] = SIDES[k];
