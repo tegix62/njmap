@@ -246,7 +246,30 @@ for s in reversed(order):
     c += 1
 big = Counter(comp).most_common(1)[0][0]
 core = {u for u in range(N) if comp[u] == big}
+# Dead ends: a street that only leads back the way you came (a stub, a
+# driveway the city lists, a road the background map doesn't even show). In
+# the game they only make the car turn around, so drop them, repeatedly, so a
+# chain of stubs goes too.
+und = defaultdict(set)
+for a, b, *_r in edges:
+    if a in core and b in core:
+        und[a].add(b); und[b].add(a)
+pruned = 0
+stack = [u for u in core if len(und[u]) <= 1]
+while stack:
+    u = stack.pop()
+    if u not in core or len(und[u]) > 1:
+        continue
+    core.discard(u)
+    pruned += 1
+    for v in und.pop(u, ()):
+        und[v].discard(u)
+        if v in core and len(und[v]) <= 1:
+            stack.append(v)
+for u in core:
+    out_adj[u] = [v for v in out_adj[u] if v in core or v not in und]
 feeders = reach(core, in_adj) - core  # can drive into the core, but not back: inbound tunnel/bridge lanes and the like
+feeders = {u for u in feeders if comp[u] != big}  # not the dead ends just dropped
 keep = core | feeders
 
 # ---- where you can come in from: the start of each inbound lane ----------------------------
@@ -368,7 +391,7 @@ data = {
     'areas': areas,
 }
 json.dump(data, open(out, 'w'), separators=(',', ':'))
-rep = [data['source'], f'nodes {N}, kept {len(keep)} (core {len(core)}, feeders {len(feeders)}); edges {len(edges)}, kept {len(edge_out)}',
+rep = [data['source'], f'nodes {N}, kept {len(keep)} (core {len(core)}, feeders {len(feeders)}, dead ends dropped {pruned}); edges {len(edges)}, kept {len(edge_out)}',
        f'area lines (grid y, m): {areas}', '', 'ENTRIES:'] + [f"  {e['from']} via {e['via']}" for e in entries]
 rep += ['', 'UNNAMED SOURCES (left out):'] + [f'  {u}: {sorted(set(r))[:3]}' for u, r in unnamed]
 rep += ['', 'PLACES:'] + ['  ' + r for r in place_report]
