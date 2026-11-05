@@ -17,6 +17,7 @@ import { framesStats } from './frames.js';
 
 const DATA_URL = 'data/manhattan-streets.json';
 const CHECK_EVERY_MS = 35000; // a check-in at most this often
+const START_HOLD_MS = 2600; // the car waits this long on the start card (a tap or a turn starts it sooner)
 const GRID = 29; // the grid is turned ~29° clockwise from north
 const ZOOM = 15.7; // driving zoom
 const PACE = { easy: 1, normal: 1.35, fast: 1.9 }; // speed multipliers
@@ -107,13 +108,18 @@ export function initGridGame(ctx) {
       nb[e.from].add(e.to);
       nb[e.to].add(e.from);
     }
+    const RAMP = /entrance|exit|\bramp|\bRp\b|Bridge|Tunnel|Expwy|\bEp\b|\bEn\b|\bEt\b/i;
+    const HWY = /Drive|\bDr\b|\bDrv\b|Hwy|Pkwy|Expwy|FDR/i;
     const label = (n) => {
       const names = [];
       for (const e of [...out[n], ...inn[n]]) if (!names.includes(e.name)) names.push(e.name);
-      return names.slice(0, 2).join(' & ');
+      const streets = names.filter((x) => !RAMP.test(x));
+      return (streets.length >= 2 ? streets : names).slice(0, 2).join(' & ');
     };
+    // an ordinary street corner: no highway or ramp meets here (for random starts and destinations)
+    const plain = (n) => [...out[n], ...inn[n]].every((e) => !RAMP.test(e.name) && !HWY.test(e.name));
     const gy = nodes.map((p) => gridXY(p)[1]);
-    G = { d, nodes, edges, out, inn, nb, feeders, label, gy, places: d.places, entries: d.entries, areas: d.areas };
+    G = { d, nodes, edges, out, inn, nb, feeders, label, plain, gy, places: d.places, entries: d.entries, areas: d.areas };
     // where each entry first reaches a real intersection (for area filtering)
     for (const en of G.entries) {
       let n = en.node;
@@ -345,7 +351,7 @@ export function initGridGame(ctx) {
   }
   function pickRound() {
     const coreNodes = [];
-    for (let n = 0; n < G.nodes.length; n++) if (isCore(n) && G.nb[n].size >= 3 && inArea(n)) coreNodes.push(n);
+    for (let n = 0; n < G.nodes.length; n++) if (isCore(n) && G.nb[n].size >= 3 && G.plain(n) && inArea(n)) coreNodes.push(n);
     const places = G.places.filter((p) => inArea(p.node));
     const entries = G.entries.filter((en) => inArea(en.landsAt));
     const useEntry = entries.length && (prefs.from === 'entries' || (prefs.from === 'both' && Math.random() < 0.5));
@@ -405,7 +411,10 @@ export function initGridGame(ctx) {
       driven: 0, wrong: 0, trail: [G.nodes[r.e0.from]], msg: '', msgAt: 0, lastNote: null,
       last: performance.now(), raf: 0, view: prefs.mapFirst && ctx.dur(1) ? 'intro' : 'follow',
       check: null, lastCheck: performance.now() - CHECK_EVERY_MS / 2, checks: 0, checksRight: 0, resumeAt: 0,
+      startCard: true,
     };
+    g.resumeAt = Infinity; // set on the first frame drawn, so a slow page load doesn't eat the card
+    g.targetHood = hood(G.nodes[r.target.node]);
     const tp = G.nodes[r.target.node];
     setData('gg-target', point(tp, { name: r.target.name || r.target.label }));
     setData('gg-trail', EMPTY);
@@ -413,11 +422,8 @@ export function initGridGame(ctx) {
     setData('gg-goto', EMPTY);
     showArrows();
     carMk.setLngLat(G.nodes[r.e0.from]).addTo(map);
-    if (r.entry) {
-      g.msg = `Coming in from ${r.entry.from}. Follow the road out, then find your way.`;
-      g.msgAt = performance.now() + 6000;
-    }
     enterEdge(g.e);
+    g.msg = '';
     render();
     if (g.view === 'intro') {
       ctx.fit([G.nodes[r.e0.from], tp], 15, { bearing: GRID, duration: 700 });
@@ -468,6 +474,40 @@ export function initGridGame(ctx) {
     }
   }
 
+  // ---- where you are, in words ------------------------------------------------------------
+  /** "Chelsea (Midtown)" for a point, from the neighborhood map. */
+  function hood(p) {
+    const m = ctx.locate(p);
+    return m ? `${m.n}${m.c && m.c !== m.n ? ` (${m.c})` : ''}` : null;
+  }
+  /** The cross street at the end of edge e (the next corner), if it's a real intersection. */
+  function crossAt(e) {
+    const names = [];
+    for (const o of [...G.out[e.to], ...G.inn[e.to]]) if (o.name !== e.name && !names.includes(o.name)) names.push(o.name);
+    return names[0] ? short(names[0]) : null;
+  }
+  /** The next real intersection ahead on this road, and its cross street. */
+  function nextCross(e) {
+    for (const { node, via } of aheadChain(e, 12, 2500)) if (G.nb[node].size >= 3) return crossAt(via);
+    return null;
+  }
+  /** Which way the Hudson (west) is, relative to heading h. */
+  function hudsonSide(h) {
+    const order = ['U', 'E', 'D', 'W'];
+    return ['ahead of you', 'on your right', 'behind you', 'on your left'][(order.indexOf('W') - order.indexOf(h) + 4) % 4];
+  }
+  /** The start card: where you are, which way you face, what's next. */
+  function startCard() {
+    const h = gridDir(g.e.b0);
+    if (g.entry) {
+      const out = hood(G.nodes[g.entry.landsAt]);
+      return `Coming in from <b>${esc(g.entry.from)}</b>.${out ? ` You'll come out in <b>${esc(out)}</b>.` : ''} Follow the road out, then find your way.`;
+    }
+    const here = hood(G.nodes[g.e.from]);
+    const nx = nextCross(g.e);
+    return `You're in <b>${esc(here || 'Manhattan')}</b>, on <b>${esc(short(g.e.name))}</b> heading <b>${WORD[h]}</b>${nx ? `, coming up to <b>${esc(nx)}</b>` : ''}. The Hudson is ${hudsonSide(h)}.`;
+  }
+
   // ---- check-ins: "You're heading downtown. Which side is the Hudson?" ----------------------
   function maybeCheckIn(now) {
     if (!prefs.checkins || g.auto || g.check || g.done || g.waiting || g.home || g.goTo != null || g.queued || g.paused || g.view !== 'follow') return;
@@ -514,7 +554,14 @@ export function initGridGame(ctx) {
     if (!g || g.loading) return;
     const dt = Math.min(0.1, (now - g.last) / 1000);
     g.last = now;
-    if (!g.paused && !g.done && !g.waiting && g.view !== 'intro' && !g.check && now >= g.resumeAt) {
+    if (g.startCard && g.resumeAt === Infinity && g.view !== 'intro') g.resumeAt = now + START_HOLD_MS;
+    // the card stays up for real screen time: count frames drawn too (a busy page stalls them)
+    if (g.startCard) g.cardFrames = (g.cardFrames || 0) + 1;
+    if (g.startCard && now >= g.resumeAt && g.cardFrames >= 40 && g.view !== 'intro') {
+      g.startCard = false;
+      render();
+    }
+    if (!g.paused && !g.done && !g.waiting && g.view !== 'intro' && !g.check && !g.startCard && now >= g.resumeAt) {
       g.s += dt * speedNow();
       let guard = 0;
       while (g && !g.done && !g.waiting && g.s >= g.e.len && guard++ < 50) {
@@ -595,6 +642,7 @@ export function initGridGame(ctx) {
     g.s = 0;
     g.waiting = false;
     enterEdge(nx);
+    render(); // the street, neighborhood and next cross street follow you
   }
   function stopHere(msg) {
     g.waiting = true;
@@ -628,9 +676,18 @@ export function initGridGame(ctx) {
     g.msg = `⛔ ${why || `No ${side === 'L' ? 'left' : 'right'} turn here: there's no road that way.`}`;
     g.msgAt = performance.now();
   }
+  function go0() {
+    // leave the start card now
+    if (g.startCard) {
+      g.startCard = false;
+      g.resumeAt = 0;
+      render();
+    }
+  }
   function press(side) {
     if (!g || g.done || g.loading) return;
     if (g.check) return answerCheck(side);
+    go0();
     if (g.waiting) {
       const c = choices(g.e);
       const nx = side === 'L' ? c.left : c.right;
@@ -674,6 +731,10 @@ export function initGridGame(ctx) {
     if (!active()) return;
     if (g.view === 'intro') {
       g.view = 'follow';
+      return;
+    }
+    if (g.startCard) {
+      go0();
       return;
     }
     down = { x: e.clientX, y: e.clientY, moved: false };
@@ -807,8 +868,11 @@ export function initGridGame(ctx) {
       return;
     }
     const t = g.target;
-    const tgt = t.name ? `<b>${esc(t.name)}</b> <span class="muted">(${esc(t.label)})</span>` : `<b>${esc(t.label)}</b>`;
-    const where = `On <b>${esc(short(g.e.name))}</b> heading <b>${WORD[gridDir(g.e.b0)]}</b>`;
+    const th = g.targetHood ? ` · ${esc(g.targetHood)}` : '';
+    const tgt = t.name ? `<b>${esc(t.name)}</b> <span class="muted">(${esc(t.label)}${th})</span>` : `<b>${esc(t.label)}</b>${th ? ` <span class="muted">${th.slice(3)}</span>` : ''}`;
+    const inHood = g.pos && isCore(g.e.from) ? hood(g.pos) : null;
+    const nx = !g.done && isCore(g.e.from) ? nextCross(g.e) : null;
+    const where = `${inHood ? `In ${esc(inHood.replace(/ \(.*\)$/, ''))} · on` : 'On'} <b>${esc(short(g.e.name))}</b> heading <b>${WORD[gridDir(g.e.b0)]}</b>${nx ? ` · next: <b>${esc(nx)}</b>` : ''}`;
     ctx.hud(
       `<div class="qkind">🚕 Drive Manhattan${g.entry ? ` · from ${esc(g.entry.from)}` : ''}</div><div class="q">Get to ${tgt}</div>
        ${g.done ? '' : `<div class="hint">${where}${g.queued ? ` · turning <b>${g.queued === 'L' ? 'left' : 'right'}</b> at the next corner` : ''} · ${esc(toGo())}</div>`}`
@@ -822,8 +886,10 @@ export function initGridGame(ctx) {
     ctx.sheet(
       `${g.opts.header()}<div id="qbody">
         ${g.done ? g.result : `<div class="ggctl">${btn('L', '◀ Left')}${btn('R', 'Right ▶')}</div>
-        <div class="ggmsg${g.msg || g.check ? '' : ' muted'}">${
-          g.check
+        <div class="ggmsg${g.msg || g.check || g.startCard ? '' : ' muted'}${g.startCard ? ' startcard' : ''}">${
+          g.startCard
+            ? `${startCard()} <span class="muted">Starting… tap to go now.</span>`
+            : g.check
             ? `<b>Check-in:</b> you're heading <b>${WORD[g.check.h]}</b>. Which side is <b>${esc(g.check.thing)}</b>?`
             : g.msg
               ? esc(g.msg)
