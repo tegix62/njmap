@@ -500,6 +500,9 @@ export function initGridGame(ctx) {
   function bindPointer() {
     let down = null;
     let holdTimer = 0;
+    // no text selection, magnifier or context menu on a long press
+    for (const ev of ['contextmenu', 'selectstart']) wrap.addEventListener(ev, (e) => e.preventDefault());
+    wrap.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
     wrap.addEventListener('pointerdown', (e) => {
       if (!g || g.done) return;
       down = { x: e.clientX, y: e.clientY, moved: false };

@@ -1632,3 +1632,11 @@ body.gridding .maplibregl-ctrl-bottom-right {
   fill: #1d3a8a;
   filter: drop-shadow(0 0 6px rgba(43, 79, 179, 0.6));
 }
+/* long-press on the grid means "speed up", not "select text" (iOS) */
+#gridgame,
+#gridgame * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
