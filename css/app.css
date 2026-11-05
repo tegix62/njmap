@@ -1486,7 +1486,8 @@ body.gridding .maplibregl-ctrl-bottom-right {
 #gridgame .gg-path {
   fill: none;
   stroke: #2b4fb3;
-  stroke-width: 40;
+  stroke-width: 6;
+  vector-effect: non-scaling-stroke;
   stroke-linecap: round;
   stroke-linejoin: round;
   opacity: 0.55;
@@ -1494,8 +1495,9 @@ body.gridding .maplibregl-ctrl-bottom-right {
 #gridgame .gg-best {
   fill: none;
   stroke: #15803d;
-  stroke-width: 30;
-  stroke-dasharray: 70 60;
+  stroke-width: 4.5;
+  stroke-dasharray: 9 7;
+  vector-effect: non-scaling-stroke;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -1639,4 +1641,17 @@ body.gridding .maplibregl-ctrl-bottom-right {
   user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+.gg-key {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  vertical-align: middle;
+  border-top: 5px solid #2b4fb3;
+  opacity: 0.7;
+}
+.gg-key.best {
+  border-top: 4px dashed #15803d;
+  opacity: 1;
 }

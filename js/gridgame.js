@@ -277,7 +277,7 @@ export function initGridGame(ctx) {
   // world coordinates: x feet east of 5th Ave, y feet *down* (uptown is up)
   const X = (ai) => AVES[ai].x;
   const Y = (s) => -s * FT_PER_STREET;
-  let wrap, svg, world, labelsG, arrowsG, pathEl, bestEl, car, flag, flagLabel, northEl, offscreen, gotoEl;
+  let wrap, svg, world, labelsG, arrowsG, pathEl, bestEl, car, flag, flagLabel, flagG, northEl, offscreen, gotoEl;
 
   function buildPicture() {
     wrap = document.createElement('div');
@@ -312,15 +312,17 @@ export function initGridGame(ctx) {
     arrowsG = el('g', { class: 'gg-arrows' });
     bestEl = el('polyline', { class: 'gg-best', points: '' });
     pathEl = el('polyline', { class: 'gg-path', points: '' });
+    flagG = el('g');
     flag = el('circle', { r: 70, class: 'gg-flag' });
-    flagLabel = el('text', { class: 'gg-flaglabel' });
+    flagLabel = el('text', { class: 'gg-flaglabel', x: 110, y: 30 });
+    flagG.append(flag, flagLabel);
     car = el('g', { class: 'gg-car' });
     car.append(el('path', { d: 'M0 -95 L62 70 L0 38 L-62 70 Z' }));
     car.append(el('circle', { class: 'blink L', cx: -70, cy: -40, r: 26 }));
     car.append(el('circle', { class: 'blink R', cx: 70, cy: -40, r: 26 }));
     gotoEl = el('circle', { r: 85, class: 'gg-goto' });
     gotoEl.style.display = 'none';
-    world.append(parksG, roads, arrowsG, bestEl, pathEl, flag, flagLabel, gotoEl, car);
+    world.append(parksG, roads, arrowsG, bestEl, pathEl, flagG, gotoEl, car);
     bindPointer();
     labelsG = el('g', { class: 'gg-labels' });
     northEl = el('g', { class: 'gg-north' });
@@ -387,27 +389,80 @@ export function initGridGame(ctx) {
 
   // ---- camera ---------------------------------------------------------------
   const SCALE_PX_PER_FT = () => Math.min(0.2, Math.max(0.12, window.innerWidth / 2600));
+  // Camera. 'intro': the whole grid with you and the destination, then a quick
+  // zoom into your car; 'follow': chase the car; 'end': zoom out to fit your
+  // route and the shortest one.
+  const INTRO_HOLD_MS = 550;
+  const INTRO_ZOOM_MS = 700;
+  const END_ZOOM_MS = 900;
+  const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  function viewGoal(pad, W, H) {
+    const areaH = H - pad.top - pad.bottom;
+    if (g.view === 'follow') return { wx: g.pos.x, wy: g.pos.y, k: SCALE_PX_PER_FT(), fy: 0.55 };
+    // fit a box of the grid into the open area, leaving room for the labels
+    let x0, x1, y0, y1;
+    if (g.view === 'intro') {
+      x0 = X(0); x1 = X(AVES.length - 1); y0 = Y(S_MAX); y1 = Y(S_MIN);
+    } else {
+      const pts = [...g.trail, ...g.best.path.map((p) => [X(p.ai), Y(p.s)])];
+      x0 = Math.min(...pts.map((p) => p[0])); x1 = Math.max(...pts.map((p) => p[0]));
+      y0 = Math.min(...pts.map((p) => p[1])); y1 = Math.max(...pts.map((p) => p[1]));
+    }
+    const k = Math.min((W - 70) / Math.max(800, x1 - x0 + 500), (areaH - 50) / Math.max(800, y1 - y0 + 500));
+    return { wx: (x0 + x1) / 2, wy: (y0 + y1) / 2, k: Math.min(k, SCALE_PX_PER_FT()), fy: 0.53 };
+  }
+  function startFollow() {
+    if (!g || g.view !== 'intro') return;
+    g.view = 'follow';
+    g.trans = g.camNow ? { from: g.camNow, t0: performance.now(), dur: ctx.dur(INTRO_ZOOM_MS) } : null;
+    g.last = performance.now();
+  }
   function camera() {
     const pad = ctx.padding();
     const W = window.innerWidth, H = window.innerHeight;
-    const k = SCALE_PX_PER_FT();
+    const goal = viewGoal(pad, W, H);
+    let cam = goal;
+    if (g.trans) {
+      const p = g.trans.dur ? Math.min(1, (performance.now() - g.trans.t0) / g.trans.dur) : 1;
+      const e = ease(p);
+      const f = g.trans.from;
+      cam = {
+        wx: f.wx + (goal.wx - f.wx) * e,
+        wy: f.wy + (goal.wy - f.wy) * e,
+        k: f.k * Math.pow(goal.k / f.k, e), // zoom evenly
+        fy: f.fy + (goal.fy - f.fy) * e,
+      };
+      if (p >= 1) g.trans = null;
+    }
+    g.camNow = cam;
+    const k = cam.k;
     const cx = W / 2;
-    const cy = pad.top + (H - pad.top - pad.bottom) * 0.55;
-    const tx = cx - g.pos.x * k, ty = cy - g.pos.y * k;
+    const cy = pad.top + (H - pad.top - pad.bottom) * cam.fy;
+    const tx = cx - cam.wx * k, ty = cy - cam.wy * k;
     world.setAttribute('transform', `translate(${tx} ${ty}) scale(${k})`);
     g.cam = { tx, ty, k };
+    // markers keep a readable size when zoomed out
+    g.mScale = Math.max(1, 0.13 / k);
+    flagG.setAttribute('transform', `translate(${g.flagAt[0]} ${g.flagAt[1]}) scale(${g.mScale})`);
     // sticky labels: avenue names along the top of the open area, street numbers on the left
     const top = pad.top + 4, left = 4, bottom = H - pad.bottom;
     const lab = [];
+    let lastRight = -1e9;
     for (let ai = 0; ai < AVES.length; ai++) {
       const x = tx + X(ai) * k;
       if (x < 16 || x > W - 16) continue;
       const s = Math.round(-((top + 40 - ty) / k) / FT_PER_STREET);
-      lab.push(el('text', { x, y: top + 12, class: `gg-ave ${AVES[ai].dir}` }, (AVES[ai].short || aveName(ai, Math.min(S_MAX, Math.max(S_MIN, s))).replace(' Ave', ''))));
+      const text = AVES[ai].short || aveName(ai, Math.min(S_MAX, Math.max(S_MIN, s))).replace(' Ave', '');
+      const half = text.length * 3.4;
+      if (x - half < lastRight + 4) continue; // would overlap the one before
+      lastRight = x + half;
+      lab.push(el('text', { x, y: top + 12, class: `gg-ave ${AVES[ai].dir}` }, text));
     }
+    const every = FT_PER_STREET * k >= 13 ? 1 : FT_PER_STREET * k * 5 >= 13 ? 5 : 10;
     for (let s = S_MIN; s <= S_MAX; s++) {
       const y = ty + Y(s) * k;
       if (y < top + 26 || y > bottom - 6) continue;
+      if (every > 1 && s % every && !(s === S_MIN || s === S_MAX)) continue;
       lab.push(el('text', { x: left, y: y + 4, class: `gg-st${TWO_WAY_STREETS.has(s) ? ' two' : ''}` }, String(s)));
     }
     labelsG.replaceChildren(...lab);
@@ -483,10 +538,7 @@ export function initGridGame(ctx) {
     };
     document.body.classList.add('gridding');
     wrap.hidden = false;
-    flag.setAttribute('cx', X(target.ai));
-    flag.setAttribute('cy', Y(target.s));
-    flagLabel.setAttribute('x', X(target.ai) + 110);
-    flagLabel.setAttribute('y', Y(target.s) + 30);
+    g.flagAt = [X(target.ai), Y(target.s)];
     flagLabel.textContent = target.name || `${aveName(target.ai, target.s).replace(' Ave', '')} & ${ord(target.s)}`;
     bestEl.setAttribute('points', '');
     pathEl.setAttribute('points', '');
@@ -494,6 +546,10 @@ export function initGridGame(ctx) {
     if (prefs.arrows) drawArrows();
     else arrowsG.replaceChildren();
     beginBlock();
+    // a quick look at the whole grid first, then zoom in (skipped with reduced motion)
+    g.view = ctx.dur(1) ? 'intro' : 'follow';
+    g.introUntil = null; // set on the first frame drawn, so a slow page load doesn't eat the intro
+    g.camNow = null;
     render();
     g.raf = requestAnimationFrame(tick);
     window.addEventListener('keydown', onKey);
@@ -542,6 +598,10 @@ export function initGridGame(ctx) {
     wrap.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
     wrap.addEventListener('pointerdown', (e) => {
       if (!g || g.done) return;
+      if (g.view === 'intro') {
+        startFollow();
+        return;
+      }
       down = { x: e.clientX, y: e.clientY, moved: false };
       clearTimeout(holdTimer);
       holdTimer = setTimeout(() => {
@@ -626,7 +686,14 @@ export function initGridGame(ctx) {
     if (!g) return;
     const dt = Math.min(0.1, (now - g.last) / 1000);
     g.last = now;
-    if (!g.paused && !g.done && !g.waiting && g.next) {
+    // the overview stays up for a moment of real screen time: a busy page (still
+    // loading) can stall frames, so count frames drawn as well as time
+    if (g.view === 'intro') {
+      if (g.introUntil == null) g.introUntil = now + INTRO_HOLD_MS;
+      g.introFrames = (g.introFrames || 0) + 1;
+      if (now >= g.introUntil && g.introFrames >= 24) startFollow();
+    }
+    if (g.view !== 'intro' && !g.paused && !g.done && !g.waiting && g.next) {
       g.t += dt / (blockSeconds(g.next.len) * (g.goTo ? GOTO_SPEED : g.boost ? HOLD_SPEED : 1));
       if (g.t >= 1) arrive();
     }
@@ -635,7 +702,7 @@ export function initGridGame(ctx) {
       g.pos = { x: X(g.cur.ai) + (X(g.next.ai) - X(g.cur.ai)) * t, y: Y(g.cur.s) + (Y(g.next.s) - Y(g.cur.s)) * t };
     } else if (g) g.pos = { x: X(g.cur.ai), y: Y(g.cur.s) };
     if (!g) return;
-    car.setAttribute('transform', `translate(${g.pos.x} ${g.pos.y}) rotate(${ROT[g.cur.d]})`);
+    car.setAttribute('transform', `translate(${g.pos.x} ${g.pos.y}) rotate(${ROT[g.cur.d]}) scale(${g.mScale || 1})`);
     car.classList.toggle('sigL', g.queued === 'L');
     car.classList.toggle('sigR', g.queued === 'R');
     camera();
@@ -730,6 +797,9 @@ export function initGridGame(ctx) {
   function finish() {
     g.done = true;
     g.next = null;
+    // zoom out to show the whole drive: yours and the shortest
+    g.view = 'end';
+    g.trans = g.camNow ? { from: g.camNow, t0: performance.now(), dur: ctx.dur(END_ZOOM_MS) } : null;
     const mi = (ft) => (ft / 5280).toFixed(2).replace(/0$/, '');
     bestEl.setAttribute('points', g.best.path.map((p) => `${X(p.ai)},${Y(p.s)}`).join(' '));
     const ratio = g.driven / g.best.cost;
@@ -741,7 +811,7 @@ export function initGridGame(ctx) {
     g.result = `<div class="fb ${ok ? 'ok' : 'no'}">${ok ? '✓' : '•'} You made it: ${mi(g.driven)} mi${
       g.wrong ? `, ${g.wrong} wrong-way ${g.wrong === 1 ? 'try' : 'tries'}` : ''
     }. Shortest legal route: ${mi(g.best.cost)} mi${ratio <= 1.02 ? ' (that was it)' : ''}.</div>
-      <div class="hint">Shortest (green dashes): ${esc(describe(g.best.path))}</div>
+      <div class="hint"><span class="gg-key you"></span> your route · <span class="gg-key best"></span> shortest: ${esc(describe(g.best.path))}</div>
       <button class="primary" id="ggAgain">Another route</button>`;
     render();
   }
