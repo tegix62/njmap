@@ -71,6 +71,7 @@ export function initGridGame(ctx) {
   const fstats = framesStats(ctx.store);
   if (!AREAS[prefs.area]) prefs.area = 'all';
   const savePrefs = () => ctx.store.set('gridPrefs', prefs);
+  const rounds = () => ctx.store.get('gridRuns', { n: 0 }).n; // finished rounds, for first-time help
 
   // ---- the graph -------------------------------------------------------------------
   async function load() {
@@ -185,10 +186,9 @@ export function initGridGame(ctx) {
     const dir = gridDir(d.b1); // the way traffic flows on it
     const r = rule(d.name);
     const nm = short(d.name);
-    if (r && r === dir) return `${nm} runs ${WORD[dir]} only (${ruleText(d.name)}).`;
-    if (r === 'two') return `${nm} runs ${WORD[dir]} only on this block: an exception (it's usually two-way).`;
-    if (r) return `${nm} runs ${WORD[dir]} here: an exception (${ruleText(d.name)}).`;
-    return `${nm} is one-way here: traffic runs ${WORD[dir]}.`;
+    if (r && r === dir) return `${nm} runs ${WORD[dir]} (${ruleText(d.name)})`;
+    if (r) return `${nm} runs ${WORD[dir]} here (exception)`;
+    return `${nm} is one-way ${WORD[dir]}`;
   }
   /** A heads-up when driving onto a block that breaks the rule. */
   function exceptionNote(e) {
@@ -196,9 +196,9 @@ export function initGridGame(ctx) {
     if (!r || r === 'two') return null;
     const dir = gridDir(e.b0);
     const isAve = !!AVENUE_RULE[e.name];
-    if (!e.oneway) return `Heads up: ${short(e.name)} runs both ways here, an exception (${isAve ? `${WORD[r]} elsewhere` : ruleText(e.name)}).`;
+    if (!e.oneway) return `Exception: ${short(e.name)} is two-way here`;
     if (dir !== r && (isAve ? dir === 'U' || dir === 'D' : dir === 'E' || dir === 'W'))
-      return `Heads up: ${short(e.name)} runs ${WORD[dir]} here, an exception (${ruleText(e.name)}).`;
+      return `Exception: ${short(e.name)} runs ${WORD[dir]} here`;
     return null;
   }
 
@@ -470,7 +470,7 @@ export function initGridGame(ctx) {
       g.goTo = null;
       g.queued = null;
       setData('gg-goto', EMPTY);
-      g.msg = `✓ Right road: ${short(e.name)} takes you straight there.`;
+      g.msg = `✓ Right road: straight there`;
       g.msgAt = performance.now();
     }
   }
@@ -502,11 +502,11 @@ export function initGridGame(ctx) {
     const h = gridDir(g.e.b0);
     if (g.entry) {
       const out = hood(G.nodes[g.entry.landsAt]);
-      return `Coming in from <b>${esc(g.entry.from)}</b>.${out ? ` You'll come out in <b>${esc(out)}</b>.` : ''} Follow the road out, then find your way.`;
+      return `From <b>${esc(g.entry.from.replace(/^the /, 'the '))}</b>${out ? ` → out in <b>${esc(out.replace(/ \(.*\)$/, ''))}</b>` : ''}`;
     }
     const here = hood(G.nodes[g.e.from]);
     const nx = nextCross(g.e);
-    return `You're in <b>${esc(here || 'Manhattan')}</b>, on <b>${esc(short(g.e.name))}</b> heading <b>${WORD[h]}</b>${nx ? `, coming up to <b>${esc(nx)}</b>` : ''}. The Hudson is ${hudsonSide(h)}.`;
+    return `<b>${esc((here || 'Manhattan').replace(/ \(.*\)$/, ''))}</b> · ${esc(short(g.e.name))} ${WORD[h]}${nx ? ` → ${esc(nx)}` : ''}<br><span class="muted">Hudson: ${{ 'ahead of you': 'ahead', 'on your right': 'right', 'behind you': 'behind', 'on your left': 'left' }[hudsonSide(h)]} · tap to go</span>`;
   }
 
   // ---- check-ins: "You're heading downtown. Which side is the Hudson?" ----------------------
@@ -536,7 +536,8 @@ export function initGridGame(ctx) {
     g.lastCheck = performance.now();
     g.resumeAt = performance.now() + 900;
     const where = `${c.thing}${c.thing.startsWith('the') ? ` (${WORD[c.dir]})` : ''}`;
-    g.msg = `${ok ? '✓' : '✗'} Heading ${WORD[c.h]}, ${where} is on your ${c.answer === 'L' ? 'left' : 'right'}.`;
+    void where;
+    g.msg = `${ok ? '✓' : '✗'} ${c.thing[0].toUpperCase() + c.thing.slice(1)}: ${c.answer === 'L' ? 'left' : 'right'}`;
     g.msgAt = performance.now();
     render();
   }
@@ -612,7 +613,7 @@ export function initGridGame(ctx) {
         // nothing to decide at this corner: say so and keep going
         g.goTo = null;
         setData('gg-goto', EMPTY);
-        g.msg = `At ${G.label(n)} the only way on is straight ahead, so the car keeps going.`;
+        g.msg = `Only way on is straight: keep going`;
         g.msgAt = performance.now();
         go(onlyWay);
         return;
@@ -625,7 +626,7 @@ export function initGridGame(ctx) {
     if (!c.decision) {
       if (!c.only) return stopHere('Dead end.');
       if (c.uturn) {
-        g.msg = `Dead end: turning around on ${short(e.name)}.`;
+        g.msg = `Dead end: turning around`;
         g.msgAt = performance.now();
       }
       go(c.only);
@@ -647,7 +648,7 @@ export function initGridGame(ctx) {
       render();
       return;
     }
-    stopHere('End of the road this way: turn left or right.');
+    stopHere('Road ends: left or right');
   }
   function go(nx) {
     g.e = nx;
@@ -668,7 +669,7 @@ export function initGridGame(ctx) {
     if (!g.msg) {
       const c0 = choices(g.e);
       const ways = [c0.left && 'left', (c0.straight || (!c0.decision && c0.only)) && 'straight', c0.right && 'right'].filter(Boolean);
-      g.msg = `At ${G.label(g.e.to)}. You can go ${ways.join(' or ') || 'nowhere'} from here.`;
+      g.msg = `${G.label(g.e.to)}: ${ways.join(' · ')}`;
       g.msgAt = performance.now();
     }
     render();
@@ -687,7 +688,7 @@ export function initGridGame(ctx) {
         break;
       }
     }
-    g.msg = `⛔ ${why || `No ${side === 'L' ? 'left' : 'right'} turn here: there's no road that way.`}`;
+    g.msg = `⛔ ${why || `No road to the ${side === 'L' ? 'left' : 'right'}`}`;
     g.msgAt = performance.now();
   }
   function go0() {
@@ -846,10 +847,10 @@ export function initGridGame(ctx) {
     runs.n++;
     if (ok) runs.clean++;
     ctx.store.set('gridRuns', runs);
-    g.result = `<div class="fb ${ok ? 'ok' : 'no'}">${ok ? '✓' : '•'} You made it: ${mi(g.driven)} mi${
-      g.wrong ? `, ${g.wrong} wrong-way ${g.wrong === 1 ? 'try' : 'tries'}` : ''
-    }. Shortest legal route: ${mi(g.best.cost)} mi${ratio <= 1.03 ? ' (that was it)' : ''}.${g.checks ? ` Check-ins: ${g.checksRight} of ${g.checks}.` : ''}</div>
-      <div class="hint"><span class="gg-key you"></span> your route · <span class="gg-key best"></span> shortest: ${esc(describe(g.best.path))}</div>
+    g.result = `<div class="fb ${ok ? 'ok' : 'no'}">${ok ? '✓' : '•'} ${mi(g.driven)} mi${ratio <= 1.03 ? ' · the shortest' : ` · shortest ${mi(g.best.cost)}`}${
+      g.wrong ? ` · ${g.wrong} wrong-way` : ''
+    }${g.checks ? ` · check-ins ${g.checksRight}/${g.checks}` : ''}</div>
+      <div class="hint"><span class="gg-key you"></span> you <span class="gg-key best"></span> best: ${esc(describe(g.best.path))}</div>
       <button class="primary" id="ggAgain">Another route</button>`;
     render();
   }
@@ -862,6 +863,7 @@ export function initGridGame(ctx) {
       const last = legs[legs.length - 1];
       if (last && last.name === e.name) continue;
       if (!isCore(e.from) && !last) continue; // still on the way in from outside
+      if (/entrance|exit|\bramp/i.test(e.name)) continue; // ramps aren't worth naming
       const dir = gridDir(e.b0);
       let turn;
       if (!last) turn = dir === 'U' ? 'Up' : dir === 'D' ? 'Down' : dir === 'E' ? 'East on' : 'West on';
@@ -869,7 +871,8 @@ export function initGridGame(ctx) {
         const d = angleDiff(e.b0, path[i - 1].b1);
         turn = d < -20 ? 'left on' : d > 20 ? 'right on' : 'onto';
       }
-      legs.push({ name: e.name, text: `${turn} ${short(e.name)}` });
+      void turn;
+      legs.push({ name: e.name, text: short(e.name) });
     }
     return legs.map((l) => l.text).join(' → ');
   }
@@ -879,9 +882,9 @@ export function initGridGame(ctx) {
     const a = gridXY(g.pos || G.nodes[g.e.from]), b = gridXY(G.nodes[g.target.node]);
     const dx = b[0] - a[0], dy = b[1] - a[1];
     const mi = Math.hypot(dx, dy) / 1609.34;
-    const ud = Math.abs(dy) > 60 ? (dy > 0 ? 'uptown' : 'downtown') : '';
-    const ew = Math.abs(dx) > 60 ? (dx > 0 ? 'east' : 'west') : '';
-    return `${mi < 0.1 ? 'under 0.1' : mi.toFixed(1)} mi to go${ud || ew ? `, ${[ud, ew].filter(Boolean).join(' and ')}` : ''}`;
+    const ARROWS = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
+    const arrow = ARROWS[Math.round(((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360 / 45) % 8];
+    return `${arrow} ${mi < 0.1 ? '<0.1' : mi.toFixed(1)} mi`;
   }
   function render() {
     if (!g) return;
@@ -892,14 +895,13 @@ export function initGridGame(ctx) {
       return;
     }
     const t = g.target;
-    const th = g.targetHood ? ` · ${esc(g.targetHood)}` : '';
-    const tgt = t.name ? `<b>${esc(t.name)}</b> <span class="muted">(${esc(t.label)}${th})</span>` : `<b>${esc(t.label)}</b>${th ? ` <span class="muted">${th.slice(3)}</span>` : ''}`;
-    const inHood = g.pos && isCore(g.e.from) ? hood(g.pos) : null;
+    const corner = t.label.replace(/ St\b/g, '').replace(/\b[EW] (\d)/g, '$1');
+    const tgt = t.name ? `<b>${esc(t.name)}</b> <span class="muted">· ${esc(corner)}</span>` : `<b>${esc(t.label)}</b>`;
     const nx = !g.done && isCore(g.e.from) ? nextCross(g.e) : null;
-    const where = `${inHood ? `In ${esc(inHood.replace(/ \(.*\)$/, ''))} · on` : 'On'} <b>${esc(short(g.e.name))}</b> heading <b>${WORD[gridDir(g.e.b0)]}</b>${nx ? ` · next: <b>${esc(nx)}</b>` : ''}`;
+    const where = `<b>${esc(short(g.e.name))}</b> · ${WORD[gridDir(g.e.b0)]}${nx ? ` · next ${esc(nx)}` : ''}${g.queued ? ` · <b>${g.queued === 'L' ? '◀ left' : 'right ▶'}</b>` : ''}`;
     ctx.hud(
-      `<div class="qkind">🚕 Drive Manhattan${g.entry ? ` · from ${esc(g.entry.from)}` : ''}</div><div class="q">Get to ${tgt}</div>
-       ${g.done ? '' : `<div class="hint">${where}${g.queued ? ` · turning <b>${g.queued === 'L' ? 'left' : 'right'}</b> at the next corner` : ''} · ${esc(toGo())}</div>`}`
+      `<div class="q">→ ${tgt}</div>
+       ${g.done ? '' : `<div class="hint">${esc(toGo())} · ${where}</div>`}`
     );
     // the compass word for each hand, fading as this heading becomes solid (none during a check-in: it'd give it away)
     const hb = g.bnow ?? g.e.b0;
@@ -915,12 +917,14 @@ export function initGridGame(ctx) {
         ${g.done ? g.result : `<div class="ggctl${canStraight ? ' three' : ''}">${btn('L', '◀ Left')}${canStraight ? btn('S', '▲ Straight') : ''}${btn('R', 'Right ▶')}</div>
         <div class="ggmsg${g.msg || g.check || g.startCard ? '' : ' muted'}${g.startCard ? ' startcard' : ''}">${
           g.startCard
-            ? `${startCard()} <span class="muted">Starting… tap to go now.</span>`
+            ? startCard()
             : g.check
-            ? `<b>Check-in:</b> you're heading <b>${WORD[g.check.h]}</b>. Which side is <b>${esc(g.check.thing)}</b>?`
+            ? `<b>Heading ${WORD[g.check.h]}.</b> ${esc(g.check.thing[0].toUpperCase() + g.check.thing.slice(1))}: left or right?`
             : g.msg
               ? esc(g.msg)
-              : 'Left/Right turn at the next intersection. Tap a corner ahead to zip there; hold the map to speed up.'
+              : rounds() <= 3
+                ? 'Left/Right: turn at the next corner · tap a corner: go there · hold: faster'
+                : ''
         }</div>`}
         <div class="ggbar">
           ${g.done ? '' : `<button id="ggPause">${g.paused ? '▶ Go' : '⏸ Pause'}</button>`}

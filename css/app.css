@@ -1595,8 +1595,11 @@ body.gridding .maplibregl-ctrl-bottom-right {
 }
 .ggmsg {
   margin-top: 8px;
-  font-size: 14px;
-  min-height: 2.6em;
+  font-size: 15px;
+  min-height: 1.4em;
+}
+.ggmsg:empty {
+  display: none;
 }
 .ggopts {
   display: flex;
