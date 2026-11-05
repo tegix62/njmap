@@ -1437,7 +1437,6 @@ body[data-mode='drive'] .look .v {
 #gridgame svg {
   display: block;
 }
-body.gridding #edges,
 body.gridding #fabs,
 body.gridding .maplibregl-ctrl-bottom-left,
 body.gridding .maplibregl-ctrl-bottom-right {
@@ -1683,4 +1682,56 @@ body.gridding .maplibregl-ctrl-bottom-right {
 }
 .ggopts[hidden] {
   display: none;
+}
+
+/* ---- Drive Manhattan (real streets) --------------------------------------- */
+.gg-carmk {
+  width: 34px;
+  height: 34px;
+  pointer-events: none;
+}
+.gg-carmk .blink {
+  fill: #f59e0b;
+  display: none;
+}
+.gg-carmk.sigL .blink.L,
+.gg-carmk.sigR .blink.R {
+  display: block;
+  animation: gg-blink 0.6s steps(2, start) infinite;
+}
+.gg-carmk.boost path {
+  fill: #1d3a8a;
+}
+.gg-off {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #b91c1c;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+}
+.gg-off[hidden] {
+  display: none;
+}
+.gg-off span {
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 10px solid #fff;
+  margin-left: 3px;
+}
+body.gridding .maplibregl-canvas-container,
+body.gridding .maplibregl-canvas {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
 }

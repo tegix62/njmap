@@ -1,243 +1,842 @@
-// Drive the grid: Midtown's street grid, straightened, with uptown at the top.
-// Your car drives on its own; tap Left or Right to turn at the next corner.
-// One-way streets are enforced the way the signs are: odd streets run west,
-// even streets run east, the big crosstown streets run both ways, and the
-// avenues alternate. Wrong-way turns are refused and explained. At the end
-// your route is drawn next to the shortest legal one.
+/* global maplibregl */
+// Drive Manhattan: the real street network, every street from the Battery to
+// Inwood with its legal direction (NYC's street centerline, built into
+// data/manhattan-streets.json by tools/build_streets.py). The map is turned
+// so Midtown's grid stands upright (uptown at the top); downtown streets run
+// at their real angles.
 //
-// Every block's direction is the real one, from NYC's street centerline
-// (js/midtowngrid.js, built by tools/build_grid.py). Refusals explain the
-// rule when the block follows it, and name the exception when it doesn't, so
-// you learn the rule and the blocks that break it. Construction and bus lanes
-// change week to week and aren't modeled.
+// Your car drives on its own. Tap Left or Right before an intersection to
+// turn there; tap a corner ahead to zip to it; hold the map to speed up.
+// Wrong-way turns are refused with the reason: the rule of thumb when the
+// street follows it ("odd streets go west"), the exception by name when it
+// doesn't. Rounds can start inside a tunnel or on a bridge coming in, and
+// end once you're on the destination's road heading toward it. At the end the
+// map shows your route next to the shortest legal one.
 
-import { GRID_DATA } from './midtowngrid.js';
-
-const FT_PER_STREET = 264; // ~20 streets to the mile
-const S_MIN = GRID_DATA.sMin;
-const S_MAX = GRID_DATA.sMax;
-const TWO_WAY_STREETS = new Set(GRID_DATA.twoWay);
-
-// Avenue columns west to east, from the data: {key, x (feet from 5th Ave), from,
-// to, ranges: [[first street, name, short label, rule-of-thumb direction]]}
-const AVES = GRID_DATA.columns;
-const col = (k) => AVES.findIndex((a) => a.key === k);
-const rangeAt = (ai, s) => {
-  const rs = AVES[ai].ranges;
-  let r = rs[0];
-  for (const x of rs) if (x[0] <= s) r = x;
-  return r;
+const DATA_URL = 'data/manhattan-streets.json';
+const GRID = 29; // the grid is turned ~29° clockwise from north
+const ZOOM = 15.7; // driving zoom
+const PACE = { easy: 1, normal: 1.35, fast: 1.9 }; // speed multipliers
+const SPEED = 105; // metres per second of game time at Easy (a long crosstown block in ~2 s)
+const CORNER_SLOW = 0.5; // half speed over the last stretch before an intersection: time to decide
+const GOTO_SPEED = 5.5; // multipliers: heading to a tapped corner,
+const HOLD_SPEED = 4; // holding the map,
+const HOME_SPEED = 14; // and on the home stretch
+const AVENUE_RULE = {
+  '1st Ave': 'U', '2nd Ave': 'D', '3rd Ave': 'U', 'Lexington Ave': 'D', 'Madison Ave': 'U', '5th Ave': 'D',
+  '6th Ave': 'U', '7th Ave': 'D', '8th Ave': 'U', '9th Ave': 'D', '10th Ave': 'U', 'Amsterdam Ave': 'U', 'Columbus Ave': 'D',
 };
-const aveName = (ai, s) => rangeAt(ai, s)[1];
-const aveShort = (ai, s) => rangeAt(ai, s)[2];
-const PARK = col('park');
-const ord = (n) => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
-const streetName = (s) => (s === 59 ? '59th St (Central Park South)' : s === 110 ? '110th St' : `${ord(s)} St`);
+const TWO_WAY_STREETS = new Set([14, 23, 34, 42, 57, 72, 79, 86, 96, 106, 110, 116, 125, 135, 145, 155]);
+const WORD = { U: 'uptown', D: 'downtown', E: 'east', W: 'west' };
+const AREAS = { all: 'All of Manhattan', downtown: 'Downtown (below 14th)', midtown: 'Midtown (14th–59th)', uptown: 'Uptown (59th–110th)', upper: 'Upper Manhattan (above 110th)' };
 
-// Why a street block doesn't go through, where it's worth saying: [street, west col, east col, why]
-const BLOCKED = [
-  [41, col('6'), col('5'), 'Bryant Park and the Library'],
-  [32, col('8'), col('7'), 'Madison Square Garden and Penn Station'],
-  [24, col('5'), col('madison'), 'Madison Square Park'],
-  [25, col('5'), col('madison'), 'Madison Square Park'],
-  [15, col('5'), PARK, 'Union Square'],
-  [16, col('5'), PARK, 'Union Square'],
-  [43, col('madison'), PARK, 'Grand Central'],
-  [44, col('madison'), PARK, 'Grand Central'],
-  [45, col('madison'), PARK, 'Grand Central'],
-  [43, PARK, col('lex'), 'Grand Central'],
-  [44, PARK, col('lex'), 'Grand Central'],
-  [45, PARK, col('lex'), 'Grand Central'],
-];
-// Park Ave rides the viaduct around Grand Central: no turns on or off here
-const NO_TURN = new Set([41, 42, 43, 44, 45].map((s) => `${PARK}:${s}`));
-const TRANSVERSES = { 65: '65th St transverse', 79: '79th St transverse', 86: '86th St transverse', 97: '97th St transverse' };
-const PARKS = [
-  { name: 'Central Park', s0: 59, s1: 110, a0: col('8'), a1: col('5'), green: true, big: true },
-  { name: 'Bryant Park', s0: 40, s1: 42, a0: col('6'), a1: col('5'), green: true },
-  { name: 'Madison Sq Park', s0: 23, s1: 26, a0: col('5'), a1: col('madison'), green: true },
-  { name: 'Union Square', s0: 14, s1: 17, a0: col('5'), a1: PARK, green: true, inset: 0.35 },
-  { name: 'MSG', s0: 31, s1: 33, a0: col('8'), a1: col('7') },
-  { name: 'Grand Central', s0: 42, s1: 46, a0: col('madison'), a1: col('lex'), inset: 0.18 },
-];
-
-const PLACES = [
-  // Midtown and below
-  { name: 'Grand Central', ai: PARK, s: 42 },
-  { name: 'Empire State Building', ai: col('5'), s: 34 },
-  { name: 'Madison Square Garden', ai: col('7'), s: 33 },
-  { name: 'Port Authority', ai: col('8'), s: 42 },
-  { name: 'Times Square', ai: col('7'), s: 46 },
-  { name: 'Radio City', ai: col('6'), s: 50 },
-  { name: 'the Library (Bryant Park)', ai: col('5'), s: 42 },
-  { name: 'MoMA', ai: col('5'), s: 53 },
-  { name: 'Carnegie Hall', ai: col('7'), s: 57 },
-  { name: 'the Flatiron Building', ai: col('5'), s: 23 },
-  { name: 'Chelsea Market', ai: col('9'), s: 15 },
-  { name: 'the Javits Center', ai: col('11'), s: 36 },
-  { name: 'the UN', ai: col('1'), s: 45 },
-  { name: 'Bellevue', ai: col('1'), s: 27 },
-  { name: 'Hudson Yards', ai: col('10'), s: 33 },
-  { name: "Macy's (Herald Square)", ai: col('6'), s: 34 },
-  { name: 'the Chrysler Building', ai: col('lex'), s: 42 },
-  // Uptown
-  { name: 'Columbus Circle', ai: col('8'), s: 59 },
-  { name: 'Lincoln Center', ai: col('9'), s: 65 },
-  { name: 'the Natural History Museum', ai: col('8'), s: 79 },
-  { name: 'the Met', ai: col('5'), s: 82 },
-  { name: 'the Guggenheim', ai: col('5'), s: 88 },
-  { name: 'Bloomingdale\'s', ai: col('lex'), s: 59 },
-  { name: 'Hunter College', ai: col('lex'), s: 68 },
-  { name: 'the Beacon Theatre', ai: col('bway'), s: 74 },
-  { name: "Zabar's", ai: col('bway'), s: 80 },
-  { name: 'Mount Sinai Hospital', ai: col('madison'), s: 100 },
-  { name: 'the Museum of the City of New York', ai: col('5'), s: 103 },
-  { name: 'NewYork-Presbyterian / Weill Cornell', ai: col('york'), s: 68 },
-  { name: 'Columbia (south end, Cathedral Pkwy)', ai: col('bway'), s: 110 },
-];
-const AREAS = { all: [S_MIN, S_MAX], midtown: [S_MIN, 59], uptown: [57, S_MAX] };
-
-// Coming in from outside: where a tunnel, bridge or highway exit really puts
-// you, and which way you're facing. Each one is checked against the city's
-// ramp data (tools/entries.py); 'where' says what you'd see.
-const ENTRIES = [
-  { from: 'the Lincoln Tunnel', where: 'Dyer Ave brings you up to 42nd St; you turn east (between 10th and 9th Ave)', ai: col('10'), s: 42, d: 'E' },
-  { from: 'the Lincoln Tunnel (30th St exit)', where: 'the ramp puts you on 30th St heading east at 10th Ave', ai: col('10'), s: 30, d: 'E' },
-  { from: 'the Queens-Midtown Tunnel', where: 'you come out onto 2nd Ave heading downtown in the upper 30s', ai: col('2'), s: 37, d: 'D' },
-  { from: 'the Queensboro Bridge', where: 'you come off onto 1st Ave heading uptown, around 60th St', ai: col('1'), s: 60, d: 'U' },
-  { from: 'the Queensboro Bridge', where: 'you come off onto 2nd Ave heading downtown, around 60th St', ai: col('2'), s: 60, d: 'D' },
-  { from: 'the FDR Drive (exit 9, northbound)', where: 'the exit puts you on 1st Ave heading uptown at 42nd St, by the UN', ai: col('1'), s: 42, d: 'U' },
-  { from: 'the FDR Drive (exit 11, southbound)', where: 'the exit puts you on 53rd St heading west', ai: col('1'), s: 53, d: 'W' },
-  { from: 'the FDR Drive (exit 12, northbound)', where: 'the exit puts you on 61st St heading west at York Ave', ai: col('york'), s: 61, d: 'W' },
-  { from: 'the FDR Drive (exit 14, northbound)', where: 'the exit puts you on 96th St heading west', ai: col('1'), s: 96, d: 'W' },
-  { from: 'the Henry Hudson Parkway (from the GWB)', where: 'the 96th St exit puts you at Riverside Dr; head east on 96th', ai: col('west'), s: 96, d: 'E' },
-];
-
-// grid directions: U uptown, D downtown, E east, W west
-const LEFT = { U: 'W', W: 'D', D: 'E', E: 'U' };
-const RIGHT = { U: 'E', E: 'D', D: 'W', W: 'U' };
-const DIR_WORD = { U: 'uptown', D: 'downtown', E: 'east', W: 'west' };
-const ROT = { U: 0, E: 90, D: 180, W: 270 };
-const PACE = { easy: 1, normal: 0.72, fast: 0.5 };
-
-const exists = (ai, s) => s >= S_MIN && s <= S_MAX && s >= AVES[ai].from && s <= AVES[ai].to;
-const key = (ai, s) => `${ai}:${s}`;
-/** The next avenue east/west of ai that exists on street s. */
-function nextAve(ai, s, step) {
-  for (let j = ai + step; j >= 0 && j < AVES.length; j += step) if (exists(j, s)) return j;
-  return -1;
+// ---- geometry helpers ------------------------------------------------------------
+const rad = (d) => (d * Math.PI) / 180;
+function metres(a, b) {
+  const kx = 111320 * Math.cos(rad((a[1] + b[1]) / 2));
+  return Math.hypot((a[0] - b[0]) * kx, (a[1] - b[1]) * 110540);
 }
-const blockedWhy = (s, a, b) => {
-  const [w, e] = a < b ? [a, b] : [b, a];
-  if (w === col('8') && e === col('5') && s > 59 && s < 110) return 'Central Park (only the transverse roads at 65th, 79th, 86th and 97th cross it)';
-  const hit = BLOCKED.find(([bs, bw, be]) => bs === s && bw === w && be === e);
-  return hit ? hit[3] : null;
-};
-/** The rule of thumb for a street: odd west, even east, the big crosstown ones both ways. */
-const ruleStreet = (s) => (TWO_WAY_STREETS.has(s) ? 'two' : s % 2 ? 'W' : 'E');
-const ruleAve = (ai, s) => rangeAt(ai, s)[3];
-/** Real direction of the street block between avenue ai and the next one east: 'E' | 'W' | 'two' | null. */
-const streetBlock = (s, westAi) => GRID_DATA.streets[s]?.[westAi] ?? null;
-/** Real direction of avenue ai between street s and s + 1: 'U' | 'D' | 'two' | null. */
-function aveBlock(ai, s) {
-  // Park Ave rides the viaduct around Grand Central (41st-46th): both ways, no turns
-  if (ai === PARK && s >= 41 && s <= 45) return 'two';
-  return GRID_DATA.aves[AVES[ai].key]?.[s - S_MIN] ?? null;
+function bearing(a, b) {
+  const kx = Math.cos(rad((a[1] + b[1]) / 2));
+  return ((Math.atan2((b[0] - a[0]) * kx, b[1] - a[1]) * 180) / Math.PI + 360) % 360;
 }
-const WORD = { E: 'east', W: 'west', U: 'uptown', D: 'downtown' };
-const streetRuleText = (s) => (s % 2 ? 'odd streets usually go west' : 'even streets usually go east');
-
-/**
- * Where driving from (ai, s) toward d leads: {ai, s, len} or {why} when you
- * can't (wrong way, dead end, blocked).
- */
-function step(ai, s, d, turning) {
-  const r = rawStep(ai, s, d, turning);
-  if (r.why || !TRAPS.has(`${r.ai}:${r.s}:${d}`)) return r;
-  return { why: `${d === 'U' || d === 'D' ? aveName(ai, s) : streetName(s)} leads into a dead end that way: there's no legal way on from ${aveName(r.ai, r.s)} & ${ord(r.s)}${r.s === S_MAX || r.s === S_MIN || r.ai === 0 || r.ai === AVES.length - 1 ? ' inside the practice area' : ''}.`, edge: true };
+const angleDiff = (to, from) => ((to - from + 540) % 360) - 180; // + = clockwise (right)
+/** Grid direction of a compass bearing: U(ptown), E(ast), D(owntown), W(est). */
+function gridDir(b) {
+  const r = (b - GRID + 360) % 360;
+  return r < 45 || r >= 315 ? 'U' : r < 135 ? 'E' : r < 225 ? 'D' : 'W';
+}
+/** Position across / up the grid, metres (for areas and "to go" words). */
+function gridXY(p) {
+  const x = (p[0] + 73.97) * 111320 * Math.cos(rad(40.78)), y = (p[1] - 40.78) * 110540;
+  const a = rad(GRID);
+  return [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
 }
 
-function rawStep(ai, s, d, turning) {
-  if (turning && NO_TURN.has(key(ai, s))) return { why: 'No turns here: Park Ave runs on the viaduct around Grand Central.' };
-  if (d === 'U' || d === 'D') {
-    const s2 = s + (d === 'U' ? 1 : -1);
-    if (s2 > S_MAX || s2 < S_MIN) return { why: 'That leaves the practice area.', edge: true };
-    const real = aveBlock(ai, Math.min(s, s2));
-    const name = aveName(ai, s);
-    if (!real || !exists(ai, s2)) return { why: `${name} doesn't continue past ${streetName(s)}.`, edge: true };
-    if (real !== 'two' && real !== d) {
-      const rule = ruleAve(ai, s);
-      return {
-        why:
-          rule === real
-            ? `${name} runs ${WORD[real]} only.`
-            : `${name} runs ${WORD[real]} only on this stretch (an exception: ${rule === 'two' ? 'it runs both ways elsewhere' : `it runs ${WORD[rule]} elsewhere`}).`,
-        wrong: true,
+export function initGridGame(ctx) {
+  const { map } = ctx;
+  let G = null; // the street graph, once loaded
+  let g = null; // the running round
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const rand = (a) => a[Math.floor(Math.random() * a.length)];
+  // mapFirst: a look at the start and destination before driving (off by default:
+  // working out where the address is is the useful part).
+  // from: 'both' (half the rounds start at a tunnel or bridge), 'entries', 'anywhere'
+  const prefs = { pace: 'easy', arrows: false, mapFirst: false, area: 'all', from: 'both', optsOpen: false, ...ctx.store.get('gridPrefs', {}) };
+  if (!AREAS[prefs.area]) prefs.area = 'all';
+  const savePrefs = () => ctx.store.set('gridPrefs', prefs);
+
+  // ---- the graph -------------------------------------------------------------------
+  async function load() {
+    if (G) return G;
+    const d = await fetch(DATA_URL).then((r) => r.json());
+    const [ox, oy] = d.origin;
+    const nodes = [];
+    for (let i = 0; i < d.nodes.length; i += 2) nodes.push([ox + d.nodes[i] / d.scale, oy + d.nodes[i + 1] / d.scale]);
+    const feeders = new Set(d.feeders);
+    const out = nodes.map(() => []);
+    const inn = nodes.map(() => []);
+    const edges = []; // directed
+    d.edges.forEach(([a, b, nid, dir, mid], seg) => {
+      const pts = [nodes[a]];
+      if (mid) for (let i = 0; i < mid.length; i += 2) pts.push([ox + mid[i] / d.scale, oy + mid[i + 1] / d.scale]);
+      pts.push(nodes[b]);
+      const mk = (from, to, p) => {
+        const cum = [0];
+        for (let i = 1; i < p.length; i++) cum.push(cum[i - 1] + metres(p[i - 1], p[i]));
+        const e = {
+          id: edges.length, from, to, seg, pts: p, cum, len: cum[cum.length - 1] || 1,
+          name: d.names[nid], oneway: dir !== 0,
+          b0: bearing(p[0], p[1]), b1: bearing(p[p.length - 2], p[p.length - 1]),
+        };
+        edges.push(e);
+        out[from].push(e);
+        inn[to].push(e);
       };
+      if (dir >= 0) mk(a, b, pts);
+      if (dir <= 0) mk(b, a, [...pts].reverse());
+    });
+    // distinct neighbours: 3+ means a real intersection
+    const nb = nodes.map(() => new Set());
+    for (const e of edges) {
+      nb[e.from].add(e.to);
+      nb[e.to].add(e.from);
     }
-    const r = { ai, s: s2, len: FT_PER_STREET };
-    const rule = ruleAve(ai, s);
-    if (real !== rule && !(ai === PARK && s >= 41 && s <= 45))
-      r.note = `${name} runs ${real === 'two' ? 'both ways' : `${WORD[real]} only`} here: an exception (${rule === 'two' ? 'both ways' : `${WORD[rule]}`} elsewhere).`;
-    return r;
-  }
-  const aj = nextAve(ai, s, d === 'E' ? 1 : -1);
-  if (aj < 0) return { why: 'That leaves the practice area.', edge: true };
-  const west = Math.min(ai, aj), east = Math.max(ai, aj);
-  const real = streetBlock(s, west);
-  const where = `between ${aveName(west, s)} and ${aveName(east, s)}`;
-  if (!real) {
-    const why = blockedWhy(s, ai, aj);
-    return { why: `${streetName(s)} doesn't go through ${where}${why ? `: ${why}` : ''}.` };
-  }
-  const rule = ruleStreet(s);
-  if (TRANSVERSES[s] && west === col('8') && east === col('5')) {
-    // through Central Park on a transverse road (both ways)
-    const r = { ai: aj, s, len: Math.abs(AVES[aj].x - AVES[ai].x) };
-    r.note = `Through Central Park on the ${TRANSVERSES[s]}.`;
-    return r;
-  }
-  if (real !== 'two' && real !== d)
-    return {
-      why:
-        real === rule
-          ? `${streetName(s)} runs ${WORD[real]} only (${s % 2 ? 'odd streets go west' : 'even streets go east'}).`
-          : `${streetName(s)} runs ${WORD[real]} ${where}: an exception (${streetRuleText(s)}).`,
-      wrong: true,
+    const label = (n) => {
+      const names = [];
+      for (const e of [...out[n], ...inn[n]]) if (!names.includes(e.name)) names.push(e.name);
+      return names.slice(0, 2).join(' & ');
     };
-  const r = { ai: aj, s, len: Math.abs(AVES[aj].x - AVES[ai].x) };
-  if (real !== rule) r.note = `Heads up: ${streetName(s)} runs ${real === 'two' ? 'both ways' : WORD[real]} ${where}, an exception (${rule === 'two' ? 'it runs both ways elsewhere' : streetRuleText(s)}).`;
-  return r;
-}
+    const gy = nodes.map((p) => gridXY(p)[1]);
+    G = { d, nodes, edges, out, inn, nb, feeders, label, gy, places: d.places, entries: d.entries, areas: d.areas };
+    // where each entry first reaches a real intersection (for area filtering)
+    for (const en of G.entries) {
+      let n = en.node;
+      for (let i = 0; i < 200 && (G.feeders.has(n) || G.nb[n].size < 3); i++) {
+        const o = G.out[n][0];
+        if (!o) break;
+        n = o.to;
+      }
+      en.landsAt = n;
+    }
+    buildArrows();
+    return G;
+  }
 
-/**
- * Corners you could arrive at (heading a given way) with no legal way on:
- * straight, left and right all refused. Found once, repeatedly until nothing
- * changes (blocking one can trap another); step() refuses moves into them.
- */
-const TRAPS = new Set();
-(function findTraps() {
-  const L = { U: 'W', W: 'D', D: 'E', E: 'U' }, R = { U: 'E', E: 'D', D: 'W', W: 'U' };
-  const ok = (ai, s, d, t) => {
-    const r = rawStep(ai, s, d, t);
-    return !r.why && !TRAPS.has(`${r.ai}:${r.s}:${d}`);
+  /** The choices at the end of edge e: {straight, left, right} or {only} (no real choice). */
+  const choiceCache = new Map();
+  function choices(e) {
+    if (choiceCache.has(e.id)) return choiceCache.get(e.id);
+    const opts = G.out[e.to].filter((o) => o.seg !== e.seg); // no U-turns
+    let c;
+    if (!opts.length) {
+      const back = G.out[e.to].find((o) => o.seg === e.seg);
+      c = { only: back || null, uturn: true, options: back ? [back] : [] };
+    } else if (opts.length === 1) c = { only: opts[0], options: opts };
+    else {
+      const withD = opts.map((o) => ({ o, d: angleDiff(o.b0, e.b1) }));
+      let straight = withD.filter((x) => x.o.name === e.name && Math.abs(x.d) <= 50).sort((a, b) => Math.abs(a.d) - Math.abs(b.d))[0];
+      if (!straight) straight = withD.filter((x) => Math.abs(x.d) <= 32).sort((a, b) => Math.abs(a.d) - Math.abs(b.d))[0];
+      const rest = withD.filter((x) => x !== straight);
+      const left = rest.filter((x) => x.d < -20).sort((a, b) => Math.abs(a.d + 90) - Math.abs(b.d + 90))[0];
+      const right = rest.filter((x) => x.d > 20).sort((a, b) => Math.abs(a.d - 90) - Math.abs(b.d - 90))[0];
+      c = { straight: straight?.o || null, left: left?.o || null, right: right?.o || null, options: opts };
+    }
+    c.decision = !('only' in c);
+    choiceCache.set(e.id, c);
+    return c;
+  }
+  /** The moves the buttons can make from the end of edge e. */
+  function moves(e) {
+    const c = choices(e);
+    return !c.decision ? (c.only ? [c.only] : []) : [c.straight, c.left, c.right].filter(Boolean);
+  }
+
+  // ---- rules of thumb ------------------------------------------------------------------
+  const streetNum = (name) => {
+    const m = /^[EW] (\d+)(st|nd|rd|th) St$/.exec(name);
+    return m ? +m[1] : null;
   };
-  for (let changed = true; changed; ) {
-    changed = false;
-    for (let ai = 0; ai < AVES.length; ai++)
-      for (let s = S_MIN; s <= S_MAX; s++) {
-        if (!exists(ai, s)) continue;
-        for (const d of ['U', 'D', 'E', 'W']) {
-          const k = `${ai}:${s}:${d}`;
-          if (TRAPS.has(k)) continue;
-          if (!ok(ai, s, d, false) && !ok(ai, s, L[d], true) && !ok(ai, s, R[d], true)) {
-            TRAPS.add(k);
-            changed = true;
-          }
+  /** The rule of thumb for this road, as a grid direction ('E'|'W'|'U'|'D'|'two') or null. */
+  function rule(name) {
+    const n = streetNum(name);
+    if (n != null) return TWO_WAY_STREETS.has(n) ? 'two' : n % 2 ? 'W' : 'E';
+    return AVENUE_RULE[name] || null;
+  }
+  const ruleText = (name) => {
+    const n = streetNum(name);
+    if (n != null) return n % 2 ? 'odd streets go west' : 'even streets go east';
+    return 'avenues alternate';
+  };
+  const short = (name) => name.replace(/^[EW] (\d+\w\w) St$/, '$1 St');
+  /** Refusal text for a one-way road d (an edge that runs toward the corner we're at). */
+  function wrongWay(d) {
+    const dir = gridDir(d.b1); // the way traffic flows on it
+    const r = rule(d.name);
+    const nm = short(d.name);
+    if (r && r === dir) return `${nm} runs ${WORD[dir]} only (${ruleText(d.name)}).`;
+    if (r === 'two') return `${nm} runs ${WORD[dir]} only on this block: an exception (it's usually two-way).`;
+    if (r) return `${nm} runs ${WORD[dir]} here: an exception (${ruleText(d.name)}).`;
+    return `${nm} is one-way here: traffic runs ${WORD[dir]}.`;
+  }
+  /** A heads-up when driving onto a block that breaks the rule. */
+  function exceptionNote(e) {
+    const r = rule(e.name);
+    if (!r || r === 'two') return null;
+    const dir = gridDir(e.b0);
+    const isAve = !!AVENUE_RULE[e.name];
+    if (!e.oneway) return `Heads up: ${short(e.name)} runs both ways here, an exception (${isAve ? `${WORD[r]} elsewhere` : ruleText(e.name)}).`;
+    if (dir !== r && (isAve ? dir === 'U' || dir === 'D' : dir === 'E' || dir === 'W'))
+      return `Heads up: ${short(e.name)} runs ${WORD[dir]} here, an exception (${ruleText(e.name)}).`;
+    return null;
+  }
+
+  // ---- map layers -------------------------------------------------------------------------
+  let arrowsFC = null;
+  function buildArrows() {
+    // one-way blocks as lines drawn the way traffic flows; exceptions flagged
+    const seen = new Set();
+    const feats = [];
+    for (const e of G.edges) {
+      if (!e.oneway || seen.has(e.seg)) continue;
+      seen.add(e.seg);
+      feats.push({ type: 'Feature', properties: { name: e.name, exc: exceptionNote(e) ? 1 : 0 }, geometry: { type: 'LineString', coordinates: e.pts } });
+    }
+    arrowsFC = { type: 'FeatureCollection', features: feats };
+  }
+  const EMPTY = { type: 'FeatureCollection', features: [] };
+  function ensureLayers() {
+    if (map.getSource('gg-trail')) return;
+    map.addSource('gg-trail', { type: 'geojson', data: EMPTY });
+    map.addSource('gg-best', { type: 'geojson', data: EMPTY });
+    map.addSource('gg-arrows', { type: 'geojson', data: arrowsFC || EMPTY });
+    map.addSource('gg-target', { type: 'geojson', data: EMPTY });
+    map.addSource('gg-goto', { type: 'geojson', data: EMPTY });
+    map.addLayer({ id: 'gg-best', type: 'line', source: 'gg-best', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#15803d', 'line-width': 4.5, 'line-dasharray': [2, 1.5] } });
+    map.addLayer({ id: 'gg-trail', type: 'line', source: 'gg-trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#2b4fb3', 'line-width': 6, 'line-opacity': 0.55 } });
+    map.addLayer({
+      id: 'gg-arrows', type: 'symbol', source: 'gg-arrows',
+      layout: { 'symbol-placement': 'line', 'symbol-spacing': 70, 'text-field': '›', 'text-font': ['Noto Sans Medium'], 'text-size': 22, 'text-keep-upright': false, 'text-allow-overlap': true, 'text-ignore-placement': true, visibility: 'none' },
+      paint: { 'text-color': ['case', ['==', ['get', 'exc'], 1], '#c47a00', '#1f1b16'], 'text-halo-color': '#ffffff', 'text-halo-width': 1.2 },
+    });
+    map.addLayer({ id: 'gg-goto', type: 'circle', source: 'gg-goto', paint: { 'circle-radius': 13, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': '#2b4fb3', 'circle-stroke-width': 3 } });
+    map.addLayer({ id: 'gg-target', type: 'circle', source: 'gg-target', paint: { 'circle-radius': 9, 'circle-color': '#b91c1c', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 3 } });
+    map.addLayer({
+      id: 'gg-target-label', type: 'symbol', source: 'gg-target',
+      layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Medium'], 'text-size': 15, 'text-anchor': 'left', 'text-offset': [1, 0], 'text-allow-overlap': true },
+      paint: { 'text-color': '#b91c1c', 'text-halo-color': '#ffffff', 'text-halo-width': 2.2 },
+    });
+  }
+  const setData = (id, fc) => map.getSource(id)?.setData(fc);
+  const line = (coords) => ({ type: 'FeatureCollection', features: coords.length > 1 ? [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } }] : [] });
+  const point = (p, props = {}) => ({ type: 'FeatureCollection', features: p ? [{ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: p } }] : [] });
+  let flashTimer = 0;
+  function showArrows(name = null) {
+    if (!map.getLayer('gg-arrows')) return;
+    clearTimeout(flashTimer);
+    if (!name) {
+      map.setFilter('gg-arrows', null);
+      map.setLayoutProperty('gg-arrows', 'visibility', prefs.arrows ? 'visible' : 'none');
+      return;
+    }
+    // flash the arrows of one street after a wrong-way try
+    map.setFilter('gg-arrows', ['==', ['get', 'name'], name]);
+    map.setLayoutProperty('gg-arrows', 'visibility', 'visible');
+    flashTimer = setTimeout(() => showArrows(), 2600);
+  }
+
+  // ---- the car --------------------------------------------------------------------------
+  const carEl = document.createElement('div');
+  carEl.className = 'gg-carmk';
+  carEl.innerHTML =
+    '<svg viewBox="0 0 40 40" width="34" height="34" aria-hidden="true"><path d="M20 3 L31 33 L20 26 L9 33 Z" fill="#2b4fb3" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/>' +
+    '<circle class="blink L" cx="7" cy="14" r="4"/><circle class="blink R" cx="33" cy="14" r="4"/></svg>';
+  const carMk = new maplibregl.Marker({ element: carEl, rotationAlignment: 'map', pitchAlignment: 'map' });
+  // off-screen pointer to the destination
+  const offEl = document.createElement('div');
+  offEl.className = 'gg-off';
+  offEl.innerHTML = '<span></span>';
+  offEl.hidden = true;
+  document.body.appendChild(offEl);
+
+  function posOnEdge(e, s) {
+    s = Math.max(0, Math.min(e.len, s));
+    let i = 1;
+    while (i < e.cum.length - 1 && e.cum[i] < s) i++;
+    const a = e.pts[i - 1], b = e.pts[i];
+    const t = (s - e.cum[i - 1]) / (e.cum[i] - e.cum[i - 1] || 1);
+    return { p: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], b: bearing(a, b) };
+  }
+
+  function lockMap(lock) {
+    for (const h of ['dragPan', 'scrollZoom', 'boxZoom', 'dragRotate', 'keyboard', 'doubleClickZoom', 'touchZoomRotate']) {
+      if (lock) map[h].disable();
+      else map[h].enable();
+    }
+  }
+
+  // ---- picking a round -----------------------------------------------------------------------
+  function inArea(n) {
+    const a = prefs.area;
+    if (a === 'all') return true;
+    const y = G.gy[n], A = G.areas;
+    if (a === 'downtown') return y < A['14'];
+    if (a === 'midtown') return y >= A['14'] - 150 && y <= A['59'] + 150;
+    if (a === 'uptown') return y >= A['59'] - 150 && y <= A['110'] + 150;
+    return y > A['110'];
+  }
+  const isCore = (n) => !G.feeders.has(n);
+  /** Shortest legal route (moves the buttons can make, no U-turns) from edge e0, s metres along it, to node t. */
+  function shortest(e0, t, s = 0) {
+    const c0 = e0.len - s;
+    const dist = new Map([[e0.id, c0]]);
+    const prev = new Map();
+    const heap = new Heap();
+    heap.push({ e: e0, c: c0 });
+    while (heap.size) {
+      const { e, c } = heap.pop();
+      if (c > dist.get(e.id)) continue;
+      if (e.to === t) {
+        const path = [e];
+        let k = e.id;
+        while (prev.has(k)) {
+          const p = prev.get(k);
+          path.unshift(p);
+          k = p.id;
+        }
+        return { cost: c, path };
+      }
+      for (const o of moves(e)) {
+        const nc = c + o.len;
+        if (nc < (dist.get(o.id) ?? Infinity)) {
+          dist.set(o.id, nc);
+          prev.set(o.id, e);
+          heap.push({ e: o, c: nc });
         }
       }
+    }
+    return null;
   }
-})();
+  /** Following straight on (and through bends with no choice) from the end of edge e: the corners ahead. */
+  function aheadChain(e, maxNodes = 80, maxM = 6000) {
+    const outN = [];
+    let cur = e, m = 0;
+    const seen = new Set();
+    for (let i = 0; i < maxNodes && m < maxM; i++) {
+      outN.push({ node: cur.to, via: cur });
+      if (seen.has(cur.id)) break;
+      seen.add(cur.id);
+      const c = choices(cur);
+      const nx = !c.decision ? (c.uturn ? null : c.only) : c.straight;
+      if (!nx) break;
+      m += nx.len;
+      cur = nx;
+    }
+    return outN;
+  }
+  /** Is node t straight ahead on this road from edge e (no turns)? */
+  function straightTo(e, t) {
+    return aheadChain(e, 120, 8000).some((x) => x.node === t);
+  }
+  function pickRound() {
+    const coreNodes = [];
+    for (let n = 0; n < G.nodes.length; n++) if (isCore(n) && G.nb[n].size >= 3 && inArea(n)) coreNodes.push(n);
+    const places = G.places.filter((p) => inArea(p.node));
+    const entries = G.entries.filter((en) => inArea(en.landsAt));
+    const useEntry = entries.length && (prefs.from === 'entries' || (prefs.from === 'both' && Math.random() < 0.5));
+    for (let tries = 0; tries < 300; tries++) {
+      const target = places.length && Math.random() < 0.7 ? { ...rand(places) } : { name: null, node: rand(coreNodes) };
+      target.label = G.label(target.node);
+      let e0, entry = null;
+      if (useEntry) {
+        entry = rand(entries);
+        e0 = G.out[entry.node][0];
+        if (!e0) continue;
+      } else {
+        const n = rand(coreNodes);
+        const outs = G.out[n].filter((o) => isCore(o.to));
+        if (!outs.length) continue;
+        e0 = rand(outs);
+      }
+      const dm = metres(G.nodes[e0.from], G.nodes[target.node]);
+      if (dm < 500 || dm > (entry ? 7000 : 3000)) continue;
+      if (straightTo(e0, target.node)) continue; // already on the right road
+      const best = shortest(e0, target.node);
+      if (!best || best.path.length < 4) continue;
+      return { e0, target, best, entry };
+    }
+    return null;
+  }
+
+  // ---- a round ---------------------------------------------------------------------------
+  async function start(opts) {
+    stop();
+    g = { opts, loading: true };
+    const token = g;
+    render();
+    try {
+      await load();
+    } catch {
+      if (g === token) ctx.hud('<div class="qkind">🚕 Drive Manhattan</div><div class="q">Couldn’t load the street map.</div>');
+      return;
+    }
+    if (g !== token) return;
+    const r = pickRound();
+    if (!r) {
+      ctx.hud('<div class="qkind">🚕 Drive Manhattan</div><div class="q">No route found here; try another area.</div>');
+      return;
+    }
+    ensureLayers();
+    lockMap(true);
+    document.body.classList.add('gridding');
+    ctx.clearHighlights();
+    ctx.reveal([]);
+    ctx.line(null);
+    map.setGlobalStateProperty('quiet', false);
+    g = {
+      opts, target: r.target, best: r.best, entry: r.entry,
+      e: r.e0, s: 0, // on edge e, s metres along
+      waiting: false, queued: null, goTo: null, home: false, boost: false, paused: false, done: false,
+      driven: 0, wrong: 0, trail: [G.nodes[r.e0.from]], msg: '', msgAt: 0, lastNote: null,
+      last: performance.now(), raf: 0, view: prefs.mapFirst && ctx.dur(1) ? 'intro' : 'follow',
+    };
+    const tp = G.nodes[r.target.node];
+    setData('gg-target', point(tp, { name: r.target.name || r.target.label }));
+    setData('gg-trail', EMPTY);
+    setData('gg-best', EMPTY);
+    setData('gg-goto', EMPTY);
+    showArrows();
+    carMk.setLngLat(G.nodes[r.e0.from]).addTo(map);
+    if (r.entry) {
+      g.msg = `Coming in from ${r.entry.from}. Follow the road out, then find your way.`;
+      g.msgAt = performance.now() + 6000;
+    }
+    enterEdge(g.e);
+    render();
+    if (g.view === 'intro') {
+      ctx.fit([G.nodes[r.e0.from], tp], 15, { bearing: GRID, duration: 700 });
+      setTimeout(() => {
+        if (g && g.view === 'intro') g.view = 'follow';
+      }, 1700);
+    } else map.jumpTo({ center: G.nodes[r.e0.from], zoom: ZOOM, bearing: GRID });
+    g.raf = requestAnimationFrame(tick);
+    window.addEventListener('keydown', onKey);
+  }
+
+  function stop() {
+    if (!g) return;
+    cancelAnimationFrame(g.raf);
+    window.removeEventListener('keydown', onKey);
+    g = null;
+    carMk.remove();
+    offEl.hidden = true;
+    lockMap(false);
+    document.body.classList.remove('gridding');
+    for (const id of ['gg-trail', 'gg-best', 'gg-target', 'gg-goto']) setData(id, EMPTY);
+    if (map.getLayer('gg-arrows')) map.setLayoutProperty('gg-arrows', 'visibility', 'none');
+    map.setGlobalStateProperty('quiet', ctx.mode === 'practice');
+  }
+
+  const onKey = (e) => {
+    if (!g || g.done || g.loading) return;
+    if (e.key === 'ArrowLeft') press('L');
+    else if (e.key === 'ArrowRight') press('R');
+    else if (e.key === ' ') togglePause();
+  };
+
+  /** Starting along edge e: a note if it breaks the rule, and the home-stretch check. */
+  function enterEdge(e) {
+    const note = exceptionNote(e);
+    if (note && note !== g.lastNote) {
+      g.msg = `ℹ ${note}`;
+      g.msgAt = performance.now();
+    }
+    g.lastNote = note;
+    if (!g.home && isCore(e.from) && straightTo(e, g.target.node)) {
+      g.home = true;
+      g.goTo = null;
+      g.queued = null;
+      setData('gg-goto', EMPTY);
+      g.msg = `✓ Right road: ${short(e.name)} takes you straight there.`;
+      g.msgAt = performance.now();
+    }
+  }
+
+  function speedNow() {
+    const base = SPEED * PACE[prefs.pace];
+    if (g.home) return base * HOME_SPEED;
+    if (g.goTo != null) return base * GOTO_SPEED;
+    if (g.boost) return base * HOLD_SPEED;
+    // slow down before a real intersection, so there's a moment to decide
+    if (choices(g.e).decision && g.e.len - g.s < 30) return base * CORNER_SLOW;
+    return base;
+  }
+
+  function tick(now) {
+    if (!g || g.loading) return;
+    const dt = Math.min(0.1, (now - g.last) / 1000);
+    g.last = now;
+    if (!g.paused && !g.done && !g.waiting && g.view !== 'intro') {
+      g.s += dt * speedNow();
+      let guard = 0;
+      while (g && !g.done && !g.waiting && g.s >= g.e.len && guard++ < 50) {
+        const over = g.s - g.e.len;
+        arrive();
+        if (g && !g.waiting && !g.done) g.s = Math.min(over, g.e.len);
+      }
+    }
+    if (!g) return;
+    const { p, b } = g.waiting || g.done ? { p: G.nodes[g.e.to], b: g.e.b1 } : posOnEdge(g.e, g.s);
+    g.pos = p;
+    carMk.setLngLat(p);
+    carMk.setRotation(b);
+    carEl.classList.toggle('sigL', g.queued === 'L');
+    carEl.classList.toggle('sigR', g.queued === 'R');
+    if (g.view === 'follow' && !g.done) {
+      const pad = ctx.padding();
+      const H = window.innerHeight;
+      // the car a little below the middle of the open area: more road ahead
+      const oy = pad.top + (H - pad.top - pad.bottom) * 0.62 - H / 2;
+      map.easeTo({ center: p, zoom: ZOOM, bearing: GRID, offset: [0, oy], duration: 0 });
+    }
+    pointToTarget();
+    g.raf = requestAnimationFrame(tick);
+  }
+
+  /** At the end of g.e: finish, stop at a tapped corner, turn, go straight, or wait. */
+  function arrive() {
+    const e = g.e;
+    const n = e.to;
+    g.driven += e.len;
+    g.trail.push(...e.pts.slice(1));
+    setData('gg-trail', line(g.trail));
+    if (g.msg && performance.now() - g.msgAt > 3500) g.msg = '';
+    if (n === g.target.node) return finish();
+    if (g.goTo === n) {
+      g.msg = ''; // the tapped corner: say where you are, not an older note
+      return stopHere();
+    }
+    if (g.auto) autopilot(e);
+    const c = choices(e);
+    if (!c.decision) {
+      if (!c.only) return stopHere('Dead end.');
+      if (c.uturn) {
+        g.msg = `Dead end: turning around on ${short(e.name)}.`;
+        g.msgAt = performance.now();
+      }
+      go(c.only);
+      return;
+    }
+    if (g.queued) {
+      const side = g.queued;
+      g.queued = null;
+      const nx = side === 'L' ? c.left : c.right;
+      if (nx) {
+        go(nx);
+        render();
+        return;
+      }
+      refuse(e, side);
+    }
+    if (c.straight) {
+      go(c.straight);
+      render();
+      return;
+    }
+    stopHere('End of the road this way: turn left or right.');
+  }
+  function go(nx) {
+    g.e = nx;
+    g.s = 0;
+    g.waiting = false;
+    enterEdge(nx);
+  }
+  function stopHere(msg) {
+    g.waiting = true;
+    g.goTo = null;
+    setData('gg-goto', EMPTY);
+    g.s = g.e.len;
+    if (msg && !g.msg) {
+      g.msg = msg;
+      g.msgAt = performance.now();
+    }
+    if (!g.msg) {
+      g.msg = `At ${G.label(g.e.to)}. Turn left or right, or tap a corner further ahead.`;
+      g.msgAt = performance.now();
+    }
+    render();
+  }
+  /** Why there's no turn that way: a one-way street against you, or no road at all. */
+  function refuse(e, side) {
+    let why = null;
+    for (const d of G.inn[e.to]) {
+      if (!d.oneway || d.seg === e.seg) continue;
+      const outward = (d.b1 + 180) % 360;
+      const dd = angleDiff(outward, e.b1);
+      if (side === 'L' ? dd < -20 && dd > -160 : dd > 20 && dd < 160) {
+        why = wrongWay(d);
+        g.wrong++;
+        showArrows(d.name);
+        break;
+      }
+    }
+    g.msg = `⛔ ${why || `No ${side === 'L' ? 'left' : 'right'} turn here: there's no road that way.`}`;
+    g.msgAt = performance.now();
+  }
+  function press(side) {
+    if (!g || g.done || g.loading) return;
+    if (g.waiting) {
+      const c = choices(g.e);
+      const nx = side === 'L' ? c.left : c.right;
+      if (!nx) {
+        refuse(g.e, side);
+        render();
+        return;
+      }
+      g.msg = '';
+      go(nx);
+      render();
+      return;
+    }
+    g.queued = g.queued === side ? null : side;
+    g.home = false;
+    if (g.goTo != null) {
+      g.goTo = null;
+      setData('gg-goto', EMPTY);
+    }
+    render();
+  }
+  function togglePause() {
+    if (!g || g.done) return;
+    g.paused = !g.paused;
+    render();
+  }
+  function autopilot(e) {
+    // test helper: follow the shortest route from here
+    const r = shortest(e, g.target.node, e.len);
+    const nx = r && r.path[1];
+    const c = choices(e);
+    g.queued = !nx || !c.decision || nx === c.straight ? null : nx === c.left ? 'L' : nx === c.right ? 'R' : null;
+  }
+
+  // ---- tap a corner ahead; hold to speed up -------------------------------------------------------
+  const cont = map.getCanvasContainer();
+  let down = null, holdTimer = 0;
+  const active = () => g && !g.loading && !g.done;
+  for (const ev of ['contextmenu', 'selectstart']) cont.addEventListener(ev, (e) => active() && e.preventDefault());
+  cont.addEventListener('pointerdown', (e) => {
+    if (!active()) return;
+    if (g.view === 'intro') {
+      g.view = 'follow';
+      return;
+    }
+    down = { x: e.clientX, y: e.clientY, moved: false };
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(() => {
+      if (down && active()) {
+        g.boost = true;
+        carEl.classList.add('boost');
+      }
+    }, 260);
+  });
+  cont.addEventListener('pointermove', (e) => {
+    if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 14) down.moved = true;
+  });
+  const up = (e, cancel) => {
+    clearTimeout(holdTimer);
+    const wasBoost = g && g.boost;
+    if (g) g.boost = false;
+    carEl.classList.remove('boost');
+    if (!cancel && down && !down.moved && !wasBoost && active() && !g.paused) tapAt(e.clientX, e.clientY);
+    down = null;
+  };
+  cont.addEventListener('pointerup', (e) => up(e, false));
+  cont.addEventListener('pointercancel', (e) => up(e, true));
+
+  function tapAt(sx, sy) {
+    const rect = map.getContainer().getBoundingClientRect();
+    const st = g.waiting ? choices(g.e).straight : null;
+    const chain = g.waiting ? (st ? aheadChain(st) : []) : aheadChain(g.e);
+    let best = null;
+    for (const { node } of chain) {
+      if (G.nb[node].size < 3) continue;
+      const p = map.project(G.nodes[node]);
+      const d = Math.hypot(p.x + rect.left - sx, p.y + rect.top - sy);
+      if (d < 70 && (!best || d < best.d)) best = { node, d };
+    }
+    if (!best) {
+      g.msg = chain.length ? 'Tap a corner ahead of you on this road.' : 'No road straight ahead: turn left or right.';
+      g.msgAt = performance.now();
+      render();
+      return;
+    }
+    g.goTo = best.node;
+    g.queued = null;
+    setData('gg-goto', point(G.nodes[best.node]));
+    if (g.waiting) {
+      g.msg = '';
+      go(st);
+    }
+    render();
+  }
+
+  function pointToTarget() {
+    if (!g || g.done || !g.target) return;
+    const pad = ctx.padding();
+    const tp = map.project(G.nodes[g.target.node]);
+    const rect = map.getContainer().getBoundingClientRect();
+    const W = window.innerWidth, H = window.innerHeight;
+    const x = tp.x + rect.left, y = tp.y + rect.top;
+    const top = pad.top + 8, bottom = H - pad.bottom - 8;
+    const inView = x > 14 && x < W - 14 && y > top && y < bottom;
+    offEl.hidden = inView;
+    if (inView) return;
+    const cx = W / 2, cy = (top + bottom) / 2;
+    const ang = (Math.atan2(y - cy, x - cx) * 180) / Math.PI;
+    offEl.style.transform = `translate(${Math.min(W - 26, Math.max(26, x))}px, ${Math.min(bottom - 18, Math.max(top + 18, y))}px) translate(-50%, -50%)`;
+    offEl.firstChild.style.transform = `rotate(${ang}deg)`;
+  }
+
+  function finish() {
+    g.done = true;
+    g.waiting = true;
+    offEl.hidden = true;
+    const bestCoords = [];
+    g.best.path.forEach((e, i) => bestCoords.push(...(i ? e.pts.slice(1) : e.pts)));
+    setData('gg-best', line(bestCoords));
+    // zoom out to show the whole drive, yours and the shortest (after the result
+    // is on screen, so the framing allows for its height)
+    const all = [...g.trail, ...bestCoords];
+    requestAnimationFrame(() => g && g.done && ctx.fit(all, 16, { bearing: GRID, duration: 900 }));
+    const mi = (m) => (m / 1609.34).toFixed(2).replace(/0$/, '');
+    const ratio = g.driven / g.best.cost;
+    const ok = ratio <= 1.15 && !g.wrong;
+    const runs = ctx.store.get('gridRuns', { n: 0, clean: 0 });
+    runs.n++;
+    if (ok) runs.clean++;
+    ctx.store.set('gridRuns', runs);
+    g.result = `<div class="fb ${ok ? 'ok' : 'no'}">${ok ? '✓' : '•'} You made it: ${mi(g.driven)} mi${
+      g.wrong ? `, ${g.wrong} wrong-way ${g.wrong === 1 ? 'try' : 'tries'}` : ''
+    }. Shortest legal route: ${mi(g.best.cost)} mi${ratio <= 1.03 ? ' (that was it)' : ''}.</div>
+      <div class="hint"><span class="gg-key you"></span> your route · <span class="gg-key best"></span> shortest: ${esc(describe(g.best.path))}</div>
+      <button class="primary" id="ggAgain">Another route</button>`;
+    render();
+  }
+
+  /** "Up 8th Ave → right on W 42nd St → …" */
+  function describe(path) {
+    const legs = [];
+    for (let i = 0; i < path.length; i++) {
+      const e = path[i];
+      const last = legs[legs.length - 1];
+      if (last && last.name === e.name) continue;
+      if (!isCore(e.from) && !last) continue; // still on the way in from outside
+      const dir = gridDir(e.b0);
+      let turn;
+      if (!last) turn = dir === 'U' ? 'Up' : dir === 'D' ? 'Down' : dir === 'E' ? 'East on' : 'West on';
+      else {
+        const d = angleDiff(e.b0, path[i - 1].b1);
+        turn = d < -20 ? 'left on' : d > 20 ? 'right on' : 'onto';
+      }
+      legs.push({ name: e.name, text: `${turn} ${short(e.name)}` });
+    }
+    return legs.map((l) => l.text).join(' → ');
+  }
+
+  // ---- words on screen -------------------------------------------------------------------
+  function toGo() {
+    const a = gridXY(g.pos || G.nodes[g.e.from]), b = gridXY(G.nodes[g.target.node]);
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    const mi = Math.hypot(dx, dy) / 1609.34;
+    const ud = Math.abs(dy) > 60 ? (dy > 0 ? 'uptown' : 'downtown') : '';
+    const ew = Math.abs(dx) > 60 ? (dx > 0 ? 'east' : 'west') : '';
+    return `${mi < 0.1 ? 'under 0.1' : mi.toFixed(1)} mi to go${ud || ew ? `, ${[ud, ew].filter(Boolean).join(' and ')}` : ''}`;
+  }
+  function render() {
+    if (!g) return;
+    if (g.loading) {
+      ctx.hud('<div class="qkind">🚕 Drive Manhattan</div><div class="q">Loading the street map…</div>');
+      ctx.sheet(`${g.opts.header()}`);
+      g.opts.bindHeader();
+      return;
+    }
+    const t = g.target;
+    const tgt = t.name ? `<b>${esc(t.name)}</b> <span class="muted">(${esc(t.label)})</span>` : `<b>${esc(t.label)}</b>`;
+    const where = `On <b>${esc(short(g.e.name))}</b> heading <b>${WORD[gridDir(g.e.b0)]}</b>`;
+    ctx.hud(
+      `<div class="qkind">🚕 Drive Manhattan${g.entry ? ` · from ${esc(g.entry.from)}` : ''}</div><div class="q">Get to ${tgt}</div>
+       ${g.done ? '' : `<div class="hint">${where}${g.queued ? ` · turning <b>${g.queued === 'L' ? 'left' : 'right'}</b> at the next corner` : ''} · ${esc(toGo())}</div>`}`
+    );
+    const btn = (side, label) => `<button class="ggturn${g.queued === side ? ' on' : ''}" data-side="${side}" ${g.done ? 'disabled' : ''}>${label}</button>`;
+    ctx.sheet(
+      `${g.opts.header()}<div id="qbody">
+        ${g.done ? g.result : `<div class="ggctl">${btn('L', '◀ Left')}${btn('R', 'Right ▶')}</div>
+        <div class="ggmsg${g.msg ? '' : ' muted'}">${g.msg ? esc(g.msg) : 'Left/Right turn at the next intersection. Tap a corner ahead to zip there; hold the map to speed up.'}</div>`}
+        <div class="ggbar">
+          ${g.done ? '' : `<button id="ggPause">${g.paused ? '▶ Go' : '⏸ Pause'}</button>`}
+          <button id="ggOptsBtn" aria-expanded="${!!prefs.optsOpen}">Options ${prefs.optsOpen ? '▴' : '▾'}</button>
+        </div>
+        <div class="ggopts"${prefs.optsOpen ? '' : ' hidden'}>
+          <select id="ggArea" aria-label="Area">${Object.entries(AREAS).map(([k, v]) => `<option value="${k}"${prefs.area === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
+          <select id="ggFrom" aria-label="Start">${[['both', 'Start: mixed'], ['entries', 'Start: tunnels & bridges'], ['anywhere', 'Start: anywhere']].map(([k, v]) => `<option value="${k}"${prefs.from === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
+          <select id="ggPace" aria-label="Speed">${Object.keys(PACE).map((p) => `<option value="${p}"${prefs.pace === p ? ' selected' : ''}>${p[0].toUpperCase() + p.slice(1)}</option>`).join('')}</select>
+          <label><input type="checkbox" id="ggArrows"${prefs.arrows ? ' checked' : ''}/> One-way arrows</label>
+          <label><input type="checkbox" id="ggMapFirst"${prefs.mapFirst ? ' checked' : ''}/> Map first</label>
+        </div>
+      </div>`
+    );
+    g.opts.bindHeader();
+    for (const b of document.querySelectorAll('.ggturn')) b.addEventListener('click', () => press(b.dataset.side));
+    document.getElementById('ggPause')?.addEventListener('click', togglePause);
+    document.getElementById('ggAgain')?.addEventListener('click', () => start(g.opts));
+    document.getElementById('ggOptsBtn').addEventListener('click', () => {
+      prefs.optsOpen = !prefs.optsOpen;
+      savePrefs();
+      render();
+    });
+    const restartOn = (id, key) =>
+      document.getElementById(id).addEventListener('change', (e) => {
+        prefs[key] = e.target.value;
+        savePrefs();
+        start(g.opts);
+      });
+    restartOn('ggArea', 'area');
+    restartOn('ggFrom', 'from');
+    document.getElementById('ggPace').addEventListener('change', (e) => {
+      prefs.pace = e.target.value;
+      savePrefs();
+    });
+    document.getElementById('ggMapFirst').addEventListener('change', (e) => {
+      prefs.mapFirst = e.target.checked;
+      savePrefs();
+    });
+    document.getElementById('ggArrows').addEventListener('change', (e) => {
+      prefs.arrows = e.target.checked;
+      savePrefs();
+      showArrows();
+    });
+  }
+
+  return {
+    start,
+    stop,
+    get running() {
+      return !!g;
+    },
+    // for tests
+    _state: () => g,
+    _graph: () => G,
+    _model: { choices, moves, shortest, straightTo, aheadChain, load, rule, describe },
+    _autopilot() {
+      if (g) g.auto = true;
+    },
+    _screen(node) {
+      const p = map.project(G.nodes[node]);
+      const r = map.getContainer().getBoundingClientRect();
+      return [p.x + r.left, p.y + r.top];
+    },
+  };
+}
 
 /** Min-heap on .c */
 class Heap {
@@ -275,760 +874,4 @@ class Heap {
     }
     return top;
   }
-}
-
-/** Shortest legal route from a moving car (no U-turns). Returns [{ai,s,d}] states. */
-function shortest(start, target) {
-  const sk = (st) => `${st.ai}:${st.s}:${st.d}`;
-  const dist = new Map([[sk(start), 0]]);
-  const prev = new Map();
-  const open = new Heap();
-  open.push({ ...start, c: 0 });
-  while (open.size) {
-    const cur = open.pop();
-    if (cur.c > dist.get(sk(cur))) continue;
-    if (cur.ai === target.ai && cur.s === target.s) {
-      const path = [cur];
-      let k = sk(cur);
-      while (prev.has(k)) {
-        const p = prev.get(k);
-        path.unshift(p);
-        k = sk(p);
-      }
-      return { cost: cur.c, path };
-    }
-    // the first block is already under way: straight ahead only
-    const first = !start.free && cur.ai === start.ai && cur.s === start.s && cur.d === start.d && cur.c === 0;
-    for (const [d, turning] of first ? [[cur.d, false]] : [[cur.d, false], [LEFT[cur.d], true], [RIGHT[cur.d], true]]) {
-      const r = step(cur.ai, cur.s, d, turning);
-      if (r.why) continue;
-      const nx = { ai: r.ai, s: r.s, d };
-      const c = cur.c + r.len;
-      if (c < (dist.get(sk(nx)) ?? Infinity)) {
-        dist.set(sk(nx), c);
-        prev.set(sk(nx), { ai: cur.ai, s: cur.s, d: cur.d });
-        open.push({ ...nx, c });
-      }
-    }
-  }
-  return null;
-}
-
-/** "Up 8th Ave → right on 40th St → …" from a list of states. */
-function describe(path) {
-  const legs = [];
-  for (let i = 1; i < path.length; i++) {
-    const p = path[i];
-    const prevD = path[i - 1].d;
-    const last = legs[legs.length - 1];
-    if (last && last.d === p.d) continue;
-    const from = path[i - 1];
-    const road = p.d === 'U' || p.d === 'D' ? aveName(from.ai, from.s) : streetName(from.s);
-    const turn = !last ? (p.d === 'U' ? 'Up' : p.d === 'D' ? 'Down' : p.d === 'E' ? 'East on' : 'West on') : LEFT[prevD] === p.d ? 'left on' : 'right on';
-    legs.push({ d: p.d, text: `${turn} ${road}` });
-  }
-  return legs.map((l) => l.text).join(' → ');
-}
-
-export function initGridGame(ctx) {
-  let g = null;
-  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-  const rand = (a) => a[Math.floor(Math.random() * a.length)];
-  // mapFirst: show the whole grid before driving. Off by default: working out
-  // where the address is from the street and avenue alone is the harder,
-  // more useful skill (it's all you have in a real car).
-  // from: 'both' (half the rounds start at a tunnel or bridge), 'entries', or 'anywhere'
-  const prefs = { pace: 'easy', arrows: false, mapFirst: false, area: 'all', from: 'both', ...ctx.store.get('gridPrefs', {}) };
-  const savePrefs = () => ctx.store.set('gridPrefs', prefs);
-
-  // ---- picture ------------------------------------------------------------
-  const SVGNS = 'http://www.w3.org/2000/svg';
-  const el = (tag, attrs = {}, text) => {
-    const e = document.createElementNS(SVGNS, tag);
-    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
-    if (text != null) e.textContent = text;
-    return e;
-  };
-  // world coordinates: x feet east of 5th Ave, y feet *down* (uptown is up)
-  const X = (ai) => AVES[ai].x;
-  const Y = (s) => -s * FT_PER_STREET;
-  let wrap, svg, world, labelsG, arrowsG, pathEl, bestEl, car, flag, flagLabel, flagG, northEl, offscreen, gotoEl;
-
-  function buildPicture() {
-    wrap = document.createElement('div');
-    wrap.id = 'gridgame';
-    svg = el('svg', { width: '100%', height: '100%' });
-    world = el('g');
-    const parksG = el('g', { class: 'gg-parks' });
-    for (const p of PARKS) {
-      const i = (p.inset || 0) * FT_PER_STREET;
-      const x0 = X(p.a0) + 40 + i, x1 = X(p.a1) - 40 - i, y0 = Y(p.s1) + 40, y1 = Y(p.s0) - 40;
-      parksG.append(el('rect', { x: x0, y: y0, width: x1 - x0, height: y1 - y0, rx: 30, class: p.green ? 'park' : 'bldg' }));
-      if (p.big) {
-        // a big park: repeat the name down its length so it's visible at any zoom
-        for (let s0 = p.s0 + 4; s0 < p.s1; s0 += 12) parksG.append(el('text', { x: (x0 + x1) / 2, y: Y(s0 + 2), class: 'gg-parkname big' }, p.name));
-      } else parksG.append(el('text', { x: (x0 + x1) / 2, y: (y0 + y1) / 2, class: 'gg-parkname' }, p.name));
-    }
-    for (const [ts, tname] of Object.entries(TRANSVERSES))
-      parksG.append(el('text', { x: (X(col('8')) + X(col('5'))) / 2, y: Y(+ts) - 50, class: 'gg-parkname tv' }, tname));
-    const roads = el('g', { class: 'gg-roads' });
-    // streets
-    for (let s = S_MIN; s <= S_MAX; s++) {
-      for (let ai = 0; ai < AVES.length; ai++) {
-        if (!exists(ai, s)) continue;
-        const aj = nextAve(ai, s, 1);
-        if (aj < 0 || !streetBlock(s, ai)) continue;
-        roads.append(el('line', { x1: X(ai), y1: Y(s), x2: X(aj), y2: Y(s), class: TWO_WAY_STREETS.has(s) ? 'st two' : 'st' }));
-      }
-    }
-    // avenues, block by block (some have gaps)
-    for (let ai = 0; ai < AVES.length; ai++) {
-      for (let s = AVES[ai].from; s < AVES[ai].to; s++) {
-        const v = aveBlock(ai, s);
-        if (!v) continue;
-        roads.append(el('line', { x1: X(ai), y1: Y(s) + 12, x2: X(ai), y2: Y(s + 1) - 12, class: `av${v === 'two' ? ' two' : ''}` }));
-      }
-    }
-    arrowsG = el('g', { class: 'gg-arrows' });
-    bestEl = el('polyline', { class: 'gg-best', points: '' });
-    pathEl = el('polyline', { class: 'gg-path', points: '' });
-    flagG = el('g');
-    flag = el('circle', { r: 70, class: 'gg-flag' });
-    flagLabel = el('text', { class: 'gg-flaglabel', x: 110, y: 30 });
-    flagG.append(flag, flagLabel);
-    car = el('g', { class: 'gg-car' });
-    car.append(el('path', { d: 'M0 -95 L62 70 L0 38 L-62 70 Z' }));
-    car.append(el('circle', { class: 'blink L', cx: -70, cy: -40, r: 26 }));
-    car.append(el('circle', { class: 'blink R', cx: 70, cy: -40, r: 26 }));
-    gotoEl = el('circle', { r: 85, class: 'gg-goto' });
-    gotoEl.style.display = 'none';
-    world.append(parksG, roads, arrowsG, bestEl, pathEl, flagG, gotoEl, car);
-    bindPointer();
-    labelsG = el('g', { class: 'gg-labels' });
-    northEl = el('g', { class: 'gg-north' });
-    northEl.append(el('circle', { r: 19 }), el('path', { d: 'M0 -14 L6 6 L0 2 L-6 6 Z' }), el('text', { y: 17 }, 'N'));
-    offscreen = el('g', { class: 'gg-offscreen' });
-    offscreen.append(el('circle', { r: 13 }), el('polygon'));
-    svg.append(world, labelsG, northEl, offscreen);
-    wrap.append(svg);
-    document.body.append(wrap);
-  }
-
-  /**
-   * One-way chevrons on every block (shown when Arrows is on, or briefly after
-   * a wrong turn). Blocks that break the rule are drawn in amber.
-   */
-  function drawArrows(onlyStreet = null, onlyAve = null) {
-    arrowsG.replaceChildren();
-    const chev = (x, y, rot, exc) =>
-      arrowsG.append(el('path', { d: 'M-34 22 L0 -18 L34 22', transform: `translate(${x} ${y}) rotate(${rot})`, class: exc ? 'exc' : '' }));
-    if (onlyAve == null)
-      for (let s = S_MIN; s <= S_MAX; s++) {
-        if (onlyStreet != null && s !== onlyStreet) continue;
-        for (let ai = 0; ai < AVES.length; ai++) {
-          if (!exists(ai, s)) continue;
-          const aj = nextAve(ai, s, 1);
-          const v = aj < 0 ? null : streetBlock(s, ai);
-          if (!v) continue;
-          const exc = v !== ruleStreet(s);
-          const mx = (X(ai) + X(aj)) / 2;
-          if (v === 'two') {
-            chev(mx - 60, Y(s), 90, exc);
-            chev(mx + 60, Y(s), 270, exc);
-          } else chev(mx, Y(s), v === 'E' ? 90 : 270, exc);
-        }
-      }
-    if (onlyStreet == null)
-      for (let ai = 0; ai < AVES.length; ai++) {
-        if (onlyAve != null && ai !== onlyAve) continue;
-        for (let s = AVES[ai].from; s < AVES[ai].to; s++) {
-          const v = aveBlock(ai, s);
-          if (!v) continue;
-          const exc = v !== ruleAve(ai, s) && !(ai === PARK && s >= 41 && s <= 45);
-          if (s % 2 && !exc) continue; // every other block is enough, unless it's an exception
-          const my = (Y(s) + Y(s + 1)) / 2;
-          if (v === 'two') {
-            chev(X(ai) - 40, my, 0, exc);
-            chev(X(ai) + 40, my, 180, exc);
-          } else chev(X(ai), my, v === 'U' ? 0 : 180, exc);
-        }
-      }
-  }
-  let flashTimer = 0;
-  function flashArrows(st) {
-    if (prefs.arrows) return;
-    clearTimeout(flashTimer);
-    if (st.street != null) drawArrows(st.street, null);
-    else drawArrows(null, st.ave);
-    arrowsG.classList.add('flash');
-    flashTimer = setTimeout(() => {
-      arrowsG.classList.remove('flash');
-      arrowsG.replaceChildren();
-    }, 2600);
-  }
-
-  // ---- camera ---------------------------------------------------------------
-  const SCALE_PX_PER_FT = () => Math.min(0.2, Math.max(0.12, window.innerWidth / 2600));
-  // Camera. 'intro': the whole grid with you and the destination, then a quick
-  // zoom into your car; 'follow': chase the car; 'end': zoom out to fit your
-  // route and the shortest one.
-  const INTRO_HOLD_MS = 550;
-  const INTRO_ZOOM_MS = 700;
-  const END_ZOOM_MS = 900;
-  const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-  function viewGoal(pad, W, H) {
-    const areaH = H - pad.top - pad.bottom;
-    if (g.view === 'follow') return { wx: g.pos.x, wy: g.pos.y, k: SCALE_PX_PER_FT(), fy: 0.55 };
-    // fit a box of the grid into the open area, leaving room for the labels
-    let x0, x1, y0, y1;
-    if (g.view === 'intro') {
-      x0 = X(0); x1 = X(AVES.length - 1); y0 = Y(S_MAX); y1 = Y(S_MIN);
-    } else {
-      const pts = [...g.trail, ...g.best.path.map((p) => [X(p.ai), Y(p.s)])];
-      x0 = Math.min(...pts.map((p) => p[0])); x1 = Math.max(...pts.map((p) => p[0]));
-      y0 = Math.min(...pts.map((p) => p[1])); y1 = Math.max(...pts.map((p) => p[1]));
-    }
-    const k = Math.min((W - 70) / Math.max(800, x1 - x0 + 500), (areaH - 50) / Math.max(800, y1 - y0 + 500));
-    return { wx: (x0 + x1) / 2, wy: (y0 + y1) / 2, k: Math.min(k, SCALE_PX_PER_FT()), fy: 0.53 };
-  }
-  function startFollow() {
-    if (!g || g.view !== 'intro') return;
-    g.view = 'follow';
-    g.trans = g.camNow ? { from: g.camNow, t0: performance.now(), dur: ctx.dur(INTRO_ZOOM_MS) } : null;
-    g.last = performance.now();
-  }
-  function camera() {
-    const pad = ctx.padding();
-    const W = window.innerWidth, H = window.innerHeight;
-    const goal = viewGoal(pad, W, H);
-    let cam = goal;
-    if (g.trans) {
-      const p = g.trans.dur ? Math.min(1, (performance.now() - g.trans.t0) / g.trans.dur) : 1;
-      const e = ease(p);
-      const f = g.trans.from;
-      cam = {
-        wx: f.wx + (goal.wx - f.wx) * e,
-        wy: f.wy + (goal.wy - f.wy) * e,
-        k: f.k * Math.pow(goal.k / f.k, e), // zoom evenly
-        fy: f.fy + (goal.fy - f.fy) * e,
-      };
-      if (p >= 1) g.trans = null;
-    }
-    g.camNow = cam;
-    const k = cam.k;
-    const cx = W / 2;
-    const cy = pad.top + (H - pad.top - pad.bottom) * cam.fy;
-    const tx = cx - cam.wx * k, ty = cy - cam.wy * k;
-    world.setAttribute('transform', `translate(${tx} ${ty}) scale(${k})`);
-    g.cam = { tx, ty, k };
-    // markers keep a readable size when zoomed out
-    g.mScale = Math.max(1, 0.13 / k);
-    flagG.setAttribute('transform', `translate(${g.flagAt[0]} ${g.flagAt[1]}) scale(${g.mScale})`);
-    // sticky labels: avenue names along the top of the open area, street numbers on the left
-    const top = pad.top + 4, left = 4, bottom = H - pad.bottom;
-    const lab = [];
-    let lastRight = -1e9;
-    for (let ai = 0; ai < AVES.length; ai++) {
-      const x = tx + X(ai) * k;
-      if (x < 16 || x > W - 16) continue;
-      const s = Math.round(-((top + 40 - ty) / k) / FT_PER_STREET);
-      const sv = Math.min(AVES[ai].to, Math.max(AVES[ai].from, s));
-      if (Math.abs(sv - s) > 6) continue; // this avenue isn't on screen up here
-      const text = aveShort(ai, sv);
-      const half = text.length * 3.4;
-      if (x - half < lastRight + 4) continue; // would overlap the one before
-      lastRight = x + half;
-      lab.push(el('text', { x, y: top + 12, class: 'gg-ave' }, text));
-    }
-    const every = FT_PER_STREET * k >= 13 ? 1 : FT_PER_STREET * k * 5 >= 13 ? 5 : 10;
-    for (let s = S_MIN; s <= S_MAX; s++) {
-      const y = ty + Y(s) * k;
-      if (y < top + 26 || y > bottom - 6) continue;
-      if (every > 1 && s % every && !(s === S_MIN || s === S_MAX)) continue;
-      lab.push(el('text', { x: left, y: y + 4, class: `gg-st${TWO_WAY_STREETS.has(s) ? ' two' : ''}` }, String(s)));
-    }
-    labelsG.replaceChildren(...lab);
-    // true north: the grid is turned ~29° clockwise, so with uptown up, north points up-left
-    northEl.setAttribute('transform', `translate(${W - 30} ${bottom - 30}) rotate(-29)`);
-    // the target, pinned to the edge when it's off screen
-    const fx = tx + X(g.target.ai) * k, fy = ty + Y(g.target.s) * k;
-    const inView = fx > 12 && fx < W - 12 && fy > top + 20 && fy < bottom - 12;
-    flagLabel.style.display = inView ? '' : 'none';
-    offscreen.style.display = inView ? 'none' : '';
-    if (!inView) {
-      const ex = Math.min(W - 22, Math.max(22, fx));
-      const ey = Math.min(bottom - 22, Math.max(top + 30, fy));
-      // arrow inside the marker, pointing from you toward the destination
-      const len = Math.hypot(fx - cx, fy - cy) || 1;
-      const ux = (fx - cx) / len, uy = (fy - cy) / len;
-      const pts = [
-        [ex + ux * 9, ey + uy * 9],
-        [ex - ux * 5 - uy * 6, ey - uy * 5 + ux * 6],
-        [ex - ux * 5 + uy * 6, ey - uy * 5 - ux * 6],
-      ];
-      offscreen.firstChild.setAttribute('cx', ex);
-      offscreen.firstChild.setAttribute('cy', ey);
-      offscreen.lastChild.setAttribute('points', pts.map((p) => p.map((v) => v.toFixed(1)).join(',')).join(' '));
-    }
-  }
-
-  // ---- game -----------------------------------------------------------------
-  function pickRoute() {
-    const [a0, a1] = AREAS[prefs.area] || AREAS.all;
-    const places = PLACES.filter((p) => p.s >= a0 && p.s <= a1 && exists(p.ai, p.s));
-    const corner = () => ({ ai: Math.floor(Math.random() * AVES.length), s: a0 + Math.floor(Math.random() * (a1 - a0 + 1)) });
-    // entries that are legal (heading straight on is allowed) and in the chosen area
-    const entries = ENTRIES.filter((e) => e.s >= a0 - 2 && e.s <= a1 + 2 && exists(e.ai, e.s) && !step(e.ai, e.s, e.d, false).why);
-    const useEntry = entries.length && (prefs.from === 'entries' || (prefs.from === 'both' && Math.random() < 0.5));
-    for (let tries = 0; tries < 400; tries++) {
-      const target = places.length && Math.random() < 0.7 ? rand(places) : { name: null, ...corner() };
-      if (!exists(target.ai, target.s)) continue;
-      let start, entry = null;
-      if (useEntry) {
-        entry = rand(entries);
-        start = { ai: entry.ai, s: entry.s, d: entry.d };
-      } else {
-        const { ai, s } = corner();
-        if (!exists(ai, s) || s <= a0 || s >= a1) continue;
-        const ds = ['U', 'D', 'E', 'W'].filter((d) => !step(ai, s, d, false).why);
-        if (!ds.length) continue;
-        start = { ai, s, d: rand(ds) };
-      }
-      const blocks = Math.abs(target.s - start.s) + Math.abs(X(target.ai) - X(start.ai)) / 700;
-      if (blocks < 8 || blocks > (entry ? 45 : 30)) continue;
-      if (straightTo(start, start.d, target)) continue; // already on the right road: no decision to make
-      const best = shortest(start, target);
-      if (!best || best.path.length < 6) continue;
-      return { start, target, best, entry };
-    }
-    return null;
-  }
-
-  function start(opts) {
-    stop();
-    if (!wrap) buildPicture();
-    const r = pickRoute();
-    const { start: st0, target, best, entry } = r;
-    g = {
-      opts,
-      target,
-      best,
-      start: st0,
-      entry,
-      home: false,
-      cur: { ...st0 }, // the corner you're driving away from, and direction
-      next: null, // the corner you're driving to
-      t: 0, // 0..1 along the current block
-      pos: { x: X(st0.ai), y: Y(st0.s) },
-      queued: null, // 'L' | 'R'
-      waiting: false,
-      paused: false,
-      done: false,
-      driven: 0,
-      wrong: 0,
-      trail: [[X(st0.ai), Y(st0.s)]],
-      msg: '',
-      last: performance.now(),
-      raf: 0,
-    };
-    document.body.classList.add('gridding');
-    wrap.hidden = false;
-    g.flagAt = [X(target.ai), Y(target.s)];
-    flagLabel.textContent = target.name || `${aveName(target.ai, target.s).replace(' Ave', '')} & ${ord(target.s)}`;
-    bestEl.setAttribute('points', '');
-    pathEl.setAttribute('points', '');
-    gotoEl.style.display = 'none';
-    if (prefs.arrows) drawArrows();
-    else arrowsG.replaceChildren();
-    beginBlock();
-    if (entry) {
-      g.msg = `Coming in from ${entry.from}: ${entry.where}.`;
-      g.msgAt = performance.now() + 6000; // keep it up a while
-    }
-    // a quick look at the whole grid first, then zoom in (skipped with reduced motion)
-    g.view = prefs.mapFirst && ctx.dur(1) ? 'intro' : 'follow';
-    g.introUntil = null; // set on the first frame drawn, so a slow page load doesn't eat the intro
-    g.camNow = null;
-    render();
-    g.raf = requestAnimationFrame(tick);
-    window.addEventListener('keydown', onKey);
-  }
-
-  function stop() {
-    if (!g) return;
-    cancelAnimationFrame(g.raf);
-    window.removeEventListener('keydown', onKey);
-    g = null;
-    if (wrap) wrap.hidden = true;
-    document.body.classList.remove('gridding');
-  }
-
-  const onKey = (e) => {
-    if (!g || g.done) return;
-    if (e.key === 'ArrowLeft') press('L');
-    else if (e.key === 'ArrowRight') press('R');
-    else if (e.key === ' ') togglePause();
-  };
-
-  /** Start driving the next block from g.cur in direction g.cur.d (already checked legal). */
-  function beginBlock() {
-    const r = step(g.cur.ai, g.cur.s, g.cur.d, false);
-    g.next = r.why ? null : { ai: r.ai, s: r.s, len: r.len };
-    g.t = 0;
-    g.waiting = !g.next;
-    // driving onto a block that breaks the rule: say so (once per stretch)
-    if (r.note && r.note !== g.lastNote) {
-      g.msg = `ℹ ${r.note}`;
-      g.msgAt = performance.now();
-    }
-    g.lastNote = r.note || null;
-    // On the destination's road, heading toward it, nothing in the way: that's
-    // the decision made. Zip the rest of the way so you still see where it is.
-    if (g.next && !g.home && straightTo(g.cur, g.cur.d, g.target)) {
-      g.home = true;
-      g.goTo = null;
-      g.queued = null;
-      gotoEl.style.display = 'none';
-      const road = g.cur.d === 'U' || g.cur.d === 'D' ? aveName(g.cur.ai, g.cur.s) : streetName(g.cur.s);
-      g.msg = `✓ Right road: ${road} takes you straight there.`;
-      g.msgAt = performance.now();
-    }
-  }
-  /** Can you drive straight from corner c heading d to corner t, legally, without turning? */
-  function straightTo(c, d, t) {
-    let at = { ai: c.ai, s: c.s };
-    for (let i = 0; i < 140; i++) {
-      if (at.ai === t.ai && at.s === t.s) return true;
-      const r = step(at.ai, at.s, d, false);
-      if (r.why) return false;
-      at = { ai: r.ai, s: r.s };
-    }
-    return false;
-  }
-
-  const blockSeconds = (len) => (0.55 + len / 550) * PACE[prefs.pace];
-  const GOTO_SPEED = 0.18; // fraction of the normal block time when heading to a tapped corner
-  const HOLD_SPEED = 0.25; // … and while the map is held down
-  const HOME_SPEED = 0.07; // … and on the home stretch
-
-  // ---- tap a corner ahead to drive straight there; hold the map to speed up ----
-  function bindPointer() {
-    let down = null;
-    let holdTimer = 0;
-    // no text selection, magnifier or context menu on a long press
-    for (const ev of ['contextmenu', 'selectstart']) wrap.addEventListener(ev, (e) => e.preventDefault());
-    wrap.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
-    wrap.addEventListener('pointerdown', (e) => {
-      if (!g || g.done) return;
-      if (g.view === 'intro') {
-        startFollow();
-        return;
-      }
-      down = { x: e.clientX, y: e.clientY, moved: false };
-      clearTimeout(holdTimer);
-      holdTimer = setTimeout(() => {
-        if (down && g && !g.done) {
-          g.boost = true;
-          wrap.classList.add('boost');
-        }
-      }, 260);
-    });
-    wrap.addEventListener('pointermove', (e) => {
-      if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 14) down.moved = true;
-    });
-    const up = (e, cancel) => {
-      clearTimeout(holdTimer);
-      const wasBoost = g && g.boost;
-      if (g) g.boost = false;
-      wrap.classList.remove('boost');
-      if (!cancel && down && !down.moved && !wasBoost && g && !g.done && !g.paused) tapAt(e.clientX, e.clientY);
-      down = null;
-    };
-    wrap.addEventListener('pointerup', (e) => up(e, false));
-    wrap.addEventListener('pointercancel', (e) => up(e, true));
-  }
-
-  /** The corner on your road nearest a tap, if it's ahead of you: drive straight there and stop. */
-  function tapAt(sx, sy) {
-    if (!g.cam) return;
-    const { tx, ty, k } = g.cam;
-    const wx = (sx - tx) / k, wy = (sy - ty) / k;
-    const d = g.cur.d;
-    // the first corner you could still stop at: the one you're driving to, or the one you're at
-    const base = g.next && !g.waiting ? { ai: g.next.ai, s: g.next.s } : { ai: g.cur.ai, s: g.cur.s };
-    let want;
-    if (d === 'U' || d === 'D') {
-      const sw = Math.round(-wy / FT_PER_STREET);
-      if (d === 'U' ? sw < base.s : sw > base.s) return note('Tap a corner ahead of you on this road.');
-      want = { ai: base.ai, s: Math.max(S_MIN, Math.min(S_MAX, sw)) };
-    } else {
-      let best = -1;
-      for (let ai = 0; ai < AVES.length; ai++) if (exists(ai, base.s) && (best < 0 || Math.abs(X(ai) - wx) < Math.abs(X(best) - wx))) best = ai;
-      if (d === 'E' ? best < base.ai : best > base.ai) return note('Tap a corner ahead of you on this road.');
-      want = { ai: best, s: base.s };
-    }
-    // follow the road straight from base; stop early if it doesn't go through
-    let at = { ...base };
-    let why = null;
-    while (at.ai !== want.ai || at.s !== want.s) {
-      const r = step(at.ai, at.s, d, false);
-      if (r.why) {
-        why = r.why;
-        break;
-      }
-      at = { ai: r.ai, s: r.s };
-    }
-    g.goTo = at;
-    g.queued = null;
-    g.msg = why ? `The road stops before there: ${why}` : '';
-    g.msgAt = performance.now();
-    gotoEl.setAttribute('cx', X(at.ai));
-    gotoEl.setAttribute('cy', Y(at.s));
-    gotoEl.style.display = '';
-    if (g.waiting && (at.ai !== g.cur.ai || at.s !== g.cur.s)) beginBlock();
-    else if (g.waiting) stopAtGoTo();
-    render();
-  }
-  function note(text) {
-    g.msg = text;
-    g.msgAt = performance.now();
-    render();
-  }
-  function stopAtGoTo() {
-    g.goTo = null;
-    gotoEl.style.display = 'none';
-    g.waiting = true;
-    g.next = null;
-    const corner = `${aveName(g.cur.ai, g.cur.s)} & ${ord(g.cur.s)}`;
-    g.msg = g.msg || `At ${corner}. Turn left or right, or tap a corner further ahead.`;
-    g.msgAt = performance.now();
-  }
-
-  function tick(now) {
-    if (!g) return;
-    const dt = Math.min(0.1, (now - g.last) / 1000);
-    g.last = now;
-    // the overview stays up for a moment of real screen time: a busy page (still
-    // loading) can stall frames, so count frames drawn as well as time
-    if (g.view === 'intro') {
-      if (g.introUntil == null) g.introUntil = now + INTRO_HOLD_MS;
-      g.introFrames = (g.introFrames || 0) + 1;
-      if (now >= g.introUntil && g.introFrames >= 24) startFollow();
-    }
-    if (g.view !== 'intro' && !g.paused && !g.done && !g.waiting && g.next) {
-      g.t += dt / (blockSeconds(g.next.len) * (g.home ? HOME_SPEED : g.goTo ? GOTO_SPEED : g.boost ? HOLD_SPEED : 1));
-      if (g.t >= 1) arrive();
-    }
-    if (g && g.next && !g.waiting) {
-      const t = Math.min(1, g.t);
-      g.pos = { x: X(g.cur.ai) + (X(g.next.ai) - X(g.cur.ai)) * t, y: Y(g.cur.s) + (Y(g.next.s) - Y(g.cur.s)) * t };
-    } else if (g) g.pos = { x: X(g.cur.ai), y: Y(g.cur.s) };
-    if (!g) return;
-    car.setAttribute('transform', `translate(${g.pos.x} ${g.pos.y}) rotate(${ROT[g.cur.d]}) scale(${g.mScale || 1})`);
-    car.classList.toggle('sigL', g.queued === 'L');
-    car.classList.toggle('sigR', g.queued === 'R');
-    camera();
-    g.raf = requestAnimationFrame(tick);
-  }
-
-  /** Reached the corner g.next. Turn if a turn is queued and legal; else go straight; else wait. */
-  function arrive() {
-    const n = g.next;
-    if (g.msg && performance.now() - g.msgAt > 3500) g.msg = '';
-    g.driven += n.len;
-    g.trail.push([X(n.ai), Y(n.s)]);
-    pathEl.setAttribute('points', g.trail.map((p) => p.join(',')).join(' '));
-    g.cur = { ai: n.ai, s: n.s, d: g.cur.d };
-    if (n.ai === g.target.ai && n.s === g.target.s) return finish();
-    if (g.goTo && n.ai === g.goTo.ai && n.s === g.goTo.s) {
-      stopAtGoTo();
-      render();
-      return;
-    }
-    if (g.auto) {
-      // test autopilot: follow the shortest legal route from this corner
-      const r = shortest({ ai: n.ai, s: n.s, d: g.cur.d, free: true }, g.target);
-      const d2 = r && r.path[1] ? r.path[1].d : g.cur.d;
-      g.queued = d2 === g.cur.d ? null : LEFT[g.cur.d] === d2 ? 'L' : 'R';
-    }
-    if (g.queued) {
-      const d2 = (g.queued === 'L' ? LEFT : RIGHT)[g.cur.d];
-      const r = step(g.cur.ai, g.cur.s, d2, true);
-      g.queued = null;
-      if (!r.why) {
-        g.cur.d = d2;
-        g.msg = '';
-        beginBlock();
-        render();
-        return;
-      }
-      refused(r, d2);
-    }
-    const straight = step(g.cur.ai, g.cur.s, g.cur.d, false);
-    if (straight.why) {
-      g.waiting = true;
-      g.next = null;
-      g.msg = g.msg || `End of the block that way: ${straight.why} Turn left or right.`;
-      render();
-      return;
-    }
-    beginBlock();
-    render();
-  }
-
-  function refused(r, d2) {
-    if (r.wrong) {
-      g.wrong++;
-      const onStreet = d2 === 'E' || d2 === 'W';
-      flashArrows(onStreet ? { street: g.cur.s } : { ave: g.cur.ai });
-    }
-    g.msg = `⛔ ${r.why}`;
-    g.msgAt = performance.now();
-  }
-
-  function press(side) {
-    if (!g || g.done) return;
-    if (g.waiting) {
-      // stopped at a corner: turn now
-      const d2 = (side === 'L' ? LEFT : RIGHT)[g.cur.d];
-      const r = step(g.cur.ai, g.cur.s, d2, true);
-      if (r.why) {
-        refused(r, d2);
-        render();
-        return;
-      }
-      g.cur.d = d2;
-      g.msg = '';
-      beginBlock();
-      render();
-      return;
-    }
-    g.queued = g.queued === side ? null : side;
-    g.home = false;
-    if (g.goTo) {
-      g.goTo = null;
-      gotoEl.style.display = 'none';
-    }
-    render();
-  }
-  function togglePause() {
-    if (!g || g.done) return;
-    g.paused = !g.paused;
-    render();
-  }
-
-  function finish() {
-    g.done = true;
-    g.next = null;
-    // zoom out to show the whole drive: yours and the shortest
-    g.view = 'end';
-    g.trans = g.camNow ? { from: g.camNow, t0: performance.now(), dur: ctx.dur(END_ZOOM_MS) } : null;
-    const mi = (ft) => (ft / 5280).toFixed(2).replace(/0$/, '');
-    bestEl.setAttribute('points', g.best.path.map((p) => `${X(p.ai)},${Y(p.s)}`).join(' '));
-    const ratio = g.driven / g.best.cost;
-    const ok = ratio <= 1.15 && !g.wrong;
-    const runs = ctx.store.get('gridRuns', { n: 0, clean: 0 });
-    runs.n++;
-    if (ok) runs.clean++;
-    ctx.store.set('gridRuns', runs);
-    g.result = `<div class="fb ${ok ? 'ok' : 'no'}">${ok ? '✓' : '•'} You made it: ${mi(g.driven)} mi${
-      g.wrong ? `, ${g.wrong} wrong-way ${g.wrong === 1 ? 'try' : 'tries'}` : ''
-    }. Shortest legal route: ${mi(g.best.cost)} mi${ratio <= 1.02 ? ' (that was it)' : ''}.</div>
-      <div class="hint"><span class="gg-key you"></span> your route · <span class="gg-key best"></span> shortest: ${esc(describe(g.best.path))}</div>
-      <button class="primary" id="ggAgain">Another route</button>`;
-    render();
-  }
-
-  // ---- words on screen ----------------------------------------------------------
-  function where() {
-    const c = g.cur;
-    const on = c.d === 'U' || c.d === 'D' ? aveName(c.ai, c.s) : streetName(c.s);
-    return `On <b>${esc(on)}</b> heading <b>${DIR_WORD[c.d]}</b>`;
-  }
-  function toGo() {
-    const ds = g.target.s - g.cur.s;
-    const da = g.target.ai - g.cur.ai;
-    const parts = [];
-    if (ds) parts.push(`${Math.abs(ds)} street${Math.abs(ds) === 1 ? '' : 's'} ${ds > 0 ? 'up' : 'down'}`);
-    if (da) parts.push(`${Math.abs(da)} avenue${Math.abs(da) === 1 ? '' : 's'} ${da > 0 ? 'east' : 'west'}`);
-    return parts.join(', ');
-  }
-  function render() {
-    if (!g) return;
-    const tgt = `${esc(aveName(g.target.ai, g.target.s))} & ${ord(g.target.s)} St`;
-    ctx.hud(
-      `<div class="qkind">🚕 Drive the grid${g.entry ? ` · from ${esc(g.entry.from.replace(/ \(.*\)$/, ''))}` : ''}</div><div class="q">Get to ${g.target.name ? `<b>${esc(g.target.name)}</b> (${tgt})` : `<b>${tgt}</b>`}</div>
-       ${g.done ? '' : `<div class="hint">${where()}${g.queued ? ` · turning <b>${g.queued === 'L' ? 'left' : 'right'}</b> at the next corner` : ''} · ${esc(toGo())} to go</div>`}`
-    );
-    const btn = (side, label) =>
-      `<button class="ggturn${g.queued === side ? ' on' : ''}" data-side="${side}" ${g.done ? 'disabled' : ''}>${label}</button>`;
-    ctx.sheet(
-      `${g.opts.header()}<div id="qbody">
-        ${g.done ? g.result : `<div class="ggctl">${btn('L', '◀ Left')}${btn('R', 'Right ▶')}</div>
-        <div class="ggmsg${g.msg ? '' : ' muted'}">${g.msg ? esc(g.msg) : g.waiting ? 'Stopped at the corner: pick a way.' : 'Left/Right turn at the next corner. Tap a corner ahead to zip straight there; hold the map to speed up.'}</div>`}
-        <div class="ggbar">
-          ${g.done ? '' : `<button id="ggPause">${g.paused ? '▶ Go' : '⏸ Pause'}</button>`}
-          <button id="ggOptsBtn" aria-expanded="${!!prefs.optsOpen}">Options ${prefs.optsOpen ? '▴' : '▾'}</button>
-        </div>
-        <div class="ggopts"${prefs.optsOpen ? '' : ' hidden'}>
-          <select id="ggArea" aria-label="Area">${[['all', '14th–110th'], ['midtown', 'Midtown (14th–59th)'], ['uptown', 'Uptown (57th–110th)']].map(([k, v]) => `<option value="${k}"${prefs.area === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
-          <select id="ggFrom" aria-label="Start">${[['both', 'Start: mixed'], ['entries', 'Start: tunnels & bridges'], ['anywhere', 'Start: anywhere']].map(([k, v]) => `<option value="${k}"${prefs.from === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
-          <select id="ggPace" aria-label="Speed">${Object.keys(PACE).map((p) => `<option value="${p}"${prefs.pace === p ? ' selected' : ''}>${p[0].toUpperCase() + p.slice(1)}</option>`).join('')}</select>
-          <label><input type="checkbox" id="ggArrows"${prefs.arrows ? ' checked' : ''}/> One-way arrows</label>
-          <label><input type="checkbox" id="ggMapFirst"${prefs.mapFirst ? ' checked' : ''}/> Map first</label>
-        </div>
-      </div>`
-    );
-    g.opts.bindHeader();
-    for (const b of document.querySelectorAll('.ggturn')) b.addEventListener('click', () => press(b.dataset.side));
-    document.getElementById('ggPause')?.addEventListener('click', togglePause);
-    document.getElementById('ggOptsBtn').addEventListener('click', () => {
-      prefs.optsOpen = !prefs.optsOpen;
-      savePrefs();
-      render();
-    });
-    document.getElementById('ggAgain')?.addEventListener('click', () => start(g.opts));
-    document.getElementById('ggPace').addEventListener('change', (e) => {
-      prefs.pace = e.target.value;
-      savePrefs();
-    });
-    document.getElementById('ggFrom').addEventListener('change', (e) => {
-      prefs.from = e.target.value;
-      savePrefs();
-      start(g.opts);
-    });
-    document.getElementById('ggArea').addEventListener('change', (e) => {
-      prefs.area = e.target.value;
-      savePrefs();
-      start(g.opts); // a new route in the chosen area
-    });
-    document.getElementById('ggMapFirst').addEventListener('change', (e) => {
-      prefs.mapFirst = e.target.checked;
-      savePrefs();
-    });
-    document.getElementById('ggArrows').addEventListener('change', (e) => {
-      prefs.arrows = e.target.checked;
-      savePrefs();
-      if (prefs.arrows) drawArrows();
-      else arrowsG.replaceChildren();
-    });
-  }
-
-  return {
-    start,
-    stop,
-    get running() {
-      return !!g;
-    },
-    // for tests
-    _model: { step, shortest, describe, AVES, PLACES, ENTRIES },
-    _state: () => g,
-    _screen(ai, s) {
-      const { tx, ty, k } = g.cam;
-      return [tx + AVES[ai].x * k, ty + -s * FT_PER_STREET * k];
-    },
-    _autopilot() {
-      if (g) g.auto = true;
-    },
-  };
 }

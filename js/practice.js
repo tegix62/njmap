@@ -28,7 +28,7 @@ const TYPES = {
   today: '☀ Today (2 min)',
   rapid: '⚡ Rapid round',
   dropin: '🧩 Drop in (county puzzle)',
-  gridgame: '🚕 Drive the grid (one-ways)',
+  gridgame: '🚕 Drive Manhattan (one-ways)',
   trip: 'My last drive',
 };
 // How long the map takes to turn and move to the next question
