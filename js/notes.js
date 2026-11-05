@@ -15,8 +15,8 @@ export function migrateRoadKeys() {
   for (const [k, v] of Object.entries(d.road || {})) road[newRoadKey(k)] = [...(road[newRoadKey(k)] || []), ...v];
   d.road = road;
   store.set(KEY, d);
-  const spoken = store.get('spokenRoads', {});
-  store.set('spokenRoads', Object.fromEntries(Object.entries(spoken).map(([k, v]) => [newRoadKey(k), v])));
+  const spoken = store.get('spokenRoads', null);
+  if (spoken) store.set('spokenRoads', Object.fromEntries(Object.entries(spoken).map(([k, v]) => [newRoadKey(k), v])));
   store.set('roadKeysV2', true);
 }
 

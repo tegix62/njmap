@@ -117,6 +117,10 @@ async function main() {
   if (region.groupOrder) counties.sort((a, b) => region.groupOrder.indexOf(a) - region.groupOrder.indexOf(b));
 
   const settings = { ...DEFAULT_SETTINGS, ...store.get('settings', {}) };
+  // "Remember where I've been" off means nothing about your travel is kept,
+  // including anything saved before it existed or before it was turned off.
+  const forgetTravel = () => ['visited', 'trips', 'spokenRoads'].forEach((k) => store.del(k));
+  if (!settings.rememberPlaces) forgetTravel();
   migrateRoadKeys();
 
   // ---- map ------------------------------------------------------------------
@@ -604,6 +608,11 @@ async function main() {
     if (k === 'mapStyle') location.reload();
     if (k === 'northUp') modes.drive.applyOrientation();
     if (k === 'driveInset') modes.drive.updateInset();
+    if (k === 'rememberPlaces' && !el.checked) {
+      forgetTravel();
+      modes.drive.forget();
+      ctx.toast('Location memory off. Saved towns and drives erased from this phone.');
+    }
     if (k === 'northLine') updateEdges();
     if (k === 'driveLabels' && ctx.mode === 'drive') ctx.showLabels(settings.driveLabels);
   });
@@ -612,8 +621,8 @@ async function main() {
   });
   $('#resetVisited').addEventListener('click', () => {
     if (!confirm('Forget every place and drive this phone has remembered?')) return;
-    store.del('visited');
-    store.del('trips');
+    forgetTravel();
+    modes.drive.forget();
     ctx.toast('Forgotten.');
   });
   $('#closeSettings').addEventListener('click', () => dlg.close());

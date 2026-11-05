@@ -86,6 +86,10 @@ export function initDrive(ctx) {
         save(true);
       },
       current: () => cur,
+      clear() {
+        list = [];
+        cur = null;
+      },
       end() {
         save(true);
         cur = null;
@@ -427,14 +431,17 @@ export function initDrive(ctx) {
   }
   const sayRoad = (label) => label.replace(/&/g, ' and ');
   /** The first time you drive a road that has a note, read the note out once. */
+  // Which notes were read: kept on the phone only with "Remember where I've
+  // been" on (it says which roads you drove); otherwise just for this session.
+  const spokenNow = {};
   function firstTimeOn(r) {
-    const spoken = store.get('spokenRoads', {});
+    const spoken = settings.rememberPlaces ? store.get('spokenRoads', {}) : spokenNow;
     if (spoken[r.label]) return;
     const mine = ctx.notes.list('road', r.label);
     const note = mine.length ? mine[mine.length - 1].text : draftNote(r.label, r.name, ctx.region.roadNotes);
     if (!note) return;
     spoken[r.label] = Date.now();
-    store.set('spokenRoads', spoken);
+    if (settings.rememberPlaces) store.set('spokenRoads', spoken);
     ctx.speak(`On ${sayRoad(r.label)}. ${note}`);
   }
 
@@ -729,6 +736,11 @@ export function initDrive(ctx) {
       return (visited = store.get('visited', {}));
     },
     trips: () => trips.list(),
+    /** Drop remembered towns and drives (the store is cleared by the caller). */
+    forget() {
+      visited = {};
+      trips.clear();
+    },
     get tracking() {
       return st.watchId != null;
     },

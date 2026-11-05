@@ -449,7 +449,7 @@ export function initPractice(ctx) {
 
   /** Recap of your most recent drive, then questions about it. */
   function makeTrip() {
-    const trip = ctx.modes.drive.trips().filter((t) => t.towns.length >= 2).pop();
+    const trip = ctx.modes.drive.trips().filter((t) => t.towns.length >= 2 && t.towns.every((x) => ctx.byKey.has(x.key))).pop();
     if (!trip) return { kind: 'tripnone', m: null };
     const towns = trip.towns.map((x) => ({ ...x, m: ctx.byKey.get(x.key) })).filter((x) => x.m);
     if (tripSeen !== trip.start) {
@@ -705,7 +705,8 @@ export function initPractice(ctx) {
       Object.entries(o)
         .map(([k, v]) => `<option value="${k}"${cfg.type === k ? ' selected' : ''}>${v}</option>`)
         .join('');
-    const nVisited = Object.keys(ctx.modes.drive.visited).length;
+    // only this map's places: the list is shared between New Jersey and Manhattan
+    const nVisited = munis.filter((m) => ctx.modes.drive.visited[m.key]).length;
     const areaOpt = (v, label) => `<option value="${v}"${cfg.area === v ? ' selected' : ''}>${esc(label)}</option>`;
     const area =
       (R.wellKnown ? areaOpt('known', `Well-known ${R.units} (${munis.filter((m) => m.wellKnown).length})`) : '') +
@@ -755,7 +756,7 @@ export function initPractice(ctx) {
         store.set(TODAY_KEY, buildToday());
         q = null;
       }
-      if (cfg.area === 'visited' && Object.keys(ctx.modes.drive.visited).length < 4)
+      if (cfg.area === 'visited' && munis.filter((m) => ctx.modes.drive.visited[m.key]).length < 4)
         alert(
           ctx.settings.rememberPlaces
             ? `Fewer than 4 ${R.units} visited so far. Use Drive mode with location on, and the ${R.units} you pass through will collect here. Using all of ${R.name} for now.`

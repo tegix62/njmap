@@ -110,7 +110,7 @@ The level breakpoints are in `js/style.js`.
 
 **Tapping a town in Explore** frames it with all of its neighbors, but only when they aren't already comfortably on screen, so free looking around isn't interrupted.
 
-**Privacy.** Remembering where you've been (the towns you pass through and your drive routes) is **off by default**. Turn it on in Settings if you want trip recaps and the "towns I've been through" practice area. It stays on this phone, and "Forget where I've been" wipes it.
+**Privacy.** Remembering where you've been (the towns you pass through and your drive routes) is **off by default**. Turn it on in Settings if you want trip recaps and the "towns I've been through" practice area. It stays on this phone, and "Forget where I've been" wipes it. While it's off, nothing about your travel is kept: anything saved earlier (including by older versions of the app, which saved towns without asking) is erased on the next launch, and the list of road notes already read aloud is kept only until you close the app. The app reads your location only between Start and Stop in Drive. The map tiles it downloads (from OpenFreeMap) do reveal which area is on screen, as with any online map.
 
 **Limitation:** a web page can't run in the background on a phone. When Google Maps is in front, Townfinder goes quiet. A native app would fix that, but building one needs a Mac, or a paid Apple developer account plus a cloud build service.
 
