@@ -1,5 +1,5 @@
 import { bearing, compass8, ARROWS } from './geo.js';
-import { roadsInTown, roadsFrom, draftNote } from './roads.js';
+import { roadsInTown, roadsFrom, draftNote, countyNum, byName } from './roads.js';
 import { editNote } from './notes.js';
 
 let L; // label colors of the active theme (set in initExplore)
@@ -188,7 +188,7 @@ export function initExplore(ctx) {
         .map((x) => `<button class="chip${x.label === roadSel ? ' on' : ''}" data-road="${esc(x.label)}">${ctx.swatch(x.label)}${esc(x.label)}</button>`)
         .join('')}</div>${
         r
-          ? `${leads}${noteCards('road', r.label, draftNote(r.label, r.name, ctx.region.roadNotes)) || '<div class="hint muted">No notes yet.</div>'}
+          ? `${countyNum(r.raw.join(';')) ? `<div class="hint muted">County Route ${countyNum(r.raw.join(';'))}</div>` : ''}${leads}${noteCards('road', r.label, draftNote(r.label, r.name, ctx.region.roadNotes)) || '<div class="hint muted">No notes yet.</div>'}
              <button class="addnote" data-note="road" data-key="${esc(r.label)}">＋ Note about ${esc(r.label)}</button>`
           : '<div class="hint muted">Tap a road to highlight it and see notes.</div>'
       }`;
@@ -395,7 +395,7 @@ export function initExplore(ctx) {
       b.addEventListener('click', () => {
         roadSel = roadSel === b.dataset.road ? null : b.dataset.road;
         const r = roadSel && roadsInTown(map, sel, ctx.locate).find((x) => x.label === roadSel);
-        ctx.focusRoad(r ? r.raw : null, r && ctx.hwy(r.label) ? ctx.hwy(r.label).color : null);
+        ctx.focusRoad(r ? r.raw : null, r && ctx.hwy(r.label) ? ctx.hwy(r.label).color : null, byName(r));
         render();
       });
     for (const b of hud.querySelectorAll('.addnote'))

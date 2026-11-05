@@ -1,6 +1,6 @@
 import { bearing, distanceMi, compass8, compass16, angleDiff, dirWord, destination as destinationPt } from './geo.js';
 import { gridY } from './grid.js';
-import { sampleRoads, roadsThrough } from './roads.js';
+import { sampleRoads, roadsThrough, byName } from './roads.js';
 
 let L; // label colors of the active theme (set in initPractice)
 
@@ -1140,8 +1140,8 @@ export function initPractice(ctx) {
       btn.classList.add(ok ? 'right' : 'wrong');
       document.querySelector(`#qbody .choice[data-v="${q.choices.indexOf(q.right)}"]`).classList.add('right');
       ctx.showRoadRefs(true);
-      ctx.focusRoad(q.right.raw, ctx.theme.hl.good);
-      if (!ok) ctx.focusRoadBad(chosen.raw);
+      ctx.focusRoad(q.right.raw, ctx.theme.hl.good, byName(q.right));
+      if (!ok) ctx.focusRoadBad(chosen.raw, byName(chosen));
       ctx.highlight(q.target.id, 'good');
       // the towns along the right road, on the target's side
       const toward = q.right.towns.filter((t) => Math.abs(angleDiff(bearing(m.pt, t.m.pt), bearing(m.pt, q.target.pt))) <= 60 && t.d <= q.tgt.d + 0.05 * SC);

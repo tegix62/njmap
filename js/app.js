@@ -12,6 +12,13 @@ import { activeRegion, switchRegion, ALL_REGIONS } from './region.js';
 import { initAnchors } from './anchors.js';
 import { initDropIn } from './dropin.js';
 
+/** Map filter for one road: its OSM refs, narrowed to one name for roads known by name. */
+const roadFilter = (raw, name) => {
+  if (!raw || !raw.length) return ['==', ['get', 'ref'], '__none__'];
+  const f = ['in', ['get', 'ref'], ['literal', raw]];
+  return name ? ['all', f, ['==', ['get', 'name'], name]] : f;
+};
+
 const TYPE_ABBR = { Township: 'Twp', Borough: 'Boro', City: 'City', Town: 'Town', Village: 'Vlg' };
 
 const DEFAULT_SETTINGS = {
@@ -417,15 +424,15 @@ async function main() {
       for (const id of ['road-ref-major', 'road-ref'])
         map.setLayoutProperty(id, 'visibility', on && settings.basemap === 'streets' ? 'visible' : 'none');
     },
-    /** Highlight one road (its raw OSM refs) on the map; null clears. */
-    focusRoad(raw, color) {
-      map.setFilter('road-focus', raw && raw.length ? ['in', ['get', 'ref'], ['literal', raw]] : ['==', ['get', 'ref'], '__none__']);
+    /** Highlight one road (its raw OSM refs, plus its name for roads known by name) on the map; null clears. */
+    focusRoad(raw, color, name = null) {
+      map.setFilter('road-focus', roadFilter(raw, name));
       map.setPaintProperty('road-focus', 'line-color', color || theme.hl.sel);
       if (!raw) map.setFilter('road-focus-bad', ['==', ['get', 'ref'], '__none__']);
     },
     /** The road you picked when it was wrong (drawn in the "wrong" color). */
-    focusRoadBad(raw) {
-      map.setFilter('road-focus-bad', raw && raw.length ? ['in', ['get', 'ref'], ['literal', raw]] : ['==', ['get', 'ref'], '__none__']);
+    focusRoadBad(raw, name = null) {
+      map.setFilter('road-focus-bad', roadFilter(raw, name));
     },
     toast(msg, ms = 3200) {
       const t = $('#toast');

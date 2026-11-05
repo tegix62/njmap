@@ -34,6 +34,29 @@ export function normRef(raw) {
   return [...new Set(parts)].join(' / ');
 }
 
+/** The county route number in a ref ("CR 510" -> "510"), or null. */
+export function countyNum(raw) {
+  for (const p of String(raw || '').split(/\s*;\s*/)) {
+    const m = p.match(/^CR[ -]?(\d+\w?)$/);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+/**
+ * What people call a road: the route number for interstates, US and state
+ * routes ("Route 46"); the street name for county routes, since nobody says
+ * "CR 510" for Columbia Turnpike; the name for unnumbered highways.
+ */
+export function roadLabel(props) {
+  return normRef(props.ref) || (countyNum(props.ref) && props.name) || (props.class === 'motorway' && props.name) || null;
+}
+
+/** A road known by its name, not a route number: highlight it by name too, not every road with the same ref. */
+export function byName(r) {
+  return r && !normRef([...(r.raw || [])].join(';')) ? r.label : null;
+}
+
 /** Draft note for a road, by name first ("Pulaski Skyway"), then each part of its label. */
 export function draftNote(label, name, notes) {
   if (name && notes[name]) return notes[name];
@@ -88,7 +111,7 @@ export function nearbyRoads(map, pt, maxMi = 3, limit = 3) {
   const best = new Map();
   for (const f of majorFeatures(map)) {
     const props = f.properties || {};
-    const label = normRef(props.ref) || (props.class === 'motorway' && props.name) || null;
+    const label = roadLabel(props);
     if (!label) continue;
     for (const line of lines(f.geometry)) {
       for (let i = 1; i < line.length; i++) {
@@ -130,7 +153,7 @@ export function roadsInTown(map, m, locate) {
   const hits = new Map();
   for (const f of majorFeatures(map)) {
     const props = f.properties || {};
-    const label = normRef(props.ref) || (props.class === 'motorway' && props.name) || null;
+    const label = roadLabel(props);
     if (!label) continue;
     // Sample along each segment (~150 m apart): a straight highway can cross a
     // whole town without a single vertex inside it.
@@ -165,7 +188,7 @@ export function sampleRoads(map, locate) {
   const roads = new Map();
   for (const f of majorFeatures(map)) {
     const props = f.properties || {};
-    const label = normRef(props.ref) || (props.class === 'motorway' && props.name) || null;
+    const label = roadLabel(props);
     if (!label) continue;
     const r = roads.get(label) || { label, name: props.name || '', raw: new Set(), towns: new Set() };
     r.raw.add(props.ref);

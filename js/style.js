@@ -129,11 +129,14 @@ const baseLayers = (Z) => [
 
 // Route numbers on the map, said the way people say them (same rules as
 // roads.js normRef): "I 80" -> "I-80", "US 46" / "NJ 23" -> "Route 46" /
-// "Route 23", "US 1;US 9" -> "Route 1&9", NJTP -> Turnpike, GSP -> Parkway.
+// "Route 23", "US 1;US 9" -> "Route 1&9", NJTP -> Turnpike, GSP -> Parkway,
+// "CR 510" -> its street name.
 const routeWord = (v) => [
   'case',
   ['==', ['slice', v, 0, 2], 'I '], ['concat', 'I-', ['slice', v, 2]],
   ['in', ['slice', v, 0, 3], ['literal', ['US ', 'NJ ', 'NY ']]], ['concat', 'Route ', ['slice', v, 3]],
+  // county routes go by their street name ("Columbia Turnpike", not "CR 510")
+  ['all', ['==', ['slice', v, 0, 3], 'CR '], ['has', 'name']], ['get', 'name'],
   v,
 ];
 const REF_LABEL = [
@@ -219,7 +222,12 @@ const baseLabelLayers = (Z) => [
       source: 'omt',
       'source-layer': 'transportation_name',
       minzoom: 14,
-      filter: isClass(['primary', 'secondary', 'tertiary', 'minor']),
+      filter: [
+        'all',
+        isClass(['primary', 'secondary', 'tertiary', 'minor']),
+        // county routes already show their name in the route-label layer
+        ['!', ['all', isClass(['trunk', 'primary']), ['==', ['slice', ['coalesce', ['get', 'ref'], ''], 0, 3], 'CR ']]],
+      ],
       layout: { 'symbol-placement': 'line', 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Italic'], 'text-size': 11, 'text-padding': 4 },
       paint: { 'text-color': T.ink3, 'text-halo-color': T.halo, 'text-halo-width': 1.5 },
     },
