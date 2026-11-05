@@ -1667,3 +1667,20 @@ body.gridding .maplibregl-ctrl-bottom-right {
   font-style: italic;
   fill: #5d7a4d;
 }
+.ggbar {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.ggbar button {
+  font: inherit;
+  font-size: 13px;
+  border-radius: 8px;
+  border: 1px solid rgba(31, 27, 22, 0.2);
+  background: transparent;
+  color: var(--panel-ink);
+  padding: 4px 10px;
+}
+.ggopts[hidden] {
+  display: none;
+}

@@ -97,6 +97,22 @@ const PLACES = [
 ];
 const AREAS = { all: [S_MIN, S_MAX], midtown: [S_MIN, 59], uptown: [57, S_MAX] };
 
+// Coming in from outside: where a tunnel, bridge or highway exit really puts
+// you, and which way you're facing. Each one is checked against the city's
+// ramp data (tools/entries.py); 'where' says what you'd see.
+const ENTRIES = [
+  { from: 'the Lincoln Tunnel', where: 'Dyer Ave brings you up to 42nd St; you turn east (between 10th and 9th Ave)', ai: col('10'), s: 42, d: 'E' },
+  { from: 'the Lincoln Tunnel (30th St exit)', where: 'the ramp puts you on 30th St heading east at 10th Ave', ai: col('10'), s: 30, d: 'E' },
+  { from: 'the Queens-Midtown Tunnel', where: 'you come out onto 2nd Ave heading downtown in the upper 30s', ai: col('2'), s: 37, d: 'D' },
+  { from: 'the Queensboro Bridge', where: 'you come off onto 1st Ave heading uptown, around 60th St', ai: col('1'), s: 60, d: 'U' },
+  { from: 'the Queensboro Bridge', where: 'you come off onto 2nd Ave heading downtown, around 60th St', ai: col('2'), s: 60, d: 'D' },
+  { from: 'the FDR Drive (exit 9, northbound)', where: 'the exit puts you on 1st Ave heading uptown at 42nd St, by the UN', ai: col('1'), s: 42, d: 'U' },
+  { from: 'the FDR Drive (exit 11, southbound)', where: 'the exit puts you on 53rd St heading west', ai: col('1'), s: 53, d: 'W' },
+  { from: 'the FDR Drive (exit 12, northbound)', where: 'the exit puts you on 61st St heading west at York Ave', ai: col('york'), s: 61, d: 'W' },
+  { from: 'the FDR Drive (exit 14, northbound)', where: 'the exit puts you on 96th St heading west', ai: col('1'), s: 96, d: 'W' },
+  { from: 'the Henry Hudson Parkway (from the GWB)', where: 'the 96th St exit puts you at Riverside Dr; head east on 96th', ai: col('west'), s: 96, d: 'E' },
+];
+
 // grid directions: U uptown, D downtown, E east, W west
 const LEFT = { U: 'W', W: 'D', D: 'E', E: 'U' };
 const RIGHT = { U: 'E', E: 'D', D: 'W', W: 'U' };
@@ -321,7 +337,8 @@ export function initGridGame(ctx) {
   // mapFirst: show the whole grid before driving. Off by default: working out
   // where the address is from the street and avenue alone is the harder,
   // more useful skill (it's all you have in a real car).
-  const prefs = { pace: 'easy', arrows: false, mapFirst: false, area: 'all', ...ctx.store.get('gridPrefs', {}) };
+  // from: 'both' (half the rounds start at a tunnel or bridge), 'entries', or 'anywhere'
+  const prefs = { pace: 'easy', arrows: false, mapFirst: false, area: 'all', from: 'both', ...ctx.store.get('gridPrefs', {}) };
   const savePrefs = () => ctx.store.set('gridPrefs', prefs);
 
   // ---- picture ------------------------------------------------------------
@@ -560,19 +577,29 @@ export function initGridGame(ctx) {
     const [a0, a1] = AREAS[prefs.area] || AREAS.all;
     const places = PLACES.filter((p) => p.s >= a0 && p.s <= a1 && exists(p.ai, p.s));
     const corner = () => ({ ai: Math.floor(Math.random() * AVES.length), s: a0 + Math.floor(Math.random() * (a1 - a0 + 1)) });
+    // entries that are legal (heading straight on is allowed) and in the chosen area
+    const entries = ENTRIES.filter((e) => e.s >= a0 - 2 && e.s <= a1 + 2 && exists(e.ai, e.s) && !step(e.ai, e.s, e.d, false).why);
+    const useEntry = entries.length && (prefs.from === 'entries' || (prefs.from === 'both' && Math.random() < 0.5));
     for (let tries = 0; tries < 400; tries++) {
       const target = places.length && Math.random() < 0.7 ? rand(places) : { name: null, ...corner() };
       if (!exists(target.ai, target.s)) continue;
-      const { ai, s } = corner();
-      if (!exists(ai, s) || s <= a0 || s >= a1) continue;
-      const blocks = Math.abs(target.s - s) + Math.abs(X(target.ai) - X(ai)) / 700;
-      if (blocks < 8 || blocks > 30) continue;
-      const ds = ['U', 'D', 'E', 'W'].filter((d) => !step(ai, s, d, false).why);
-      if (!ds.length) continue;
-      const start = { ai, s, d: rand(ds) };
+      let start, entry = null;
+      if (useEntry) {
+        entry = rand(entries);
+        start = { ai: entry.ai, s: entry.s, d: entry.d };
+      } else {
+        const { ai, s } = corner();
+        if (!exists(ai, s) || s <= a0 || s >= a1) continue;
+        const ds = ['U', 'D', 'E', 'W'].filter((d) => !step(ai, s, d, false).why);
+        if (!ds.length) continue;
+        start = { ai, s, d: rand(ds) };
+      }
+      const blocks = Math.abs(target.s - start.s) + Math.abs(X(target.ai) - X(start.ai)) / 700;
+      if (blocks < 8 || blocks > (entry ? 45 : 30)) continue;
+      if (straightTo(start, start.d, target)) continue; // already on the right road: no decision to make
       const best = shortest(start, target);
       if (!best || best.path.length < 6) continue;
-      return { start, target, best };
+      return { start, target, best, entry };
     }
     return null;
   }
@@ -581,12 +608,14 @@ export function initGridGame(ctx) {
     stop();
     if (!wrap) buildPicture();
     const r = pickRoute();
-    const { start: st0, target, best } = r;
+    const { start: st0, target, best, entry } = r;
     g = {
       opts,
       target,
       best,
       start: st0,
+      entry,
+      home: false,
       cur: { ...st0 }, // the corner you're driving away from, and direction
       next: null, // the corner you're driving to
       t: 0, // 0..1 along the current block
@@ -612,6 +641,10 @@ export function initGridGame(ctx) {
     if (prefs.arrows) drawArrows();
     else arrowsG.replaceChildren();
     beginBlock();
+    if (entry) {
+      g.msg = `Coming in from ${entry.from}: ${entry.where}.`;
+      g.msgAt = performance.now() + 6000; // keep it up a while
+    }
     // a quick look at the whole grid first, then zoom in (skipped with reduced motion)
     g.view = prefs.mapFirst && ctx.dur(1) ? 'intro' : 'follow';
     g.introUntil = null; // set on the first frame drawn, so a slow page load doesn't eat the intro
@@ -649,11 +682,34 @@ export function initGridGame(ctx) {
       g.msgAt = performance.now();
     }
     g.lastNote = r.note || null;
+    // On the destination's road, heading toward it, nothing in the way: that's
+    // the decision made. Zip the rest of the way so you still see where it is.
+    if (g.next && !g.home && straightTo(g.cur, g.cur.d, g.target)) {
+      g.home = true;
+      g.goTo = null;
+      g.queued = null;
+      gotoEl.style.display = 'none';
+      const road = g.cur.d === 'U' || g.cur.d === 'D' ? aveName(g.cur.ai, g.cur.s) : streetName(g.cur.s);
+      g.msg = `✓ Right road: ${road} takes you straight there.`;
+      g.msgAt = performance.now();
+    }
+  }
+  /** Can you drive straight from corner c heading d to corner t, legally, without turning? */
+  function straightTo(c, d, t) {
+    let at = { ai: c.ai, s: c.s };
+    for (let i = 0; i < 140; i++) {
+      if (at.ai === t.ai && at.s === t.s) return true;
+      const r = step(at.ai, at.s, d, false);
+      if (r.why) return false;
+      at = { ai: r.ai, s: r.s };
+    }
+    return false;
   }
 
   const blockSeconds = (len) => (0.55 + len / 550) * PACE[prefs.pace];
   const GOTO_SPEED = 0.18; // fraction of the normal block time when heading to a tapped corner
   const HOLD_SPEED = 0.25; // … and while the map is held down
+  const HOME_SPEED = 0.07; // … and on the home stretch
 
   // ---- tap a corner ahead to drive straight there; hold the map to speed up ----
   function bindPointer() {
@@ -760,7 +816,7 @@ export function initGridGame(ctx) {
       if (now >= g.introUntil && g.introFrames >= 24) startFollow();
     }
     if (g.view !== 'intro' && !g.paused && !g.done && !g.waiting && g.next) {
-      g.t += dt / (blockSeconds(g.next.len) * (g.goTo ? GOTO_SPEED : g.boost ? HOLD_SPEED : 1));
+      g.t += dt / (blockSeconds(g.next.len) * (g.home ? HOME_SPEED : g.goTo ? GOTO_SPEED : g.boost ? HOLD_SPEED : 1));
       if (g.t >= 1) arrive();
     }
     if (g && g.next && !g.waiting) {
@@ -848,6 +904,7 @@ export function initGridGame(ctx) {
       return;
     }
     g.queued = g.queued === side ? null : side;
+    g.home = false;
     if (g.goTo) {
       g.goTo = null;
       gotoEl.style.display = 'none';
@@ -900,7 +957,7 @@ export function initGridGame(ctx) {
     if (!g) return;
     const tgt = `${esc(aveName(g.target.ai, g.target.s))} & ${ord(g.target.s)} St`;
     ctx.hud(
-      `<div class="qkind">🚕 Drive the grid</div><div class="q">Get to ${g.target.name ? `<b>${esc(g.target.name)}</b> (${tgt})` : `<b>${tgt}</b>`}</div>
+      `<div class="qkind">🚕 Drive the grid${g.entry ? ` · from ${esc(g.entry.from.replace(/ \(.*\)$/, ''))}` : ''}</div><div class="q">Get to ${g.target.name ? `<b>${esc(g.target.name)}</b> (${tgt})` : `<b>${tgt}</b>`}</div>
        ${g.done ? '' : `<div class="hint">${where()}${g.queued ? ` · turning <b>${g.queued === 'L' ? 'left' : 'right'}</b> at the next corner` : ''} · ${esc(toGo())} to go</div>`}`
     );
     const btn = (side, label) =>
@@ -909,22 +966,36 @@ export function initGridGame(ctx) {
       `${g.opts.header()}<div id="qbody">
         ${g.done ? g.result : `<div class="ggctl">${btn('L', '◀ Left')}${btn('R', 'Right ▶')}</div>
         <div class="ggmsg${g.msg ? '' : ' muted'}">${g.msg ? esc(g.msg) : g.waiting ? 'Stopped at the corner: pick a way.' : 'Left/Right turn at the next corner. Tap a corner ahead to zip straight there; hold the map to speed up.'}</div>`}
-        <div class="ggopts">
+        <div class="ggbar">
+          ${g.done ? '' : `<button id="ggPause">${g.paused ? '▶ Go' : '⏸ Pause'}</button>`}
+          <button id="ggOptsBtn" aria-expanded="${!!prefs.optsOpen}">Options ${prefs.optsOpen ? '▴' : '▾'}</button>
+        </div>
+        <div class="ggopts"${prefs.optsOpen ? '' : ' hidden'}>
           <select id="ggArea" aria-label="Area">${[['all', '14th–110th'], ['midtown', 'Midtown (14th–59th)'], ['uptown', 'Uptown (57th–110th)']].map(([k, v]) => `<option value="${k}"${prefs.area === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
+          <select id="ggFrom" aria-label="Start">${[['both', 'Start: mixed'], ['entries', 'Start: tunnels & bridges'], ['anywhere', 'Start: anywhere']].map(([k, v]) => `<option value="${k}"${prefs.from === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggPace" aria-label="Speed">${Object.keys(PACE).map((p) => `<option value="${p}"${prefs.pace === p ? ' selected' : ''}>${p[0].toUpperCase() + p.slice(1)}</option>`).join('')}</select>
           <label><input type="checkbox" id="ggArrows"${prefs.arrows ? ' checked' : ''}/> One-way arrows</label>
           <label><input type="checkbox" id="ggMapFirst"${prefs.mapFirst ? ' checked' : ''}/> Map first</label>
-          ${g.done ? '' : `<button id="ggPause">${g.paused ? '▶ Go' : '⏸ Pause'}</button>`}
         </div>
       </div>`
     );
     g.opts.bindHeader();
     for (const b of document.querySelectorAll('.ggturn')) b.addEventListener('click', () => press(b.dataset.side));
     document.getElementById('ggPause')?.addEventListener('click', togglePause);
+    document.getElementById('ggOptsBtn').addEventListener('click', () => {
+      prefs.optsOpen = !prefs.optsOpen;
+      savePrefs();
+      render();
+    });
     document.getElementById('ggAgain')?.addEventListener('click', () => start(g.opts));
     document.getElementById('ggPace').addEventListener('change', (e) => {
       prefs.pace = e.target.value;
       savePrefs();
+    });
+    document.getElementById('ggFrom').addEventListener('change', (e) => {
+      prefs.from = e.target.value;
+      savePrefs();
+      start(g.opts);
     });
     document.getElementById('ggArea').addEventListener('change', (e) => {
       prefs.area = e.target.value;
@@ -950,7 +1021,7 @@ export function initGridGame(ctx) {
       return !!g;
     },
     // for tests
-    _model: { step, shortest, describe, AVES, PLACES },
+    _model: { step, shortest, describe, AVES, PLACES, ENTRIES },
     _state: () => g,
     _screen(ai, s) {
       const { tx, ty, k } = g.cam;
