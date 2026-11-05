@@ -140,6 +140,27 @@ export function initPractice(ctx) {
       if (r.due <= now) return 4 + Math.min(3, (now - r.due) / DAY); // due (more overdue = sooner)
       return 0.08; // learned and not due: rare
     });
+    // Manhattan: balance the areas. Midtown alone has a third of the
+    // neighborhoods, and they're small, so picking by neighborhood keeps you in
+    // Midtown. Pick an area first (weighted by its members' average need, so an
+    // area with places due still comes up sooner), then a place in it.
+    if (R.groupOrder) {
+      const byG = new Map();
+      p.forEach((m, i) => {
+        const g = byG.get(m.c) || { sum: 0, n: 0, idx: [] };
+        g.sum += ws[i];
+        g.n++;
+        g.idx.push(i);
+        byG.set(m.c, g);
+      });
+      const gs = [...byG.values()].filter((g) => g.sum > 0);
+      if (gs.length > 1) {
+        let y = Math.random() * gs.reduce((a, g) => a + g.sum / g.n, 0);
+        const g = gs.find((q) => (y -= q.sum / q.n) <= 0) || gs[gs.length - 1];
+        let z = Math.random() * g.sum;
+        for (const i of g.idx) if ((z -= ws[i]) <= 0) return remember(p[i]);
+      }
+    }
     const tot = ws.reduce((a, b) => a + b, 0);
     let x = Math.random() * tot;
     for (let i = 0; i < p.length; i++) if ((x -= ws[i]) <= 0) return remember(p[i]);
@@ -380,7 +401,7 @@ export function initPractice(ctx) {
       const heading = 45 * Math.floor(Math.random() * 8);
       const pool2 = munis.filter((o) => o !== a && distanceMi(a.pt, o.pt) > 2 * SC && distanceMi(a.pt, o.pt) < 14 * SC);
       if (!pool2.length) continue;
-      const b = rand(pool2.filter((o) => o.wellKnown).length ? pool2.filter((o) => o.wellKnown) : pool2);
+      const b = R.groupOrder ? pick(pool2) : rand(pool2.filter((o) => o.wellKnown).length ? pool2.filter((o) => o.wellKnown) : pool2);
       const rel = angleDiff(bearing(a.pt, b.pt), heading);
       const side = Object.keys(SIDES).find((k) => {
         const [lo, hi] = SIDES[k];
