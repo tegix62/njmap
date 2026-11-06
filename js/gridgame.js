@@ -44,6 +44,15 @@ function bearing(a, b) {
   const kx = Math.cos(rad((a[1] + b[1]) / 2));
   return ((Math.atan2((b[0] - a[0]) * kx, b[1] - a[1]) * 180) / Math.PI + 360) % 360;
 }
+const BEAR_M = 30;
+/** The point d metres along polyline p (cum = cumulative lengths). */
+function alongPt(p, cum, d) {
+  let i = 1;
+  while (i < p.length - 1 && cum[i] < d) i++;
+  const span = cum[i] - cum[i - 1] || 1;
+  const t = Math.max(0, Math.min(1, (d - cum[i - 1]) / span));
+  return [p[i - 1][0] + (p[i][0] - p[i - 1][0]) * t, p[i - 1][1] + (p[i][1] - p[i - 1][1]) * t];
+}
 const angleDiff = (to, from) => ((to - from + 540) % 360) - 180; // + = clockwise (right)
 /** Grid direction of a compass bearing: U(ptown), E(ast), D(owntown), W(est). */
 function gridDir(b) {
@@ -94,7 +103,11 @@ export function initGridGame(ctx) {
         const e = {
           id: edges.length, from, to, seg, pts: p, cum, len: cum[cum.length - 1] || 1,
           name: d.names[nid], oneway: dir !== 0,
-          b0: bearing(p[0], p[1]), b1: bearing(p[p.length - 2], p[p.length - 1]),
+          // direction over the first / last ~30 m, not the last vertex pair: the
+          // centerline often kinks in the final few metres into a corner (Delancey
+          // bends southwest just before Bowery, which made Bowery look "straight")
+          b0: bearing(p[0], alongPt(p, cum, Math.min(BEAR_M, cum[cum.length - 1]))),
+          b1: bearing(alongPt(p, cum, Math.max(0, cum[cum.length - 1] - BEAR_M)), p[p.length - 1]),
         };
         edges.push(e);
         out[from].push(e);
@@ -150,8 +163,18 @@ export function initGridGame(ctx) {
       let straight = withD.filter((x) => x.o.name === e.name && Math.abs(x.d) <= 50).sort((a, b) => Math.abs(a.d) - Math.abs(b.d))[0];
       if (!straight) straight = withD.filter((x) => Math.abs(x.d) <= 32).sort((a, b) => Math.abs(a.d) - Math.abs(b.d))[0];
       const rest = withD.filter((x) => x !== straight);
-      const left = rest.filter((x) => x.d < -20).sort((a, b) => Math.abs(a.d + 90) - Math.abs(b.d + 90))[0];
-      const right = rest.filter((x) => x.d > 20).sort((a, b) => Math.abs(a.d - 90) - Math.abs(b.d - 90))[0];
+      // a real turn (past 20°) if there is one, else a fork that bears off to that side
+      // (a highway exit leaves at a shallow angle)
+      const side = (sgn) => {
+        // turning back onto the same street is a U-turn across a median (Delancey's
+        // other roadbed at Bowery): only if nothing else goes that way
+        const back = (x) => (x.o.name === e.name && Math.abs(x.d) > 95 ? 1000 : 0);
+        const by = (a, b) => back(a) + Math.abs(a.d - sgn * 90) - back(b) - Math.abs(b.d - sgn * 90);
+        const s = rest.filter((x) => x.d * sgn > 0);
+        return s.filter((x) => x.d * sgn > 20).sort(by)[0] || s.sort(by)[0];
+      };
+      const left = side(-1);
+      const right = side(1);
       c = { straight: straight?.o || null, left: left?.o || null, right: right?.o || null, options: opts };
     }
     c.decision = !('only' in c);

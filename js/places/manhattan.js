@@ -143,6 +143,9 @@ export default {
   majorSize: 4000, // neighborhood area in units of 100 m²: the bigger ones get names first
   sizeWord: null,
   superGroups: null,
+  // the shoreline is all water (piers make it a zigzag): draw only the lines between
+  // areas, dashed so they don't read as streets
+  innerBorders: true,
   groupTint: { Downtown: 'B', Midtown: 'D', Uptown: 'A', 'Upper Manhattan': 'E' },
   groupOrder: ['Downtown', 'Midtown', 'Uptown', 'Upper Manhattan'], // south to north
   landmarks: LANDMARKS,

@@ -172,9 +172,13 @@ async function main() {
     groupTint: region.groupTint,
     attribution: region.attribution,
     highways: region.highways,
+    innerBorders: !!region.innerBorders,
     data: {
       munis: munisData,
       counties: countiesFC,
+      // the borders between areas only (no outer edge), for regions that ask for it
+      muniEdges: region.innerBorders ? topojson.mesh(topo, topo.objects.munis, (a, b) => a !== b) : null,
+      countyEdges: region.innerBorders ? topojson.mesh(topo, topo.objects.counties, (a, b) => a !== b) : null,
       labels: labelsData,
       countyLabels: countyLabelsFC,
       regionLabels,

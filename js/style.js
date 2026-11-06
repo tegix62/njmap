@@ -239,7 +239,7 @@ export const PLACE_LAYER_IDS = ['landmark-dot', 'landmark-label', 'nature-dot', 
  * Returns { style, baseLayers } for a region. `Z` = the region's zoom levels:
  * { groups, region, town, street }.
  */
-export function buildStyle({ base, basemap, data, sectionNames, Z, majorSize, groupTint, attribution, theme, highways }) {
+export function buildStyle({ base, basemap, data, sectionNames, Z, majorSize, groupTint, attribution, theme, highways, innerBorders }) {
   T = theme || THEME;
   HWYS = highways || [];
   const BASE_LAYERS = baseLayers(Z);
@@ -258,6 +258,7 @@ export function buildStyle({ base, basemap, data, sectionNames, Z, majorSize, gr
       omt: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' },
       munis: { type: 'geojson', data: data.munis },
       counties: { type: 'geojson', data: data.counties, attribution },
+      ...(innerBorders ? { muniedges: { type: 'geojson', data: data.muniEdges }, countyedges: { type: 'geojson', data: data.countyEdges } } : {}),
       labels: { type: 'geojson', data: data.labels },
       countylabels: { type: 'geojson', data: data.countyLabels },
       regionlabels: { type: 'geojson', data: data.regionLabels },
@@ -288,22 +289,37 @@ export function buildStyle({ base, basemap, data, sectionNames, Z, majorSize, gr
       {
         id: 'muni-line',
         type: 'line',
-        source: 'munis',
-        paint: {
-          'line-color': T.ink4,
-          'line-opacity': ['interpolate', ['linear'], ['zoom'], 7, 0.5, Z.region, 0.7, Z.town, 0.9],
-          'line-width': ['interpolate', ['linear'], ['zoom'], 7, 0.3, Z.town, 0.9, 13, 1.5, 16, 2.4],
-        },
+        source: innerBorders ? 'muniedges' : 'munis',
+        paint: innerBorders
+          ? {
+              // dotted and thin: a border, not a street
+              'line-color': T.ink3,
+              'line-opacity': 0.75,
+              'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.8, 14, 1.2, 16, 1.6],
+              'line-dasharray': [1, 2.5],
+            }
+          : {
+              'line-color': T.ink4,
+              'line-opacity': ['interpolate', ['linear'], ['zoom'], 7, 0.5, Z.region, 0.7, Z.town, 0.9],
+              'line-width': ['interpolate', ['linear'], ['zoom'], 7, 0.3, Z.town, 0.9, 13, 1.5, 16, 2.4],
+            },
       },
       {
         id: 'county-line',
         type: 'line',
-        source: 'counties',
+        source: innerBorders ? 'countyedges' : 'counties',
         layout: { 'line-join': 'round' },
-        paint: {
-          'line-color': T.ink2,
-          'line-width': ['interpolate', ['linear'], ['zoom'], 6, 1.1, Z.region, 1.6, Z.town, 2.2, 13, 3, 16, 4],
-        },
+        paint: innerBorders
+          ? {
+              'line-color': T.ink2,
+              'line-opacity': 0.6,
+              'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1.4, 14, 2, 16, 2.6],
+              'line-dasharray': [3, 2],
+            }
+          : {
+              'line-color': T.ink2,
+              'line-width': ['interpolate', ['linear'], ['zoom'], 6, 1.1, Z.region, 1.6, Z.town, 2.2, 13, 3, 16, 4],
+            },
       },
       {
         id: 'muni-hl-line',
