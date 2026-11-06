@@ -5,8 +5,14 @@
 // so Midtown's grid stands upright (uptown at the top); downtown streets run
 // at their real angles.
 //
-// Your car drives on its own. Tap Left or Right before an intersection to
-// turn there; tap a corner ahead to zip to it; hold the map to speed up.
+// The data is a graph of real intersections (the two roadbeds of a divided
+// road, median crossings and kinks merged into one corner at build time) and
+// the links between them. Your car drives on its own. At an ordinary corner,
+// Left / Straight / Right; where the ways out don't fit those (five-way
+// junctions, forks, angled streets), each way out is its own button, with its
+// street name and an arrow at its real angle. Straight runs speed up the longer
+// you keep going, and no stretch of road takes more than LEG_MAX_S; tap a
+// corner ahead to zip to it; hold the map to speed up.
 // Wrong-way turns are refused with the reason: the rule of thumb when the
 // street follows it ("odd streets go west"), the exception by name when it
 // doesn't. Rounds can start inside a tunnel or on a bridge coming in, and
@@ -26,12 +32,21 @@ const CORNER_SLOW = 0.5; // half speed over the last stretch before an intersect
 const GOTO_SPEED = 5.5; // multipliers: heading to a tapped corner,
 const HOLD_SPEED = 4; // holding the map,
 const HOME_SPEED = 14; // and on the home stretch
+const LEG_MAX_S = 1.5; // no link between two corners takes longer than this (Easy)
+const CRUISE_STEP = 0.5; // each corner passed straight on without input adds this to the speed multiplier
+const CRUISE_MAX = 5;
+const CORNER_MIN_S = 0.4;
+const APPROACH_M = 80; // the last stretch before a corner, driven at normal speed // but never faster than this per corner while you could still turn (time to press)
 const AVENUE_RULE = {
   '1st Ave': 'U', '2nd Ave': 'D', '3rd Ave': 'U', 'Lexington Ave': 'D', 'Madison Ave': 'U', '5th Ave': 'D',
   '6th Ave': 'U', '7th Ave': 'D', '8th Ave': 'U', '9th Ave': 'D', '10th Ave': 'U', 'Amsterdam Ave': 'U', 'Columbus Ave': 'D',
 };
 const TWO_WAY_STREETS = new Set([14, 23, 34, 42, 57, 72, 79, 86, 96, 106, 110, 116, 125, 135, 145, 155]);
 const WORD = { U: 'uptown', D: 'downtown', E: 'east', W: 'west' };
+const COMPASS = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'];
+// avenues that follow the grid (uptown / downtown means something on them)
+const GRID_AVES = new Set([...Object.keys(AVENUE_RULE), 'Park Ave', 'Park Ave S', '11th Ave', '12th Ave (West Side Hwy)', 'York Ave', 'East End Ave',
+  'West End Ave', 'Central Park West', 'Adam Clayton Powell Jr Blvd', 'Frederick Douglass Blvd', 'Malcolm X Blvd (Lenox Ave)', 'Avenue A', 'Avenue B', 'Avenue C', 'Avenue D']);
 const AREAS = { all: 'All of Manhattan', downtown: 'Downtown (below 14th)', midtown: 'Midtown (14th–59th)', uptown: 'Uptown (59th–110th)', upper: 'Upper Manhattan (above 110th)' };
 
 // ---- geometry helpers ------------------------------------------------------------
@@ -44,24 +59,21 @@ function bearing(a, b) {
   const kx = Math.cos(rad((a[1] + b[1]) / 2));
   return ((Math.atan2((b[0] - a[0]) * kx, b[1] - a[1]) * 180) / Math.PI + 360) % 360;
 }
-const BEAR_M = 30;
-/** The point d metres along polyline p (cum = cumulative lengths). */
-function alongPt(p, cum, d) {
-  let i = 1;
-  while (i < p.length - 1 && cum[i] < d) i++;
-  const span = cum[i] - cum[i - 1] || 1;
-  const t = Math.max(0, Math.min(1, (d - cum[i - 1]) / span));
-  return [p[i - 1][0] + (p[i][0] - p[i - 1][0]) * t, p[i - 1][1] + (p[i][1] - p[i - 1][1]) * t];
-}
 const angleDiff = (to, from) => ((to - from + 540) % 360) - 180; // + = clockwise (right)
 /** Grid direction of a compass bearing: U(ptown), E(ast), D(owntown), W(est). */
 function gridDir(b) {
   const r = (b - GRID + 360) % 360;
   return r < 45 || r >= 315 ? 'U' : r < 135 ? 'E' : r < 225 ? 'D' : 'W';
 }
-/** Position across / up the grid, metres (for areas and "to go" words). */
+/** How far a bearing is from the grid's axes (0 = along an avenue or a street). */
+function offGrid(b) {
+  const r = ((((b - GRID) % 90) + 90) % 90);
+  return Math.min(r, 90 - r);
+}
+const compassWord = (b) => COMPASS[Math.round((((b % 360) + 360) % 360) / 45) % 8];
 // an arrow pointing up, rotated to point the way
 const DIR_SVG = '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 1.5 L16.5 17 L10 13 L3.5 17 Z" fill="currentColor"/></svg>';
+/** Position across / up the grid, metres (for areas). */
 function gridXY(p) {
   const x = (p[0] + 73.97) * 111320 * Math.cos(rad(40.78)), y = (p[1] - 40.78) * 110540;
   const a = rad(GRID);
@@ -89,41 +101,49 @@ export function initGridGame(ctx) {
     if (G) return G;
     const d = await fetch(DATA_URL).then((r) => r.json());
     const [ox, oy] = d.origin;
-    const nodes = [];
-    for (let i = 0; i < d.nodes.length; i += 2) nodes.push([ox + d.nodes[i] / d.scale, oy + d.nodes[i + 1] / d.scale]);
+    const nodes = []; // junctions (real intersections)
+    for (let i = 0; i < d.junctions.length; i += 2) nodes.push([ox + d.junctions[i] / d.scale, oy + d.junctions[i + 1] / d.scale]);
+    const geo = d.geoms.map((flat) => {
+      const pts = [];
+      let x = 0, y = 0;
+      for (let i = 0; i < flat.length; i += 2) {
+        x += flat[i];
+        y += flat[i + 1];
+        pts.push([ox + x / d.scale, oy + y / d.scale]);
+      }
+      return pts;
+    });
     const feeders = new Set(d.feeders);
     const out = nodes.map(() => []);
     const inn = nodes.map(() => []);
-    const edges = []; // directed
-    d.edges.forEach(([a, b, nid, dir, mid], seg) => {
-      const pts = [nodes[a]];
-      if (mid) for (let i = 0; i < mid.length; i += 2) pts.push([ox + mid[i] / d.scale, oy + mid[i + 1] / d.scale]);
-      pts.push(nodes[b]);
-      const mk = (from, to, p) => {
-        const cum = [0];
-        for (let i = 1; i < p.length; i++) cum.push(cum[i - 1] + metres(p[i - 1], p[i]));
-        const e = {
-          id: edges.length, from, to, seg, pts: p, cum, len: cum[cum.length - 1] || 1,
-          name: d.names[nid], oneway: dir !== 0,
-          // direction over the first / last ~30 m, not the last vertex pair: the
-          // centerline often kinks in the final few metres into a corner (Delancey
-          // bends southwest just before Bowery, which made Bowery look "straight")
-          b0: bearing(p[0], alongPt(p, cum, Math.min(BEAR_M, cum[cum.length - 1]))),
-          b1: bearing(alongPt(p, cum, Math.max(0, cum[cum.length - 1] - BEAR_M)), p[p.length - 1]),
-        };
-        edges.push(e);
-        out[from].push(e);
-        inn[to].push(e);
+    // links between corners, directed; a two-way block is two links sharing a shape
+    const ways = new Map();
+    const edges = d.links.map(([from, to, nid, gi, b0, b1], id) => {
+      const p = gi >= 0 ? geo[gi] : [...geo[~gi]].reverse();
+      const cum = [0];
+      for (let i = 1; i < p.length; i++) cum.push(cum[i - 1] + metres(p[i - 1], p[i]));
+      const len = cum[cum.length - 1] || 1;
+      const shape = gi >= 0 ? gi : ~gi;
+      ways.set(shape, (ways.get(shape) || 0) + 1);
+      const e = {
+        id, from, to, pts: p, cum, len, shape, name: d.names[nid], core: !feeders.has(id),
+        // the road's direction leaving / reaching its corners, over ~30 m of the road
+        // itself (from the build: the same numbers its button layout used)
+        b0,
+        b1,
       };
-      if (dir >= 0) mk(a, b, pts);
-      if (dir <= 0) mk(b, a, [...pts].reverse());
+      out[from].push(e);
+      inn[to].push(e);
+      return e;
     });
-    // distinct neighbours: 3+ means a real intersection
-    const nb = nodes.map(() => new Set());
-    for (const e of edges) {
-      nb[e.from].add(e.to);
-      nb[e.to].add(e.from);
-    }
+    for (const e of edges) e.oneway = ways.get(e.shape) === 1;
+    // the ways on from the end of each link, with the button each gets (from the build)
+    d.turns.forEach((t, i) => {
+      const opts = [];
+      for (let j = 0; j < t.length; j += 2) opts.push({ o: edges[t[j]], slot: ' LSRnN'[t[j + 1]] });
+      edges[i].opts = opts;
+    });
+    const coreJ = new Set(edges.filter((e) => e.core).map((e) => e.from));
     const RAMP = /entrance|exit|\bramp|\bRp\b|Bridge|Tunnel|Expwy|\bEp\b|\bEn\b|\bEt\b/i;
     const HWY = /Drive|\bDr\b|\bDrv\b|Hwy|Pkwy|Expwy|FDR/i;
     const label = (n) => {
@@ -134,60 +154,46 @@ export function initGridGame(ctx) {
     };
     // an ordinary street corner: no highway or ramp meets here (for random starts and destinations)
     const plain = (n) => [...out[n], ...inn[n]].every((e) => !RAMP.test(e.name) && !HWY.test(e.name));
+    const real = (n) => d.jdeg[n] >= 3; // three or more roads meet: a corner you could turn at
     const gy = nodes.map((p) => gridXY(p)[1]);
-    G = { d, nodes, edges, out, inn, nb, feeders, label, plain, gy, places: d.places, entries: d.entries, areas: d.areas };
-    // where each entry first reaches a real intersection (for area filtering)
-    for (const en of G.entries) {
-      let n = en.node;
-      for (let i = 0; i < 200 && (G.feeders.has(n) || G.nb[n].size < 3); i++) {
-        const o = G.out[n][0];
-        if (!o) break;
-        n = o.to;
-      }
-      en.landsAt = n;
-    }
+    G = { d, nodes, edges, out, inn, coreJ, real, label, plain, gy, RAMP, places: d.places, entries: d.entries, areas: d.areas };
     buildArrows();
     return G;
   }
 
-  /** The choices at the end of edge e: {straight, left, right} or {only} (no real choice). */
+  /**
+   * The ways on from the end of link e. Simple corner: {left, straight, right}.
+   * Named corner (the ways out don't fit those): every option is its own button;
+   * dflt is the way that carries on along the same road, if any.
+   */
   const choiceCache = new Map();
   function choices(e) {
     if (choiceCache.has(e.id)) return choiceCache.get(e.id);
-    const opts = G.out[e.to].filter((o) => o.seg !== e.seg); // no U-turns
-    let c;
-    if (!opts.length) {
-      const back = G.out[e.to].find((o) => o.seg === e.seg);
-      c = { only: back || null, uturn: true, options: back ? [back] : [] };
-    } else if (opts.length === 1) c = { only: opts[0], options: opts };
-    else {
-      const withD = opts.map((o) => ({ o, d: angleDiff(o.b0, e.b1) }));
-      let straight = withD.filter((x) => x.o.name === e.name && Math.abs(x.d) <= 50).sort((a, b) => Math.abs(a.d) - Math.abs(b.d))[0];
-      if (!straight) straight = withD.filter((x) => Math.abs(x.d) <= 32).sort((a, b) => Math.abs(a.d) - Math.abs(b.d))[0];
-      const rest = withD.filter((x) => x !== straight);
-      // a real turn (past 20°) if there is one, else a fork that bears off to that side
-      // (a highway exit leaves at a shallow angle)
-      const side = (sgn) => {
-        // turning back onto the same street is a U-turn across a median (Delancey's
-        // other roadbed at Bowery): only if nothing else goes that way
-        const back = (x) => (x.o.name === e.name && Math.abs(x.d) > 95 ? 1000 : 0);
-        const by = (a, b) => back(a) + Math.abs(a.d - sgn * 90) - back(b) - Math.abs(b.d - sgn * 90);
-        const s = rest.filter((x) => x.d * sgn > 0);
-        return s.filter((x) => x.d * sgn > 20).sort(by)[0] || s.sort(by)[0];
-      };
-      const left = side(-1);
-      const right = side(1);
-      c = { straight: straight?.o || null, left: left?.o || null, right: right?.o || null, options: opts };
+    const c = { options: e.opts.map((x) => x.o), decision: e.opts.length >= 2, named: e.opts.some((x) => x.slot === 'n' || x.slot === 'N') };
+    c.left = c.straight = c.right = c.dflt = null;
+    for (const { o, slot } of e.opts) {
+      if (slot === 'L') c.left = o;
+      else if (slot === 'S') c.straight = o;
+      else if (slot === 'R') c.right = o;
+      else if (slot === 'N') c.dflt = o;
     }
-    c.decision = !('only' in c);
+    if (!c.named) c.dflt = c.straight;
+    c.only = e.opts.length === 1 ? e.opts[0].o : null;
     choiceCache.set(e.id, c);
     return c;
   }
-  /** The moves the buttons can make from the end of edge e. */
-  function moves(e) {
-    const c = choices(e);
-    return !c.decision ? (c.only ? [c.only] : []) : [c.straight, c.left, c.right].filter(Boolean);
+  /** The moves you can make from the end of link e (every way on has a button). */
+  const moves = (e) => choices(e).options;
+  /** At a named corner, the way out nearest a left (or right) turn, for the arrow keys. */
+  function sideOption(e, side) {
+    const sgn = side === 'L' ? -1 : 1;
+    return choices(e).options
+      .map((o) => ({ o, d: angleDiff(o.b0, e.b1) }))
+      .filter((x) => x.d * sgn > 20)
+      .sort((a, b) => Math.abs(a.d - sgn * 90) - Math.abs(b.d - sgn * 90))[0]?.o || null;
   }
+  /** Turn angle from link e onto link o (+ = right). */
+  const turnOf = (e, o) => angleDiff(o.b0, e.b1);
 
   // ---- rules of thumb ------------------------------------------------------------------
   const streetNum = (name) => {
@@ -206,6 +212,12 @@ export function initGridGame(ctx) {
     return 'avenues alternate';
   };
   const short = (name) => name.replace(/^[EW] (\d+\w\w) St$/, '$1 St');
+  /** On a grid street or avenue running along the grid (or any road lined up with it):
+   *  uptown / downtown / east / west mean something. */
+  const gridRoad = (name) => streetNum(name) != null || GRID_AVES.has(name);
+  const onGrid = (name, b) => (gridRoad(name) && offGrid(b) <= 25) || offGrid(b) <= 10;
+  /** The way you're heading, in words that are true here: grid words on the grid, the compass elsewhere. */
+  const headWord = (name, b) => (onGrid(name, b) ? WORD[gridDir(b)] : compassWord(b));
   /** Refusal text for a one-way road d (an edge that runs toward the corner we're at). */
   function wrongWay(d) {
     const dir = gridDir(d.b1); // the way traffic flows on it
@@ -231,11 +243,9 @@ export function initGridGame(ctx) {
   let arrowsFC = null;
   function buildArrows() {
     // one-way blocks as lines drawn the way traffic flows; exceptions flagged
-    const seen = new Set();
     const feats = [];
     for (const e of G.edges) {
-      if (!e.oneway || seen.has(e.seg)) continue;
-      seen.add(e.seg);
+      if (!e.oneway) continue;
       feats.push({ type: 'Feature', properties: { name: e.name, exc: exceptionNote(e) ? 1 : 0 }, geometry: { type: 'LineString', coordinates: e.pts } });
     }
     arrowsFC = { type: 'FeatureCollection', features: feats };
@@ -390,7 +400,7 @@ export function initGridGame(ctx) {
     if (a === 'uptown') return y >= A['59'] - 150 && y <= A['110'] + 150;
     return y > A['110'];
   }
-  const isCore = (n) => !G.feeders.has(n);
+  const isCore = (n) => G.coreJ.has(n);
   /** Shortest legal route (moves the buttons can make, no U-turns) from edge e0, s metres along it, to node t. */
   function shortest(e0, t, s = 0) {
     const c0 = e0.len - s;
@@ -422,7 +432,7 @@ export function initGridGame(ctx) {
     }
     return null;
   }
-  /** Following straight on (and through bends with no choice) from the end of edge e: the corners ahead. */
+  /** Following the road on (straight, or where it carries on at a named corner) from the end of link e: the corners ahead. */
   function aheadChain(e, maxNodes = 80, maxM = 6000) {
     const outN = [];
     let cur = e, m = 0;
@@ -432,14 +442,14 @@ export function initGridGame(ctx) {
       if (seen.has(cur.id)) break;
       seen.add(cur.id);
       const c = choices(cur);
-      const nx = !c.decision ? (c.uturn ? null : c.only) : c.straight;
+      const nx = c.decision ? c.dflt : c.only;
       if (!nx) break;
       m += nx.len;
       cur = nx;
     }
     return outN;
   }
-  /** Is node t straight ahead on this road from edge e (no turns)? */
+  /** Is node t straight ahead on this road from link e (no turns)? */
   function straightTo(e, t) {
     return aheadChain(e, 120, 8000).some((x) => x.node === t);
   }
@@ -448,49 +458,48 @@ export function initGridGame(ctx) {
    * it reaches the city's streets (not out in the middle of the river).
    */
   const ENTRY_LEAD_M = 300;
-  function entryEdge(entry) {
+  function entryStart(entry) {
+    // the lane in, up to the first corner where there's a choice to make
     const chain = [];
-    let n = entry.node;
-    for (let i = 0; i < 400 && !(isCore(n) && G.nb[n].size >= 3); i++) {
-      const o = G.out[n][0];
-      if (!o) break;
-      chain.push(o);
-      n = o.to;
+    let e = G.edges[entry.link];
+    for (let i = 0; i < 100 && e; i++) {
+      chain.push(e);
+      const c = choices(e);
+      if (c.decision || !c.only) break;
+      e = c.only;
     }
-    if (!chain.length) return null;
     let left = 0;
     for (let i = chain.length - 1; i >= 0; i--) {
+      if (left + chain[i].len >= ENTRY_LEAD_M) return { e: chain[i], s: chain[i].len - (ENTRY_LEAD_M - left) };
       left += chain[i].len;
-      if (left >= ENTRY_LEAD_M) return chain[i];
     }
-    return chain[0];
+    return { e: chain[0], s: 0 };
   }
   function pickRound() {
     const coreNodes = [];
-    for (let n = 0; n < G.nodes.length; n++) if (isCore(n) && G.nb[n].size >= 3 && G.plain(n) && inArea(n)) coreNodes.push(n);
+    for (let n = 0; n < G.nodes.length; n++) if (isCore(n) && G.real(n) && G.plain(n) && inArea(n)) coreNodes.push(n);
     const places = G.places.filter((p) => inArea(p.node));
     const entries = G.entries.filter((en) => inArea(en.landsAt));
     const useEntry = entries.length && (prefs.from === 'entries' || (prefs.from === 'both' && Math.random() < 0.5));
     for (let tries = 0; tries < 300; tries++) {
       const target = places.length && Math.random() < 0.7 ? { ...rand(places) } : { name: null, node: rand(coreNodes) };
       target.label = G.label(target.node);
-      let e0, entry = null;
+      let e0, s0 = 0, entry = null;
       if (useEntry) {
         entry = rand(entries);
-        e0 = entryEdge(entry);
-        if (!e0) continue;
+        ({ e: e0, s: s0 } = entryStart(entry));
       } else {
         const n = rand(coreNodes);
-        const outs = G.out[n].filter((o) => isCore(o.to));
+        const outs = G.out[n].filter((o) => o.core);
         if (!outs.length) continue;
         e0 = rand(outs);
       }
       const dm = metres(G.nodes[e0.from], G.nodes[target.node]);
-      if (dm < 500 || dm > (entry ? 7000 : 3000)) continue;
+      if (dm < 500 || dm > (entry ? 7000 : 3500)) continue;
       if (straightTo(e0, target.node)) continue; // already on the right road
-      const best = shortest(e0, target.node);
+      const best = shortest(e0, target.node, s0);
       if (!best || best.path.length < 4) continue;
-      return { e0, target, best, entry };
+      return { e0, s0, target, best, entry };
     }
     return null;
   }
@@ -523,9 +532,10 @@ export function initGridGame(ctx) {
     map.setGlobalStateProperty('quiet', false);
     g = {
       opts, target: r.target, best: r.best, entry: r.entry,
-      e: r.e0, s: 0, // on edge e, s metres along
-      waiting: false, queued: null, goTo: null, home: false, boost: false, paused: false, done: false,
-      driven: 0, wrong: 0, trail: [G.nodes[r.e0.from]], msg: '', msgAt: 0, lastNote: null,
+      e: r.e0, s: r.s0, // on link e, s metres along
+      waiting: false, queued: null, pick: null, goTo: null, gotoV: 0, home: false, boost: false, paused: false, done: false,
+      cruise: 0, zoom: ZOOM,
+      driven: -r.s0, wrong: 0, trail: [posOnEdge(r.e0, r.s0).p], msg: '', msgAt: 0, lastNote: null,
       last: performance.now(), raf: 0, view: prefs.mapFirst && ctx.dur(1) ? 'intro' : 'follow',
       check: null, lastCheck: performance.now() - CHECK_EVERY_MS / 2, checks: 0, checksRight: 0, resumeAt: 0,
       startCard: true,
@@ -538,16 +548,16 @@ export function initGridGame(ctx) {
     setData('gg-best', EMPTY);
     setData('gg-goto', EMPTY);
     showArrows();
-    carMk.setLngLat(G.nodes[r.e0.from]).addTo(map);
+    carMk.setLngLat(g.trail[0]).addTo(map);
     enterEdge(g.e);
     g.msg = '';
     render();
     if (g.view === 'intro') {
-      ctx.fit([G.nodes[r.e0.from], tp], 15, { bearing: GRID, duration: 700 });
+      ctx.fit([g.trail[0], tp], 15, { bearing: GRID, duration: 700 });
       setTimeout(() => {
         if (g && g.view === 'intro') g.view = 'follow';
       }, 1700);
-    } else map.jumpTo({ center: G.nodes[r.e0.from], zoom: ZOOM, bearing: GRID });
+    } else map.jumpTo({ center: g.trail[0], zoom: ZOOM, bearing: GRID });
     g.raf = requestAnimationFrame(tick);
     window.addEventListener('keydown', onKey);
   }
@@ -583,7 +593,7 @@ export function initGridGame(ctx) {
       g.msgAt = performance.now();
     }
     g.lastNote = note;
-    if (!g.home && isCore(e.from) && straightTo(e, g.target.node)) {
+    if (!g.home && e.core && homeStretch(e)) {
       g.home = true;
       g.goTo = null;
       g.queued = null;
@@ -591,6 +601,19 @@ export function initGridGame(ctx) {
       g.msg = `✓ Right road: straight there`;
       g.msgAt = performance.now();
     }
+  }
+
+  /** On the destination's road, heading to it, and that's also the shortest way: the rest drives itself. */
+  function homeStretch(e) {
+    let m = 0;
+    for (const { node, via } of aheadChain(e, 120, 8000)) {
+      if (via !== e) m += via.len;
+      if (node === g.target.node) {
+        const r = shortest(e, g.target.node, 0);
+        return !!r && e.len + m <= r.cost + 1;
+      }
+    }
+    return false;
   }
 
   // ---- where you are, in words ------------------------------------------------------------
@@ -603,11 +626,12 @@ export function initGridGame(ctx) {
   function crossAt(e) {
     const names = [];
     for (const o of [...G.out[e.to], ...G.inn[e.to]]) if (o.name !== e.name && !names.includes(o.name)) names.push(o.name);
-    return names[0] ? short(names[0]) : null;
+    const nm = names.find((x) => !G.RAMP.test(x)) || names[0]; // a street, not a ramp, if there is one
+    return nm ? short(nm) : null;
   }
   /** The next real intersection ahead on this road, and its cross street. */
   function nextCross(e) {
-    for (const { node, via } of aheadChain(e, 12, 2500)) if (G.nb[node].size >= 3) return crossAt(via);
+    for (const { node, via } of aheadChain(e, 12, 2500)) if (G.real(node)) return crossAt(via);
     return null;
   }
   /** Which way the Hudson (west) is, relative to heading h. */
@@ -624,13 +648,14 @@ export function initGridGame(ctx) {
     }
     const here = hood(G.nodes[g.e.from]);
     const nx = nextCross(g.e);
-    return `<b>${esc((here || 'Manhattan').replace(/ \(.*\)$/, ''))}</b> · ${esc(short(g.e.name))} ${WORD[h]}${nx ? ` → ${esc(nx)}` : ''}<br><span class="muted">Hudson: ${{ 'ahead of you': 'ahead', 'on your right': 'right', 'behind you': 'behind', 'on your left': 'left' }[hudsonSide(h)]} · tap to go</span>`;
+    return `<b>${esc((here || 'Manhattan').replace(/ \(.*\)$/, ''))}</b> · ${esc(short(g.e.name))} ${headWord(g.e.name, g.e.b0)}${nx ? ` → ${esc(nx)}` : ''}<br><span class="muted">Hudson: ${{ 'ahead of you': 'ahead', 'on your right': 'right', 'behind you': 'behind', 'on your left': 'left' }[hudsonSide(h)]} · tap to go</span>`;
   }
 
   // ---- check-ins: "You're heading downtown. Which side is the Hudson?" ----------------------
   function maybeCheckIn(now) {
     if (!prefs.checkins || g.auto || g.check || g.done || g.waiting || g.home || g.goTo != null || g.queued || g.paused || g.view !== 'follow') return;
-    if (now - g.lastCheck < CHECK_EVERY_MS || !isCore(g.e.from) || g.e.len < 60 || g.s < g.e.len * 0.25 || g.s > g.e.len * 0.6) return;
+    if (now - g.lastCheck < CHECK_EVERY_MS || !g.e.core || g.e.len < 60 || g.s < g.e.len * 0.25 || g.s > g.e.len * 0.6) return;
+    if (!onGrid(g.e.name, g.bnow)) return; // "heading downtown" only means something on the grid
     const h = gridDir(g.bnow);
     let thing, dir;
     if (h === 'U' || h === 'D') {
@@ -651,6 +676,7 @@ export function initGridGame(ctx) {
     g.checks++;
     if (ok) g.checksRight++;
     g.check = null;
+    g.cruise = 0;
     g.lastCheck = performance.now();
     g.resumeAt = performance.now() + 900;
     const where = `${c.thing}${c.thing.startsWith('the') ? ` (${WORD[c.dir]})` : ''}`;
@@ -660,14 +686,26 @@ export function initGridGame(ctx) {
     render();
   }
 
+  const cruiseMult = () => Math.min(CRUISE_MAX, 1 + CRUISE_STEP * g.cruise);
   function speedNow() {
     const base = SPEED * PACE[prefs.pace];
     if (g.home) return base * HOME_SPEED;
-    if (g.goTo != null) return base * GOTO_SPEED;
+    if (g.goTo != null) return Math.max(base * GOTO_SPEED, g.gotoV);
+    const c = choices(g.e);
+    const left = g.e.len - g.s;
+    // a long stretch with no corner: never more than LEG_MAX_S for the whole of it
+    // (bridges, tunnels, highways), up to the last APPROACH_M before a corner
+    if (left > APPROACH_M) {
+      const floor = ((g.e.len - APPROACH_M) / LEG_MAX_S) * PACE[prefs.pace];
+      return Math.max(floor, base * (g.boost ? Math.max(HOLD_SPEED, cruiseMult()) : cruiseMult()));
+    }
+    if (!c.decision) return base * Math.max(cruiseMult(), g.boost ? HOLD_SPEED : 1);
     if (g.boost) return base * HOLD_SPEED;
-    // slow down before a real intersection, so there's a moment to decide
-    if (choices(g.e).decision && g.e.len - g.s < 30) return base * CORNER_SLOW;
-    return base;
+    // a corner where you could turn: a beat to decide at the first corner after a turn,
+    // and before one where you have to pick (no way carries on)
+    if (left < 30 && (g.cruise === 0 || (!c.dflt && !g.pick && !g.queued))) return base * CORNER_SLOW;
+    // cruising straight on: faster each corner, but never more than one corner per CORNER_MIN_S
+    return Math.min(base * cruiseMult(), Math.max(base, g.e.len / CORNER_MIN_S));
   }
 
   function tick(now) {
@@ -702,7 +740,7 @@ export function initGridGame(ctx) {
     const { p, b } = g.waiting || g.done ? { p: G.nodes[g.e.to], b: g.e.b1 } : posOnEdge(g.e, g.s);
     g.pos = p;
     g.bnow = b;
-    const hc = gridDir(b);
+    const hc = `${gridDir(b)}${onGrid(g.e.name, b) ? '' : compassWord(b)}${choices(g.e).named ? 'n' : ''}`;
     if (hc !== g.lastHC) {
       g.lastHC = hc;
       render(); // the compass words on Left / Right follow your heading
@@ -717,13 +755,16 @@ export function initGridGame(ctx) {
       const H = window.innerHeight;
       // the car a little below the middle of the open area: more road ahead
       const oy = pad.top + (H - pad.top - pad.bottom) * 0.62 - H / 2;
-      map.easeTo({ center: p, zoom: ZOOM, bearing: GRID, offset: [0, oy], duration: 0 });
+      // zoom out as you cruise, so the corners coming up stay in view
+      const want = g.home || g.goTo != null ? ZOOM - 0.4 : ZOOM - Math.min(1.3, 0.32 * (cruiseMult() - 1));
+      g.zoom += (want - g.zoom) * Math.min(1, dt * 2.5);
+      map.easeTo({ center: p, zoom: g.zoom, bearing: GRID, offset: [0, oy], duration: 0 });
     }
     pointToTarget();
     g.raf = requestAnimationFrame(tick);
   }
 
-  /** At the end of g.e: finish, stop at a tapped corner, turn, go straight, or wait. */
+  /** At the end of g.e: finish, stop at a tapped corner, take the chosen way, carry on, or wait. */
   function arrive() {
     const e = g.e;
     const n = e.to;
@@ -732,71 +773,69 @@ export function initGridGame(ctx) {
     setData('gg-trail', line(g.trail));
     if (g.msg && performance.now() - g.msgAt > 3500) g.msg = '';
     if (n === g.target.node) return finish();
+    const c = choices(e);
     if (g.goTo === n) {
-      const cc = choices(e);
-      const onlyWay = !cc.decision ? cc.only : !cc.left && !cc.right ? cc.straight : null;
-      if (onlyWay && !cc.uturn) {
+      if (!c.decision && c.only) {
         // nothing to decide at this corner: say so and keep going
         g.goTo = null;
         setData('gg-goto', EMPTY);
-        g.msg = `Only way on is straight: keep going`;
-        g.msgAt = performance.now();
-        go(onlyWay);
+        say(`Only way on: ${short(c.only.name)}`);
+        go(c.only, true);
         return;
       }
       g.msg = ''; // the tapped corner: say where you are, not an older note
       return stopHere();
     }
     if (g.auto) autopilot(e);
-    const c = choices(e);
     if (!c.decision) {
       if (!c.only) return stopHere('Dead end.');
-      if (c.uturn) {
-        g.msg = `Dead end: turning around`;
-        g.msgAt = performance.now();
-      }
-      go(c.only);
+      const d = turnOf(e, c.only);
+      if (Math.abs(d) > 50) say(`Only way on: ${d < 0 ? 'left' : 'right'} onto ${short(c.only.name)}`);
+      go(c.only, Math.abs(d) <= 50);
       return;
+    }
+    if (g.pick) {
+      const p = g.pick;
+      g.pick = null;
+      if (c.options.includes(p)) return go(p, p === c.dflt);
     }
     if (g.queued) {
       const side = g.queued;
       g.queued = null;
-      const nx = side === 'L' ? c.left : c.right;
-      if (nx) {
-        go(nx);
-        render();
-        return;
-      }
+      const nx = c.named ? sideOption(e, side) : side === 'L' ? c.left : c.right;
+      if (nx) return go(nx);
       refuse(e, side);
     }
-    if (c.straight) {
-      go(c.straight);
-      render();
-      return;
-    }
-    stopHere('Road ends: left or right');
+    if (c.dflt) return go(c.dflt, true);
+    stopHere();
   }
-  function go(nx) {
+  /** Onto link nx. carryOn: straight on with no input (the cruise builds); otherwise it resets. */
+  function go(nx, carryOn = false) {
+    g.cruise = carryOn ? g.cruise + 1 : 0;
     g.e = nx;
     g.s = 0;
     g.waiting = false;
     enterEdge(nx);
     render(); // the street, neighborhood and next cross street follow you
   }
+  function say(msg) {
+    g.msg = msg;
+    g.msgAt = performance.now();
+  }
   function stopHere(msg) {
     g.waiting = true;
+    g.cruise = 0;
     g.goTo = null;
     setData('gg-goto', EMPTY);
     g.s = g.e.len;
-    if (msg && !g.msg) {
-      g.msg = msg;
-      g.msgAt = performance.now();
-    }
+    if (msg && !g.msg) say(msg);
     if (!g.msg) {
       const c0 = choices(g.e);
-      const ways = [c0.left && 'left', (c0.straight || (!c0.decision && c0.only)) && 'straight', c0.right && 'right'].filter(Boolean);
-      g.msg = `${G.label(g.e.to)}: ${ways.join(' · ')}`;
-      g.msgAt = performance.now();
+      if (c0.named) say(`${G.label(g.e.to)}: which way?`);
+      else {
+        const ways = [c0.left && 'left', c0.straight && 'straight', c0.right && 'right'].filter(Boolean);
+        say(`${G.label(g.e.to)}: ${ways.join(' · ')}`);
+      }
     }
     render();
   }
@@ -804,18 +843,17 @@ export function initGridGame(ctx) {
   function refuse(e, side) {
     let why = null;
     for (const d of G.inn[e.to]) {
-      if (!d.oneway || d.seg === e.seg) continue;
+      if (!d.oneway || d.shape === e.shape) continue;
       const outward = (d.b1 + 180) % 360;
       const dd = angleDiff(outward, e.b1);
-      if (side === 'L' ? dd < -20 && dd > -160 : dd > 20 && dd < 160) {
+      if (side === 'L' ? dd < -30 && dd > -150 : dd > 30 && dd < 150) {
         why = wrongWay(d);
         g.wrong++;
         showArrows(d.name);
         break;
       }
     }
-    g.msg = `⛔ ${why || `No road to the ${side === 'L' ? 'left' : 'right'}`}`;
-    g.msgAt = performance.now();
+    say(`⛔ ${why || `No road to the ${side === 'L' ? 'left' : 'right'}`}`);
   }
   function go0() {
     // leave the start card now
@@ -829,19 +867,18 @@ export function initGridGame(ctx) {
     if (!g || g.done || g.loading) return;
     if (g.check) return side === 'S' ? undefined : answerCheck(side);
     go0();
+    g.cruise = 0;
+    const c = choices(g.e);
     if (side === 'S') {
       if (!g.waiting) return;
-      const c = choices(g.e);
-      const nx = c.straight || (!c.decision ? c.only : null);
+      const nx = c.straight || c.dflt || c.only;
       if (!nx) return;
       g.msg = '';
       go(nx);
-      render();
       return;
     }
     if (g.waiting) {
-      const c = choices(g.e);
-      const nx = side === 'L' ? c.left : c.right;
+      const nx = c.named ? sideOption(g.e, side) : side === 'L' ? c.left : c.right;
       if (!nx) {
         refuse(g.e, side);
         render();
@@ -849,15 +886,36 @@ export function initGridGame(ctx) {
       }
       g.msg = '';
       go(nx);
-      render();
       return;
     }
     g.queued = g.queued === side ? null : side;
+    g.pick = null;
     g.home = false;
     if (g.goTo != null) {
       g.goTo = null;
       setData('gg-goto', EMPTY);
     }
+    render();
+  }
+  /** A named way out, tapped: take it now if stopped, else at the coming corner. */
+  function pickLink(id) {
+    if (!g || g.done || g.loading || g.check) return;
+    go0();
+    const o = G.edges[id];
+    if (!choices(g.e).options.includes(o)) return;
+    g.cruise = 0;
+    g.queued = null;
+    g.home = false;
+    if (g.goTo != null) {
+      g.goTo = null;
+      setData('gg-goto', EMPTY);
+    }
+    if (g.waiting) {
+      g.msg = '';
+      go(o);
+      return;
+    }
+    g.pick = g.pick === o ? null : o;
     render();
   }
   function togglePause() {
@@ -868,9 +926,8 @@ export function initGridGame(ctx) {
   function autopilot(e) {
     // test helper: follow the shortest route from here
     const r = shortest(e, g.target.node, e.len);
-    const nx = r && r.path[1];
-    const c = choices(e);
-    g.queued = !nx || !c.decision || nx === c.straight ? null : nx === c.left ? 'L' : nx === c.right ? 'R' : null;
+    g.pick = (r && r.path[1]) || null;
+    g.queued = null;
   }
 
   // ---- tap a corner ahead; hold to speed up -------------------------------------------------------
@@ -913,11 +970,11 @@ export function initGridGame(ctx) {
 
   function tapAt(sx, sy) {
     const rect = map.getContainer().getBoundingClientRect();
-    const st = g.waiting ? choices(g.e).straight : null;
+    const st = g.waiting ? choices(g.e).dflt : null;
     const chain = g.waiting ? (st ? aheadChain(st) : []) : aheadChain(g.e);
     let best = null;
     for (const { node } of chain) {
-      if (G.nb[node].size < 3) continue;
+      if (!G.real(node)) continue;
       const p = map.project(G.nodes[node]);
       const d = Math.hypot(p.x + rect.left - sx, p.y + rect.top - sy);
       if (d < 70 && (!best || d < best.d)) best = { node, d };
@@ -930,6 +987,15 @@ export function initGridGame(ctx) {
     }
     g.goTo = best.node;
     g.queued = null;
+    g.pick = null;
+    g.cruise = 0;
+    // get there in about a second, however far
+    let m = g.waiting ? 0 : g.e.len - g.s;
+    for (const { node, via } of chain) {
+      if (via !== g.e) m += via.len;
+      if (node === best.node) break;
+    }
+    g.gotoV = m / 1.2;
     setData('gg-goto', point(G.nodes[best.node]));
     if (g.waiting) {
       g.msg = '';
@@ -994,7 +1060,7 @@ export function initGridGame(ctx) {
     for (let i = 0; i < path.length; i++) {
       const e = path[i];
       const last = legs[legs.length - 1];
-      if (last && last.name === e.name) continue;
+      if (last && short(last.name) === short(e.name)) continue;
       if (!isCore(e.from) && !last) continue; // still on the way in from outside
       if (/entrance|exit|\bramp/i.test(e.name)) continue; // ramps aren't worth naming
       const dir = gridDir(e.b0);
@@ -1022,8 +1088,10 @@ export function initGridGame(ctx) {
     const t = g.target;
     const corner = t.label.replace(/ St\b/g, '').replace(/\b[EW] (\d)/g, '$1');
     const tgt = t.name ? `<b>${esc(t.name)}</b> <span class="muted">· ${esc(corner)}</span>` : `<b>${esc(t.label)}</b>`;
-    const nx = !g.done && isCore(g.e.from) ? nextCross(g.e) : null;
-    const where = `<b>${esc(short(g.e.name))}</b> · ${WORD[gridDir(g.e.b0)]}${nx ? ` · next ${esc(nx)}` : ''}${g.queued ? ` · <b>${g.queued === 'L' ? '◀ left' : 'right ▶'}</b>` : ''}`;
+    const nx = !g.done && g.e.core ? nextCross(g.e) : null;
+    const hb = g.bnow ?? g.e.b0;
+    const plan = g.queued ? ` · <b>${g.queued === 'L' ? '◀ left' : 'right ▶'}</b>` : g.pick ? ` · <b>→ ${esc(short(g.pick.name))}</b>` : '';
+    const where = `<b>${esc(short(g.e.name))}</b> · ${headWord(g.e.name, hb)}${nx ? ` · next ${esc(nx)}` : ''}${plan}`;
     ctx.hud(
       g.check
         ? `<div class="q gg-checkq">Heading ${WORD[g.check.h]}. ${esc(g.check.thing[0].toUpperCase() + g.check.thing.slice(1))}: <b>left or right?</b></div>
@@ -1032,18 +1100,33 @@ export function initGridGame(ctx) {
        ${g.done ? '' : `<div class="hint gg-go"><span class="gg-dir" title="Which way the destination is">${DIR_SVG}</span><b class="gg-dist"></b> · ${where}</div>`}`
     );
     if (!g.done && g.pos) updateDir(aim());
-    // the compass word for each hand, fading as this heading becomes solid (none during a check-in: it'd give it away)
-    const hb = g.bnow ?? g.e.b0;
+    // the direction each hand points, fading as this heading becomes solid (none during a check-in: it'd give it away);
+    // grid words on the grid, the compass elsewhere
     const lvl = g.check ? 'hide' : fstats.hint(gridDir(hb));
-    const hint = (dir) => (lvl === 'hide' ? '' : `<span class="dirhint${lvl === 'faint' ? ' faint' : ''}">${WORD[dir]}</span>`);
+    const grid = onGrid(g.e.name, hb);
+    const handWord = (b) => (grid ? WORD[gridDir(b)] : compassWord(b));
+    const hint = (b) => (lvl === 'hide' ? '' : `<span class="dirhint${lvl === 'faint' ? ' faint' : ''}">${handWord(b)}</span>`);
     const btn = (side, label) =>
-      `<button class="ggturn${g.queued === side ? ' on' : ''}${g.check ? ' check' : ''}" data-side="${side}" ${g.done ? 'disabled' : ''}>${label}${side === 'S' ? '' : hint(gridDir(hb + (side === 'L' ? -90 : 90)))}</button>`;
+      `<button class="ggturn${g.queued === side ? ' on' : ''}${g.check ? ' check' : ''}" data-side="${side}" ${g.done ? 'disabled' : ''}>${label}${side === 'S' ? '' : hint(hb + (side === 'L' ? -90 : 90))}</button>`;
+    const cc = !g.done ? choices(g.e) : null;
     // stopped at a corner where straight on is possible: offer it
-    const cw = g.waiting && !g.done && !g.check ? choices(g.e) : null;
-    const canStraight = !!(cw && (cw.straight || (!cw.decision && cw.only)));
+    const cw = g.waiting && !g.check ? cc : null;
+    const canStraight = !!(cw && (cw.straight || cw.only));
+    // a corner whose ways out don't fit Left / Straight / Right: a button for each, with its
+    // real angle on screen (the map is turned so the grid is upright)
+    const named = cc && cc.named && !g.check;
+    const pickBtns = () =>
+      cc.options
+        .map((o) => ({ o, d: turnOf(g.e, o) }))
+        .sort((a, b) => a.d - b.d)
+        .map(
+          ({ o }) =>
+            `<button class="ggpick${g.pick === o ? ' on' : ''}" data-link="${o.id}"><span class="gg-arr" style="transform:rotate(${(o.b0 - GRID).toFixed(0)}deg)">${DIR_SVG}</span><span class="nm">${esc(short(o.name))}${o === cc.dflt ? ' <small>default</small>' : ''}</span></button>`
+        )
+        .join('');
     ctx.sheet(
       `${g.opts.header()}<div id="qbody">
-        ${g.done ? g.result : `<div class="ggctl${canStraight ? ' three' : ''}">${btn('L', '◀ Left')}${canStraight ? btn('S', '▲ Straight') : ''}${btn('R', 'Right ▶')}</div>
+        ${g.done ? g.result : `${named ? `<div class="ggctl named">${pickBtns()}</div>` : `<div class="ggctl${canStraight ? ' three' : ''}">${btn('L', '◀ Left')}${canStraight ? btn('S', '▲ Straight') : ''}${btn('R', 'Right ▶')}</div>`}
         <div class="ggmsg${g.msg || g.check || g.startCard ? '' : ' muted'}${g.startCard ? ' startcard' : ''}">${
           g.startCard
             ? startCard()
@@ -1052,7 +1135,9 @@ export function initGridGame(ctx) {
             : g.msg
               ? esc(g.msg)
               : rounds() <= 3
-                ? 'Left/Right: turn at the next corner · tap a corner: go there · hold: faster'
+                ? named
+                  ? 'Tap the way you want at the next corner'
+                  : 'Left/Right: turn at the next corner · tap a corner: go there · hold: faster'
                 : ''
         }</div>`}
         <div class="ggbar">
@@ -1071,6 +1156,7 @@ export function initGridGame(ctx) {
     );
     g.opts.bindHeader();
     for (const b of document.querySelectorAll('.ggturn')) b.addEventListener('click', () => press(b.dataset.side));
+    for (const b of document.querySelectorAll('.ggpick')) b.addEventListener('click', () => pickLink(+b.dataset.link));
     document.getElementById('ggPause')?.addEventListener('click', togglePause);
     document.getElementById('ggAgain')?.addEventListener('click', () => start(g.opts));
     document.getElementById('ggOptsBtn').addEventListener('click', () => {
@@ -1115,6 +1201,7 @@ export function initGridGame(ctx) {
     _state: () => g,
     _graph: () => G,
     _model: { choices, moves, shortest, straightTo, aheadChain, load, rule, describe },
+    _speed: () => (g && !g.loading && g.e ? speedNow() : 0),
     _autopilot() {
       if (g) g.auto = true;
     },

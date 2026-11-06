@@ -17,6 +17,20 @@ What it does:
 - keeps the largest part of the network where every intersection can reach
   every other one, so you can never get stuck, plus the lanes that lead into
   it from outside (tunnels and bridges): those are where rounds can start
+- merges the pieces of one real corner (a divided road's two roadbeds, median
+  crossings, short connectors) into one intersection, and writes links from
+  corner to corner, through bends
+- for each way into a corner, the ways on (no U-turns) and the button each gets:
+  Left / Straight / Right when they fit one each, clearly apart; otherwise a
+  named button per way out, one marked as the default (the road carrying on)
+- refuses to write the file if any check fails: a link with no way on, two ways
+  on one button; the link states kept are those that can all reach each other
+
+Output (version 2): junctions (corner centres), jdeg (roads meeting there),
+geoms (road shapes, delta-encoded; a two-way block's two links share one),
+links [from, to, name, geom (~g = reversed), bearing out, bearing in],
+turns per link [link, slot, ...] (slot 1 L, 2 S, 3 R, 4 named, 5 named default),
+feeders (links on the way in), entries, places, areas.
 """
 import json, math, re, sys
 from collections import defaultdict, Counter
@@ -337,63 +351,362 @@ PLACES = [
     ('Columbia University', (-73.9626, 40.8075), None), ('the Apollo Theater', (-73.9500, 40.8100), None),
     ('the George Washington Bridge (Manhattan end)', (-73.9465, 40.8507), None), ('the Cloisters', (-73.9319, 40.8649), None),
 ]
-deg = Counter()
-nbrs = defaultdict(set)
-for a, b, *_r in edges:
-    if a in core and b in core:
-        nbrs[a].add(b); nbrs[b].add(a)
+# ---- intersections: the pieces of one real corner become one ------------------------------
+# The centerline draws a divided road (Park Ave, Broadway, Bowery, West St) as
+# two roadbeds, so a cross street meets it twice a few metres apart, and many
+# corners have short connector pieces and kinks. A driver sees one corner. Ends
+# joined by a short piece are merged: under MERGE_M, or under MEDIAN_M when the
+# piece just crosses between two roadbeds of the same road; a merged corner
+# never grows wider than SPAN_M.
+MERGE_M, MEDIAN_M, SPAN_M = 26, 34, 50
+kept_ix = [i for i, e in enumerate(edges) if e[0] in keep and e[1] in keep]
+names_at = defaultdict(set)
+for i in kept_ix:
+    a, b, nid, *_r = edges[i]
+    names_at[a].add(nid); names_at[b].add(nid)
+parent = {u: u for u in keep}
+members = {u: [u] for u in keep}
+def find(u):
+    while parent[u] != u:
+        parent[u] = parent[parent[u]]
+        u = parent[u]
+    return u
+def median_crossing(i):
+    a, b, nid, *_r = edges[i]
+    return bool((names_at[a] & names_at[b]) - {nid})
+cand = sorted((edges[i][5], i) for i in kept_ix if edges[i][5] < MERGE_M or (edges[i][5] < MEDIAN_M and median_crossing(i)))
+for _L, i in cand:
+    a, b = find(edges[i][0]), find(edges[i][1])
+    if a == b:
+        continue
+    ms = members[a] + members[b]
+    if max(metres(nodes[p], nodes[q]) for p in ms for q in ms) > SPAN_M:
+        continue
+    if len(members[a]) < len(members[b]):
+        a, b = b, a
+    parent[b] = a
+    members[a] = ms
+    del members[b]
+cl = {u: find(u) for u in keep}
+centroid = {c: (sum(nodes[u][0] for u in ms) / len(ms), sum(nodes[u][1] for u in ms) / len(ms)) for c, ms in members.items()}
+
+# directed raw pieces
+draw = []  # (from, to, edge index, pts)
+out_raw = defaultdict(list)
+for i in kept_ix:
+    a, b, nid, d, pts, L, rawname = edges[i]
+    if d >= 0:
+        out_raw[a].append(len(draw)); draw.append((a, b, i, pts))
+    if d <= 0:
+        out_raw[b].append(len(draw)); draw.append((b, a, i, pts[::-1]))
+ext = defaultdict(list)  # cluster -> raw edges leaving it (undirected)
+for i in kept_ix:
+    a, b = edges[i][0], edges[i][1]
+    if cl[a] != cl[b]:
+        ext[cl[a]].append(i); ext[cl[b]].append(i)
+_reach = {}
+def reach_in(w):
+    """raw nodes reachable from w without leaving its corner"""
+    if w in _reach:
+        return _reach[w]
+    c, seen, stack = cl[w], {w}, [w]
+    while stack:
+        u = stack.pop()
+        for k in out_raw[u]:
+            v = draw[k][1]
+            if cl[v] == c and v not in seen:
+                seen.add(v); stack.append(v)
+    _reach[w] = seen
+    return seen
+def exits(k_in):
+    """directed raw pieces that leave the corner reached by piece k_in (no turning back on it)"""
+    w, i_in = draw[k_in][1], draw[k_in][2]
+    c = cl[w]
+    return [k for x in reach_in(w) for k in out_raw[x] if cl[draw[k][1]] != c and draw[k][2] != i_in]
+
+# A corner where only two roads meet and each way through has exactly one way on
+# is just a bend: links run through it.
+def through(c):
+    if len(ext[c]) != 2:
+        return False
+    ins = [k for u in members[c] for k in out_raw_in[u] if cl[draw[k][0]] != c]
+    return all(len(exits(k)) == 1 for k in ins)
+out_raw_in = defaultdict(list)
+for k, (a, b, i, pts) in enumerate(draw):
+    out_raw_in[b].append(k)
+src_c = {cl[u] for u in sources}  # where a tunnel or bridge lane comes in: always a corner of its own
+junction = {c for c in members if c in src_c or not through(c)}
+
+def bearing_pts(p, fwd=True, span=30):
+    """direction over the first (or last) ~span metres"""
+    q = p if fwd else p[::-1]
+    acc, i = 0, 1
+    while i < len(q) - 1 and acc + metres(q[i - 1], q[i]) < span:
+        acc += metres(q[i - 1], q[i]); i += 1
+    a, b = (q[0], q[i]) if fwd else (q[i], q[0])
+    kx = math.cos(math.radians((a[1] + b[1]) / 2))
+    return math.degrees(math.atan2((b[0] - a[0]) * kx, b[1] - a[1])) % 360
+def adiff(to, frm):
+    return (to - frm + 540) % 360 - 180
+
+# links: corner to corner, through bends
+links = []  # dict(from, to, pts, raws, name, start, end)
+for c in junction:
+    for u in members[c]:
+        for k in out_raw[u]:
+            if cl[draw[k][1]] == c:
+                continue
+            pts = [centroid[c]] + list(draw[k][3])
+            road = list(draw[k][3])  # the road itself, without the corners' centre points
+            raws, length_by = [k], Counter()
+            cur, ok, seen = k, True, {c}
+            while True:
+                a, b, i, p = draw[cur]
+                length_by[edges[i][2]] += edges[i][5]
+                d = cl[b]
+                if d in junction:
+                    break
+                if d in seen:
+                    ok = False; break
+                seen.add(d)
+                nx = exits(cur)
+                if len(nx) != 1:
+                    ok = False; break
+                cur = nx[0]
+                raws.append(cur)
+                pts += list(draw[cur][3])
+                road += list(draw[cur][3])
+            if not ok:
+                continue
+            end = cl[draw[cur][1]]
+            pts.append(centroid[end])
+            clean = [pts[0]]
+            for q in pts[1:]:
+                if metres(q, clean[-1]) > 0.5:
+                    clean.append(q)
+            if len(clean) < 2:
+                continue
+            links.append({'from': c, 'to': end, 'pts': clean, 'road': road, 'raws': raws, 'name': length_by.most_common(1)[0][0],
+                          'start': draw[k][0], 'end': draw[cur][1],
+                          'len': sum(metres(clean[j], clean[j + 1]) for j in range(len(clean) - 1))})
+# directions measured on the road where it leaves / reaches the corner (a merged
+# corner's centre can sit off to one side and would skew them)
+for L in links:
+    L['b0'] = bearing_pts(L['road'], True)
+    L['b1'] = bearing_pts(L['road'], False)
+links_from = defaultdict(list)
+for li, L in enumerate(links):
+    links_from[L['from']].append(li)
+UTURN = 155
+turns = []
+for li, L in enumerate(links):
+    w, last_raw = L['end'], draw[L['raws'][-1]][2]
+    ok = []
+    for lo in links_from[L['to']]:
+        O = links[lo]
+        if O['start'] not in reach_in(w) or draw[O['raws'][0]][2] == last_raw:
+            continue
+        if abs(adiff(O['b0'], L['b1'])) > UTURN:
+            continue  # a U-turn (across a median, or back the way you came)
+        ok.append(lo)
+    turns.append(ok)
+
+# keep the link states from which every other can be reached, plus those that lead into them
+def scc(n, adj):
+    radj = [[] for _ in range(n)]
+    for u in range(n):
+        for v in adj[u]:
+            radj[v].append(u)
+    order, seen = [], [False] * n
+    for s in range(n):
+        if seen[s]:
+            continue
+        stack = [(s, 0)]; seen[s] = True
+        while stack:
+            u, i = stack[-1]
+            if i < len(adj[u]):
+                stack[-1] = (u, i + 1); v = adj[u][i]
+                if not seen[v]:
+                    seen[v] = True; stack.append((v, 0))
+            else:
+                order.append(u); stack.pop()
+    comp, c = [-1] * n, 0
+    for s in reversed(order):
+        if comp[s] != -1:
+            continue
+        stack = [s]; comp[s] = c
+        while stack:
+            u = stack.pop()
+            for v in radj[u]:
+                if comp[v] == -1:
+                    comp[v] = c; stack.append(v)
+        c += 1
+    return comp, radj
+comp, radj = scc(len(links), turns)
+bigc = Counter(comp).most_common(1)[0][0]
+core_l = {i for i in range(len(links)) if comp[i] == bigc}
+feed_l = set()
+stack = list(core_l)
+while stack:
+    u = stack.pop()
+    for v in radj[u]:
+        if v not in core_l and v not in feed_l:
+            feed_l.add(v); stack.append(v)
+keep_l = core_l | feed_l
+
+# ---- every way out of a corner gets a button ------------------------------------------------
+# Simple corner: the ways out fit Left / Straight / Right one each, clearly apart.
+# Otherwise (five-way junctions, forks, angled streets) each way out is its own
+# named button with an arrow at its real angle; 'N' marks the way that carries
+# on along the same road, taken if you don't choose.
+SLOT = {'L': 1, 'S': 2, 'R': 3, 'n': 4, 'N': 5}
+def classify(li, opts):
+    L = links[li]
+    ds = [(lo, adiff(links[lo]['b0'], L['b1'])) for lo in opts]
+    if len(ds) == 1:
+        lo, d = ds[0]
+        return {lo: 'S' if abs(d) <= 35 else 'L' if d < 0 else 'R'}
+    slots = {}
+    st = [x for x in ds if abs(x[1]) <= 35]
+    st.sort(key=lambda x: (links[x[0]]['name'] != L['name'], abs(x[1])))
+    if st:
+        slots[st[0][0]] = 'S'
+    for lo, d in ds:
+        if lo in slots:
+            continue
+        s = 'L' if d < 0 else 'R'
+        if s in slots.values():
+            slots = None; break
+        slots[lo] = s
+    if slots is not None:
+        angs = sorted(d for _, d in ds)
+        if all(b - a >= 30 for a, b in zip(angs, angs[1:])) and all(not (s in 'LR' and abs(d) < 25) for (lo, d), s in ((x, slots[x[0]]) for x in ds)):
+            return slots
+    # named
+    same = [x for x in ds if links[x[0]]['name'] == L['name'] and abs(x[1]) <= 45]
+    ahead = [x for x in ds if abs(x[1]) <= 20]
+    # carries on: the same road, else the one way that's dead ahead
+    dflt = min(same, key=lambda x: abs(x[1]))[0] if same else ahead[0][0] if len(ahead) == 1 else None
+    return {lo: 'N' if lo == dflt else 'n' for lo, _ in ds}
+
+kl = sorted(keep_l)
+lre = {li: j for j, li in enumerate(kl)}
+jl = sorted({links[li]['from'] for li in kl} | {links[li]['to'] for li in kl})
+jre = {c: j for j, c in enumerate(jl)}
+turn_out, stats = [], Counter()
+problems = []
+for li in kl:
+    opts = [lo for lo in turns[li] if lo in keep_l]
+    if not opts:
+        problems.append(f'no way on after link {li} ({names[links[li]["name"]]})')
+    sl = classify(li, opts) if opts else {}
+    kind = 'only' if len(opts) == 1 else 'named' if any(s in 'nN' for s in sl.values()) else 'simple'
+    stats[kind] += 1
+    if kind == 'simple' and len(set(sl.values())) != len(sl):
+        problems.append(f'two ways out on one button after link {li}')
+    turn_out.append([x for lo in opts for x in (lre[lo], SLOT[sl[lo]])])
+
+# ---- entries, places, check -----------------------------------------------------------------------
+def landing(li):
+    """the first core link on the way in from link li"""
+    seen = set()
+    while li not in core_l and li not in seen:
+        seen.add(li)
+        nx = [lo for lo in turns[li] if lo in keep_l]
+        if not nx:
+            return None
+        li = nx[0]
+    return li if li in core_l else None
+entries_out = []
+for en in entries:
+    c = cl[en['node']]
+    for li in links_from.get(c, []):
+        if li in keep_l:
+            land = landing(li)
+            if land is not None:
+                entries_out.append({'from': en['from'], 'via': en['via'], 'link': lre[li], 'landsAt': jre[links[land]['from']]})
+            break
+core_j = {links[li]['from'] for li in core_l} & {links[li]['to'] for li in core_l}
 def snap(pt):
     best = None
-    for u in core:
-        if len(nbrs[u]) < 3:
+    for c in core_j:
+        if len(ext[c]) < 3:
             continue
-        d = metres(nodes[u], pt)
+        d = metres(centroid[c], pt)
         if best is None or d < best[0]:
-            best = (d, u)
+            best = (d, c)
     return best
 places, place_report = [], []
 for nm, pt, ramp in PLACES:
     if ramp:
-        # the intersection where this entrance ramp starts
-        cand = [e for e in edges if e[6] == ramp]
-        if not cand:
+        cand2 = [e for e in edges if e[6] == ramp]
+        if not cand2:
             place_report.append(f'MISSING ramp {ramp}')
             continue
-        e = cand[0]
-        start = e[0] if e[3] >= 0 else e[1]
-        hit = snap(nodes[start])
+        e = cand2[0]
+        hit = snap(nodes[e[0] if e[3] >= 0 else e[1]])
     else:
         hit = snap(pt)
     if hit and hit[0] < 150:
-        places.append({'name': nm, 'node': hit[1]})
+        places.append({'name': nm, 'node': jre[hit[1]]})
         place_report.append(f'{nm}: {hit[0]:.0f} m from the point')
     else:
         place_report.append(f'SKIPPED {nm}: nearest intersection {hit[0]:.0f} m away' if hit else f'SKIPPED {nm}')
+for en in entries_out:
+    if en['landsAt'] is None:
+        problems.append(f"entry {en['from']} never reaches the streets")
+
+spans = [max((metres(nodes[p], nodes[q]) for p in ms for q in ms), default=0) for c, ms in members.items() if c in jre]
+short_links = sum(1 for li in kl if links[li]['len'] < 15)
+if problems:
+    print('\n'.join(['BUILD CHECK FAILED:'] + problems[:30]))
+    sys.exit(1)
 
 # ---- write ---------------------------------------------------------------------------
-kept_nodes = sorted(keep)
-renum = {u: i for i, u in enumerate(kept_nodes)}
 O = (-74.03, 40.68)
 enc = lambda c: [round((c[0] - O[0]) * 1e5), round((c[1] - O[1]) * 1e5)]
-node_out = [v for u in kept_nodes for v in enc(nodes[u])]
-edge_out = []
-for a, b, nid, d, pts, L, rawname in edges:
-    if a in keep and b in keep:
-        mid = [v for c in pts[1:-1] for v in enc(c)]
-        edge_out.append([renum[a], renum[b], nid, d] + ([mid] if mid else []))
+# each road's shape once: a two-way block's two links share it (~g = the same shape reversed);
+# points as differences from the one before
+geoms, geo_ix, link_out = [], {}, []
+for li in kl:
+    L = links[li]
+    key = (L['from'], L['to'], tuple(draw[k][2] for k in L['raws']))
+    rkey = (L['to'], L['from'], tuple(draw[k][2] for k in reversed(L['raws'])))
+    if rkey in geo_ix:
+        gi = ~geo_ix[rkey]
+    else:
+        gi = geo_ix.setdefault(key, len(geoms))
+        if gi == len(geoms):
+            flat, px, py = [], 0, 0
+            for q in L['pts']:
+                x, y = enc(q)
+                flat += [x - px, y - py]
+                px, py = x, y
+            geoms.append(flat)
+    link_out.append([jre[L['from']], jre[L['to']], L['name'], gi, round(L['b0']), round(L['b1'])])
 data = {
+    'version': 2,
     'source': f"NYC street centerline (CSCL), NYC Open Data, last edited {latest[:10]}",
     'origin': list(O), 'scale': 1e5, 'gridAngle': 29,
-    'names': names, 'nodes': node_out, 'edges': edge_out,
-    'core': len(core), 'feeders': sorted(renum[u] for u in feeders),
-    'entries': [{**e, 'node': renum[e['node']]} for e in entries],
-    'places': [{**p, 'node': renum[p['node']]} for p in places],
+    'names': names,
+    'junctions': [v for c in jl for v in enc(centroid[c])],
+    'jdeg': [len(ext[c]) for c in jl],
+    'geoms': geoms,
+    'links': link_out,
+    'turns': turn_out,
+    'feeders': sorted(lre[li] for li in feed_l),
+    'entries': entries_out,
+    'places': places,
     'areas': areas,
 }
 json.dump(data, open(out, 'w'), separators=(',', ':'))
-rep = [data['source'], f'nodes {N}, kept {len(keep)} (core {len(core)}, feeders {len(feeders)}, dead ends dropped {pruned}); edges {len(edges)}, kept {len(edge_out)}',
-       f'area lines (grid y, m): {areas}', '', 'ENTRIES:'] + [f"  {e['from']} via {e['via']}" for e in entries]
+rep = [data['source'],
+       f'raw: nodes {N}, kept {len(keep)} (dead ends dropped {pruned}); pieces {len(edges)}',
+       f'corners {len(jl)} (widest {max(spans):.0f} m, {sum(1 for s in spans if s > 0)} merged from pieces); links {len(kl)} (core {len(core_l & keep_l)}, way-in {len(feed_l)}); links under 15 m: {short_links}',
+       f'decisions: simple (Left/Straight/Right) {stats["simple"]}, named buttons {stats["named"]}, no choice {stats["only"]}',
+       'check: every link has a way on; every way out has a button; no U-turns; every corner reachable from every other',
+       f'area lines (grid y, m): {areas}', '', 'ENTRIES:'] + [f"  {e['from']} via {e['via']}" for e in entries_out]
 rep += ['', 'UNNAMED SOURCES (left out):'] + [f'  {u}: {sorted(set(r))[:3]}' for u, r in unnamed]
 rep += ['', 'PLACES:'] + ['  ' + r for r in place_report]
 open(report, 'w').write('\n'.join(rep) + '\n')
-print('\n'.join(rep[:3]))
+print('\n'.join(rep[:5]))

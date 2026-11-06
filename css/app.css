@@ -1578,6 +1578,58 @@ body.gridding .maplibregl-ctrl-bottom-right {
   gap: 10px;
   margin-top: 8px;
 }
+.ggctl.named {
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 8px;
+}
+.ggpick {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 64px;
+  padding: 6px 4px;
+  border-radius: 14px;
+  border: 2px solid transparent;
+  background: var(--chip, rgba(0, 0, 0, 0.06));
+  color: inherit;
+  text-align: center;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+.ggpick.on {
+  border-color: #2b4fb3;
+  background: rgba(43, 79, 179, 0.12);
+}
+.ggpick .gg-arr {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #2b4fb3;
+  color: #fff;
+}
+.ggpick .gg-arr svg {
+  width: 15px;
+  height: 15px;
+}
+.ggpick .nm {
+  line-height: 1.15;
+}
+.ggpick small {
+  display: block;
+}
+.ggpick small {
+  font-weight: 500;
+  opacity: 0.65;
+}
 .ggturn {
   font: inherit;
   font-size: 22px;
