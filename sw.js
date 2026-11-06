@@ -1,7 +1,7 @@
 // Offline support: the app shell, boundary data, libraries and fonts are
 // cached, so "which town am I in" keeps working with no signal. Background map
 // tiles are only cached opportunistically.
-const VERSION = 'njtf-v41';
+const VERSION = 'njtf-v43';
 const SHELL = [
   './',
   'index.html',
@@ -80,7 +80,7 @@ self.addEventListener('fetch', (e) => {
 
   if (url.hostname === 'tiles.openfreemap.org') {
     e.respondWith(
-      fetch(req)
+      fetchRetry(req)
         .then(async (r) => {
           if (r.ok) {
             const c = await caches.open(TILES);
@@ -93,6 +93,20 @@ self.addEventListener('fetch', (e) => {
     );
   }
 });
+
+// A tile that fails to download would stay blank until the app reloads (the
+// map doesn't ask again), so try a couple more times before giving up.
+async function fetchRetry(req, tries = 3) {
+  for (let i = 0; ; i++) {
+    try {
+      const r = await fetch(req);
+      if (r.ok || r.status === 404 || i >= tries - 1) return r;
+    } catch (err) {
+      if (i >= tries - 1) throw err;
+    }
+    await new Promise((res) => setTimeout(res, 600 * (i + 1)));
+  }
+}
 
 let trimming = false;
 async function trim(c) {

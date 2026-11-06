@@ -1808,3 +1808,6 @@ body.gridding .maplibregl-canvas {
 .ggctl.three {
   grid-template-columns: 1fr 0.85fr 1fr;
 }
+#hud .gg-checkq {
+  color: #2b4fb3;
+}

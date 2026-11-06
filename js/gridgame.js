@@ -368,6 +368,28 @@ export function initGridGame(ctx) {
   function straightTo(e, t) {
     return aheadChain(e, 120, 8000).some((x) => x.node === t);
   }
+  /**
+   * Where a round from a tunnel or bridge starts: on the way in, ~300 m before
+   * it reaches the city's streets (not out in the middle of the river).
+   */
+  const ENTRY_LEAD_M = 300;
+  function entryEdge(entry) {
+    const chain = [];
+    let n = entry.node;
+    for (let i = 0; i < 400 && !(isCore(n) && G.nb[n].size >= 3); i++) {
+      const o = G.out[n][0];
+      if (!o) break;
+      chain.push(o);
+      n = o.to;
+    }
+    if (!chain.length) return null;
+    let left = 0;
+    for (let i = chain.length - 1; i >= 0; i--) {
+      left += chain[i].len;
+      if (left >= ENTRY_LEAD_M) return chain[i];
+    }
+    return chain[0];
+  }
   function pickRound() {
     const coreNodes = [];
     for (let n = 0; n < G.nodes.length; n++) if (isCore(n) && G.nb[n].size >= 3 && G.plain(n) && inArea(n)) coreNodes.push(n);
@@ -380,7 +402,7 @@ export function initGridGame(ctx) {
       let e0, entry = null;
       if (useEntry) {
         entry = rand(entries);
-        e0 = G.out[entry.node][0];
+        e0 = entryEdge(entry);
         if (!e0) continue;
       } else {
         const n = rand(coreNodes);
@@ -543,7 +565,7 @@ export function initGridGame(ctx) {
     // which hand that direction is on, facing h
     const order = ['U', 'E', 'D', 'W'];
     const steps = (order.indexOf(dir) - order.indexOf(h) + 4) % 4;
-    g.check = { h, thing, dir, answer: steps === 1 ? 'R' : 'L' };
+    g.check = { h, thing, dir, answer: steps === 1 ? 'R' : 'L', t0: now };
     g.msg = '';
     render();
   }
@@ -577,6 +599,14 @@ export function initGridGame(ctx) {
     if (!g || g.loading) return;
     const dt = Math.min(0.1, (now - g.last) / 1000);
     g.last = now;
+    if (g.check && now - g.check.t0 > 8000) {
+      // unanswered: move on (not counted)
+      g.check = null;
+      g.lastCheck = now;
+      g.msg = 'Check-in skipped';
+      g.msgAt = now;
+      render();
+    }
     if (g.startCard && g.resumeAt === Infinity && g.view !== 'intro') g.resumeAt = now + START_HOLD_MS;
     // the card stays up for real screen time: count frames drawn too (a busy page stalls them)
     if (g.startCard) g.cardFrames = (g.cardFrames || 0) + 1;
@@ -921,7 +951,10 @@ export function initGridGame(ctx) {
     const nx = !g.done && isCore(g.e.from) ? nextCross(g.e) : null;
     const where = `<b>${esc(short(g.e.name))}</b> · ${WORD[gridDir(g.e.b0)]}${nx ? ` · next ${esc(nx)}` : ''}${g.queued ? ` · <b>${g.queued === 'L' ? '◀ left' : 'right ▶'}</b>` : ''}`;
     ctx.hud(
-      `<div class="q">→ ${tgt}</div>
+      g.check
+        ? `<div class="q gg-checkq">Heading ${WORD[g.check.h]}. ${esc(g.check.thing[0].toUpperCase() + g.check.thing.slice(1))}: <b>left or right?</b></div>
+           <div class="hint">Answer with ◀ Left or Right ▶ · skips in a few seconds</div>`
+        : `<div class="q">→ ${tgt}</div>
        ${g.done ? '' : `<div class="hint">${esc(toGo())} · ${where}</div>`}`
     );
     // the compass word for each hand, fading as this heading becomes solid (none during a check-in: it'd give it away)
