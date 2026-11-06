@@ -279,6 +279,25 @@ export function initGridGame(ctx) {
     return { p: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], b: bearing(a, b) };
   }
 
+  // While driving, only streets: neighborhood outlines read as roads that go
+  // nowhere, so they (and other overlays) are hidden for the round.
+  const CLUTTER = ['muni-fill', 'muni-hl', 'muni-line', 'county-line', 'muni-hl-line', 'county-label', 'region-label',
+    'landmark-dot', 'landmark-label', 'nature-dot', 'nature-label', 'anchor-dot', 'anchor-label', 'section-label', 'section-label-local', 'trip-line', 'qline'];
+  let hidden = null;
+  function declutter(on) {
+    if (on && !hidden) {
+      hidden = {};
+      for (const id of CLUTTER) {
+        if (!map.getLayer(id)) continue;
+        hidden[id] = map.getLayoutProperty(id, 'visibility') || 'visible';
+        map.setLayoutProperty(id, 'visibility', 'none');
+      }
+    } else if (!on && hidden) {
+      for (const [id, v] of Object.entries(hidden)) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', v);
+      hidden = null;
+    }
+  }
+
   function lockMap(lock) {
     for (const h of ['dragPan', 'scrollZoom', 'boxZoom', 'dragRotate', 'keyboard', 'doubleClickZoom', 'touchZoomRotate']) {
       if (lock) map[h].disable();
@@ -399,6 +418,7 @@ export function initGridGame(ctx) {
     }
     ensureLayers();
     lockMap(true);
+    declutter(true);
     document.body.classList.add('gridding');
     ctx.clearHighlights();
     ctx.reveal([]);
@@ -443,6 +463,7 @@ export function initGridGame(ctx) {
     carMk.remove();
     offEl.hidden = true;
     lockMap(false);
+    declutter(false);
     document.body.classList.remove('gridding');
     for (const id of ['gg-trail', 'gg-best', 'gg-target', 'gg-goto']) setData(id, EMPTY);
     if (map.getLayer('gg-arrows')) map.setLayoutProperty('gg-arrows', 'visibility', 'none');
