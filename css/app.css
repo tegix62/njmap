@@ -1437,6 +1437,7 @@ body[data-mode='drive'] .look .v {
 #gridgame svg {
   display: block;
 }
+body.gridclassic #edges,
 body.gridding #fabs,
 body.gridding .maplibregl-ctrl-bottom-left,
 body.gridding .maplibregl-ctrl-bottom-right {

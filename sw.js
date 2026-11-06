@@ -1,7 +1,7 @@
 // Offline support: the app shell, boundary data, libraries and fonts are
 // cached, so "which town am I in" keeps working with no signal. Background map
 // tiles are only cached opportunistically.
-const VERSION = 'njtf-v47';
+const VERSION = 'njtf-v48';
 const SHELL = [
   './',
   'index.html',
@@ -24,6 +24,8 @@ const SHELL = [
   'js/anchors.js',
   'js/dropin.js',
   'js/gridgame.js',
+  'js/gridclassic.js',
+  'js/midtowngrid.js',
   'js/frames.js',
   'js/grid.js',
   'js/region.js',

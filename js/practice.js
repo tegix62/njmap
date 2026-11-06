@@ -28,7 +28,8 @@ const TYPES = {
   today: '☀ Today (2 min)',
   rapid: '⚡ Rapid round',
   dropin: '🧩 Drop in (county puzzle)',
-  gridgame: '🚕 Drive Manhattan (one-ways)',
+  gridclassic: '🚕 Drive Midtown (classic)',
+  gridgame: '🚧 Drive all Manhattan (experimental)',
   frames: '🧭 Left, right & compass',
   trip: 'My last drive',
 };
@@ -47,8 +48,14 @@ export function initPractice(ctx) {
   const CFG_KEY = R.id === 'nj' ? 'practice' : `practice.${R.id}`;
   const cfg = { type: 'today', area: R.wellKnown ? 'known' : 'all', ...store.get(CFG_KEY, {}) };
   const SC = R.gridAngle ? 0.12 : 1; // Manhattan distances are short
-  const allowed = ['today', 'mix', 'rapid', ...(R.gridAngle ? ['gridgame'] : []), 'frames', 'dropin', ...R.quizTypes, 'trip'];
+  const allowed = ['today', 'mix', 'rapid', ...(R.gridAngle ? ['gridclassic', 'gridgame'] : []), 'frames', 'dropin', ...R.quizTypes, 'trip'];
   if (!allowed.includes(cfg.type)) cfg.type = 'mix';
+  // the whole-island game isn't reliable yet: anyone on it moves to the classic once
+  if (cfg.type === 'gridgame' && !store.get('classicBack', false)) {
+    cfg.type = 'gridclassic';
+    store.set('classicBack', true);
+    store.set(CFG_KEY, cfg);
+  }
   const score = { right: 0, total: 0, streak: 0 };
   let q = null;
   const recent = [];
@@ -523,8 +530,10 @@ export function initPractice(ctx) {
     if (cfg.type === 'rapid') return nextRapid();
     if (cfg.type === 'dropin') return startDropIn();
     ctx.dropin.stop();
+    if (cfg.type !== 'gridgame') ctx.gridgame.stop();
+    if (cfg.type !== 'gridclassic') ctx.gridclassic.stop();
     if (cfg.type === 'gridgame') return startGridGame();
-    ctx.gridgame.stop();
+    if (cfg.type === 'gridclassic') return startGridClassic();
     if (cfg.type === 'frames') {
       q = { kind: 'frames', m: null, answered: false };
       return ctx.frames.start({ header: () => header(), bindHeader: () => bindHeader() });
@@ -739,6 +748,14 @@ export function initPractice(ctx) {
     ctx.gridgame.start({ header: () => header(), bindHeader: () => bindHeader() });
   }
 
+  function startGridClassic() {
+    q = { kind: 'gridgame', m: null, answered: false };
+    ctx.clearHighlights();
+    ctx.reveal([]);
+    ctx.line(null);
+    ctx.gridclassic.start({ header: () => header(), bindHeader: () => bindHeader() });
+  }
+
   // ---- Drop in ------------------------------------------------------------------
   function startDropIn() {
     q = { kind: 'dropin', m: null, answered: false };
@@ -776,7 +793,7 @@ export function initPractice(ctx) {
         <select id="qArea" aria-label="Area">${area}</select>
       </div><div class="score todaybar"><span class="dots">${dots}</span>${streak() ? `<span>🔥 ${streak()} day${streak() === 1 ? '' : 's'}</span>` : ''}</div>`;
     }
-    if (cfg.type === 'gridgame' || cfg.type === 'frames')
+    if (cfg.type === 'gridgame' || cfg.type === 'gridclassic' || cfg.type === 'frames')
       // these have no use for the neighborhood/town list
       return `<div class="prow">
         <select id="qType" aria-label="Question type">${opts(Object.fromEntries(allowed.map((k) => [k, TYPES[k]])))}</select>
@@ -1538,6 +1555,7 @@ export function initPractice(ctx) {
       rapid.on = false;
       ctx.dropin.stop();
       ctx.gridgame.stop();
+      ctx.gridclassic.stop();
       ctx.frames.stop();
       ctx.clearHighlights();
       ctx.reveal([]);
