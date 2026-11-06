@@ -10,9 +10,12 @@
 // the links between them. Your car drives on its own. At an ordinary corner,
 // Left / Straight / Right; where the ways out don't fit those (five-way
 // junctions, forks, angled streets), each way out is its own button, with its
-// street name and an arrow at its real angle. Straight runs speed up the longer
-// you keep going, and no stretch of road takes more than LEG_MAX_S; tap a
-// corner ahead to zip to it; hold the map to speed up.
+// street name and an arrow at its real angle. Speed changes smoothly: it eases
+// up the longer you keep going straight, and brakes along a steady curve before
+// a corner where you turn; long stretches (bridges, tunnels, highways) take at
+// most LEG_MAX_S. Tap a corner ahead to zip to it; hold the map to speed up.
+// Links follow the road itself; the car crosses each corner in a straight line
+// from where one road ends to where the next begins.
 // Wrong-way turns are refused with the reason: the rule of thumb when the
 // street follows it ("odd streets go west"), the exception by name when it
 // doesn't. Rounds can start inside a tunnel or on a bridge coming in, and
@@ -28,15 +31,16 @@ const GRID = 29; // the grid is turned ~29° clockwise from north
 const ZOOM = 15.7; // driving zoom
 const PACE = { easy: 1, normal: 1.35, fast: 1.9 }; // speed multipliers
 const SPEED = 105; // metres per second of game time at Easy (a long crosstown block in ~2 s)
-const CORNER_SLOW = 0.5; // half speed over the last stretch before an intersection: time to decide
 const GOTO_SPEED = 5.5; // multipliers: heading to a tapped corner,
-const HOLD_SPEED = 4; // holding the map,
+const HOLD_SPEED = 3; // holding the map,
 const HOME_SPEED = 14; // and on the home stretch
-const LEG_MAX_S = 1.5; // no link between two corners takes longer than this (Easy)
-const CRUISE_STEP = 0.5; // each corner passed straight on without input adds this to the speed multiplier
-const CRUISE_MAX = 5;
-const CORNER_MIN_S = 0.4;
-const APPROACH_M = 80; // the last stretch before a corner, driven at normal speed // but never faster than this per corner while you could still turn (time to press)
+const CRUISE_STEP = 0.12; // each corner passed straight on without input adds this to the speed multiplier,
+const CRUISE_MAX = 1.8; // up to this
+const LONG_M = 250; // a stretch longer than this with no corner (bridge, tunnel, highway)...
+const LEG_MAX_S = 2.5; // ...takes at most this long
+const TURN_V = 0.6; // speed through a corner where you turn, or have to choose (x the base speed)
+const BRAKE = 8; // braking, in base speeds per second: a steady slowdown, not a jolt
+const EASE_UP_S = 0.8; // speeding up eases in over about this long
 const AVENUE_RULE = {
   '1st Ave': 'U', '2nd Ave': 'D', '3rd Ave': 'U', 'Lexington Ave': 'D', 'Madison Ave': 'U', '5th Ave': 'D',
   '6th Ave': 'U', '7th Ave': 'D', '8th Ave': 'U', '9th Ave': 'D', '10th Ave': 'U', 'Amsterdam Ave': 'U', 'Columbus Ave': 'D',
@@ -687,26 +691,41 @@ export function initGridGame(ctx) {
   }
 
   const cruiseMult = () => Math.min(CRUISE_MAX, 1 + CRUISE_STEP * g.cruise);
-  function speedNow() {
-    const base = SPEED * PACE[prefs.pace];
+  const baseSpeed = () => SPEED * PACE[prefs.pace];
+  /** The speed the car eases toward, before the corner ahead is considered. */
+  function cruiseTarget() {
+    const base = baseSpeed();
     if (g.home) return base * HOME_SPEED;
     if (g.goTo != null) return Math.max(base * GOTO_SPEED, g.gotoV);
-    const c = choices(g.e);
-    const left = g.e.len - g.s;
-    // a long stretch with no corner: never more than LEG_MAX_S for the whole of it
-    // (bridges, tunnels, highways), up to the last APPROACH_M before a corner
-    if (left > APPROACH_M) {
-      const floor = ((g.e.len - APPROACH_M) / LEG_MAX_S) * PACE[prefs.pace];
-      return Math.max(floor, base * (g.boost ? Math.max(HOLD_SPEED, cruiseMult()) : cruiseMult()));
-    }
-    if (!c.decision) return base * Math.max(cruiseMult(), g.boost ? HOLD_SPEED : 1);
-    if (g.boost) return base * HOLD_SPEED;
-    // a corner where you could turn: a beat to decide at the first corner after a turn,
-    // and before one where you have to pick (no way carries on)
-    if (left < 30 && (g.cruise === 0 || (!c.dflt && !g.pick && !g.queued))) return base * CORNER_SLOW;
-    // cruising straight on: faster each corner, but never more than one corner per CORNER_MIN_S
-    return Math.min(base * cruiseMult(), Math.max(base, g.e.len / CORNER_MIN_S));
+    let v = base * (g.boost ? Math.max(HOLD_SPEED, cruiseMult()) : cruiseMult());
+    if (g.e.len > LONG_M) v = Math.max(v, (g.e.len / LEG_MAX_S) * PACE[prefs.pace]);
+    return v;
   }
+  /** The fastest the car may be going here and still slow steadily for the corner ahead. */
+  function cornerCap() {
+    if (g.home) return Infinity;
+    const base = baseSpeed();
+    const c = choices(g.e);
+    let vc; // speed at the corner
+    if (g.goTo === g.e.to) vc = base * 0.3; // stopping there
+    else if (!c.decision) vc = c.only && Math.abs(turnOf(g.e, c.only)) > 50 ? base * TURN_V : Infinity;
+    else if (g.queued || (g.pick && g.pick !== c.dflt)) vc = base * TURN_V; // turning
+    else if (!c.dflt) vc = base * TURN_V * 0.7; // no way carries on: you'll have to choose
+    else vc = base * cruiseMult(); // carrying on
+    if (vc === Infinity) return Infinity;
+    const left = g.e.len - g.s;
+    return Math.sqrt(vc * vc + 2 * BRAKE * base * Math.max(0, left - 8));
+  }
+  /** Ease the speed toward its target; never over the braking curve. */
+  function updateSpeed(dt) {
+    const tgt = Math.min(cruiseTarget(), cornerCap());
+    if (g.v == null) g.v = Math.min(tgt, baseSpeed());
+    const tau = tgt > g.v ? (g.home || g.goTo != null ? 0.25 : EASE_UP_S) : 0.2;
+    g.v += (tgt - g.v) * Math.min(1, dt / tau);
+    g.v = Math.min(g.v, cornerCap());
+    return g.v;
+  }
+  const speedNow = () => g.v || 0;
 
   function tick(now) {
     if (!g || g.loading) return;
@@ -728,7 +747,7 @@ export function initGridGame(ctx) {
       render();
     }
     if (!g.paused && !g.done && !g.waiting && g.view !== 'intro' && !g.check && !g.startCard && now >= g.resumeAt) {
-      g.s += dt * speedNow();
+      g.s += dt * updateSpeed(dt);
       let guard = 0;
       while (g && !g.done && !g.waiting && g.s >= g.e.len && guard++ < 50) {
         const over = g.s - g.e.len;
@@ -737,7 +756,8 @@ export function initGridGame(ctx) {
       }
     }
     if (!g) return;
-    const { p, b } = g.waiting || g.done ? { p: G.nodes[g.e.to], b: g.e.b1 } : posOnEdge(g.e, g.s);
+    if (g.waiting) g.v = 0;
+    const { p, b } = g.waiting || g.done ? { p: g.e.pts[g.e.pts.length - 1], b: g.e.b1 } : posOnEdge(g.e, g.s);
     g.pos = p;
     g.bnow = b;
     const hc = `${gridDir(b)}${onGrid(g.e.name, b) ? '' : compassWord(b)}${choices(g.e).named ? 'n' : ''}`;
@@ -756,8 +776,8 @@ export function initGridGame(ctx) {
       // the car a little below the middle of the open area: more road ahead
       const oy = pad.top + (H - pad.top - pad.bottom) * 0.62 - H / 2;
       // zoom out as you cruise, so the corners coming up stay in view
-      const want = g.home || g.goTo != null ? ZOOM - 0.4 : ZOOM - Math.min(1.3, 0.32 * (cruiseMult() - 1));
-      g.zoom += (want - g.zoom) * Math.min(1, dt * 2.5);
+      const want = ZOOM - Math.min(1.2, 0.5 * Math.max(0, (g.v || 0) / baseSpeed() - 1));
+      g.zoom += (want - g.zoom) * Math.min(1, dt * 1.5);
       map.easeTo({ center: p, zoom: g.zoom, bearing: GRID, offset: [0, oy], duration: 0 });
     }
     pointToTarget();
@@ -768,7 +788,7 @@ export function initGridGame(ctx) {
   function arrive() {
     const e = g.e;
     const n = e.to;
-    g.driven += e.len;
+    g.driven += e.len - (e.chord || 0);
     g.trail.push(...e.pts.slice(1));
     setData('gg-trail', line(g.trail));
     if (g.msg && performance.now() - g.msgAt > 3500) g.msg = '';
@@ -812,11 +832,25 @@ export function initGridGame(ctx) {
   /** Onto link nx. carryOn: straight on with no input (the cruise builds); otherwise it resets. */
   function go(nx, carryOn = false) {
     g.cruise = carryOn ? g.cruise + 1 : 0;
-    g.e = nx;
+    g.e = legOf(g.e.pts[g.e.pts.length - 1], nx);
     g.s = 0;
     g.waiting = false;
     enterEdge(nx);
     render(); // the street, neighborhood and next cross street follow you
+  }
+  /**
+   * Link nx as driven from point a (where the last road ended): a straight cross
+   * through the corner, then the road. The rest (name, choices, id) is nx's own.
+   */
+  function legOf(a, nx) {
+    const ch = metres(a, nx.pts[0]);
+    if (ch < 0.5) return nx;
+    const leg = Object.create(nx);
+    leg.pts = [a, ...nx.pts];
+    leg.cum = [0, ...nx.cum.map((c) => c + ch)];
+    leg.len = nx.len + ch;
+    leg.chord = ch;
+    return leg;
   }
   function say(msg) {
     g.msg = msg;
@@ -969,6 +1003,7 @@ export function initGridGame(ctx) {
   cont.addEventListener('pointercancel', (e) => up(e, true));
 
   function tapAt(sx, sy) {
+    if (g.home) return; // the round is decided: on the right road, straight there
     const rect = map.getContainer().getBoundingClientRect();
     const st = g.waiting ? choices(g.e).dflt : null;
     const chain = g.waiting ? (st ? aheadChain(st) : []) : aheadChain(g.e);
@@ -1033,7 +1068,7 @@ export function initGridGame(ctx) {
     g.waiting = true;
     offEl.hidden = true;
     const bestCoords = [];
-    g.best.path.forEach((e, i) => bestCoords.push(...(i ? e.pts.slice(1) : e.pts)));
+    g.best.path.forEach((e) => bestCoords.push(...e.pts));
     setData('gg-best', line(bestCoords));
     // zoom out to show the whole drive, yours and the shortest (after the result
     // is on screen, so the framing allows for its height)

@@ -456,7 +456,10 @@ for c in junction:
         for k in out_raw[u]:
             if cl[draw[k][1]] == c:
                 continue
-            pts = [centroid[c]] + list(draw[k][3])
+            # the road itself, end to end (no detour to the corners' centre points: a
+            # merged corner's centre can sit off the road); the game crosses each
+            # corner straight from where one road ends to where the next begins
+            pts = list(draw[k][3])
             road = list(draw[k][3])  # the road itself, without the corners' centre points
             raws, length_by = [k], Counter()
             cur, ok, seen = k, True, {c}
@@ -479,7 +482,6 @@ for c in junction:
             if not ok:
                 continue
             end = cl[draw[cur][1]]
-            pts.append(centroid[end])
             clean = [pts[0]]
             for q in pts[1:]:
                 if metres(q, clean[-1]) > 0.5:
