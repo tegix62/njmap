@@ -1723,14 +1723,34 @@ body.gridding .maplibregl-ctrl-bottom-right {
 .gg-off[hidden] {
   display: none;
 }
-.gg-off span {
-  width: 0;
-  height: 0;
-  border-top: 6px solid transparent;
-  border-bottom: 6px solid transparent;
-  border-left: 10px solid #fff;
-  margin-left: 3px;
+.gg-off {
+  color: #fff;
 }
+.gg-off svg {
+  display: block;
+}
+.gg-go {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.gg-dir {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #b91c1c;
+  color: #fff;
+  flex: none;
+}
+.gg-dir svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+}
+
 body.gridding .maplibregl-canvas-container,
 body.gridding .maplibregl-canvas {
   -webkit-user-select: none;

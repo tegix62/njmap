@@ -60,6 +60,8 @@ function gridDir(b) {
   return r < 45 || r >= 315 ? 'U' : r < 135 ? 'E' : r < 225 ? 'D' : 'W';
 }
 /** Position across / up the grid, metres (for areas and "to go" words). */
+// an arrow pointing up, rotated to point the way
+const DIR_SVG = '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 1.5 L16.5 17 L10 13 L3.5 17 Z" fill="currentColor"/></svg>';
 function gridXY(p) {
   const x = (p[0] + 73.97) * 111320 * Math.cos(rad(40.78)), y = (p[1] - 40.78) * 110540;
   const a = rad(GRID);
@@ -239,7 +241,36 @@ export function initGridGame(ctx) {
     arrowsFC = { type: 'FeatureCollection', features: feats };
   }
   const EMPTY = { type: 'FeatureCollection', features: [] };
+  /** A chevron pointing along the line (+x), as a map image: the font the map ships
+   *  has only basic Latin, so a '›' text arrow drew nothing. */
+  function chevron(color) {
+    const r = 2, w = 20, h = 20;
+    const c = document.createElement('canvas');
+    c.width = w * r;
+    c.height = h * r;
+    const x = c.getContext('2d');
+    x.scale(r, r);
+    x.lineCap = 'round';
+    x.lineJoin = 'round';
+    x.beginPath();
+    x.moveTo(6, 4);
+    x.lineTo(14, 10);
+    x.lineTo(6, 16);
+    x.strokeStyle = '#ffffff';
+    x.lineWidth = 6;
+    x.stroke();
+    x.strokeStyle = color;
+    x.lineWidth = 3;
+    x.stroke();
+    return { img: x.getImageData(0, 0, w * r, h * r), opts: { pixelRatio: r } };
+  }
   function ensureLayers() {
+    for (const [id, col] of [['gg-chev', '#1f1b16'], ['gg-chev-exc', '#c47a00']]) {
+      if (!map.hasImage(id)) {
+        const { img, opts } = chevron(col);
+        map.addImage(id, img, opts);
+      }
+    }
     if (map.getSource('gg-trail')) return;
     map.addSource('gg-trail', { type: 'geojson', data: EMPTY });
     map.addSource('gg-best', { type: 'geojson', data: EMPTY });
@@ -250,8 +281,13 @@ export function initGridGame(ctx) {
     map.addLayer({ id: 'gg-trail', type: 'line', source: 'gg-trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#2b4fb3', 'line-width': 6, 'line-opacity': 0.55 } });
     map.addLayer({
       id: 'gg-arrows', type: 'symbol', source: 'gg-arrows',
-      layout: { 'symbol-placement': 'line', 'symbol-spacing': 70, 'text-field': '›', 'text-font': ['Noto Sans Medium'], 'text-size': 22, 'text-keep-upright': false, 'text-allow-overlap': true, 'text-ignore-placement': true, visibility: 'none' },
-      paint: { 'text-color': ['case', ['==', ['get', 'exc'], 1], '#c47a00', '#1f1b16'], 'text-halo-color': '#ffffff', 'text-halo-width': 1.2 },
+      layout: {
+        'symbol-placement': 'line', 'symbol-spacing': 60,
+        'icon-image': ['case', ['==', ['get', 'exc'], 1], 'gg-chev-exc', 'gg-chev'],
+        'icon-size': ['interpolate', ['linear'], ['zoom'], 13, 0.7, 16, 1],
+        'icon-rotation-alignment': 'map', 'icon-keep-upright': false,
+        'icon-allow-overlap': true, 'icon-ignore-placement': true, visibility: 'none',
+      },
     });
     map.addLayer({ id: 'gg-goto', type: 'circle', source: 'gg-goto', paint: { 'circle-radius': 13, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': '#2b4fb3', 'circle-stroke-width': 3 } });
     map.addLayer({ id: 'gg-target', type: 'circle', source: 'gg-target', paint: { 'circle-radius': 9, 'circle-color': '#b91c1c', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 3 } });
@@ -289,9 +325,25 @@ export function initGridGame(ctx) {
   // off-screen pointer to the destination
   const offEl = document.createElement('div');
   offEl.className = 'gg-off';
-  offEl.innerHTML = '<span></span>';
+  offEl.innerHTML = DIR_SVG;
   offEl.hidden = true;
   document.body.appendChild(offEl);
+
+  /** Screen direction (degrees, 0 = up) and straight-line metres from the car to the destination. */
+  function aim() {
+    const c = map.project(g.pos), t = map.project(G.nodes[g.target.node]);
+    return { c, t, ang: (Math.atan2(t.x - c.x, -(t.y - c.y)) * 180) / Math.PI, m: metres(g.pos, G.nodes[g.target.node]) };
+  }
+  /** The arrow and distance in the top card, kept current every frame. */
+  function updateDir(a) {
+    const el = document.querySelector('#hud .gg-dir');
+    if (!el) return;
+    el.firstChild.style.transform = `rotate(${a.ang}deg)`;
+    const mi = a.m / 1609.34;
+    const txt = mi < 0.1 ? '<0.1 mi' : `${mi.toFixed(1)} mi`;
+    const d = el.nextElementSibling;
+    if (d && d.textContent !== txt) d.textContent = txt;
+  }
 
   function posOnEdge(e, s) {
     s = Math.max(0, Math.min(e.len, s));
@@ -887,20 +939,27 @@ export function initGridGame(ctx) {
   }
 
   function pointToTarget() {
-    if (!g || g.done || !g.target) return;
+    if (!g || g.done || !g.target || !g.pos) return;
+    const a = aim();
+    updateDir(a);
     const pad = ctx.padding();
-    const tp = map.project(G.nodes[g.target.node]);
     const rect = map.getContainer().getBoundingClientRect();
     const W = window.innerWidth, H = window.innerHeight;
-    const x = tp.x + rect.left, y = tp.y + rect.top;
-    const top = pad.top + 8, bottom = H - pad.bottom - 8;
-    const inView = x > 14 && x < W - 14 && y > top && y < bottom;
+    const cx = a.c.x + rect.left, cy = a.c.y + rect.top;
+    const x = a.t.x + rect.left, y = a.t.y + rect.top;
+    const L = 26, R = W - 26, T = pad.top + 26, B = H - pad.bottom - 26;
+    const inView = x > L - 12 && x < R + 12 && y > T - 12 && y < B + 12;
     offEl.hidden = inView;
     if (inView) return;
-    const cx = W / 2, cy = (top + bottom) / 2;
-    const ang = (Math.atan2(y - cy, x - cx) * 180) / Math.PI;
-    offEl.style.transform = `translate(${Math.min(W - 26, Math.max(26, x))}px, ${Math.min(bottom - 18, Math.max(top + 18, y))}px) translate(-50%, -50%)`;
-    offEl.firstChild.style.transform = `rotate(${ang}deg)`;
+    // on the screen's edge where the line from the car to the destination leaves it
+    const dx = x - cx, dy = y - cy;
+    let k = 1;
+    if (dx) k = Math.min(k, ((dx > 0 ? R : L) - cx) / dx);
+    if (dy) k = Math.min(k, ((dy > 0 ? B : T) - cy) / dy);
+    k = Math.max(0, k);
+    const px = Math.min(R, Math.max(L, cx + dx * k)), py = Math.min(B, Math.max(T, cy + dy * k));
+    offEl.style.transform = `translate(${px}px, ${py}px) translate(-50%, -50%)`;
+    offEl.firstChild.style.transform = `rotate(${a.ang}deg)`;
   }
 
   function finish() {
@@ -952,14 +1011,6 @@ export function initGridGame(ctx) {
   }
 
   // ---- words on screen -------------------------------------------------------------------
-  function toGo() {
-    const a = gridXY(g.pos || G.nodes[g.e.from]), b = gridXY(G.nodes[g.target.node]);
-    const dx = b[0] - a[0], dy = b[1] - a[1];
-    const mi = Math.hypot(dx, dy) / 1609.34;
-    const ARROWS = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
-    const arrow = ARROWS[Math.round(((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360 / 45) % 8];
-    return `${arrow} ${mi < 0.1 ? '<0.1' : mi.toFixed(1)} mi`;
-  }
   function render() {
     if (!g) return;
     if (g.loading) {
@@ -977,9 +1028,10 @@ export function initGridGame(ctx) {
       g.check
         ? `<div class="q gg-checkq">Heading ${WORD[g.check.h]}. ${esc(g.check.thing[0].toUpperCase() + g.check.thing.slice(1))}: <b>left or right?</b></div>
            <div class="hint">Answer with ◀ Left or Right ▶ · skips in a few seconds</div>`
-        : `<div class="q">→ ${tgt}</div>
-       ${g.done ? '' : `<div class="hint">${esc(toGo())} · ${where}</div>`}`
+        : `<div class="q">🏁 ${tgt}</div>
+       ${g.done ? '' : `<div class="hint gg-go"><span class="gg-dir" title="Which way the destination is">${DIR_SVG}</span><b class="gg-dist"></b> · ${where}</div>`}`
     );
+    if (!g.done && g.pos) updateDir(aim());
     // the compass word for each hand, fading as this heading becomes solid (none during a check-in: it'd give it away)
     const hb = g.bnow ?? g.e.b0;
     const lvl = g.check ? 'hide' : fstats.hint(gridDir(hb));
