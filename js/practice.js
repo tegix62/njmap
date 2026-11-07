@@ -29,7 +29,7 @@ const TYPES = {
   rapid: '⚡ Rapid round',
   dropin: '🧩 Drop in (county puzzle)',
   gridclassic: '🚕 Drive Midtown (classic)',
-  gridgame: '🚧 Drive all Manhattan (experimental)',
+  gridgame: '🚕 Drive Downtown (new)',
   frames: '🧭 Left, right & compass',
   trip: 'My last drive',
 };

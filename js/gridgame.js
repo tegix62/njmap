@@ -1,46 +1,42 @@
 /* global maplibregl */
-// Drive Manhattan: the real street network, every street from the Battery to
-// Inwood with its legal direction (NYC's street centerline, built into
-// data/manhattan-streets.json by tools/build_streets.py). The map is turned
-// so Midtown's grid stands upright (uptown at the top); downtown streets run
-// at their real angles.
+// Drive Downtown: every street below 14th St with its legal direction, from
+// NYC's street centerline (built into data/downtown-streets.json by
+// tools/build_streets.py --downtown). Streets only: no FDR, ramps, tunnels or
+// bridges; a round from the Holland Tunnel or a bridge starts where it comes
+// out onto a street. The map is turned so the grid stands upright (uptown at
+// the top); downtown streets run at their real angles.
 //
-// The data is a graph of real intersections (the two roadbeds of a divided
-// road, median crossings and kinks merged into one corner at build time) and
-// the links between them. Your car drives on its own. At an ordinary corner,
-// Left / Straight / Right; where the ways out don't fit those (five-way
-// junctions, forks, angled streets), each way out is its own button, with its
-// street name and an arrow at its real angle. Speed changes smoothly: it eases
-// up the longer you keep going straight, and brakes along a steady curve before
-// a corner where you turn; long stretches (bridges, tunnels, highways) take at
-// most LEG_MAX_S. Tap a corner ahead to zip to it; hold the map to speed up.
+// The data is a graph of real intersections (a divided road's two roadbeds,
+// median crossings and kinks merged into one corner at build time) and the
+// links between them. Your car drives on its own at the classic game's steady
+// rhythm: each block takes 0.55 s plus its length, never under a second at
+// Easy. At an ordinary corner, tap Left or Right before you get there (Straight
+// when stopped). Where the ways out don't fit Left / Straight / Right (five-way
+// junctions, forks, angled streets) the car stops and waits: each way out is a
+// button with its street name, an arrow at its real angle and where it heads.
+// Tap a corner ahead to zip to it; hold the map to speed up.
 // Links follow the road itself; the car crosses each corner in a straight line
 // from where one road ends to where the next begins.
 // Wrong-way turns are refused with the reason: the rule of thumb when the
 // street follows it ("odd streets go west"), the exception by name when it
-// doesn't. Rounds can start inside a tunnel or on a bridge coming in, and
-// end once you're on the destination's road heading toward it. At the end the
-// map shows your route next to the shortest legal one.
+// doesn't. The round ends once you're on the destination's road heading toward
+// it (when that's the shortest way); the map then shows your route next to the
+// shortest legal one.
 
 import { framesStats } from './frames.js';
 
-const DATA_URL = 'data/manhattan-streets.json';
+const DATA_URL = 'data/downtown-streets.json';
 const CHECK_EVERY_MS = 35000; // a check-in at most this often
 const START_HOLD_MS = 2600; // the car waits this long on the start card (a tap or a turn starts it sooner)
 const GRID = 29; // the grid is turned ~29° clockwise from north
 const ZOOM = 15.7; // driving zoom
-const PACE = { easy: 1, normal: 1.35, fast: 1.9 }; // speed multipliers
-const SPEED = 105; // metres per second of game time at Easy (a long crosstown block in ~2 s)
-const GOTO_SPEED = 5.5; // multipliers: heading to a tapped corner,
-const HOLD_SPEED = 3; // holding the map,
-const HOME_SPEED = 14; // and on the home stretch
-const CRUISE_STEP = 0.12; // each corner passed straight on without input adds this to the speed multiplier,
-const CRUISE_MAX = 1.8; // up to this
-const LONG_M = 250; // a stretch longer than this with no corner (bridge, tunnel, highway)...
-const LEG_MAX_S = 2.5; // ...takes at most this long
-const TURN_V = 0.6; // speed through a corner where you turn, or have to choose (x the base speed)
-const BRAKE = 8; // braking, in base speeds per second: a steady slowdown, not a jolt
-const EASE_UP_S = 0.8; // speeding up eases in over about this long
+// the classic game's rhythm: a block takes (0.55 s + its length / 168 m per s) x pace,
+// and never less than BLOCK_MIN_S x pace (short downtown blocks don't rush you)
+const PACE = { relaxed: 2, easy: 1, normal: 0.72, fast: 0.5 }; // relaxed: at least 2 s a block, time to decide every corner
+const BLOCK_MIN_S = 1;
+const GOTO_SPEED = 0.18; // fraction of the block time: heading to a tapped corner,
+const HOLD_SPEED = 0.25; // holding the map,
+const HOME_SPEED = 0.07; // and on the home stretch
 const AVENUE_RULE = {
   '1st Ave': 'U', '2nd Ave': 'D', '3rd Ave': 'U', 'Lexington Ave': 'D', 'Madison Ave': 'U', '5th Ave': 'D',
   '6th Ave': 'U', '7th Ave': 'D', '8th Ave': 'U', '9th Ave': 'D', '10th Ave': 'U', 'Amsterdam Ave': 'U', 'Columbus Ave': 'D',
@@ -51,7 +47,7 @@ const COMPASS = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest'
 // avenues that follow the grid (uptown / downtown means something on them)
 const GRID_AVES = new Set([...Object.keys(AVENUE_RULE), 'Park Ave', 'Park Ave S', '11th Ave', '12th Ave (West Side Hwy)', 'York Ave', 'East End Ave',
   'West End Ave', 'Central Park West', 'Adam Clayton Powell Jr Blvd', 'Frederick Douglass Blvd', 'Malcolm X Blvd (Lenox Ave)', 'Avenue A', 'Avenue B', 'Avenue C', 'Avenue D']);
-const AREAS = { all: 'All of Manhattan', downtown: 'Downtown (below 14th)', midtown: 'Midtown (14th–59th)', uptown: 'Uptown (59th–110th)', upper: 'Upper Manhattan (above 110th)' };
+const AREAS = { all: 'All of downtown (below 14th St)' };
 
 // ---- geometry helpers ------------------------------------------------------------
 const rad = (d) => (d * Math.PI) / 180;
@@ -94,11 +90,11 @@ export function initGridGame(ctx) {
   // working out where the address is is the useful part).
   // from: 'both' (half the rounds start at a tunnel or bridge), 'entries', 'anywhere'
   // checkins: now and then the car pauses and asks which side the Hudson (or uptown) is
-  const prefs = { pace: 'easy', arrows: false, mapFirst: false, area: 'all', from: 'both', optsOpen: false, checkins: true, ...ctx.store.get('gridPrefs', {}) };
+  const prefs = { pace: 'relaxed', arrows: false, mapFirst: false, area: 'all', from: 'both', optsOpen: false, checkins: true, ...ctx.store.get('downtownPrefs', {}) };
   const fstats = framesStats(ctx.store);
   if (!AREAS[prefs.area]) prefs.area = 'all';
-  const savePrefs = () => ctx.store.set('gridPrefs', prefs);
-  const rounds = () => ctx.store.get('gridRuns', { n: 0 }).n; // finished rounds, for first-time help
+  const savePrefs = () => ctx.store.set('downtownPrefs', prefs);
+  const rounds = () => ctx.store.get('downtownRuns', { n: 0 }).n; // finished rounds, for first-time help
 
   // ---- the graph -------------------------------------------------------------------
   async function load() {
@@ -446,7 +442,7 @@ export function initGridGame(ctx) {
       if (seen.has(cur.id)) break;
       seen.add(cur.id);
       const c = choices(cur);
-      const nx = c.decision ? c.dflt : c.only;
+      const nx = c.decision ? (c.named ? null : c.straight) : c.only; // the car stops at a named corner
       if (!nx) break;
       m += nx.len;
       cur = nx;
@@ -499,7 +495,7 @@ export function initGridGame(ctx) {
         e0 = rand(outs);
       }
       const dm = metres(G.nodes[e0.from], G.nodes[target.node]);
-      if (dm < 500 || dm > (entry ? 7000 : 3500)) continue;
+      if (dm < 400 || dm > (entry ? 4000 : 2800)) continue;
       if (straightTo(e0, target.node)) continue; // already on the right road
       const best = shortest(e0, target.node, s0);
       if (!best || best.path.length < 4) continue;
@@ -538,7 +534,7 @@ export function initGridGame(ctx) {
       opts, target: r.target, best: r.best, entry: r.entry,
       e: r.e0, s: r.s0, // on link e, s metres along
       waiting: false, queued: null, pick: null, goTo: null, gotoV: 0, home: false, boost: false, paused: false, done: false,
-      cruise: 0, zoom: ZOOM,
+      cruise: 0,
       driven: -r.s0, wrong: 0, trail: [posOnEdge(r.e0, r.s0).p], msg: '', msgAt: 0, lastNote: null,
       last: performance.now(), raf: 0, view: prefs.mapFirst && ctx.dur(1) ? 'intro' : 'follow',
       check: null, lastCheck: performance.now() - CHECK_EVERY_MS / 2, checks: 0, checksRight: 0, resumeAt: 0,
@@ -648,7 +644,7 @@ export function initGridGame(ctx) {
     const h = gridDir(g.e.b0);
     if (g.entry) {
       const out = hood(G.nodes[g.entry.landsAt]);
-      return `From <b>${esc(g.entry.from.replace(/^the /, 'the '))}</b>${out ? ` → out in <b>${esc(out.replace(/ \(.*\)$/, ''))}</b>` : ''}`;
+      return `From <b>${esc(g.entry.from)}</b> → out on <b>${esc(short(g.entry.via))}</b>${out ? ` in ${esc(out.replace(/ \(.*\)$/, ''))}` : ''}`;
     }
     const here = hood(G.nodes[g.e.from]);
     const nx = nextCross(g.e);
@@ -690,39 +686,11 @@ export function initGridGame(ctx) {
     render();
   }
 
-  const cruiseMult = () => Math.min(CRUISE_MAX, 1 + CRUISE_STEP * g.cruise);
-  const baseSpeed = () => SPEED * PACE[prefs.pace];
-  /** The speed the car eases toward, before the corner ahead is considered. */
-  function cruiseTarget() {
-    const base = baseSpeed();
-    if (g.home) return base * HOME_SPEED;
-    if (g.goTo != null) return Math.max(base * GOTO_SPEED, g.gotoV);
-    let v = base * (g.boost ? Math.max(HOLD_SPEED, cruiseMult()) : cruiseMult());
-    if (g.e.len > LONG_M) v = Math.max(v, (g.e.len / LEG_MAX_S) * PACE[prefs.pace]);
-    return v;
-  }
-  /** The fastest the car may be going here and still slow steadily for the corner ahead. */
-  function cornerCap() {
-    if (g.home) return Infinity;
-    const base = baseSpeed();
-    const c = choices(g.e);
-    let vc; // speed at the corner
-    if (g.goTo === g.e.to) vc = base * 0.3; // stopping there
-    else if (!c.decision) vc = c.only && Math.abs(turnOf(g.e, c.only)) > 50 ? base * TURN_V : Infinity;
-    else if (g.queued || (g.pick && g.pick !== c.dflt)) vc = base * TURN_V; // turning
-    else if (!c.dflt) vc = base * TURN_V * 0.7; // no way carries on: you'll have to choose
-    else vc = base * cruiseMult(); // carrying on
-    if (vc === Infinity) return Infinity;
-    const left = g.e.len - g.s;
-    return Math.sqrt(vc * vc + 2 * BRAKE * base * Math.max(0, left - 8));
-  }
-  /** Ease the speed toward its target; never over the braking curve. */
-  function updateSpeed(dt) {
-    const tgt = Math.min(cruiseTarget(), cornerCap());
-    if (g.v == null) g.v = Math.min(tgt, baseSpeed());
-    const tau = tgt > g.v ? (g.home || g.goTo != null ? 0.25 : EASE_UP_S) : 0.2;
-    g.v += (tgt - g.v) * Math.min(1, dt / tau);
-    g.v = Math.min(g.v, cornerCap());
+  /** Seconds this block takes (the classic rhythm). */
+  const blockSeconds = (len) => Math.max(BLOCK_MIN_S, 0.55 + len / 168) * PACE[prefs.pace];
+  function updateSpeed() {
+    const f = g.home ? HOME_SPEED : g.goTo != null ? GOTO_SPEED : g.boost ? HOLD_SPEED : 1;
+    g.v = g.e.len / (blockSeconds(g.e.len) * f);
     return g.v;
   }
   const speedNow = () => g.v || 0;
@@ -747,7 +715,7 @@ export function initGridGame(ctx) {
       render();
     }
     if (!g.paused && !g.done && !g.waiting && g.view !== 'intro' && !g.check && !g.startCard && now >= g.resumeAt) {
-      g.s += dt * updateSpeed(dt);
+      g.s += dt * updateSpeed();
       let guard = 0;
       while (g && !g.done && !g.waiting && g.s >= g.e.len && guard++ < 50) {
         const over = g.s - g.e.len;
@@ -775,10 +743,7 @@ export function initGridGame(ctx) {
       const H = window.innerHeight;
       // the car a little below the middle of the open area: more road ahead
       const oy = pad.top + (H - pad.top - pad.bottom) * 0.62 - H / 2;
-      // zoom out as you cruise, so the corners coming up stay in view
-      const want = ZOOM - Math.min(1.2, 0.5 * Math.max(0, (g.v || 0) / baseSpeed() - 1));
-      g.zoom += (want - g.zoom) * Math.min(1, dt * 1.5);
-      map.easeTo({ center: p, zoom: g.zoom, bearing: GRID, offset: [0, oy], duration: 0 });
+      map.easeTo({ center: p, zoom: ZOOM, bearing: GRID, offset: [0, oy], duration: 0 });
     }
     pointToTarget();
     g.raf = requestAnimationFrame(tick);
@@ -826,7 +791,8 @@ export function initGridGame(ctx) {
       if (nx) return go(nx);
       refuse(e, side);
     }
-    if (c.dflt) return go(c.dflt, true);
+    // an ordinary corner: carry straight on; a named one: stop and wait for a pick
+    if (!c.named && c.straight) return go(c.straight, true);
     stopHere();
   }
   /** Onto link nx. carryOn: straight on with no input (the cruise builds); otherwise it resets. */
@@ -1005,7 +971,8 @@ export function initGridGame(ctx) {
   function tapAt(sx, sy) {
     if (g.home) return; // the round is decided: on the right road, straight there
     const rect = map.getContainer().getBoundingClientRect();
-    const st = g.waiting ? choices(g.e).dflt : null;
+    const cw = choices(g.e);
+    const st = g.waiting && !cw.named ? cw.straight : null;
     const chain = g.waiting ? (st ? aheadChain(st) : []) : aheadChain(g.e);
     let best = null;
     for (const { node } of chain) {
@@ -1077,10 +1044,10 @@ export function initGridGame(ctx) {
     const mi = (m) => (m / 1609.34).toFixed(2).replace(/0$/, '');
     const ratio = g.driven / g.best.cost;
     const ok = ratio <= 1.15 && !g.wrong;
-    const runs = ctx.store.get('gridRuns', { n: 0, clean: 0 });
+    const runs = ctx.store.get('downtownRuns', { n: 0, clean: 0 });
     runs.n++;
     if (ok) runs.clean++;
-    ctx.store.set('gridRuns', runs);
+    ctx.store.set('downtownRuns', runs);
     g.result = `<div class="fb ${ok ? 'ok' : 'no'}">${ok ? '✓' : '•'} ${mi(g.driven)} mi${ratio <= 1.03 ? ' · the shortest' : ` · shortest ${mi(g.best.cost)}`}${
       g.wrong ? ` · ${g.wrong} wrong-way` : ''
     }${g.checks ? ` · check-ins ${g.checksRight}/${g.checks}` : ''}</div>
@@ -1109,6 +1076,15 @@ export function initGridGame(ctx) {
       legs.push({ name: e.name, text: short(e.name) });
     }
     return legs.map((l) => l.text).join(' → ');
+  }
+
+  /** Where a way out heads: the neighborhood a few hundred metres on, if it's a different one, else its compass direction. */
+  function leadsTo(o) {
+    let last = o;
+    for (const { via } of aheadChain(o, 10, 400)) last = via;
+    const there = ctx.locate(last.pts[last.pts.length - 1]);
+    const here = ctx.locate(G.nodes[o.from]);
+    return there && (!here || there.n !== here.n) ? `→ ${there.n}` : compassWord(o.b0);
   }
 
   // ---- words on screen -------------------------------------------------------------------
@@ -1156,7 +1132,7 @@ export function initGridGame(ctx) {
         .sort((a, b) => a.d - b.d)
         .map(
           ({ o }) =>
-            `<button class="ggpick${g.pick === o ? ' on' : ''}" data-link="${o.id}"><span class="gg-arr" style="transform:rotate(${(o.b0 - GRID).toFixed(0)}deg)">${DIR_SVG}</span><span class="nm">${esc(short(o.name))}${o === cc.dflt ? ' <small>default</small>' : ''}</span></button>`
+            `<button class="ggpick${g.pick === o ? ' on' : ''}" data-link="${o.id}"><span class="gg-arr" style="transform:rotate(${(o.b0 - GRID).toFixed(0)}deg)">${DIR_SVG}</span><span class="nm">${esc(short(o.name))} <small>${esc(leadsTo(o))}</small></span></button>`
         )
         .join('');
     ctx.sheet(
@@ -1180,7 +1156,7 @@ export function initGridGame(ctx) {
           <button id="ggOptsBtn" aria-expanded="${!!prefs.optsOpen}">Options ${prefs.optsOpen ? '▴' : '▾'}</button>
         </div>
         <div class="ggopts"${prefs.optsOpen ? '' : ' hidden'}>
-          <select id="ggArea" aria-label="Area">${Object.entries(AREAS).map(([k, v]) => `<option value="${k}"${prefs.area === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
+          <select id="ggArea" aria-label="Area"${Object.keys(AREAS).length < 2 ? ' hidden' : ''}>${Object.entries(AREAS).map(([k, v]) => `<option value="${k}"${prefs.area === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggFrom" aria-label="Start">${[['both', 'Start: mixed'], ['entries', 'Start: tunnels & bridges'], ['anywhere', 'Start: anywhere']].map(([k, v]) => `<option value="${k}"${prefs.from === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggPace" aria-label="Speed">${Object.keys(PACE).map((p) => `<option value="${p}"${prefs.pace === p ? ' selected' : ''}>${p[0].toUpperCase() + p.slice(1)}</option>`).join('')}</select>
           <label><input type="checkbox" id="ggArrows"${prefs.arrows ? ' checked' : ''}/> One-way arrows</label>

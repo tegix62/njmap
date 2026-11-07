@@ -1,7 +1,7 @@
 // Offline support: the app shell, boundary data, libraries and fonts are
 // cached, so "which town am I in" keeps working with no signal. Background map
 // tiles are only cached opportunistically.
-const VERSION = 'njtf-v48';
+const VERSION = 'njtf-v49';
 const SHELL = [
   './',
   'index.html',
@@ -37,6 +37,7 @@ const SHELL = [
   'data/nj.topo.json',
   'data/sections.json',
   'data/manhattan.topo.json',
+  'data/downtown-streets.json',
   'fonts/Noto Sans Medium/0-255.pbf',
   'fonts/Noto Sans Italic/0-255.pbf',
   'manifest.webmanifest',

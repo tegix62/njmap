@@ -36,6 +36,9 @@ import json, math, re, sys
 from collections import defaultdict, Counter
 
 src, out, report = sys.argv[1:4]
+# --downtown: the streets below 14th St only, no highways, ramps, tunnels or bridges
+# (rounds from a tunnel or bridge start where it lands on a street)
+DOWNTOWN = '--downtown' in sys.argv[4:]
 raw = json.load(open(src))
 DRIVABLE = {'1', '2', '3', '4', '9'}  # street, highway, bridge, tunnel, ramp
 
@@ -513,6 +516,16 @@ for li, L in enumerate(links):
         ok.append(lo)
     turns.append(ok)
 
+turns_full = turns
+if DOWNTOWN:
+    NOT_STREET = re.compile(r'FDR|ROOSEVELT|TUNNEL|TUNL|UNDERPASS|\bBRG\b|BRIDGE (?!ST$)|BRIDGE$|\bEN\b|\bET\b|\bEX\b|ENTRANCE|EXIT|\bRP\b|RAMP|EXPWY|EXPY|VIADUCT|\bEP\b')
+    Y14 = areas['14'] + 40  # 14th St itself is in
+    def below14(c):
+        return grid_xy(*centroid[c])[1] <= Y14
+    street_l = {li for li, L in enumerate(links)
+                if below14(L['from']) and below14(L['to']) and not any(NOT_STREET.search(edges[draw[k][2]][6]) for k in L['raws'])}
+    turns = [[lo for lo in t if lo in street_l] if li in street_l else [] for li, t in enumerate(turns)]
+
 # keep the link states from which every other can be reached, plus those that lead into them
 def scc(n, adj):
     radj = [[] for _ in range(n)]
@@ -620,7 +633,47 @@ def landing(li):
         li = nx[0]
     return li if li in core_l else None
 entries_out = []
-for en in entries:
+def landing_straight(c):
+    """downtown: follow the lane in straight on (the way traffic carries) until it's a street"""
+    for li in links_from.get(c, []):
+        seen, dist = set(), 0.0
+        while li not in seen and dist < 2500:
+            if li in core_l:
+                return li
+            seen.add(li)
+            nx = turns_full[li]
+            if not nx:
+                break
+            dist += links[li]['len']
+            li = min(nx, key=lambda lo, li=li: abs(adiff(links[lo]['b0'], links[li]['b1'])))
+    return None
+def landing_street(c):
+    """downtown: from a tunnel or bridge's lane in, the first street link it puts you on,
+    through ramps, tunnels and bridges only, within 2.5 km (so not round by the FDR)"""
+    best = {}
+    frontier = [(0.0, li) for li in links_from.get(c, [])]
+    while frontier:
+        frontier.sort()
+        dist, li = frontier.pop(0)
+        if li in core_l:
+            return li
+        if li in best or dist > 2500 or not any(NOT_STREET.search(edges[draw[k][2]][6]) for k in links[li]['raws']):
+            continue
+        best[li] = dist
+        onto = [lo for lo in turns_full[li] if lo in core_l]
+        if onto:  # off the ramp: the street it carries straight on to
+            return min(onto, key=lambda lo: abs(adiff(links[lo]['b0'], links[li]['b1'])))
+        for lo in turns_full[li]:
+            frontier.append((dist + links[li]['len'], lo))
+    return None
+for en in (entries if DOWNTOWN else []):
+    land = landing_straight(cl[en['node']])
+    if land is None:
+        land = landing_street(cl[en['node']])
+    if land is not None and not any(e['from'] == en['from'] and e['link'] == lre[land] for e in entries_out):
+        L = links[land]
+        entries_out.append({'from': en['from'], 'via': names[L['name']], 'link': lre[land], 'landsAt': jre[L['from']]})
+for en in ([] if DOWNTOWN else entries):
     c = cl[en['node']]
     for li in links_from.get(c, []):
         if li in keep_l:
