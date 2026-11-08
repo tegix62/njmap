@@ -961,14 +961,14 @@ export function initGridClassic(ctx) {
   const cornerName = (ai, s) => `${aveName(ai, s)} & ${streetName(s)}`;
   function briefYou() {
     const c = g.cur;
-    const at = `at <b>${esc(cornerName(c.ai, c.s))}</b>`;
-    if (g.entry) return `From <b>${esc(g.entry.from.replace(/ \(.*\)$/, ''))}</b>: ${esc(g.entry.where)} · ${at}`;
-    return `${where()} · ${at}`;
+    const where = `<b>${esc(cornerName(c.ai, c.s))}</b>`;
+    const name = g.entry ? g.entry.from.replace(/ \(.*\)$/, '').replace(/^the /, '') : null;
+    return `${name ? `<b>${esc(name)}</b> <span class="muted">· ${where.replace(/<\/?b>/g, '')}</span>` : where} <span class="muted">· facing ${DIR_WORD[c.d]}</span>`;
   }
   function briefTo() {
     const t = g.target;
     const tgt = `${aveName(t.ai, t.s)} & ${ord(t.s)} St`;
-    return `<b>${esc(t.name || tgt)}</b>${t.name ? ` · ${esc(tgt)}` : ''}`;
+    return t.name ? `<b>${esc(t.name)}</b> <span class="muted">· ${esc(tgt)}</span>` : `<b>${esc(tgt)}</b>`;
   }
   /** The guess: which way is the destination from here, before any pointer says so (grid frame: uptown = up). */
   function guessSide(side) {
@@ -1017,7 +1017,7 @@ export function initGridClassic(ctx) {
     if (!g) return;
     const tgt = `${esc(aveName(g.target.ai, g.target.s))} & ${ord(g.target.s)} St`;
     ctx.hud(
-      `<div class="qkind">🚕 Drive the grid${g.entry ? ` · from ${esc(g.entry.from.replace(/ \(.*\)$/, ''))}` : ''}</div><div class="q">Get to ${g.target.name ? `<b>${esc(g.target.name)}</b> (${tgt})` : `<b>${tgt}</b>`}</div>
+      g.startCard ? '' : `<div class="qkind">🚕 Drive the grid${g.entry ? ` · from ${esc(g.entry.from.replace(/ \(.*\)$/, ''))}` : ''}</div><div class="q">Get to ${g.target.name ? `<b>${esc(g.target.name)}</b> (${tgt})` : `<b>${tgt}</b>`}</div>
        ${g.done || g.startCard ? '' : `<div class="hint">${where()}${g.queued ? ` · turning <b>${g.queued === 'L' ? 'left' : 'right'}</b> at the next corner` : ''}${showWords() ? ` · <b>${esc(toGo())}</b> to go` : ''}</div>`}`
     );
     const btn = (side, label) =>

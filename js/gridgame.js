@@ -794,14 +794,28 @@ export function initGridGame(ctx, areaId = 'downtown') {
     return ['ahead of you', 'on your right', 'behind you', 'on your left'][(order.indexOf('W') - order.indexOf(h) + 4) % 4];
   }
   /** The briefing: where you are, which way you face, what's next. */
+  /** A famous place within a block of a point, if there is one ("Grand Central"). */
+  function placeNear(p, within = 130) {
+    let best = null;
+    for (const pl of G.places) {
+      const d = metres(G.nodes[pl.node], p);
+      if (d < within && (!best || d < best.d)) best = { d, name: pl.name };
+    }
+    return best ? best.name.replace(/^the /, '').replace(/ \(.*\)$/, '') : null;
+  }
+  /** "Name · Street & Street", or just the streets when it has no name (or the streets already say it). */
+  function placeText(name, label) {
+    if (!name) return `<b>${esc(label)}</b>`;
+    const bare = name.replace(/^the /i, '').toLowerCase();
+    return label.toLowerCase().includes(bare) ? `<b>${esc(label)}</b>` : `<b>${esc(name)}</b> <span class="muted">· ${esc(label)}</span>`;
+  }
+  /** Where you are: a famous spot if there is one, then the street you're on and the next one. */
   function briefYou() {
-    const here = (hood(g.pos || g.trail[0]) || '').replace(/ \(.*\)$/, '');
+    const p = g.pos || g.trail[0];
     const nx = nextCross(g.e);
-    const head = headWord(g.e.name, g.e.b0);
-    const st = `<b>${esc(short(g.e.name))}</b>`;
-    const next = nx ? ` · next corner <b>${esc(nx)}</b>` : '';
-    if (g.entry) return `Out of <b>${esc(g.entry.from)}</b> onto ${st}${here ? ` in <b>${esc(here)}</b>` : ''}, heading <b>${head}</b>${next}`;
-    return `${here ? `<b>${esc(here)}</b> · ` : ''}on ${st} heading <b>${head}</b>${next}`;
+    const name = g.entry ? g.entry.from.replace(/^the /, '') : placeNear(p);
+    const streets = nx ? `${short(g.e.name)} & ${nx}` : short(g.e.name);
+    return `${placeText(name, streets)} <span class="muted">· facing ${headWord(g.e.name, g.e.b0)}</span>`;
   }
   /** Act on touch-down (and on a keyboard "click", which has no pointer). */
   function onTap(el, fn) {
@@ -847,17 +861,15 @@ export function initGridGame(ctx, areaId = 'downtown') {
   /** The briefing: where you're going. */
   function briefTo() {
     const t = g.target;
-    const corner = t.label.replace(/ St\b/g, ' St');
-    const there = (g.targetHood || '').replace(/ \(.*\)$/, '');
     const why =
       g.kind === 'revisit' && g.mistake
-        ? `<br><span class="muted">↺ On the way: ${esc(g.mistake.corner)}, where you went wrong before</span>`
+        ? `<br><span class="muted">↺ Practice: ${esc(g.mistake.corner)}</span>`
         : g.kind === 'trip'
-          ? '<br><span class="muted">★ One of your saved trips</span>'
+          ? '<br><span class="muted">★ Saved trip</span>'
           : g.kind === 'replay'
-            ? '<br><span class="muted">↻ Same route again</span>'
+            ? '<br><span class="muted">↻ Same route</span>'
             : '';
-    return `<b>${esc(t.name || corner)}</b>${t.name ? ` · ${esc(corner)}` : ''}${there && there !== t.name ? ` · in ${esc(there)}` : ''}${why}`;
+    return `${placeText(t.name, t.label)}${why}`;
   }
 
   // ---- check-ins: "You're heading downtown. Which side is the Hudson?" ----------------------
@@ -1627,8 +1639,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       return;
     }
     const t = g.target;
-    const corner = t.label.replace(/ St\b/g, '').replace(/\b[EW] (\d)/g, '$1');
-    const tgt = t.name ? `<b>${esc(t.name)}</b> <span class="muted">· ${esc(corner)}</span>` : `<b>${esc(t.label)}</b>`;
+    const tgt = placeText(t.name, t.label);
     const nx = !g.done && g.e.core ? nextCross(g.e) : null;
     const hb = g.bnow ?? g.e.b0;
     void nx;
@@ -1648,7 +1659,9 @@ export function initGridGame(ctx, areaId = 'downtown') {
       ? `📍 ${here ? `${esc(here)} · ` : ''}<b>${esc(short(g.e.name))}</b> ${headWord(g.e.name, hb)}${nextTxt}`
       : `📍 ${here ? `${esc(here)} · ` : ''}heading <b>${headWord(g.e.name, hb)}</b>${nextTxt}`; // hard mode: no street names
     ctx.hud(
-      g.check && g.check.kind === 'name'
+      g.startCard
+        ? '' // the briefing says it all: the top card would only repeat it
+        : g.check && g.check.kind === 'name'
         ? `<div class="q gg-checkq">What street are you on?</div><div class="hint">Pick one below · skips in a few seconds</div>`
         : g.check
         ? `<div class="q gg-checkq">Heading ${WORD[g.check.h]}. ${esc(g.check.thing[0].toUpperCase() + g.check.thing.slice(1))}: <b>left or right?</b></div>
