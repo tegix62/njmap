@@ -2036,3 +2036,10 @@ body.gridding .maplibregl-canvas {
   color: #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
+.gg-where .gg-ways {
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+.gg-where .gg-plan {
+  color: #b45309;
+}

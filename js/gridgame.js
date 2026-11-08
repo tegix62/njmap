@@ -29,7 +29,7 @@ import { GUIDES, PEEK_MS, okSides, sideWords, guessRecord, briefingHTML, bindBri
 const DATA_URL = 'data/downtown-streets.json';
 const CHECK_EVERY_MS = 35000; // a check-in at most this often
 const GRID = 29; // the grid is turned ~29° clockwise from north
-const ZOOM = 15.7; // driving zoom
+const ZOOM = 15.3; // driving zoom (wide enough to see a few corners ahead and around)
 // the classic game's rhythm: a block takes (0.55 s + its length / 168 m per s) x pace,
 // and never less than BLOCK_MIN_S x pace (short downtown blocks don't rush you)
 const PACE = { relaxed: 2, easy: 1, normal: 0.72, fast: 0.5 }; // relaxed: at least 2 s a block, time to decide every corner
@@ -519,7 +519,8 @@ export function initGridGame(ctx) {
       if (seen.has(cur.id)) break;
       seen.add(cur.id);
       const c = choices(cur);
-      const nx = c.decision ? (c.named ? null : c.straight) : c.only; // the car stops at a named corner
+      // the car stops at a named corner, and where the road ends in a turn
+      const nx = c.decision ? (c.named ? null : c.straight) : c.only && Math.abs(turnOf(cur, c.only)) <= 50 ? c.only : null;
       if (!nx) break;
       m += nx.len;
       cur = nx;
@@ -809,6 +810,15 @@ export function initGridGame(ctx) {
     say(`${ok ? '✓' : '✗'} You're on ${short(c.answer)}`);
     render();
   }
+  /** The next corner where something happens (a choice, or the road ending in a turn): {via, c, name}. */
+  function nextTurnCorner() {
+    const chain = g.waiting ? [{ node: g.e.to, via: g.e }] : aheadChain(g.e, 40, 3000);
+    for (const { via } of chain) {
+      const c = choices(via);
+      if (c.decision || (c.only && Math.abs(turnOf(via, c.only)) > 50)) return { via, c, name: short(crossAt(via) || G.label(via.to)) };
+    }
+    return null;
+  }
   /** The briefing: where you're going. */
   function briefTo() {
     const t = g.target;
@@ -974,9 +984,17 @@ export function initGridGame(ctx) {
     if (!c.decision) {
       if (!c.only) return stopHere('Dead end.');
       const d = turnOf(e, c.only);
-      if (Math.abs(d) > 50) say(`Only way on: ${d < 0 ? 'left' : 'right'} onto ${short(c.only.name)}`);
-      go(c.only, Math.abs(d) <= 50);
-      return;
+      if (Math.abs(d) <= 50) return go(c.only, true); // the road carries on
+      // the road ends and the only way on is a turn: the car doesn't turn by itself
+      const side = d < 0 ? 'L' : 'R';
+      if (g.queued === side || g.pick === c.only || g.home) {
+        g.queued = null;
+        g.pick = null;
+        return go(c.only);
+      }
+      g.queued = null;
+      g.pick = null;
+      return stopHere(`Road ends: only ${side === 'L' ? '◀ left' : 'right ▶'} onto ${short(c.only.name)}`);
     }
     if (g.pick) {
       const p = g.pick;
@@ -1441,10 +1459,22 @@ export function initGridGame(ctx) {
     const tgt = t.name ? `<b>${esc(t.name)}</b> <span class="muted">· ${esc(corner)}</span>` : `<b>${esc(t.label)}</b>`;
     const nx = !g.done && g.e.core ? nextCross(g.e) : null;
     const hb = g.bnow ?? g.e.b0;
-    const plan = g.queued ? ` · <b>${g.queued === 'L' ? '◀ left' : 'right ▶'}</b>` : g.pick ? ` · <b>→ ${esc(short(g.pick.name))}</b>` : '';
+    void nx;
+    const here = !g.done && g.pos ? (hood(g.pos) || '').replace(/ \(.*\)$/, '') : '';
+    const nt = !g.done ? nextTurnCorner() : null;
+    // the next corner where something happens, and which ways it allows
+    const ways = nt
+      ? nt.c.named
+        ? 'pick a way'
+        : !nt.c.decision
+          ? `only ${turnOf(nt.via, nt.c.only) < 0 ? '◀' : '▶'}`
+          : `${nt.c.left ? '◀' : ''}${nt.c.straight ? '▲' : ''}${nt.c.right ? '▶' : ''}`
+      : '';
+    const plan = g.queued ? ` <b class="gg-plan">${g.queued === 'L' ? '◀ left there' : 'right ▶ there'}</b>` : g.pick ? ` <b class="gg-plan">→ ${esc(short(g.pick.name))}</b>` : '';
+    const nextTxt = nt ? ` · next ${prefs.labels ? `<b>${esc(nt.name)}</b> ` : 'corner '}<span class="gg-ways">${ways}</span>${plan}` : plan;
     const where = prefs.labels
-      ? `<b>${esc(short(g.e.name))}</b> · ${headWord(g.e.name, hb)}${nx ? ` · next ${esc(nx)}` : ''}${plan}`
-      : `heading <b>${headWord(g.e.name, hb)}</b>${plan}`; // hard mode: no street names
+      ? `📍 ${here ? `${esc(here)} · ` : ''}<b>${esc(short(g.e.name))}</b> ${headWord(g.e.name, hb)}${nextTxt}`
+      : `📍 ${here ? `${esc(here)} · ` : ''}heading <b>${headWord(g.e.name, hb)}</b>${nextTxt}`; // hard mode: no street names
     ctx.hud(
       g.check && g.check.kind === 'name'
         ? `<div class="q gg-checkq">What street are you on?</div><div class="hint">Pick one below · skips in a few seconds</div>`
@@ -1455,9 +1485,9 @@ export function initGridGame(ctx) {
        ${
          g.done || g.startCard
            ? ''
-           : `<div class="hint gg-go">${showGuide() ? `<span class="gg-dir" title="Which way the destination is">${DIR_SVG}</span><b class="gg-dist"></b> · ` : ''}${
-               showWords() && !showGuide() ? `<span class="gg-words"></span> · ` : ''
-             }${where}</div>`
+           : `${showGuide() || showWords() ? `<div class="hint gg-go">${showGuide() ? `<span class="gg-dir" title="Which way the destination is">${DIR_SVG}</span><b class="gg-dist"></b>` : ''}${
+               showWords() && !showGuide() ? `<span class="gg-words"></span>` : ''
+             }</div>` : ''}<div class="hint gg-where">${where}</div>`
        }`
     );
     if (!g.done && g.pos && showGuide()) updateDir(aim());
@@ -1473,7 +1503,7 @@ export function initGridGame(ctx) {
     const cc = !g.done ? choices(g.e) : null;
     // stopped at a corner where straight on is possible: offer it
     const cw = g.waiting && !g.check ? cc : null;
-    const canStraight = !!(cw && (cw.straight || cw.only));
+    const canStraight = !!(cw && (cw.straight || (cw.only && cw.only === cw.straight)));
     // a corner whose ways out don't fit Left / Straight / Right: a button for each, with its
     // real angle on screen (the map is turned so the grid is upright)
     const named = cc && cc.named && !g.check;

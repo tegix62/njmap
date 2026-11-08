@@ -595,7 +595,9 @@ def classify(li, opts):
         slots[lo] = s
     if slots is not None:
         angs = sorted(d for _, d in ds)
-        if all(b - a >= 30 for a, b in zip(angs, angs[1:])) and all(not (s in 'LR' and abs(d) < 25) for (lo, d), s in ((x, slots[x[0]]) for x in ds)):
+        # Left / Right only for real turns (55-125 degrees): a shallow fork or a hairpin
+        # on the Left button surprises you, so those corners get named buttons instead
+        if all(b - a >= 30 for a, b in zip(angs, angs[1:])) and all(not (s in 'LR' and not 55 <= abs(d) <= 125) for (lo, d), s in ((x, slots[x[0]]) for x in ds)):
             return slots
     # named
     same = [x for x in ds if links[x[0]]['name'] == L['name'] and abs(x[1]) <= 45]
