@@ -1,7 +1,8 @@
 /* global maplibregl */
-// Drive Downtown: every street below 14th St with its legal direction, from
-// NYC's street centerline (built into data/downtown-streets.json by
-// tools/build_streets.py --downtown). Streets only: no FDR, ramps, tunnels or
+// Drive Downtown / Drive Midtown: every street in the area with its legal
+// direction, from NYC's street centerline (built into data/downtown-streets.json
+// and data/midtown-streets.json by tools/build_streets.py --downtown / --midtown;
+// one instance of this game per area, see DRIVE_AREAS). Streets only: no FDR, ramps, tunnels or
 // bridges; a round from the Holland Tunnel or a bridge starts where it comes
 // out onto a street. The map is turned so the grid stands upright (uptown at
 // the top); downtown streets run at their real angles.
@@ -26,7 +27,6 @@
 import { framesStats } from './frames.js';
 import { GUIDES, PEEK_MS, okSides, sideWords, guessRecord, briefingHTML, bindBriefing } from './briefing.js';
 
-const DATA_URL = 'data/downtown-streets.json';
 const CHECK_EVERY_MS = 35000; // a check-in at most this often
 const GRID = 29; // the grid is turned ~29° clockwise from north
 const ZOOM = 15.3; // driving zoom (wide enough to see a few corners ahead and around)
@@ -47,7 +47,6 @@ const COMPASS = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest'
 // avenues that follow the grid (uptown / downtown means something on them)
 const GRID_AVES = new Set([...Object.keys(AVENUE_RULE), 'Park Ave', 'Park Ave S', '11th Ave', '12th Ave (West Side Hwy)', 'York Ave', 'East End Ave',
   'West End Ave', 'Central Park West', 'Adam Clayton Powell Jr Blvd', 'Frederick Douglass Blvd', 'Malcolm X Blvd (Lenox Ave)', 'Avenue A', 'Avenue B', 'Avenue C', 'Avenue D']);
-const AREAS = { all: 'All of downtown (below 14th St)' };
 
 // ---- geometry helpers ------------------------------------------------------------
 const rad = (d) => (d * Math.PI) / 180;
@@ -80,7 +79,16 @@ function gridXY(p) {
   return [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
 }
 
-export function initGridGame(ctx) {
+// The areas there's a game for (data built by tools/build_streets.py --downtown / --midtown)
+export const DRIVE_AREAS = {
+  downtown: { data: 'data/downtown-streets.json', title: 'Drive Downtown', span: 'below 14th St', of: "downtown's" },
+  midtown: { data: 'data/midtown-streets.json', title: 'Drive Midtown', span: '14th–60th St', of: "Midtown's" },
+};
+
+export function initGridGame(ctx, areaId = 'downtown') {
+  const AREA = DRIVE_AREAS[areaId];
+  const DATA_URL = AREA.data;
+  const AREAS = { all: `All of ${areaId === 'downtown' ? 'downtown' : 'Midtown'} (${AREA.span})` };
   const { map } = ctx;
   let G = null; // the street graph, once loaded
   let g = null; // the running round
@@ -90,23 +98,23 @@ export function initGridGame(ctx) {
   // working out where the address is is the useful part).
   // from: 'both' (half the rounds start at a tunnel or bridge), 'entries', 'anywhere'
   // checkins: now and then the car pauses and asks which side the Hudson (or uptown) is
-  const prefs = { pace: 'relaxed', guide: 'words', labels: true, cover: false, trips: true, arrows: false, mapFirst: false, area: 'all', from: 'both', optsOpen: false, checkins: true, ...ctx.store.get('downtownPrefs', {}) };
+  const prefs = { pace: 'relaxed', guide: 'words', labels: true, cover: false, trips: true, arrows: false, mapFirst: false, area: 'all', from: 'both', optsOpen: false, checkins: true, ...ctx.store.get(`${areaId}Prefs`, {}) };
   const fstats = framesStats(ctx.store);
   const guesses = guessRecord(ctx.store);
   // what's remembered between rounds: tied to this build of the street data (link ids change when it's rebuilt)
   const mem = {
     get(k, dflt) {
-      const v = ctx.store.get(`downtown.${k}`, null);
+      const v = ctx.store.get(`${areaId}.${k}`, null);
       return v && v.data === G.dataKey ? v.v : dflt;
     },
     set(k, v) {
-      ctx.store.set(`downtown.${k}`, { data: G.dataKey, v });
+      ctx.store.set(`${areaId}.${k}`, { data: G.dataKey, v });
     },
   };
   if (!GUIDES[prefs.guide]) prefs.guide = 'words';
   if (!AREAS[prefs.area]) prefs.area = 'all';
-  const savePrefs = () => ctx.store.set('downtownPrefs', prefs);
-  const rounds = () => ctx.store.get('downtownRuns', { n: 0 }).n; // finished rounds, for first-time help
+  const savePrefs = () => ctx.store.set(`${areaId}Prefs`, prefs);
+  const rounds = () => ctx.store.get(`${areaId}Runs`, { n: 0 }).n; // finished rounds, for first-time help
 
   // ---- the graph -------------------------------------------------------------------
   async function load() {
@@ -647,13 +655,13 @@ export function initGridGame(ctx) {
     try {
       await load();
     } catch {
-      if (g === token) ctx.hud('<div class="qkind">🚕 Drive Manhattan</div><div class="q">Couldn’t load the street map.</div>');
+      if (g === token) ctx.hud(`<div class="qkind">🚕 ${AREA.title}</div><div class="q">Couldn’t load the street map.</div>`);
       return;
     }
     if (g !== token) return;
     const r = pickRound(forced);
     if (!r) {
-      ctx.hud('<div class="qkind">🚕 Drive Manhattan</div><div class="q">No route found here; try another area.</div>');
+      ctx.hud(`<div class="qkind">🚕 ${AREA.title}</div><div class="q">No route found here; try another area.</div>`);
       return;
     }
     ensureLayers();
@@ -683,6 +691,8 @@ export function initGridGame(ctx) {
     setData('gg-trail', EMPTY);
     setData('gg-best', EMPTY);
     setData('gg-goto', EMPTY);
+    setData('gg-streets', streetsFC || EMPTY);
+    setData('gg-arrows', arrowsFC || EMPTY);
     showArrows();
     showLabels(prefs.labels);
     showCover();
@@ -1366,10 +1376,10 @@ export function initGridGame(ctx) {
     const mi = (m) => (m / 1609.34).toFixed(2).replace(/0$/, '');
     const ratio = g.driven / g.best.cost;
     const ok = ratio <= 1.15 && !g.wrong;
-    const runs = ctx.store.get('downtownRuns', { n: 0, clean: 0 });
+    const runs = ctx.store.get(`${areaId}Runs`, { n: 0, clean: 0 });
     runs.n++;
     if (ok) runs.clean++;
-    ctx.store.set('downtownRuns', runs);
+    ctx.store.set(`${areaId}Runs`, runs);
     // stars: there; the shortest way with no wrong-way tries; and that, without peeking or an
     // arrow, having guessed the way at the start
     const shortestWay = ratio <= 1.03 && !g.wrong;
@@ -1415,7 +1425,7 @@ export function initGridGame(ctx) {
       ${fixed ? `<div class="hint">✓ ${esc(g.mistake.corner)}: got it this time</div>` : ''}
       ${missed ? `<div class="hint">↺ ${esc(missed)} (it'll come back)</div>` : ''}
       <div class="hint"><span class="gg-key you"></span> you <span class="gg-key best"></span> best: ${esc(describe(g.best.path))}</div>
-      <div class="hint">Driven: ${Math.round(cover * 100)}% of downtown's blocks${g.newBlocks ? ` (+${g.newBlocks} new${cover - prevCover >= 0.005 ? `, +${Math.round((cover - prevCover) * 100)}%` : ''})` : ''}</div>
+      <div class="hint">Driven: ${Math.round(cover * 100)}% of ${AREA.of} blocks${g.newBlocks ? ` (+${g.newBlocks} new${cover - prevCover >= 0.005 ? `, +${Math.round((cover - prevCover) * 100)}%` : ''})` : ''}</div>
       <div class="ggend">
         <button class="primary" id="ggAgain">Another route</button>
         <button id="ggSame">↻ Same route</button>
@@ -1459,7 +1469,7 @@ export function initGridGame(ctx) {
   function render() {
     if (!g) return;
     if (g.loading) {
-      ctx.hud('<div class="qkind">🚕 Drive Manhattan</div><div class="q">Loading the street map…</div>');
+      ctx.hud(`<div class="qkind">🚕 ${AREA.title}</div><div class="q">Loading the street map…</div>`);
       ctx.sheet(`${g.opts.header()}`);
       g.opts.bindHeader();
       return;

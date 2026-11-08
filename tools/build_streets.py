@@ -38,7 +38,9 @@ from collections import defaultdict, Counter
 src, out, report = sys.argv[1:4]
 # --downtown: the streets below 14th St only, no highways, ramps, tunnels or bridges
 # (rounds from a tunnel or bridge start where it lands on a street)
-DOWNTOWN = '--downtown' in sys.argv[4:]
+# --midtown: the same, between 14th and 59th St
+AREA = 'downtown' if '--downtown' in sys.argv[4:] else 'midtown' if '--midtown' in sys.argv[4:] else None
+DOWNTOWN = AREA is not None  # streets only, one area
 raw = json.load(open(src))
 DRIVABLE = {'1', '2', '3', '4', '9'}  # street, highway, bridge, tunnel, ramp
 
@@ -145,7 +147,7 @@ for f in raw['features']:
         pts = simplify([tuple(c) for c in line])
         length = sum(metres(pts[i], pts[i + 1]) for i in range(len(pts) - 1))
         d = {'FT': 1, 'TF': -1, 'TW': 0}[p['trafdir']]
-        edges.append([a, b, name_id(pretty(rawname)), d, pts, length, rawname])
+        edges.append([a, b, name_id(pretty(rawname)), d, pts, length, rawname, p.get('rw_type')])
 
 # ---- join road ends that meet at the same point but are coded at different levels ----------------
 # A road that simply ends where another begins (a ramp onto the FDR, a parkway
@@ -321,7 +323,7 @@ for u in sources:
 def gy(u):
     return grid_xy(*nodes[u])[1]
 street_y = defaultdict(list)
-for a, b, nid, d, pts, L, rawname in edges:
+for a, b, nid, d, pts, L, rawname, *_rw in edges:
     m = re.match(r'^[EW] (\d+) ST$', rawname)
     if m:
         street_y[int(m.group(1))].append(gy(a))
@@ -397,7 +399,7 @@ centroid = {c: (sum(nodes[u][0] for u in ms) / len(ms), sum(nodes[u][1] for u in
 draw = []  # (from, to, edge index, pts)
 out_raw = defaultdict(list)
 for i in kept_ix:
-    a, b, nid, d, pts, L, rawname = edges[i]
+    a, b, nid, d, pts, L, rawname, *_rw = edges[i]
     if d >= 0:
         out_raw[a].append(len(draw)); draw.append((a, b, i, pts))
     if d <= 0:
@@ -514,16 +516,29 @@ for li, L in enumerate(links):
         if abs(adiff(O['b0'], L['b1'])) > UTURN:
             continue  # a U-turn (across a median, or back the way you came)
         ok.append(lo)
+    if AREA:
+        # the same road twice the same way out of a corner (a service lane beside the
+        # avenue, a duplicated roadbed in the city's data): one button, the plain block
+        one = []
+        for lo in sorted(ok, key=lambda x: links[x]['len']):
+            O = links[lo]
+            if any(links[x]['name'] == O['name'] and abs(adiff(links[x]['b0'], O['b0'])) < 15 for x in one):
+                continue
+            one.append(lo)
+        ok = one
     turns.append(ok)
 
 turns_full = turns
 if DOWNTOWN:
     NOT_STREET = re.compile(r'FDR|ROOSEVELT|TUNNEL|TUNL|UNDERPASS|\bBRG\b|BRIDGE (?!ST$)|BRIDGE$|\bEN\b|\bET\b|\bEX\b|ENTRANCE|EXIT|\bRP\b|RAMP|EXPWY|EXPY|VIADUCT|\bEP\b')
-    Y14 = areas['14'] + 40  # 14th St itself is in
-    def below14(c):
-        return grid_xy(*centroid[c])[1] <= Y14
+    # the area's edge streets themselves are in (14th St for both; 59th St for Midtown)
+    # (Midtown takes in 60th St: the Queensboro Bridge lets you out there)
+    Y_LO, Y_HI = (-1e9, areas['14'] + 40) if AREA == 'downtown' else (areas['14'] - 40, areas['59'] + 110)
+    def below14(c):  # in the area
+        return Y_LO <= grid_xy(*centroid[c])[1] <= Y_HI
     street_l = {li for li, L in enumerate(links)
-                if below14(L['from']) and below14(L['to']) and not any(NOT_STREET.search(edges[draw[k][2]][6]) for k in L['raws'])}
+                if below14(L['from']) and below14(L['to'])
+                and not any(NOT_STREET.search(edges[draw[k][2]][6]) or edges[draw[k][2]][7] == '4' for k in L['raws'])}
     turns = [[lo for lo in t if lo in street_l] if li in street_l else [] for li, t in enumerate(turns)]
 
 # keep the link states from which every other can be reached, plus those that lead into them
@@ -642,6 +657,8 @@ def landing_straight(c):
         while li not in seen and dist < 2500:
             if li in core_l:
                 return li
+            if li not in street_l and not any(NOT_STREET.search(edges[draw[k][2]][6]) for k in links[li]['raws']):
+                break  # an ordinary street outside the area: not the way in
             seen.add(li)
             nx = turns_full[li]
             if not nx:
