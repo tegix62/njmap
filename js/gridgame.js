@@ -266,7 +266,19 @@ export function initGridGame(ctx) {
       feats.push({ type: 'Feature', properties: { name: e.name, exc: exceptionNote(e) ? 1 : 0 }, geometry: { type: 'LineString', coordinates: e.pts } });
     }
     arrowsFC = { type: 'FeatureCollection', features: feats };
+    // every street the game drives on, drawn from its own data with its own names: the
+    // background map's tiles can fail to load (a blank square in Hudson Square), and
+    // then the streets you're driving would be missing
+    const seen = new Set();
+    const streets = [];
+    for (const e of G.edges) {
+      if (seen.has(e.shape)) continue;
+      seen.add(e.shape);
+      streets.push({ type: 'Feature', properties: { name: short(e.name) }, geometry: { type: 'LineString', coordinates: e.pts } });
+    }
+    streetsFC = { type: 'FeatureCollection', features: streets };
   }
+  let streetsFC = null;
   const EMPTY = { type: 'FeatureCollection', features: [] };
   /** A chevron pointing along the line (+x), as a map image: the font the map ships
    *  has only basic Latin, so a '›' text arrow drew nothing. */
@@ -299,6 +311,15 @@ export function initGridGame(ctx) {
       }
     }
     if (map.getSource('gg-trail')) return;
+    map.addSource('gg-streets', { type: 'geojson', data: streetsFC || EMPTY });
+    const roadCol = map.getLayer('road-mid') && map.getPaintProperty('road-mid', 'line-color');
+    map.addLayer(
+      {
+        id: 'gg-streets', type: 'line', source: 'gg-streets', layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'none' },
+        paint: { 'line-color': typeof roadCol === 'string' ? roadCol : '#d8d1c3', 'line-width': ['interpolate', ['linear'], ['zoom'], 13, 1.5, 15, 5, 16, 8, 17, 12] },
+      },
+      map.getLayer('road-minor') ? 'road-minor' : undefined // under the background map's roads: where its tiles load, they draw on top
+    );
     map.addSource('gg-trail', { type: 'geojson', data: EMPTY });
     map.addSource('gg-best', { type: 'geojson', data: EMPTY });
     map.addSource('gg-arrows', { type: 'geojson', data: arrowsFC || EMPTY });
@@ -308,6 +329,14 @@ export function initGridGame(ctx) {
     map.addLayer({ id: 'gg-cover', type: 'line', source: 'gg-cover', layout: { 'line-cap': 'round' }, paint: { 'line-color': '#16a34a', 'line-width': 3, 'line-opacity': 0.35 } });
     map.addLayer({ id: 'gg-best', type: 'line', source: 'gg-best', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#15803d', 'line-width': 4.5, 'line-dasharray': [2, 1.5] } });
     map.addLayer({ id: 'gg-trail', type: 'line', source: 'gg-trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#2b4fb3', 'line-width': 6, 'line-opacity': 0.55 } });
+    map.addLayer({
+      id: 'gg-street-names', type: 'symbol', source: 'gg-streets',
+      layout: {
+        visibility: 'none', 'symbol-placement': 'line', 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Medium'],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 14, 10.5, 16, 13.5], 'symbol-spacing': 280, 'text-max-angle': 30,
+      },
+      paint: { 'text-color': '#4f483e', 'text-halo-color': '#ffffff', 'text-halo-width': 1.8 },
+    });
     map.addLayer({
       id: 'gg-arrows', type: 'symbol', source: 'gg-arrows',
       layout: {
@@ -331,7 +360,11 @@ export function initGridGame(ctx) {
   const point = (p, props = {}) => ({ type: 'FeatureCollection', features: p ? [{ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: p } }] : [] });
   /** Hard mode: street names off the map for the round. */
   function showLabels(on) {
-    if (map.getLayer('road-name')) map.setLayoutProperty('road-name', 'visibility', on ? 'visible' : 'none');
+    const vis = (id, v) => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', v ? 'visible' : 'none');
+    const inGame = !!(g && !g.loading);
+    vis('gg-streets', inGame);
+    vis('gg-street-names', inGame && on);
+    vis('road-name', !inGame); // in the game, the names come from its own street data (same names as everywhere else in it)
   }
   /** The blocks you've driven, faintly green (Options: Show streets I've driven). */
   function showCover() {
@@ -1199,7 +1232,8 @@ export function initGridGame(ctx) {
     const chain = g.waiting ? aheadChain(st, 40, 3000) : aheadChain(g.e, 40, 3000);
     const out = [];
     for (const { node, via } of chain) {
-      if (!G.real(node)) continue;
+      // only corners where you could turn (some meet only one-way streets coming in)
+      if (!G.real(node) || (!choices(via).decision && node !== g.target.node)) continue;
       out.push({ node, via, name: crossAt(via) || G.label(node) });
       if (out.length >= max) break;
     }
