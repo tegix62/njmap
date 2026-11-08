@@ -316,7 +316,13 @@ export function initGridGame(ctx) {
     map.addLayer(
       {
         id: 'gg-streets', type: 'line', source: 'gg-streets', layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'none' },
-        paint: { 'line-color': typeof roadCol === 'string' ? roadCol : '#d8d1c3', 'line-width': ['interpolate', ['linear'], ['zoom'], 13, 1.5, 15, 5, 16, 8, 17, 12] },
+        // only at driving zoom: zoomed out, the background map leaves small streets out on
+        // purpose, and drawing all of ours there (offset a little from its own) is a fuzzy mesh
+        paint: {
+          'line-color': typeof roadCol === 'string' ? roadCol : '#d8d1c3',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 14.5, 2, 15.3, 5, 16, 8, 17, 12],
+          'line-opacity': ['interpolate', ['linear'], ['zoom'], 14.4, 0, 15, 1],
+        },
       },
       map.getLayer('road-minor') ? 'road-minor' : undefined // under the background map's roads: where its tiles load, they draw on top
     );
@@ -330,9 +336,10 @@ export function initGridGame(ctx) {
     map.addLayer({ id: 'gg-best', type: 'line', source: 'gg-best', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#15803d', 'line-width': 4.5, 'line-dasharray': [2, 1.5] } });
     map.addLayer({ id: 'gg-trail', type: 'line', source: 'gg-trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#2b4fb3', 'line-width': 6, 'line-opacity': 0.55 } });
     map.addLayer({
-      id: 'gg-street-names', type: 'symbol', source: 'gg-streets',
+      id: 'gg-street-names', type: 'symbol', source: 'gg-streets', minzoom: 14.6,
       layout: {
         visibility: 'none', 'symbol-placement': 'line', 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Medium'],
+        // (minzoom below: names only at driving zoom too)
         'text-size': ['interpolate', ['linear'], ['zoom'], 14, 10.5, 16, 13.5], 'symbol-spacing': 280, 'text-max-angle': 30,
       },
       paint: { 'text-color': '#4f483e', 'text-halo-color': '#ffffff', 'text-halo-width': 1.8 },
@@ -361,7 +368,9 @@ export function initGridGame(ctx) {
   /** Hard mode: street names off the map for the round. */
   function showLabels(on) {
     const vis = (id, v) => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', v ? 'visible' : 'none');
-    const inGame = !!(g && !g.loading);
+    // driving: the game's own streets and names; the end-of-round overview and the rest of
+    // the app: the background map's own
+    const inGame = !!(g && !g.loading && !g.done);
     vis('gg-streets', inGame);
     vis('gg-street-names', inGame && on);
     vis('road-name', !inGame); // in the game, the names come from its own street data (same names as everywhere else in it)
@@ -1346,6 +1355,7 @@ export function initGridGame(ctx) {
     g.done = true;
     g.waiting = true;
     offEl.hidden = true;
+    showLabels(prefs.labels);
     const bestCoords = [];
     g.best.path.forEach((e) => bestCoords.push(...e.pts));
     setData('gg-best', line(bestCoords));
