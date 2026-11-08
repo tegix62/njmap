@@ -17,3 +17,17 @@ export function switchRegion(id) {
   u.searchParams.delete('region');
   location.replace(u.toString());
 }
+
+/** First launch: no map chosen yet (and none forced by ?region=). */
+export function needsRegionChoice() {
+  return !new URLSearchParams(location.search).get('region') && store.get('region', null) === null;
+}
+export function setRegion(id) {
+  store.set('region', id);
+}
+
+// What each map is, in a line, for the chooser and the switcher
+export const REGION_BLURB = {
+  nj: { name: 'New Jersey', tag: 'NJ', line: '564 towns and 21 counties: which one you’re in, highways, lakes and mountains.' },
+  manhattan: { name: 'New York City', tag: 'NYC', line: 'Manhattan’s neighborhoods, avenues and one-way streets, with driving games.' },
+};

@@ -1703,25 +1703,35 @@ export function initGridGame(ctx, areaId = 'downtown') {
                 : ''
         }</div>`}
         <div class="ggbar">
-          ${g.done || g.startCard ? '' : `<button id="ggPause">${g.paused ? '▶ Go' : '⏸ Pause'}</button>`}
-          ${!g.done && !g.startCard && !g.report ? `<button id="ggFast">⏩ Hold: faster</button>` : ''}
-          ${!g.done && !g.startCard && !g.report ? `<button id="ggOff" title="Something's off: send this round's moves">⚑</button>` : ''}
+          ${g.done || g.startCard ? '' : `<button id="ggPause" aria-label="${g.paused ? 'Resume' : 'Pause'}">${g.paused ? '▶ Go' : '⏸ Pause'}</button>`}
+          ${!g.done && !g.startCard && !g.report ? `<button id="ggFast" aria-label="Hold to go faster">⏩ Hold</button>` : ''}
           ${!g.done && !g.startCard && prefs.guide === 'off' ? `<button id="ggPeek">👁 Peek</button>` : ''}
           ${hintReady() ? `<button id="ggHint">💡 Hint</button>` : ''}
-          <button id="ggOptsBtn" aria-expanded="${!!prefs.optsOpen}">Options ${prefs.optsOpen ? '▴' : '▾'}</button>
+          <button id="ggMore" aria-expanded="${!!g.more}" aria-label="More">${g.more ? '✕' : '⋯'}</button>
         </div>
-        <div class="ggopts"${prefs.optsOpen ? '' : ' hidden'}>
+        ${
+          g.more
+            ? `<div class="ggmore">
+                ${!g.done && !g.startCard && !g.report ? `<button id="ggOff">⚑ Something’s off</button>` : ''}
+                <button id="ggOptsBtn" aria-expanded="${!!prefs.optsOpen}">⚙ Options</button>
+              </div>`
+            : ''
+        }
+        <div class="ggopts"${g.more && prefs.optsOpen ? '' : ' hidden'}>
           <select id="ggArea" aria-label="Area"${Object.keys(AREAS).length < 2 ? ' hidden' : ''}>${Object.entries(AREAS).map(([k, v]) => `<option value="${k}"${prefs.area === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggFrom" aria-label="Start">${[['both', 'Start: mixed'], ['entries', 'Start: tunnels & bridges'], ['anywhere', 'Start: anywhere']].map(([k, v]) => `<option value="${k}"${prefs.from === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggGuide" aria-label="Guide">${Object.entries(GUIDES).map(([k, v]) => `<option value="${k}"${prefs.guide === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggPace" aria-label="Speed">${Object.keys(PACE).map((p) => `<option value="${p}"${prefs.pace === p ? ' selected' : ''}>${p[0].toUpperCase() + p.slice(1)}</option>`).join('')}</select>
-          <label><input type="checkbox" id="ggArrows"${prefs.arrows ? ' checked' : ''}/> One-way arrows</label>
-          <label><input type="checkbox" id="ggLabels"${prefs.labels ? ' checked' : ''}/> Street names (off: hard mode)</label>
-          <label><input type="checkbox" id="ggCover"${prefs.cover ? ' checked' : ''}/> Show streets I've driven</label>
-          <label><input type="checkbox" id="ggTrips"${prefs.trips ? ' checked' : ''}/> Mix in my saved trips</label>
-          ${earlierLogs()}
-          <label><input type="checkbox" id="ggMapFirst"${prefs.mapFirst ? ' checked' : ''}/> Map first</label>
-          <label><input type="checkbox" id="ggChecks"${prefs.checkins ? ' checked' : ''}/> Check-ins</label>
+          <details class="ggmoreopts">
+            <summary>More options</summary>
+            <label><input type="checkbox" id="ggArrows"${prefs.arrows ? ' checked' : ''}/> One-way arrows</label>
+            <label><input type="checkbox" id="ggLabels"${prefs.labels ? ' checked' : ''}/> Street names (off: hard mode)</label>
+            <label><input type="checkbox" id="ggCover"${prefs.cover ? ' checked' : ''}/> Show streets I've driven</label>
+            <label><input type="checkbox" id="ggTrips"${prefs.trips ? ' checked' : ''}/> Mix in my saved trips</label>
+            <label><input type="checkbox" id="ggMapFirst"${prefs.mapFirst ? ' checked' : ''}/> Map first</label>
+            <label><input type="checkbox" id="ggChecks"${prefs.checkins ? ' checked' : ''}/> Check-ins</label>
+            ${earlierLogs()}
+          </details>
         </div>
       </div>`
     );
@@ -1733,7 +1743,10 @@ export function initGridGame(ctx, areaId = 'downtown') {
     document.getElementById('ggPause')?.addEventListener('click', togglePause);
     document.getElementById('ggPeek')?.addEventListener('click', peek);
     document.getElementById('ggHint')?.addEventListener('click', showHint);
-    document.getElementById('ggOff')?.addEventListener('click', () => openReport('off'));
+    document.getElementById('ggOff')?.addEventListener('click', () => {
+      g.more = false;
+      openReport('off');
+    });
     document.getElementById('ggLog')?.addEventListener('click', () => openReport('log'));
     document.getElementById('ggOldLog')?.addEventListener('click', () => {
       const sel = document.getElementById('ggOldSel');
@@ -1780,7 +1793,11 @@ export function initGridGame(ctx, areaId = 'downtown') {
       render();
     });
     document.getElementById('ggAgain')?.addEventListener('click', () => start(g.opts));
-    document.getElementById('ggOptsBtn').addEventListener('click', () => {
+    document.getElementById('ggMore')?.addEventListener('click', () => {
+      g.more = !g.more;
+      render();
+    });
+    document.getElementById('ggOptsBtn')?.addEventListener('click', () => {
       prefs.optsOpen = !prefs.optsOpen;
       savePrefs();
       render();

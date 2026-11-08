@@ -428,7 +428,7 @@ body[data-mode='drive'].unfollowed #recenter {
   height: calc(var(--tabs-h) + var(--safe-b));
   padding-bottom: var(--safe-b);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   background: var(--ink);
   z-index: 6;
 }
@@ -872,10 +872,8 @@ body.picking #map {
 #hud .corner b {
   color: #fde68a;
 }
-#settings .regionrow select {
-  font-size: 16px;
-  padding: 6px 8px;
-  border-radius: 8px;
+#settings .regionrow {
+  margin: 4px 0 8px;
 }
 .titlerow {
   display: flex;
@@ -2068,4 +2066,288 @@ body.gridding .maplibregl-canvas {
 .ggoldlog select {
   flex: 1;
   min-width: 0;
+}
+
+
+/* ---- first-run chooser, region switcher, settings sections ------------------- */
+#welcome {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: #101828;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  overflow-y: auto;
+}
+#welcome[hidden] {
+  display: none;
+}
+#welcome .wcard {
+  width: min(420px, 100%);
+}
+#welcome h1 {
+  margin: 0 0 6px;
+  font-size: 34px;
+  letter-spacing: -0.5px;
+}
+#welcome .wsub {
+  margin: 0 0 18px;
+  font-size: 17px;
+  line-height: 1.4;
+  opacity: 0.85;
+}
+#welcome .wfine {
+  margin: 16px 0 0;
+  font-size: 13px;
+  opacity: 0.6;
+  line-height: 1.4;
+}
+.wchoices {
+  display: grid;
+  gap: 12px;
+}
+.wopt {
+  font: inherit;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 2px solid rgba(127, 127, 127, 0.35);
+  background: rgba(127, 127, 127, 0.1);
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.wopt .wt {
+  font-size: 20px;
+  font-weight: 800;
+}
+.wopt .wt small {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.7;
+}
+.wopt .wd {
+  font-size: 14px;
+  line-height: 1.35;
+  opacity: 0.8;
+}
+.wopt.on {
+  border-color: var(--accent, #2b4fb3);
+}
+#welcome .wopt:active,
+#regionDlg .wopt:active {
+  transform: scale(0.99);
+}
+#regionDlg {
+  border: 0;
+  border-radius: 16px;
+  padding: 16px;
+  width: min(440px, calc(100vw - 32px));
+  color: var(--ink);
+}
+#regionDlg::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+#regionDlg h2 {
+  margin: 0 0 12px;
+}
+#regionDlg .primary {
+  margin-top: 12px;
+  width: 100%;
+}
+#regionBtn {
+  font-size: 12px;
+}
+.seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: rgba(127, 127, 127, 0.15);
+  border-radius: 12px;
+  padding: 3px;
+  gap: 3px;
+}
+.seg button {
+  font: inherit;
+  font-weight: 700;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.seg button.on {
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+#settings details.sect {
+  border-bottom: 1px solid #eaecf0;
+}
+#settings details.sect > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 12px 0;
+  font-weight: 700;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+#settings details.sect > summary::-webkit-details-marker {
+  display: none;
+}
+#settings details.sect > summary::after {
+  content: '▾';
+  opacity: 0.5;
+}
+#settings details.sect[open] > summary::after {
+  content: '▴';
+}
+#settings details.sect > :last-child {
+  margin-bottom: 8px;
+}
+#settings #closeSettings {
+  margin-top: 14px;
+  width: 100%;
+}
+
+
+/* ---- Practice picker ---------------------------------------------------------- */
+.prow .typebtn {
+  font: inherit;
+  font-size: 14px;
+  width: 100%;
+  min-width: 0;
+  padding: 7px 8px;
+  border-radius: 8px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--panel-ink);
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.prow .typebtn .caret {
+  flex: none;
+  opacity: 0.6;
+}
+body.ink .prow .typebtn {
+  background: rgba(31, 27, 22, 0.06);
+}
+#pickDlg {
+  border: 0;
+  border-radius: 16px;
+  padding: 16px;
+  width: min(480px, calc(100vw - 24px));
+  max-height: calc(100vh - 48px);
+  color: var(--ink);
+}
+#pickDlg::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+#pickDlg h2 {
+  margin: 0 0 6px;
+}
+#pickDlg .pname {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  opacity: 0.55;
+  margin: 14px 0 6px;
+}
+#pickDlg .pcards {
+  display: grid;
+  gap: 8px;
+}
+#pickDlg .pcards.compact {
+  grid-template-columns: 1fr 1fr;
+}
+.pcard {
+  font: inherit;
+  text-align: left;
+  display: grid;
+  gap: 2px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background: rgba(127, 127, 127, 0.12);
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.pcard .pt {
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.25;
+}
+.pcard .pd {
+  font-size: 13px;
+  opacity: 0.7;
+  line-height: 1.3;
+}
+.pcard.on {
+  border-color: var(--accent, #2b4fb3);
+}
+.pcards.compact .pcard {
+  padding: 10px;
+}
+.precent {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.pchip {
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(127, 127, 127, 0.4);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+#pickDlg #pickClose {
+  margin-top: 16px;
+  width: 100%;
+}
+
+/* ---- drive-game panel: fewer buttons, the rest behind ⋯ ----------------------- */
+.ggmore {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.ggmore button {
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(31, 27, 22, 0.2);
+  background: transparent;
+  color: inherit;
+}
+.ggmoreopts {
+  grid-column: 1 / -1;
+}
+.ggmoreopts summary {
+  cursor: pointer;
+  padding: 6px 0;
+  font-weight: 600;
+  font-size: 14px;
+}
+.ggmoreopts label {
+  display: block;
+  padding: 4px 0;
+}
+#ggMore {
+  min-width: 44px;
 }

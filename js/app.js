@@ -9,7 +9,7 @@ import { notes, migrateRoadKeys } from './notes.js';
 import { LABEL_EXPR } from './roadlabel.js';
 import { buildStyle, MUNI_LABEL_IDS, PLACE_LAYER_IDS } from './style.js';
 import { THEMES } from './theme.js';
-import { activeRegion, switchRegion, ALL_REGIONS } from './region.js';
+import { activeRegion, switchRegion, ALL_REGIONS, needsRegionChoice, setRegion, REGION_BLURB } from './region.js';
 import { initAnchors } from './anchors.js';
 import { initDropIn } from './dropin.js';
 import { initGridGame } from './gridgame.js';
@@ -39,9 +39,40 @@ const DEFAULT_SETTINGS = {
   phoneCompass: true,
 };
 
+/** One big button per map: the first-run chooser and the switcher use the same cards. */
+function regionCards(into, current, onPick) {
+  into.innerHTML = Object.entries(REGION_BLURB)
+    .map(
+      ([id, r]) =>
+        `<button class="wopt${id === current ? ' on' : ''}" data-region="${id}"><span class="wt">${r.name}${id === current ? ' <small>· current</small>' : ''}</span><span class="wd">${r.line}</span></button>`
+    )
+    .join('');
+  for (const b of into.querySelectorAll('.wopt')) b.addEventListener('click', () => onPick(b.dataset.region));
+}
+
+/** First launch: pick a map before anything else shows. */
+function askRegion() {
+  return new Promise((resolve) => {
+    const w = document.getElementById('welcome');
+    w.hidden = false;
+    document.body.classList.add('welcoming');
+    regionCards(document.getElementById('welcomeChoices'), null, (id) => {
+      setRegion(id);
+      w.hidden = true;
+      document.body.classList.remove('welcoming');
+      resolve();
+    });
+  });
+}
+
 async function main() {
+  if (needsRegionChoice()) await askRegion();
   const region = activeRegion();
   document.body.dataset.region = region.id;
+  document.title = `${REGION_BLURB[region.id]?.tag === 'NJ' ? 'NJ' : 'Manhattan'} Townfinder`;
+  const tag = REGION_BLURB[region.id]?.tag || region.id;
+  document.getElementById('regionBtnLabel').textContent = tag;
+  document.getElementById('map').setAttribute('aria-label', `Map of ${REGION_BLURB[region.id]?.name || region.name}`);
   const [topo, sectionsByKey] = await Promise.all([
     fetch(region.data).then((r) => r.json()),
     region.sections
@@ -598,9 +629,21 @@ async function main() {
     dlg.close();
     ctx.anchors.startPick(n);
   });
-  $('#regionSel').addEventListener('change', (e) => switchRegion(e.target.value));
+  const markRegion = () => {
+    for (const b of document.querySelectorAll('#regionSeg button')) b.classList.toggle('on', b.dataset.region === region.id);
+  };
+  for (const b of document.querySelectorAll('#regionSeg button'))
+    b.addEventListener('click', () => b.dataset.region !== region.id && switchRegion(b.dataset.region));
+  // the tab-bar button: switch maps from anywhere
+  const regionDlg = $('#regionDlg');
+  $('#regionBtn').addEventListener('click', () => {
+    regionCards($('#regionChoices'), region.id, (id) => (id === region.id ? regionDlg.close() : switchRegion(id)));
+    regionDlg.showModal();
+  });
+  $('#closeRegion').addEventListener('click', () => regionDlg.close());
+  regionDlg.addEventListener('click', (e) => e.target === regionDlg && regionDlg.close());
   $('#settingsBtn').addEventListener('click', () => {
-    $('#regionSel').value = region.id;
+    markRegion();
     renderAnchors();
     for (const el of dlg.querySelectorAll('[data-setting]')) {
       const k = el.dataset.setting;

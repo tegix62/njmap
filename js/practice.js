@@ -34,6 +34,24 @@ const TYPES = {
   frames: '🧭 Left, right & compass',
   trip: 'My last drive',
 };
+// What each kind is, in a line, for the picker (the ones worth explaining)
+const DESC = {
+  today: 'A short set picked for you today. The best place to start.',
+  mix: 'A bit of everything.',
+  rapid: 'Timed one-tap rounds, three lives.',
+  dropin: 'Drop each town into its county.',
+  gridmid: 'Drive Midtown: avenues, numbered streets and the real one-ways.',
+  gridgame: 'Drive Downtown: the tangle below 14th St, tunnels and bridges in.',
+  gridclassic: 'The original: a straightened grid, 14th to 110th St.',
+  frames: 'Left, right and compass: face every direction.',
+  trip: 'Quiz yourself on your last drive.',
+};
+// How the kinds group in the picker (anything not listed lands in Quizzes)
+const GROUPS = [
+  ['Start here', ['today', 'mix']],
+  ['Games', ['rapid', 'dropin']],
+  ['Driving practice', ['gridmid', 'gridgame', 'gridclassic', 'frames']],
+];
 // How long the map takes to turn and move to the next question
 const QUESTION_MOVE_MS = 1200;
 // One-tap kinds that work against a clock
@@ -792,38 +810,80 @@ export function initPractice(ctx) {
       const t = todayState();
       const dots = t.items.map((_, k) => `<span class="${k < t.i ? 'd done' : k === t.i && !t.done ? 'd now' : 'd'}"></span>`).join('');
       return `<div class="prow">
-        <select id="qType" aria-label="Question type">${opts(Object.fromEntries(allowed.map((k) => [k, TYPES[k]])))}</select>
+        ${typeBtn()}
         <select id="qArea" aria-label="Area">${area}</select>
       </div><div class="score todaybar"><span class="dots">${dots}</span>${streak() ? `<span>🔥 ${streak()} day${streak() === 1 ? '' : 's'}</span>` : ''}</div>`;
     }
     if (cfg.type === 'gridgame' || cfg.type === 'gridmid' || cfg.type === 'gridclassic' || cfg.type === 'frames')
       // these have no use for the neighborhood/town list
       return `<div class="prow">
-        <select id="qType" aria-label="Question type">${opts(Object.fromEntries(allowed.map((k) => [k, TYPES[k]])))}</select>
+        ${typeBtn()}
       </div><div class="score"></div>`;
     if ((cfg.type === 'rapid' && !rapid.on) || cfg.type === 'dropin')
       return `<div class="prow">
-        <select id="qType" aria-label="Question type">${opts(Object.fromEntries(allowed.map((k) => [k, TYPES[k]])))}</select>
+        ${typeBtn()}
         <select id="qArea" aria-label="Area">${area}</select>
       </div><div class="score"></div>`;
     if (cfg.type === 'rapid' && rapid.on)
       return `<div class="prow">
-        <select id="qType" aria-label="Question type">${opts(Object.fromEntries(allowed.map((k) => [k, TYPES[k]])))}</select>
+        ${typeBtn()}
         <select id="qArea" aria-label="Area">${area}</select>
       </div><div class="score"><span class="lives">${'♥'.repeat(Math.max(0, rapid.lives))}${'♡'.repeat(Math.max(0, 3 - rapid.lives))}</span> · ${rapid.score} right · round ${rapid.round}</div>`;
     return `<div class="prow">
-        <select id="qType" aria-label="Question type">${opts(Object.fromEntries(allowed.map((k) => [k, TYPES[k]])))}</select>
+        ${typeBtn()}
         <select id="qArea" aria-label="Area">${area}</select>
       </div>
       <div class="score">${due ? `<span class="due">${due} due for review</span> · ` : ''}${score.right}/${score.total}${score.total ? ` · ${pct}%` : ''}${score.streak > 1 ? ` · streak ${score.streak}` : ''}</div>`;
   }
 
+  /** The button that shows what you're practicing and opens the picker. */
+  function typeBtn() {
+    return `<button id="qType" class="typebtn" aria-haspopup="dialog" aria-label="Choose what to practice">${esc(TYPES[cfg.type] || cfg.type)} <span class="caret">▾</span></button>`;
+  }
+  function chooseType(t) {
+    if (!allowed.includes(t)) return;
+    const recent = [cfg.type, ...store.get('practice.recent', [])].filter((x, i, a) => x && a.indexOf(x) === i && x !== t);
+    store.set('practice.recent', recent.slice(0, 4));
+    cfg.type = t;
+    store.set(CFG_KEY, cfg);
+    next();
+  }
+  /** A grouped list of everything there is to practice, with a line on each. */
+  function openPicker() {
+    let dlg = document.getElementById('pickDlg');
+    if (!dlg) {
+      dlg = document.createElement('dialog');
+      dlg.id = 'pickDlg';
+      document.body.appendChild(dlg);
+      dlg.addEventListener('click', (e) => e.target === dlg && dlg.close());
+    }
+    const card = (k) =>
+      `<button class="pcard${k === cfg.type ? ' on' : ''}" data-type="${k}"><span class="pt">${esc(TYPES[k])}</span>${DESC[k] ? `<span class="pd">${esc(DESC[k])}</span>` : ''}</button>`;
+    const used = new Set(GROUPS.flatMap(([, ks]) => ks));
+    const groups = GROUPS.map(([name, ks]) => [name, ks.filter((k) => allowed.includes(k))]);
+    groups.push(['Quizzes', allowed.filter((k) => !used.has(k))]);
+    const recent = store.get('practice.recent', []).filter((k) => allowed.includes(k) && k !== cfg.type).slice(0, 3);
+    dlg.innerHTML = `<h2>Practice</h2>
+      ${recent.length ? `<div class="pgroup"><div class="pname">Recently</div><div class="precent">${recent.map((k) => `<button class="pchip" data-type="${k}">${esc(TYPES[k])}</button>`).join('')}</div></div>` : ''}
+      ${groups
+        .filter(([, ks]) => ks.length)
+        .map(
+          ([name, ks]) =>
+            `<div class="pgroup"><div class="pname">${name}</div><div class="pcards${name === 'Quizzes' ? ' compact' : ''}">${ks.map(card).join('')}</div></div>`
+        )
+        .join('')}
+      <button class="primary" id="pickClose">Close</button>`;
+    for (const b of dlg.querySelectorAll('[data-type]'))
+      b.addEventListener('click', () => {
+        dlg.close();
+        chooseType(b.dataset.type);
+      });
+    dlg.querySelector('#pickClose').addEventListener('click', () => dlg.close());
+    dlg.showModal();
+    dlg.querySelector('.pcard.on')?.scrollIntoView({ block: 'center' });
+  }
   function bindHeader() {
-    document.getElementById('qType').addEventListener('change', (e) => {
-      cfg.type = e.target.value;
-      store.set(CFG_KEY, cfg);
-      next();
-    });
+    document.getElementById('qType').addEventListener('click', openPicker);
     document.getElementById('qArea')?.addEventListener('change', (e) => {
       cfg.area = e.target.value;
       store.set(CFG_KEY, cfg);

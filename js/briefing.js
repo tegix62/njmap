@@ -64,7 +64,7 @@ export function briefingHTML({ you, to, guess }) {
       guess
         ? `<div class="bres ${guess.ok ? 'ok' : 'no'}">${guess.ok ? '✓' : '✗'} It's ${guess.said}</div>
            <button class="primary" id="ggGo">Go ▶</button>`
-        : `<div class="bq">Which way is it from here?</div>${pad}<button class="linkish" id="ggGo">Go without guessing</button>`
+        : `<div class="bq">Which way is it?</div>${pad}<button class="linkish" id="ggGo">Go without guessing</button>`
     }
   </div>`;
 }

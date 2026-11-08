@@ -56,6 +56,13 @@ The screen is built in two layers. The first is what you can take in at a glance
 - **Your notes**: add a note to any town or road, e.g. *"Use 23 instead of 287 at rush hour"*. Notes show up in Explore, and Drive reads a road's note aloud the first time you drive it. They stay on your phone; Settings can export and import them as a file.
 - **On the map**: river and lake names, and 31 landmarks (stadiums, malls, train stations, parks, colleges).
 
+## Getting around the app
+
+- **First launch:** before anything else you pick **New Jersey** or **New York City** (remembered). The tab bar's **⇄ NJ / NYC** button switches maps from any screen, and Settings has the same switch at the top. The page title follows the map.
+- **Practice** shows what you're practicing on one button; tapping it opens a grouped picker (*Start here*, *Games*, *Driving practice*, *Quizzes*) with a line on each, and your recent picks on top.
+- **Settings** keeps the three everyday switches (speak when I cross into a new town, north-up, remember where I've been) in view and folds the rest into *More voice*, *More driving*, *My places*, *Look & map* and *Data & privacy*.
+- **Drive games** show Pause, Hold and (when needed) Hint or Peek; **⋯** holds *Something's off* and *Options*, and the less-used options sit under *More options*.
+
 ## Manhattan mode
 
 - **Directions the way New Yorkers give them.** The street grid is turned about 29° clockwise from true north. Drive says *"Heading UPTOWN (NNE) · left West Side · right East Side"*, and announcements say "heading uptown".

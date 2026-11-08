@@ -16,7 +16,22 @@
     <link rel="stylesheet" href="css/app.css" />
   </head>
   <body data-mode="drive">
-    <div id="map" aria-label="Map of New Jersey municipalities"></div>
+    <div id="map" aria-label="Map"></div>
+
+    <div id="welcome" hidden>
+      <div class="wcard">
+        <h1>Townfinder</h1>
+        <p class="wsub">Know where you are, which way you’re heading, and learn the map. Where do you drive?</p>
+        <div class="wchoices" id="welcomeChoices"></div>
+        <p class="wfine">You can switch any time with the button at the bottom of the screen. Everything stays on this phone.</p>
+      </div>
+    </div>
+
+    <dialog id="regionDlg">
+      <h2>Switch map</h2>
+      <div class="wchoices" id="regionChoices"></div>
+      <button class="primary" id="closeRegion">Cancel</button>
+    </dialog>
 
     <div id="edges" aria-hidden="true">
       <svg id="northline" hidden><line /></svg>
@@ -51,73 +66,94 @@
       <button role="tab" data-mode="drive"><span class="ti">◉</span>Drive</button>
       <button role="tab" data-mode="explore"><span class="ti">⌕</span>Explore</button>
       <button role="tab" data-mode="practice"><span class="ti">✎</span>Practice</button>
+      <button id="regionBtn" aria-label="Switch between New Jersey and New York City"><span class="ti">⇄</span><span id="regionBtnLabel">NJ</span></button>
       <button id="settingsBtn" aria-label="Settings"><span class="ti">⚙</span>Settings</button>
     </nav>
 
     <dialog id="settings">
       <h2>Settings</h2>
-      <label class="row regionrow">Map
-        <select id="regionSel" aria-label="Region">
-          <option value="nj">New Jersey (towns)</option>
-          <option value="manhattan">Manhattan (neighborhoods)</option>
-        </select>
-      </label>
+      <div class="regionrow" role="group" aria-label="Map">
+        <div class="seg" id="regionSeg">
+          <button data-region="nj">New Jersey</button>
+          <button data-region="manhattan">New York City</button>
+        </div>
+      </div>
       <label class="row"><input type="checkbox" data-setting="voice" /> Speak when I cross into a new town</label>
-      <label class="row sub"><input type="checkbox" data-setting="voiceGuess" /> …but ask me first (“New town. Which one?”), pause, then say it</label>
-      <label class="row sub"><input type="checkbox" data-setting="voiceHints" /> …and name its sound-alike (“Not Rockaway — that's 19 miles west-northwest”)</label>
-      <label class="row"><input type="checkbox" data-setting="driveQuiz" /> Quiz me while I drive: a spoken question every few minutes ("Paterson: left, right, ahead or behind?"), a pause, then the answer. Nothing to tap.</label>
-      <label class="row sub">How often
-        <select data-setting="driveQuizMin">
-          <option value="2">every 2 min</option>
-          <option value="4">every 4 min</option>
-          <option value="7">every 7 min</option>
-          <option value="12">every 12 min</option>
-        </select>
-      </label>
       <label class="row"><input type="checkbox" data-setting="northUp" /> North-up map while driving (off = map turns with you)</label>
-      <label class="row"><input type="checkbox" data-setting="northLine" /> Line from you to north (the N on the map edge)</label>
-      <label class="row"><input type="checkbox" data-setting="driveInset" /> Overview circle: your town and its neighbors, zoomed out</label>
-      <label class="row"><input type="checkbox" data-setting="sayCardinal" /> Say “Heading north” when I settle onto north, east, south or west</label>
-      <label class="row"><input type="checkbox" data-setting="driveLabels" /> Show town names on the map while driving</label>
-      <label class="row"><input type="checkbox" data-setting="wakeLock" /> Keep screen on while tracking</label>
-      <label class="row"><input type="checkbox" data-setting="phoneCompass" /> Use phone compass for heading when stopped</label>
-      <label class="row"><input type="checkbox" data-setting="rememberPlaces" /> Remember where I've been (towns and drive routes, on this phone only). Off: nothing about your location is saved.</label>
-      <h3>My places</h3>
-      <p class="fine">Home, work, family… Towns are described relative to the nearest one, and Practice asks you to point from them.</p>
-      <div id="anchorList"></div>
-      <div class="anchoradd">
-        <input id="anchorName" type="text" placeholder="Name, e.g. Home" maxlength="24" autocomplete="off" />
-        <button id="anchorHere">Use my location</button>
-        <button id="anchorPick">Tap on map</button>
-      </div>
-      <h3>Map &amp; voice</h3>
-      <label class="row">Look
-        <select data-setting="mapStyle">
-          <option value="ink">Ink: paper and ink; places darken as you learn them</option>
-          <option value="classic">Classic: soft county colors</option>
-        </select>
-      </label>
-      <label class="row">Background map
-        <select data-setting="basemap">
-          <option value="streets">Streets + road numbers</option>
-          <option value="light">Highways + water only</option>
-          <option value="none">None (works offline)</option>
-        </select>
-      </label>
-      <div class="btnrow">
-        <button id="stopTracking">Stop location</button>
-        <button id="resetStats">Clear practice scores</button>
-        <button id="resetVisited">Forget where I've been</button>
-      </div>
-      <div class="btnrow">
-        <button id="exportNotes">Export my notes</button>
-        <label class="filebtn">Import notes<input type="file" id="importNotes" accept="application/json,.json" hidden /></label>
-      </div>
-      <p class="fine">
-        Town boundaries: NJ Office of GIS, Municipal Boundaries of NJ (564 municipalities). Background map © OpenStreetMap
-        contributors, served by OpenFreeMap (OpenMapTiles schema). Your location, scores and notes are stored only on this
-        device; export your notes to move them to another phone.
-      </p>
+      <label class="row"><input type="checkbox" data-setting="rememberPlaces" /> Remember where I’ve been (on this phone only)</label>
+
+      <details class="sect">
+        <summary>More voice</summary>
+        <label class="row sub"><input type="checkbox" data-setting="voiceGuess" /> …but ask me first (“New town. Which one?”), pause, then say it</label>
+        <label class="row sub"><input type="checkbox" data-setting="voiceHints" /> …and name its sound-alike (“Not Rockaway — that's 19 miles west-northwest”)</label>
+        <label class="row"><input type="checkbox" data-setting="driveQuiz" /> Quiz me while I drive: a spoken question every few minutes ("Paterson: left, right, ahead or behind?"), a pause, then the answer. Nothing to tap.</label>
+        <label class="row sub">How often
+          <select data-setting="driveQuizMin">
+            <option value="2">every 2 min</option>
+            <option value="4">every 4 min</option>
+            <option value="7">every 7 min</option>
+            <option value="12">every 12 min</option>
+          </select>
+        </label>
+      </details>
+
+      <details class="sect">
+        <summary>More driving</summary>
+        <label class="row"><input type="checkbox" data-setting="northLine" /> Line from you to north (the N on the map edge)</label>
+        <label class="row"><input type="checkbox" data-setting="driveInset" /> Overview circle: your town and its neighbors, zoomed out</label>
+        <label class="row"><input type="checkbox" data-setting="sayCardinal" /> Say “Heading north” when I settle onto north, east, south or west</label>
+        <label class="row"><input type="checkbox" data-setting="driveLabels" /> Show town names on the map while driving</label>
+        <label class="row"><input type="checkbox" data-setting="wakeLock" /> Keep screen on while tracking</label>
+        <label class="row"><input type="checkbox" data-setting="phoneCompass" /> Use phone compass for heading when stopped</label>
+      </details>
+
+      <details class="sect">
+        <summary>My places</summary>
+        <p class="fine">Home, work, family… Towns are described relative to the nearest one, and Practice asks you to point from them.</p>
+        <div id="anchorList"></div>
+        <div class="anchoradd">
+          <input id="anchorName" type="text" placeholder="Name, e.g. Home" maxlength="24" autocomplete="off" />
+          <button id="anchorHere">Use my location</button>
+          <button id="anchorPick">Tap on map</button>
+        </div>
+      </details>
+
+      <details class="sect">
+        <summary>Look &amp; map</summary>
+        <label class="row">Look
+          <select data-setting="mapStyle">
+            <option value="ink">Ink: paper and ink; places darken as you learn them</option>
+            <option value="classic">Classic: soft county colors</option>
+          </select>
+        </label>
+        <label class="row">Background map
+          <select data-setting="basemap">
+            <option value="streets">Streets + road numbers</option>
+            <option value="light">Highways + water only</option>
+            <option value="none">None (works offline)</option>
+          </select>
+        </label>
+      </details>
+
+      <details class="sect">
+        <summary>Data &amp; privacy</summary>
+        <p class="fine">With “Remember where I’ve been” off, nothing about your location is saved. Your location, scores and notes are stored only on this device.</p>
+        <div class="btnrow">
+          <button id="stopTracking">Stop location</button>
+          <button id="resetStats">Clear practice scores</button>
+          <button id="resetVisited">Forget where I've been</button>
+        </div>
+        <div class="btnrow">
+          <button id="exportNotes">Export my notes</button>
+          <label class="filebtn">Import notes<input type="file" id="importNotes" accept="application/json,.json" hidden /></label>
+        </div>
+        <p class="fine">
+          Town boundaries: NJ Office of GIS, Municipal Boundaries of NJ (564 municipalities). Manhattan neighborhoods and streets:
+          NYC Open Data. Background map © OpenStreetMap contributors, served by OpenFreeMap (OpenMapTiles schema). Export your
+          notes to move them to another phone.
+        </p>
+      </details>
+
       <button class="primary" id="closeSettings">Done</button>
     </dialog>
 
