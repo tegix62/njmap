@@ -665,7 +665,7 @@ export function initGridGame(ctx) {
       startCard: true, // the briefing: up until you tap Go
       guess: null, peeks: 0, peekUntil: 0,
       route: routeOf(r), kind: forced ? 'replay' : r.kind || 'random', mistake: r.mistake || null,
-      path: [], newBlocks: 0,
+      path: [], newBlocks: 0, hints: 0, goAt: 0,
     };
     g.targetHood = hood(G.nodes[r.target.node]);
     const tp = G.nodes[r.target.node];
@@ -901,6 +901,10 @@ export function initGridGame(ctx) {
       g.peekUntil = 0;
       render();
     }
+    if (!g.hintShown && hintReady()) {
+      g.hintShown = true;
+      render();
+    }
     if (!g.paused && !g.done && !g.waiting && g.view !== 'intro' && !g.check && !g.startCard && now >= g.resumeAt) {
       g.s += dt * updateSpeed();
       let guard = 0;
@@ -1065,6 +1069,7 @@ export function initGridGame(ctx) {
     if (!g.startCard) return;
     g.startCard = false;
     g.resumeAt = 0;
+    g.goAt = performance.now();
     const tp = G.nodes[g.target.node];
     setData('gg-target', point(tp, { name: g.target.name || g.target.label }));
     if (prefs.mapFirst && ctx.dur(1)) {
@@ -1095,6 +1100,26 @@ export function initGridGame(ctx) {
   }
   const showGuide = () => prefs.guide === 'arrow' || performance.now() < g.peekUntil;
   const showWords = () => prefs.guide !== 'off' || performance.now() < g.peekUntil;
+  /** Stuck? The next roads on the shortest way from here, in words ("Ave A downtown → E Houston St west → 🏁"). */
+  function showHint() {
+    if (!g || g.done || g.startCard) return;
+    const r = shortest(g.e, g.target.node, g.waiting ? g.e.len : g.s);
+    if (!r) return;
+    g.hints++;
+    const legs = [];
+    for (const e of r.path) {
+      const nm = short(e.name);
+      if (legs.length && legs[legs.length - 1].nm === nm) continue;
+      if (G.RAMP.test(e.name)) continue;
+      legs.push({ nm, dir: headWord(e.name, e.b0) });
+    }
+    const steps = legs.slice(0, 3).map((l) => `${l.nm} ${l.dir}`);
+    say(`💡 ${steps.join(' → ')}${legs.length <= 3 ? ' → 🏁' : ' → …'}`);
+    g.msgAt = performance.now() + 6000; // keep it up a while
+    render();
+  }
+  /** Show the Hint button once you've been at it a while, or gone well past the shortest way. */
+  const hintReady = () => g && !g.done && !g.startCard && (performance.now() - g.goAt > 45000 || g.driven > g.best.cost * 1.3 + 200);
   function peek() {
     if (!g || g.done || g.startCard) return;
     g.peeks++;
@@ -1320,7 +1345,7 @@ export function initGridGame(ctx) {
     // stars: there; the shortest way with no wrong-way tries; and that, without peeking or an
     // arrow, having guessed the way at the start
     const shortestWay = ratio <= 1.03 && !g.wrong;
-    const stars = 1 + (shortestWay ? 1 : 0) + (shortestWay && !g.peeks && prefs.guide !== 'arrow' && g.guess && g.guess.ok ? 1 : 0);
+    const stars = 1 + (shortestWay ? 1 : 0) + (shortestWay && !g.peeks && !g.hints && prefs.guide !== 'arrow' && g.guess && g.guess.ok ? 1 : 0);
     const key = routeKey(g.route);
     const bests = mem.get('best', {});
     const before = bests[key] || 0;
@@ -1358,7 +1383,7 @@ export function initGridGame(ctx) {
       g.wrong ? ` · ${g.wrong} wrong-way` : ''
     }${g.checks ? ` · check-ins ${g.checksRight}/${g.checks}` : ''}${
       g.guess ? ` · start guess ${g.guess.ok ? '✓' : '✗'}` : ''
-    }${g.peeks ? ` · ${g.peeks} peek${g.peeks === 1 ? '' : 's'}` : ''}</div>
+    }${g.peeks ? ` · ${g.peeks} peek${g.peeks === 1 ? '' : 's'}` : ''}${g.hints ? ` · ${g.hints} hint${g.hints === 1 ? '' : 's'}` : ''}</div>
       ${fixed ? `<div class="hint">✓ ${esc(g.mistake.corner)}: got it this time</div>` : ''}
       ${missed ? `<div class="hint">↺ ${esc(missed)} (it'll come back)</div>` : ''}
       <div class="hint"><span class="gg-key you"></span> you <span class="gg-key best"></span> best: ${esc(describe(g.best.path))}</div>
@@ -1479,6 +1504,7 @@ export function initGridGame(ctx) {
           ${g.done || g.startCard ? '' : `<button id="ggPause">${g.paused ? '▶ Go' : '⏸ Pause'}</button>`}
           ${!g.done && !g.startCard ? `<button id="ggFast">⏩ Hold: faster</button>` : ''}
           ${!g.done && !g.startCard && prefs.guide === 'off' ? `<button id="ggPeek">👁 Peek</button>` : ''}
+          ${hintReady() ? `<button id="ggHint">💡 Hint</button>` : ''}
           <button id="ggOptsBtn" aria-expanded="${!!prefs.optsOpen}">Options ${prefs.optsOpen ? '▴' : '▾'}</button>
         </div>
         <div class="ggopts"${prefs.optsOpen ? '' : ' hidden'}>
@@ -1502,6 +1528,7 @@ export function initGridGame(ctx) {
     for (const b of document.querySelectorAll('.ggpick:not(.ggname)')) onTap(b, () => pickLink(+b.dataset.link));
     document.getElementById('ggPause')?.addEventListener('click', togglePause);
     document.getElementById('ggPeek')?.addEventListener('click', peek);
+    document.getElementById('ggHint')?.addEventListener('click', showHint);
     for (const b of document.querySelectorAll('.ggchip')) onTap(b, () => goToNode(+b.dataset.node));
     for (const b of document.querySelectorAll('.ggname')) onTap(b, () => answerName(b.dataset.name));
     const fast = document.getElementById('ggFast');
