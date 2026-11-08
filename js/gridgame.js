@@ -697,6 +697,11 @@ export function initGridGame(ctx, areaId = 'downtown') {
     showLabels(prefs.labels);
     showCover();
     carMk.setLngLat(g.trail[0]).addTo(map);
+    g.log = {
+      t0: performance.now(), at: new Date().toISOString(), area: areaId, data: G.dataKey, pace: prefs.pace, guide: prefs.guide,
+      labels: prefs.labels, kind: g.kind, route: g.route, target: g.target.name || g.target.label, best: Math.round(g.best.cost), ev: [],
+    };
+    logEv('start', g.e.id, Math.round(g.s));
     enterEdge(g.e);
     g.msg = '';
     render();
@@ -707,6 +712,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
 
   function stop() {
     if (!g) return;
+    keepLog();
     cancelAnimationFrame(g.raf);
     window.removeEventListener('keydown', onKey);
     g = null;
@@ -1033,6 +1039,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   }
   /** Onto link nx. carryOn: straight on with no input (the cruise builds); otherwise it resets. */
   function go(nx, carryOn = false) {
+    logEv('go', nx.id, carryOn ? 'on' : 'turn');
     g.cruise = carryOn ? g.cruise + 1 : 0;
     g.e = legOf(g.e.pts[g.e.pts.length - 1], nx);
     g.s = 0;
@@ -1057,8 +1064,145 @@ export function initGridGame(ctx, areaId = 'downtown') {
   function say(msg) {
     g.msg = msg;
     g.msgAt = performance.now();
+    logEv('msg', msg);
+  }
+  // ---- reports: something's off / the round's log, to GitHub or the clipboard ------------------
+  const REPO = 'tegix62/njmap';
+  /** Where you are and what the corner ahead allows, right now. */
+  function snapshot() {
+    const c = choices(g.e);
+    const nm = (o) => (o ? `${short(o.name)} #${o.id}` : '-');
+    const nt = nextTurnCorner();
+    return {
+      link: g.e.id, on: g.e.name, s: Math.round(g.s), len: Math.round(g.e.len), corner: G.label(g.e.to), waiting: g.waiting,
+      left: nm(c.left), straight: nm(c.straight), right: nm(c.right), named: c.named ? c.options.map(nm) : null, only: nm(c.only),
+      queued: g.queued, pick: g.pick ? nm(g.pick) : null, next: nt ? `${nt.name} (${G.label(nt.via.to)})` : null, msg: g.msg || null,
+      where: (hood(g.pos || g.trail[0]) || '').replace(/ \(.*\)$/, ''),
+    };
+  }
+  /** The log in words, a line per event (needs this area's street data). */
+  function readable(log) {
+    if (log.area !== areaId || log.data !== G.dataKey) return [];
+    const L = (id) => (G.edges[id] ? short(G.edges[id].name) : `#${id}`);
+    return log.ev.map(([t, what, a, b, c, d]) => {
+      const tt = `${t.toFixed(1)}s`;
+      if (what === 'start') return `${tt} start on ${L(a)}`;
+      if (what === 'drive') return `${tt} Go`;
+      if (what === 'go') return `${tt} → ${L(a)}${b === 'turn' ? ' (turn)' : ''}`;
+      if (what === 'press') return `${tt} pressed ${{ L: '◀ Left', R: 'Right ▶', S: '▲ Straight' }[a] || a} (${d}, on ${L(b)} ${c} m in)`;
+      if (what === 'pick') return `${tt} tapped ${L(a)}`;
+      if (what === 'zip') return `${tt} Go-to ${G.label(a)}`;
+      if (what === 'stop') return `${tt} stopped at ${G.edges[a] ? G.label(G.edges[a].to) : a}`;
+      if (what === 'msg') return `${tt} “${a}”`;
+      if (what === 'hint') return `${tt} hint`;
+      if (what === 'done') return `${tt} done: ${a} m (shortest ${b})${c ? `, ${c} wrong-way` : ''}`;
+      return `${tt} ${[what, a, b, c, d].filter((x) => x != null).join(' ')}`;
+    });
+  }
+  /** The report: a short summary, the timeline in words, and the raw log to replay. */
+  function reportText(kind, log, snap, note) {
+    const head = `**${AREA.title} · ${kind === 'off' ? "something's off" : 'round log'}**`;
+    const lines = readable(log);
+    const raw = JSON.stringify({ ...log, kept: undefined, t0: undefined, snap });
+    let body = (tl, rw) =>
+      [
+        head,
+        note ? `> ${note.replace(/\n/g, '\n> ')}` : '',
+        snap ? `At **${snap.corner}** (${snap.where}), on ${snap.on}${snap.waiting ? ', stopped' : ''}. Ahead: ◀ ${snap.left} · ▲ ${snap.straight} · ▶ ${snap.right}${snap.named ? ` · named: ${snap.named.join(', ')}` : ''}${snap.only !== '-' ? ` · only: ${snap.only}` : ''}${snap.next ? ` · next corner: ${snap.next}` : ''}${snap.queued ? ` · queued ${snap.queued}` : ''}${snap.msg ? ` · message: “${snap.msg}”` : ''}` : '',
+        `To ${log.target} · ${log.kind} round · pace ${log.pace} · guide ${log.guide}${log.labels ? '' : ' · hard mode'} · ${log.at}`,
+        tl.length ? '```\n' + tl.join('\n') + '\n```' : '',
+        '<details><summary>log (for replay)</summary>\n\n```json\n' + rw + '\n```\n</details>',
+      ]
+        .filter(Boolean)
+        .join('\n\n');
+    // keep it short enough for a GitHub link: the most recent part if it's long
+    let text = body(lines, raw);
+    for (let keep = 120; encodeURIComponent(text).length > 7000 && keep >= 10; keep = Math.floor(keep * 0.6)) {
+      const lg = { ...log, ev: log.ev.slice(-keep), kept: undefined, t0: undefined, snap, trimmed: true };
+      text = body(lines.slice(-Math.min(keep, 40)), JSON.stringify(lg));
+    }
+    return text;
+  }
+  function openReport(kind, log = g.log) {
+    if (!g || !log) return;
+    g.report = { kind, log, snap: kind === 'off' && !g.done ? snapshot() : null, note: '', wasPaused: g.paused };
+    if (!g.done) g.paused = true;
+    logEv('report', kind);
+    render();
+  }
+  function closeReport() {
+    if (!g || !g.report) return;
+    g.paused = g.report.wasPaused;
+    g.report = null;
+    render();
+  }
+  function reportHTML() {
+    const r = g.report;
+    return `<div class="ggreport">
+      <b>${r.kind === 'off' ? '⚑ Something’s off' : '📋 Round log'}</b>
+      <textarea id="ggNote" rows="3" placeholder="What happened? (optional)">${esc(r.note)}</textarea>
+      <div class="ggend">
+        <button class="primary" id="ggSend">Send to GitHub ↗</button>
+        <button id="ggCopy">📋 Copy</button>
+        <button id="ggBack">Back</button>
+      </div>
+      <div class="hint">Send opens a new issue on the app’s GitHub page with this round’s moves filled in (game moves only, no GPS): tap Submit there. Copy puts the same text on your clipboard.</div>
+    </div>`;
+  }
+  async function copyText(text, btn) {
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.textContent = 'Copied ✓';
+    } catch {
+      // no clipboard access: show the text to copy by hand
+      const ta = document.getElementById('ggNote');
+      if (ta) {
+        ta.value = text;
+        ta.select();
+      }
+      btn.textContent = 'Select all, copy';
+    }
+  }
+  function sendIssue(text, title) {
+    const url = `https://github.com/${REPO}/issues/new?labels=drive-log&title=${encodeURIComponent(title)}&body=${encodeURIComponent(text)}`;
+    window.open(url, '_blank', 'noopener');
+  }
+  function bindReport() {
+    const r = g.report;
+    const ta = document.getElementById('ggNote');
+    ta?.addEventListener('input', () => (r.note = ta.value));
+    const title = () => `${AREA.title}: ${r.kind === 'off' ? `something's off${r.snap ? ` at ${r.snap.corner}` : ''}` : `round to ${r.log.target}`}`;
+    document.getElementById('ggSend')?.addEventListener('click', () => sendIssue(reportText(r.kind, r.log, r.snap, r.note), title()));
+    document.getElementById('ggCopy')?.addEventListener('click', (e) => copyText(reportText(r.kind, r.log, r.snap, r.note), e.target));
+    document.getElementById('ggBack')?.addEventListener('click', closeReport);
+  }
+  /** Options: an earlier round's log (the last 10, both games), to send or copy. */
+  function earlierLogs() {
+    const logs = ctx.store.get('driveLogs', []);
+    if (!logs.length) return '';
+    const opts = logs
+      .map((l, i) => ({ l, i }))
+      .reverse()
+      .map(({ l, i }) => `<option value="${i}">${esc(new Date(l.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))} · ${esc(l.area)} · to ${esc(l.target)}</option>`)
+      .join('');
+    return `<div class="ggoldlog"><select id="ggOldSel" aria-label="An earlier round">${opts}</select><button id="ggOldLog">Report it</button></div>`;
+  }
+  /** The last 10 rounds' logs stay on the phone (Options: copy or send an earlier one). */
+  function keepLog() {
+    if (!g || !g.log || g.log.kept || !g.log.ev.length) return;
+    g.log.kept = true;
+    const all = ctx.store.get('driveLogs', []).filter((l) => l.at !== g.log.at);
+    all.push({ ...g.log, kept: undefined, t0: undefined });
+    ctx.store.set('driveLogs', all.slice(-10));
+  }
+  /** One line of the round's log: [seconds since start, what, ...details]. */
+  function logEv(...a) {
+    if (!g || !g.log) return;
+    g.log.ev.push([Math.round((performance.now() - g.log.t0) / 100) / 10, ...a]);
+    if (g.log.ev.length > 400) g.log.ev.shift();
   }
   function stopHere(msg) {
+    logEv('stop', g.e.id);
     g.waiting = true;
     g.cruise = 0;
     g.goTo = null;
@@ -1104,6 +1248,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   /** Leave the briefing and drive: the destination appears (with Map first, a look at both first). */
   function go0() {
     if (!g.startCard) return;
+    logEv('drive');
     g.startCard = false;
     g.resumeAt = 0;
     g.goAt = performance.now();
@@ -1143,6 +1288,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const r = shortest(g.e, g.target.node, g.waiting ? g.e.len : g.s);
     if (!r) return;
     g.hints++;
+    logEv('hint', g.e.id);
     const legs = [];
     for (const e of r.path) {
       const nm = short(e.name);
@@ -1167,6 +1313,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     if (!g || g.done || g.loading) return;
     if (g.check) return side === 'S' || g.check.kind === 'name' ? undefined : answerCheck(side);
     if (g.startCard) return; // the briefing: Go starts the drive
+    logEv('press', side, g.e.id, Math.round(g.s), g.waiting ? 'stopped' : 'moving');
     g.cruise = 0;
     const c = choices(g.e);
     if (side === 'S') {
@@ -1201,6 +1348,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   function pickLink(id) {
     if (!g || g.done || g.loading || g.check || g.startCard) return;
     const o = G.edges[id];
+    logEv('pick', id, g.e.id, Math.round(g.s));
     if (!choices(g.e).options.includes(o)) return;
     g.cruise = 0;
     g.queued = null;
@@ -1304,6 +1452,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   /** Drive straight on to corner `node` (about a second, however far) and stop there. */
   function goToNode(node) {
     if (!g || g.done || g.startCard || g.home) return;
+    logEv('zip', node, g.e.id, Math.round(g.s));
     const cw = choices(g.e);
     const st = g.waiting && !cw.named ? cw.straight : null;
     const chain = g.waiting ? (st ? aheadChain(st) : []) : aheadChain(g.e);
@@ -1362,10 +1511,12 @@ export function initGridGame(ctx, areaId = 'downtown') {
   }
 
   function finish() {
+    logEv('done', Math.round(g.driven), Math.round(g.best.cost), g.wrong);
     g.done = true;
     g.waiting = true;
     offEl.hidden = true;
     showLabels(prefs.labels);
+    keepLog();
     const bestCoords = [];
     g.best.path.forEach((e) => bestCoords.push(...e.pts));
     setData('gg-best', line(bestCoords));
@@ -1430,6 +1581,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
         <button class="primary" id="ggAgain">Another route</button>
         <button id="ggSame">↻ Same route</button>
         <button id="ggSave"${saved ? ' disabled' : ''}>${saved ? '★ Saved' : '☆ Save trip'}</button>
+        <button id="ggLog">📋 Round log</button>
       </div>`;
     render();
   }
@@ -1538,7 +1690,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
         .join('');
     ctx.sheet(
       `${g.opts.header()}<div id="qbody">
-        ${g.done ? g.result : g.startCard ? briefingHTML({ you: briefYou(), to: briefTo(), guess: g.guess }) : g.check && g.check.kind === 'name' ? `<div class="ggctl named">${g.check.options.map((n) => `<button class="ggpick ggname" data-name="${esc(n)}"><span class="nm">${esc(short(n))}</span></button>`).join('')}</div>` : `${chipsRow()}${named ? `<div class="ggctl named">${pickBtns()}</div>` : `<div class="ggctl${canStraight ? ' three' : ''}">${btn('L', '◀ Left')}${canStraight ? btn('S', '▲ Straight') : ''}${btn('R', 'Right ▶')}</div>`}
+        ${g.report ? reportHTML() : g.done ? g.result : g.startCard ? briefingHTML({ you: briefYou(), to: briefTo(), guess: g.guess }) : g.check && g.check.kind === 'name' ? `<div class="ggctl named">${g.check.options.map((n) => `<button class="ggpick ggname" data-name="${esc(n)}"><span class="nm">${esc(short(n))}</span></button>`).join('')}</div>` : `${chipsRow()}${named ? `<div class="ggctl named">${pickBtns()}</div>` : `<div class="ggctl${canStraight ? ' three' : ''}">${btn('L', '◀ Left')}${canStraight ? btn('S', '▲ Straight') : ''}${btn('R', 'Right ▶')}</div>`}
         <div class="ggmsg${g.msg || g.check ? '' : ' muted'}">${
           g.check
             ? `<b>Heading ${WORD[g.check.h]}.</b> ${esc(g.check.thing[0].toUpperCase() + g.check.thing.slice(1))}: left or right?`
@@ -1552,7 +1704,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
         }</div>`}
         <div class="ggbar">
           ${g.done || g.startCard ? '' : `<button id="ggPause">${g.paused ? '▶ Go' : '⏸ Pause'}</button>`}
-          ${!g.done && !g.startCard ? `<button id="ggFast">⏩ Hold: faster</button>` : ''}
+          ${!g.done && !g.startCard && !g.report ? `<button id="ggFast">⏩ Hold: faster</button>` : ''}
+          ${!g.done && !g.startCard && !g.report ? `<button id="ggOff" title="Something's off: send this round's moves">⚑</button>` : ''}
           ${!g.done && !g.startCard && prefs.guide === 'off' ? `<button id="ggPeek">👁 Peek</button>` : ''}
           ${hintReady() ? `<button id="ggHint">💡 Hint</button>` : ''}
           <button id="ggOptsBtn" aria-expanded="${!!prefs.optsOpen}">Options ${prefs.optsOpen ? '▴' : '▾'}</button>
@@ -1566,6 +1719,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
           <label><input type="checkbox" id="ggLabels"${prefs.labels ? ' checked' : ''}/> Street names (off: hard mode)</label>
           <label><input type="checkbox" id="ggCover"${prefs.cover ? ' checked' : ''}/> Show streets I've driven</label>
           <label><input type="checkbox" id="ggTrips"${prefs.trips ? ' checked' : ''}/> Mix in my saved trips</label>
+          ${earlierLogs()}
           <label><input type="checkbox" id="ggMapFirst"${prefs.mapFirst ? ' checked' : ''}/> Map first</label>
           <label><input type="checkbox" id="ggChecks"${prefs.checkins ? ' checked' : ''}/> Check-ins</label>
         </div>
@@ -1579,6 +1733,14 @@ export function initGridGame(ctx, areaId = 'downtown') {
     document.getElementById('ggPause')?.addEventListener('click', togglePause);
     document.getElementById('ggPeek')?.addEventListener('click', peek);
     document.getElementById('ggHint')?.addEventListener('click', showHint);
+    document.getElementById('ggOff')?.addEventListener('click', () => openReport('off'));
+    document.getElementById('ggLog')?.addEventListener('click', () => openReport('log'));
+    document.getElementById('ggOldLog')?.addEventListener('click', () => {
+      const sel = document.getElementById('ggOldSel');
+      const log = ctx.store.get('driveLogs', [])[+sel.value];
+      if (log) openReport('log', log);
+    });
+    if (g.report) bindReport();
     for (const b of document.querySelectorAll('.ggchip')) onTap(b, () => goToNode(+b.dataset.node));
     for (const b of document.querySelectorAll('.ggname')) onTap(b, () => answerName(b.dataset.name));
     const fast = document.getElementById('ggFast');

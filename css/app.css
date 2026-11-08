@@ -2043,3 +2043,29 @@ body.gridding .maplibregl-canvas {
 .gg-where .gg-plan {
   color: #b45309;
 }
+
+/* ---- Drive games: reports ---------------------------------------------------- */
+.ggreport {
+  display: grid;
+  gap: 8px;
+}
+.ggreport textarea {
+  font: inherit;
+  font-size: 15px;
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1.5px solid rgba(31, 27, 22, 0.2);
+  padding: 8px;
+  background: transparent;
+  color: inherit;
+}
+.ggoldlog {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.ggoldlog select {
+  flex: 1;
+  min-width: 0;
+}
