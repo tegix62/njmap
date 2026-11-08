@@ -1,7 +1,8 @@
 // Offline support: the app shell, boundary data, libraries and fonts are
-// cached, so "which town am I in" keeps working with no signal. Background map
+// cached, so "which town am I in" keeps working with no signal. Online, the
+// app's own files come from the network first (the latest version every time). Background map
 // tiles are only cached opportunistically.
-const VERSION = 'njtf-v51';
+const VERSION = 'njtf-v52';
 const SHELL = [
   './',
   'index.html',
@@ -66,16 +67,20 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
 
   if (url.origin === location.origin) {
-    // stale-while-revalidate: instant from cache, refreshed in the background
+    // network first: online you always get the latest version (no "reload twice");
+    // the saved copy is the fallback offline, or when the network is too slow
     e.respondWith(
       caches.open(VERSION).then(async (c) => {
+        const net = fetch(req, { cache: 'no-cache' }).then((r) => {
+          if (r.ok) c.put(req, r.clone());
+          return r;
+        });
+        const slow = new Promise((res) => setTimeout(res, 4000, null));
+        try {
+          const r = await Promise.race([net, slow]);
+          if (r) return r;
+        } catch {}
         const hit = await c.match(req, { ignoreSearch: true });
-        const net = fetch(req)
-          .then((r) => {
-            if (r.ok) c.put(req, r.clone());
-            return r;
-          })
-          .catch(() => hit);
         return hit || net;
       })
     );

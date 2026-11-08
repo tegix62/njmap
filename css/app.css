@@ -2020,3 +2020,19 @@ body.gridding .maplibregl-canvas {
 .ggend button:not(.primary) {
   flex: 1;
 }
+
+.update-btn {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  font: inherit;
+  font-weight: 700;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 0;
+  background: #2b4fb3;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}

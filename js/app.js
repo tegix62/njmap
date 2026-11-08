@@ -664,17 +664,36 @@ async function main() {
   document.body.classList.add('ready');
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
-    // When a new version takes over, reload once so you see it right away
-    // (otherwise the offline copy shows the old version until the next open).
+    // When a new version takes over, reload once so you see it right away. In the
+    // middle of a drive round, offer it instead of yanking the round away.
     if (navigator.serviceWorker.controller) {
       let reloaded = false;
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (reloaded) return;
+        if (document.body.classList.contains('gridding')) {
+          if (document.getElementById('updateBtn')) return;
+          const b = document.createElement('button');
+          b.id = 'updateBtn';
+          b.className = 'update-btn';
+          b.textContent = 'New version · Reload';
+          b.addEventListener('click', () => location.reload());
+          document.body.appendChild(b);
+          return;
+        }
         reloaded = true;
         location.reload();
       });
     }
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker
+      .register('sw.js')
+      .then((reg) => {
+        // a home-screen app on a phone is often resumed, not reopened: look for a
+        // new version whenever it comes back to the front
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') reg.update().catch(() => {});
+        });
+      })
+      .catch(() => {});
   }
 }
 
