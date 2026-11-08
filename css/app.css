@@ -1954,3 +1954,69 @@ body.gridding .maplibregl-canvas {
 .gg-words {
   font-weight: 700;
 }
+
+/* ---- Drive Downtown: cross-street chips, stars, end buttons ------------------ */
+.ggchips {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  overflow-x: auto;
+  padding: 2px 0 8px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.ggchips::-webkit-scrollbar {
+  display: none;
+}
+.ggchips .lbl {
+  flex: none;
+  font-size: 12px;
+  opacity: 0.6;
+}
+.ggchip {
+  flex: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(31, 27, 22, 0.15);
+  background: transparent;
+  color: inherit;
+  touch-action: manipulation;
+  white-space: nowrap;
+}
+.ggchip.on {
+  border-color: #2b4fb3;
+  background: rgba(43, 79, 179, 0.12);
+}
+#ggFast {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+#ggFast.on {
+  background: rgba(43, 79, 179, 0.15);
+}
+.ggstars {
+  font-size: 26px;
+  letter-spacing: 2px;
+  color: #d97706;
+}
+.ggstars .muted {
+  font-size: 13px;
+  letter-spacing: 0;
+}
+.ggend {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.ggend .primary {
+  flex: 1 1 100%;
+}
+.ggend button:not(.primary) {
+  flex: 1;
+}

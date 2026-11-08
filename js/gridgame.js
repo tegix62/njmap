@@ -90,9 +90,19 @@ export function initGridGame(ctx) {
   // working out where the address is is the useful part).
   // from: 'both' (half the rounds start at a tunnel or bridge), 'entries', 'anywhere'
   // checkins: now and then the car pauses and asks which side the Hudson (or uptown) is
-  const prefs = { pace: 'relaxed', guide: 'words', arrows: false, mapFirst: false, area: 'all', from: 'both', optsOpen: false, checkins: true, ...ctx.store.get('downtownPrefs', {}) };
+  const prefs = { pace: 'relaxed', guide: 'words', labels: true, cover: false, trips: true, arrows: false, mapFirst: false, area: 'all', from: 'both', optsOpen: false, checkins: true, ...ctx.store.get('downtownPrefs', {}) };
   const fstats = framesStats(ctx.store);
   const guesses = guessRecord(ctx.store);
+  // what's remembered between rounds: tied to this build of the street data (link ids change when it's rebuilt)
+  const mem = {
+    get(k, dflt) {
+      const v = ctx.store.get(`downtown.${k}`, null);
+      return v && v.data === G.dataKey ? v.v : dflt;
+    },
+    set(k, v) {
+      ctx.store.set(`downtown.${k}`, { data: G.dataKey, v });
+    },
+  };
   if (!GUIDES[prefs.guide]) prefs.guide = 'words';
   if (!AREAS[prefs.area]) prefs.area = 'all';
   const savePrefs = () => ctx.store.set('downtownPrefs', prefs);
@@ -159,6 +169,11 @@ export function initGridGame(ctx) {
     const real = (n) => d.jdeg[n] >= 3; // three or more roads meet: a corner you could turn at
     const gy = nodes.map((p) => gridXY(p)[1]);
     G = { d, nodes, edges, out, inn, coreJ, real, label, plain, gy, RAMP, places: d.places, entries: d.entries, areas: d.areas };
+    G.dataKey = `${d.source}|${edges.length}|${nodes.length}`;
+    // each block once (a two-way block's two links share a shape), for coverage
+    G.shapeLen = new Map();
+    for (const e of edges) if (e.core) G.shapeLen.set(e.shape, e.len);
+    G.totalLen = [...G.shapeLen.values()].reduce((a, b) => a + b, 0);
     buildArrows();
     return G;
   }
@@ -289,6 +304,8 @@ export function initGridGame(ctx) {
     map.addSource('gg-arrows', { type: 'geojson', data: arrowsFC || EMPTY });
     map.addSource('gg-target', { type: 'geojson', data: EMPTY });
     map.addSource('gg-goto', { type: 'geojson', data: EMPTY });
+    map.addSource('gg-cover', { type: 'geojson', data: EMPTY });
+    map.addLayer({ id: 'gg-cover', type: 'line', source: 'gg-cover', layout: { 'line-cap': 'round' }, paint: { 'line-color': '#16a34a', 'line-width': 3, 'line-opacity': 0.35 } });
     map.addLayer({ id: 'gg-best', type: 'line', source: 'gg-best', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#15803d', 'line-width': 4.5, 'line-dasharray': [2, 1.5] } });
     map.addLayer({ id: 'gg-trail', type: 'line', source: 'gg-trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#2b4fb3', 'line-width': 6, 'line-opacity': 0.55 } });
     map.addLayer({
@@ -312,6 +329,31 @@ export function initGridGame(ctx) {
   const setData = (id, fc) => map.getSource(id)?.setData(fc);
   const line = (coords) => ({ type: 'FeatureCollection', features: coords.length > 1 ? [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } }] : [] });
   const point = (p, props = {}) => ({ type: 'FeatureCollection', features: p ? [{ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: p } }] : [] });
+  /** Hard mode: street names off the map for the round. */
+  function showLabels(on) {
+    if (map.getLayer('road-name')) map.setLayoutProperty('road-name', 'visibility', on ? 'visible' : 'none');
+  }
+  /** The blocks you've driven, faintly green (Options: Show streets I've driven). */
+  function showCover() {
+    if (!G || !map.getSource('gg-cover')) return;
+    if (!prefs.cover) return setData('gg-cover', EMPTY);
+    const driven = new Set(mem.get('driven', []));
+    const seen = new Set();
+    const feats = [];
+    for (const e of G.edges) {
+      if (!driven.has(e.shape) || seen.has(e.shape)) continue;
+      seen.add(e.shape);
+      feats.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: e.pts } });
+    }
+    setData('gg-cover', { type: 'FeatureCollection', features: feats });
+  }
+  /** Share of downtown's blocks you've driven, by length. */
+  function coverage() {
+    const driven = mem.get('driven', []);
+    let m = 0;
+    for (const sh of driven) m += G.shapeLen.get(sh) || 0;
+    return m / G.totalLen;
+  }
   let flashTimer = 0;
   function showArrows(name = null) {
     if (!map.getLayer('gg-arrows')) return;
@@ -477,7 +519,54 @@ export function initGridGame(ctx) {
     }
     return { e: chain[0], s: 0 };
   }
-  function pickRound() {
+  /** A round from a saved description {e0, s0, target, entry} (same route again, a saved trip). */
+  function roundFrom(rt) {
+    const e0 = G.edges[rt.e0];
+    if (!e0 || !G.nodes[rt.target.node]) return null;
+    const best = shortest(e0, rt.target.node, rt.s0 || 0);
+    if (!best) return null;
+    const entry = rt.entry != null ? G.entries.find((en) => en.link === rt.entry && en.from === rt.entryFrom) || null : null;
+    return { e0, s0: rt.s0 || 0, target: { ...rt.target, label: G.label(rt.target.node) }, best, entry };
+  }
+  const routeOf = (r) => ({ e0: r.e0.id, s0: r.s0, target: { name: r.target.name, node: r.target.node }, entry: r.entry ? r.entry.link : null, entryFrom: r.entry ? r.entry.from : null });
+  const routeKey = (rt) => `${rt.e0}:${Math.round(rt.s0 || 0)}>${rt.target.node}`;
+  function pickRound(forced) {
+    if (forced) return roundFrom(forced);
+    // now and then, a trip you saved, or back to a corner you got wrong
+    const trips = mem.get('trips', []);
+    if (prefs.trips && trips.length && Math.random() < 0.3) {
+      const r = roundFrom(rand(trips));
+      if (r) return { ...r, kind: 'trip' };
+    }
+    const mistakes = mem.get('mistakes', []);
+    if (mistakes.length && Math.random() < 0.35) {
+      const m = rand(mistakes);
+      const e0 = G.edges[m.link];
+      if (e0 && e0.core) {
+        const r = pickTarget(e0, 0, null);
+        if (r) return { ...r, kind: 'revisit', mistake: m };
+      }
+    }
+    return pickRandom();
+  }
+  /** A destination for a round that starts on link e0. */
+  function pickTarget(e0, s0, entry) {
+    const coreNodes = [];
+    for (let n = 0; n < G.nodes.length; n++) if (isCore(n) && G.real(n) && G.plain(n) && inArea(n)) coreNodes.push(n);
+    const places = G.places.filter((p) => inArea(p.node));
+    for (let tries = 0; tries < 200; tries++) {
+      const target = places.length && Math.random() < 0.7 ? { ...rand(places) } : { name: null, node: rand(coreNodes) };
+      target.label = G.label(target.node);
+      const dm = metres(G.nodes[e0.from], G.nodes[target.node]);
+      if (dm < 400 || dm > 2800) continue;
+      if (straightTo(e0, target.node)) continue;
+      const best = shortest(e0, target.node, s0);
+      if (!best || best.path.length < 4) continue;
+      return { e0, s0, target, best, entry };
+    }
+    return null;
+  }
+  function pickRandom() {
     const coreNodes = [];
     for (let n = 0; n < G.nodes.length; n++) if (isCore(n) && G.real(n) && G.plain(n) && inArea(n)) coreNodes.push(n);
     const places = G.places.filter((p) => inArea(p.node));
@@ -507,7 +596,7 @@ export function initGridGame(ctx) {
   }
 
   // ---- a round ---------------------------------------------------------------------------
-  async function start(opts) {
+  async function start(opts, forced = null) {
     stop();
     g = { opts, loading: true };
     const token = g;
@@ -519,7 +608,7 @@ export function initGridGame(ctx) {
       return;
     }
     if (g !== token) return;
-    const r = pickRound();
+    const r = pickRound(forced);
     if (!r) {
       ctx.hud('<div class="qkind">🚕 Drive Manhattan</div><div class="q">No route found here; try another area.</div>');
       return;
@@ -542,6 +631,8 @@ export function initGridGame(ctx) {
       check: null, lastCheck: performance.now() - CHECK_EVERY_MS / 2, checks: 0, checksRight: 0, resumeAt: 0,
       startCard: true, // the briefing: up until you tap Go
       guess: null, peeks: 0, peekUntil: 0,
+      route: routeOf(r), kind: forced ? 'replay' : r.kind || 'random', mistake: r.mistake || null,
+      path: [], newBlocks: 0,
     };
     g.targetHood = hood(G.nodes[r.target.node]);
     const tp = G.nodes[r.target.node];
@@ -550,6 +641,8 @@ export function initGridGame(ctx) {
     setData('gg-best', EMPTY);
     setData('gg-goto', EMPTY);
     showArrows();
+    showLabels(prefs.labels);
+    showCover();
     carMk.setLngLat(g.trail[0]).addTo(map);
     enterEdge(g.e);
     g.msg = '';
@@ -569,7 +662,8 @@ export function initGridGame(ctx) {
     lockMap(false);
     declutter(false);
     document.body.classList.remove('gridding');
-    for (const id of ['gg-trail', 'gg-best', 'gg-target', 'gg-goto']) setData(id, EMPTY);
+    for (const id of ['gg-trail', 'gg-best', 'gg-target', 'gg-goto', 'gg-cover']) setData(id, EMPTY);
+    showLabels(true);
     if (map.getLayer('gg-arrows')) map.setLayoutProperty('gg-arrows', 'visibility', 'none');
     map.setGlobalStateProperty('quiet', ctx.mode === 'practice');
   }
@@ -650,18 +744,73 @@ export function initGridGame(ctx) {
     if (g.entry) return `Out of <b>${esc(g.entry.from)}</b> onto ${st}${here ? ` in <b>${esc(here)}</b>` : ''}, heading <b>${head}</b>${next}`;
     return `${here ? `<b>${esc(here)}</b> · ` : ''}on ${st} heading <b>${head}</b>${next}`;
   }
+  /** Act on touch-down (and on a keyboard "click", which has no pointer). */
+  function onTap(el, fn) {
+    el.addEventListener('pointerdown', (e) => {
+      if (e.button > 0) return;
+      e.preventDefault();
+      fn();
+    });
+    el.addEventListener('click', (e) => {
+      if (e.detail === 0) fn();
+    });
+  }
+  /** "Go to: Spring · Prince · Houston…": the corners ahead on this road, to zip to. */
+  function chipsRow() {
+    const cs = cornersAhead(8);
+    if (cs.length < 2 || g.check) return '';
+    return `<div class="ggchips"><span class="lbl">Go to</span>${cs
+      .map((c, i) => `<button class="ggchip${c.node === g.goTo ? ' on' : ''}" data-node="${c.node}">${c.node === g.target.node ? '🏁 ' : ''}${esc(prefs.labels ? short(c.name) : `+${i + 1}`)}</button>`)
+      .join('')}</div>`;
+  }
+  /** Hard mode check-in: "What street are you on?" */
+  function answerName(name) {
+    const c = g.check;
+    if (!c || c.kind !== 'name') return;
+    const ok = name === c.answer;
+    g.checks++;
+    if (ok) g.checksRight++;
+    g.check = null;
+    g.lastCheck = performance.now();
+    g.resumeAt = performance.now() + 900;
+    say(`${ok ? '✓' : '✗'} You're on ${short(c.answer)}`);
+    render();
+  }
   /** The briefing: where you're going. */
   function briefTo() {
     const t = g.target;
     const corner = t.label.replace(/ St\b/g, ' St');
     const there = (g.targetHood || '').replace(/ \(.*\)$/, '');
-    return `<b>${esc(t.name || corner)}</b>${t.name ? ` · ${esc(corner)}` : ''}${there && there !== t.name ? ` · in ${esc(there)}` : ''}`;
+    const why =
+      g.kind === 'revisit' && g.mistake
+        ? `<br><span class="muted">↺ On the way: ${esc(g.mistake.corner)}, where you went wrong before</span>`
+        : g.kind === 'trip'
+          ? '<br><span class="muted">★ One of your saved trips</span>'
+          : g.kind === 'replay'
+            ? '<br><span class="muted">↻ Same route again</span>'
+            : '';
+    return `<b>${esc(t.name || corner)}</b>${t.name ? ` · ${esc(corner)}` : ''}${there && there !== t.name ? ` · in ${esc(there)}` : ''}${why}`;
   }
 
   // ---- check-ins: "You're heading downtown. Which side is the Hudson?" ----------------------
   function maybeCheckIn(now) {
     if (!prefs.checkins || g.startCard || g.auto || g.check || g.done || g.waiting || g.home || g.goTo != null || g.queued || g.paused || g.view !== 'follow') return;
     if (now - g.lastCheck < CHECK_EVERY_MS || !g.e.core || g.e.len < 60 || g.s < g.e.len * 0.25 || g.s > g.e.len * 0.6) return;
+    if (!prefs.labels && Math.random() < 0.6) {
+      // hard mode: which street is this? (the real one and two nearby)
+      const near = new Set();
+      for (let n = 0; n < G.nodes.length; n++) {
+        if (metres(G.nodes[n], g.pos) > 350) continue;
+        for (const o of G.out[n]) if (o.name !== g.e.name && !G.RAMP.test(o.name) && short(o.name) !== short(g.e.name)) near.add(o.name);
+      }
+      const others = [...near].sort(() => Math.random() - 0.5).slice(0, 2);
+      if (others.length === 2) {
+        g.check = { kind: 'name', answer: g.e.name, options: [g.e.name, ...others].sort(() => Math.random() - 0.5), t0: now };
+        g.msg = '';
+        render();
+        return;
+      }
+    }
     if (!onGrid(g.e.name, g.bnow)) return; // "heading downtown" only means something on the grid
     const h = gridDir(g.bnow);
     let thing, dir;
@@ -698,6 +847,7 @@ export function initGridGame(ctx) {
   function updateSpeed() {
     const f = g.home ? HOME_SPEED : g.goTo != null ? GOTO_SPEED : g.boost ? HOLD_SPEED : 1;
     g.v = g.e.len / (blockSeconds(g.e.len) * f);
+    if (g.goTo != null) g.v = Math.max(g.v, g.gotoV || 0);
     return g.v;
   }
   const speedNow = () => g.v || 0;
@@ -758,6 +908,14 @@ export function initGridGame(ctx) {
     const e = g.e;
     const n = e.to;
     g.driven += e.len - (e.chord || 0);
+    g.path.push(e.id);
+    if (e.core) {
+      if (!g.drivenSet) g.drivenSet = new Set(mem.get('driven', []));
+      if (!g.drivenSet.has(e.shape)) {
+        g.drivenSet.add(e.shape);
+        g.newBlocks++;
+      }
+    }
     g.trail.push(...e.pts.slice(1));
     setData('gg-trail', line(g.trail));
     if (g.msg && performance.now() - g.msgAt > 3500) g.msg = '';
@@ -843,6 +1001,15 @@ export function initGridGame(ctx) {
     }
     render();
   }
+  /** A corner to come back to: approaching it on link `link`; `note` says what went wrong. */
+  function remember(m) {
+    const list = mem.get('mistakes', []).filter((x) => x.link !== m.link);
+    list.push({ ...m, corner: G.label(G.edges[m.link].to), at: Date.now() });
+    mem.set('mistakes', list.slice(-30));
+  }
+  function forget(link) {
+    mem.set('mistakes', mem.get('mistakes', []).filter((x) => x.link !== link));
+  }
   /** Why there's no turn that way: a one-way street against you, or no road at all. */
   function refuse(e, side) {
     let why = null;
@@ -854,6 +1021,7 @@ export function initGridGame(ctx) {
         why = wrongWay(d);
         g.wrong++;
         showArrows(d.name);
+        remember({ link: e.id, note: why });
         break;
       }
     }
@@ -902,7 +1070,7 @@ export function initGridGame(ctx) {
   }
   function press(side) {
     if (!g || g.done || g.loading) return;
-    if (g.check) return side === 'S' ? undefined : answerCheck(side);
+    if (g.check) return side === 'S' || g.check.kind === 'name' ? undefined : answerCheck(side);
     if (g.startCard) return; // the briefing: Go starts the drive
     g.cruise = 0;
     const c = choices(g.e);
@@ -1020,6 +1188,31 @@ export function initGridGame(ctx) {
       render();
       return;
     }
+    goToNode(best.node);
+  }
+  /** The corners you could zip to, straight on along this road: [{node, via, name}]. */
+  function cornersAhead(max = 8) {
+    if (!g || g.done || g.startCard) return [];
+    const cw = choices(g.e);
+    const st = g.waiting ? (cw.named ? null : cw.straight) : null;
+    if (g.waiting && !st) return [];
+    const chain = g.waiting ? aheadChain(st, 40, 3000) : aheadChain(g.e, 40, 3000);
+    const out = [];
+    for (const { node, via } of chain) {
+      if (!G.real(node)) continue;
+      out.push({ node, via, name: crossAt(via) || G.label(node) });
+      if (out.length >= max) break;
+    }
+    return out;
+  }
+  /** Drive straight on to corner `node` (about a second, however far) and stop there. */
+  function goToNode(node) {
+    if (!g || g.done || g.startCard || g.home) return;
+    const cw = choices(g.e);
+    const st = g.waiting && !cw.named ? cw.straight : null;
+    const chain = g.waiting ? (st ? aheadChain(st) : []) : aheadChain(g.e);
+    if (!chain.some((x) => x.node === node)) return;
+    const best = { node };
     g.goTo = best.node;
     g.queued = null;
     g.pick = null;
@@ -1090,13 +1283,57 @@ export function initGridGame(ctx) {
     runs.n++;
     if (ok) runs.clean++;
     ctx.store.set('downtownRuns', runs);
-    g.result = `<div class="fb ${ok ? 'ok' : 'no'}">${ok ? '✓' : '•'} ${mi(g.driven)} mi${ratio <= 1.03 ? ' · the shortest' : ` · shortest ${mi(g.best.cost)}`}${
+    // stars: there; the shortest way with no wrong-way tries; and that, without peeking or an
+    // arrow, having guessed the way at the start
+    const shortestWay = ratio <= 1.03 && !g.wrong;
+    const stars = 1 + (shortestWay ? 1 : 0) + (shortestWay && !g.peeks && prefs.guide !== 'arrow' && g.guess && g.guess.ok ? 1 : 0);
+    const key = routeKey(g.route);
+    const bests = mem.get('best', {});
+    const before = bests[key] || 0;
+    if (stars > before) {
+      bests[key] = stars;
+      mem.set('best', bests);
+    }
+    // the corner where you left the shortest way, when it cost a lot: comes back in a later round
+    let missed = null;
+    if (ratio > 1.15) {
+      const bp = g.best.path.map((e) => e.id);
+      let i = 0;
+      while (i < g.path.length && i < bp.length && g.path[i] === bp[i]) i++;
+      if (i > 0 && i < bp.length) {
+        missed = `${G.label(G.edges[bp[i - 1]].to)}: the shortest way took ${short(G.edges[bp[i]].name)}`;
+        remember({ link: bp[i - 1], note: `the shortest way took ${short(G.edges[bp[i]].name)}` });
+      }
+    }
+    // a corner you'd got wrong, driven right this time: off the list
+    let fixed = false;
+    if (g.mistake && shortestWay) {
+      forget(g.mistake.link);
+      fixed = true;
+    }
+    // blocks driven
+    const prevCover = coverage();
+    if (g.drivenSet) mem.set('driven', [...g.drivenSet]);
+    const cover = coverage();
+    const starStr = (n) => '★'.repeat(n) + '☆'.repeat(3 - n);
+    const saved = mem.get('trips', []).some((t) => routeKey(t) === key);
+    g.result = `<div class="ggstars" title="★ there · ★★ the shortest way · ★★★ and no peeks or arrow, start guess right">${starStr(stars)}${
+      before ? ` <span class="muted">best ${starStr(Math.max(before, stars))}</span>` : ''
+    }</div>
+      <div class="fb ${ok ? 'ok' : 'no'}">${mi(g.driven)} mi${ratio <= 1.03 ? ' · the shortest' : ` · shortest ${mi(g.best.cost)}`}${
       g.wrong ? ` · ${g.wrong} wrong-way` : ''
     }${g.checks ? ` · check-ins ${g.checksRight}/${g.checks}` : ''}${
       g.guess ? ` · start guess ${g.guess.ok ? '✓' : '✗'}` : ''
     }${g.peeks ? ` · ${g.peeks} peek${g.peeks === 1 ? '' : 's'}` : ''}</div>
+      ${fixed ? `<div class="hint">✓ ${esc(g.mistake.corner)}: got it this time</div>` : ''}
+      ${missed ? `<div class="hint">↺ ${esc(missed)} (it'll come back)</div>` : ''}
       <div class="hint"><span class="gg-key you"></span> you <span class="gg-key best"></span> best: ${esc(describe(g.best.path))}</div>
-      <button class="primary" id="ggAgain">Another route</button>`;
+      <div class="hint">Driven: ${Math.round(cover * 100)}% of downtown's blocks${g.newBlocks ? ` (+${g.newBlocks} new${cover - prevCover >= 0.005 ? `, +${Math.round((cover - prevCover) * 100)}%` : ''})` : ''}</div>
+      <div class="ggend">
+        <button class="primary" id="ggAgain">Another route</button>
+        <button id="ggSame">↻ Same route</button>
+        <button id="ggSave"${saved ? ' disabled' : ''}>${saved ? '★ Saved' : '☆ Save trip'}</button>
+      </div>`;
     render();
   }
 
@@ -1146,9 +1383,13 @@ export function initGridGame(ctx) {
     const nx = !g.done && g.e.core ? nextCross(g.e) : null;
     const hb = g.bnow ?? g.e.b0;
     const plan = g.queued ? ` · <b>${g.queued === 'L' ? '◀ left' : 'right ▶'}</b>` : g.pick ? ` · <b>→ ${esc(short(g.pick.name))}</b>` : '';
-    const where = `<b>${esc(short(g.e.name))}</b> · ${headWord(g.e.name, hb)}${nx ? ` · next ${esc(nx)}` : ''}${plan}`;
+    const where = prefs.labels
+      ? `<b>${esc(short(g.e.name))}</b> · ${headWord(g.e.name, hb)}${nx ? ` · next ${esc(nx)}` : ''}${plan}`
+      : `heading <b>${headWord(g.e.name, hb)}</b>${plan}`; // hard mode: no street names
     ctx.hud(
-      g.check
+      g.check && g.check.kind === 'name'
+        ? `<div class="q gg-checkq">What street are you on?</div><div class="hint">Pick one below · skips in a few seconds</div>`
+        : g.check
         ? `<div class="q gg-checkq">Heading ${WORD[g.check.h]}. ${esc(g.check.thing[0].toUpperCase() + g.check.thing.slice(1))}: <b>left or right?</b></div>
            <div class="hint">Answer with ◀ Left or Right ▶ · skips in a few seconds</div>`
         : `<div class="q">🏁 ${tgt}</div>
@@ -1188,7 +1429,7 @@ export function initGridGame(ctx) {
         .join('');
     ctx.sheet(
       `${g.opts.header()}<div id="qbody">
-        ${g.done ? g.result : g.startCard ? briefingHTML({ you: briefYou(), to: briefTo(), guess: g.guess }) : `${named ? `<div class="ggctl named">${pickBtns()}</div>` : `<div class="ggctl${canStraight ? ' three' : ''}">${btn('L', '◀ Left')}${canStraight ? btn('S', '▲ Straight') : ''}${btn('R', 'Right ▶')}</div>`}
+        ${g.done ? g.result : g.startCard ? briefingHTML({ you: briefYou(), to: briefTo(), guess: g.guess }) : g.check && g.check.kind === 'name' ? `<div class="ggctl named">${g.check.options.map((n) => `<button class="ggpick ggname" data-name="${esc(n)}"><span class="nm">${esc(short(n))}</span></button>`).join('')}</div>` : `${chipsRow()}${named ? `<div class="ggctl named">${pickBtns()}</div>` : `<div class="ggctl${canStraight ? ' three' : ''}">${btn('L', '◀ Left')}${canStraight ? btn('S', '▲ Straight') : ''}${btn('R', 'Right ▶')}</div>`}
         <div class="ggmsg${g.msg || g.check ? '' : ' muted'}">${
           g.check
             ? `<b>Heading ${WORD[g.check.h]}.</b> ${esc(g.check.thing[0].toUpperCase() + g.check.thing.slice(1))}: left or right?`
@@ -1202,6 +1443,7 @@ export function initGridGame(ctx) {
         }</div>`}
         <div class="ggbar">
           ${g.done || g.startCard ? '' : `<button id="ggPause">${g.paused ? '▶ Go' : '⏸ Pause'}</button>`}
+          ${!g.done && !g.startCard ? `<button id="ggFast">⏩ Hold: faster</button>` : ''}
           ${!g.done && !g.startCard && prefs.guide === 'off' ? `<button id="ggPeek">👁 Peek</button>` : ''}
           <button id="ggOptsBtn" aria-expanded="${!!prefs.optsOpen}">Options ${prefs.optsOpen ? '▴' : '▾'}</button>
         </div>
@@ -1211,16 +1453,53 @@ export function initGridGame(ctx) {
           <select id="ggGuide" aria-label="Guide">${Object.entries(GUIDES).map(([k, v]) => `<option value="${k}"${prefs.guide === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggPace" aria-label="Speed">${Object.keys(PACE).map((p) => `<option value="${p}"${prefs.pace === p ? ' selected' : ''}>${p[0].toUpperCase() + p.slice(1)}</option>`).join('')}</select>
           <label><input type="checkbox" id="ggArrows"${prefs.arrows ? ' checked' : ''}/> One-way arrows</label>
+          <label><input type="checkbox" id="ggLabels"${prefs.labels ? ' checked' : ''}/> Street names (off: hard mode)</label>
+          <label><input type="checkbox" id="ggCover"${prefs.cover ? ' checked' : ''}/> Show streets I've driven</label>
+          <label><input type="checkbox" id="ggTrips"${prefs.trips ? ' checked' : ''}/> Mix in my saved trips</label>
           <label><input type="checkbox" id="ggMapFirst"${prefs.mapFirst ? ' checked' : ''}/> Map first</label>
           <label><input type="checkbox" id="ggChecks"${prefs.checkins ? ' checked' : ''}/> Check-ins</label>
         </div>
       </div>`
     );
     g.opts.bindHeader();
-    for (const b of document.querySelectorAll('.ggturn')) b.addEventListener('click', () => press(b.dataset.side));
-    for (const b of document.querySelectorAll('.ggpick')) b.addEventListener('click', () => pickLink(+b.dataset.link));
+    // driving controls act on touch-down: the panel redraws at every corner, and a tap whose
+    // button is replaced between finger-down and finger-up would otherwise be lost
+    for (const b of document.querySelectorAll('.ggturn')) onTap(b, () => press(b.dataset.side));
+    for (const b of document.querySelectorAll('.ggpick:not(.ggname)')) onTap(b, () => pickLink(+b.dataset.link));
     document.getElementById('ggPause')?.addEventListener('click', togglePause);
     document.getElementById('ggPeek')?.addEventListener('click', peek);
+    for (const b of document.querySelectorAll('.ggchip')) onTap(b, () => goToNode(+b.dataset.node));
+    for (const b of document.querySelectorAll('.ggname')) onTap(b, () => answerName(b.dataset.name));
+    const fast = document.getElementById('ggFast');
+    if (fast) {
+      const on = (v) => (e) => {
+        e.preventDefault();
+        if (!g) return;
+        g.boost = v;
+        carEl.classList.toggle('boost', v);
+        fast.classList.toggle('on', v);
+      };
+      fast.addEventListener('pointerdown', on(true));
+      for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) fast.addEventListener(ev, on(false));
+      fast.addEventListener('contextmenu', (e) => e.preventDefault());
+    }
+    document.getElementById('ggSame')?.addEventListener('click', () => start(g.opts, g.route));
+    document.getElementById('ggSave')?.addEventListener('click', (e) => {
+      const trips = mem.get('trips', []);
+      if (!trips.some((t) => routeKey(t) === routeKey(g.route))) trips.push(g.route);
+      mem.set('trips', trips.slice(-40));
+      e.target.textContent = '★ Saved';
+      e.target.disabled = true;
+    });
+    const toggle = (id, key, after) =>
+      document.getElementById(id).addEventListener('change', (e) => {
+        prefs[key] = e.target.checked;
+        savePrefs();
+        after?.();
+      });
+    toggle('ggLabels', 'labels', () => g && !g.done && showLabels(prefs.labels));
+    toggle('ggCover', 'cover', showCover);
+    toggle('ggTrips', 'trips');
     if (g.startCard) bindBriefing(guessSide, go0);
     document.getElementById('ggGuide').addEventListener('change', (e) => {
       prefs.guide = e.target.value;
@@ -1271,6 +1550,9 @@ export function initGridGame(ctx) {
     _graph: () => G,
     _model: { choices, moves, shortest, straightTo, aheadChain, load, rule, describe },
     _speed: () => (g && !g.loading && g.e ? speedNow() : 0),
+    _mem: () => mem,
+    _prefs: () => prefs,
+    _corners: () => cornersAhead(8),
     _autopilot() {
       if (g) g.auto = true;
     },
