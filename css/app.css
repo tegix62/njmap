@@ -1884,3 +1884,73 @@ body.gridding .maplibregl-canvas {
 #hud .gg-checkq {
   color: #2b4fb3;
 }
+
+/* ---- Drive games: the briefing at the start of a round ---------------------- */
+.brief {
+  display: grid;
+  gap: 8px;
+}
+.brief .bline {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  line-height: 1.3;
+}
+.brief .bic {
+  flex: none;
+}
+.brief .bq {
+  font-weight: 700;
+  margin-top: 2px;
+}
+.gpad {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-areas: '. up .' 'lt . rt' '. dn .';
+  gap: 6px;
+}
+.gbtn {
+  font: inherit;
+  font-weight: 700;
+  padding: 12px 4px;
+  border-radius: 12px;
+  border: 0;
+  background: rgba(31, 27, 22, 0.07);
+  color: var(--panel-ink, inherit);
+  touch-action: manipulation;
+}
+.gbtn.up {
+  grid-area: up;
+}
+.gbtn.lt {
+  grid-area: lt;
+}
+.gbtn.rt {
+  grid-area: rt;
+}
+.gbtn.dn {
+  grid-area: dn;
+}
+.brief .bres {
+  font-weight: 600;
+}
+.brief .bres.ok {
+  color: #15803d;
+}
+.brief .bres.no {
+  color: #b45309;
+}
+.brief .linkish {
+  font: inherit;
+  font-size: 13px;
+  background: none;
+  border: 0;
+  color: inherit;
+  opacity: 0.6;
+  text-decoration: underline;
+  justify-self: center;
+  padding: 4px;
+}
+.gg-words {
+  font-weight: 700;
+}

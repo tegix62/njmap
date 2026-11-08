@@ -14,6 +14,7 @@
 // change week to week and aren't modeled.
 
 import { GRID_DATA } from './midtowngrid.js';
+import { GUIDES, PEEK_MS, okSides, sideWords, guessRecord, briefingHTML, bindBriefing } from './briefing.js';
 
 const FT_PER_STREET = 264; // ~20 streets to the mile
 const S_MIN = GRID_DATA.sMin;
@@ -340,8 +341,12 @@ export function initGridClassic(ctx) {
   // where the address is from the street and avenue alone is the harder,
   // more useful skill (it's all you have in a real car).
   // from: 'both' (half the rounds start at a tunnel or bridge), 'entries', or 'anywhere'
-  const prefs = { pace: 'easy', arrows: false, mapFirst: false, area: 'all', from: 'both', ...ctx.store.get('gridClassicPrefs', {}) };
+  const prefs = { pace: 'easy', guide: 'words', arrows: false, mapFirst: false, area: 'all', from: 'both', ...ctx.store.get('gridClassicPrefs', {}) };
   const savePrefs = () => ctx.store.set('gridClassicPrefs', prefs);
+  if (!GUIDES[prefs.guide]) prefs.guide = 'words';
+  const guesses = guessRecord(ctx.store);
+  const showGuide = () => prefs.guide === 'arrow' || performance.now() < g.peekUntil;
+  const showWords = () => prefs.guide !== 'off' || performance.now() < g.peekUntil;
 
   // ---- picture ------------------------------------------------------------
   const SVGNS = 'http://www.w3.org/2000/svg';
@@ -526,6 +531,7 @@ export function initGridClassic(ctx) {
     // markers keep a readable size when zoomed out
     g.mScale = Math.max(1, 0.13 / k);
     flagG.setAttribute('transform', `translate(${g.flagAt[0]} ${g.flagAt[1]}) scale(${g.mScale})`);
+    flagG.style.display = g.startCard ? 'none' : ''; // the briefing's guess comes first
     // sticky labels: avenue names along the top of the open area, street numbers on the left
     const top = pad.top + 4, left = 4, bottom = H - pad.bottom;
     const lab = [];
@@ -556,8 +562,9 @@ export function initGridClassic(ctx) {
     const fx = tx + X(g.target.ai) * k, fy = ty + Y(g.target.s) * k;
     const inView = fx > 12 && fx < W - 12 && fy > top + 20 && fy < bottom - 12;
     flagLabel.style.display = inView ? '' : 'none';
-    offscreen.style.display = inView ? 'none' : '';
-    if (!inView) {
+    const pointer = !inView && !g.startCard && !g.done && showGuide();
+    offscreen.style.display = pointer ? '' : 'none';
+    if (pointer) {
       const ex = Math.min(W - 22, Math.max(22, fx));
       const ey = Math.min(bottom - 22, Math.max(top + 30, fy));
       // arrow inside the marker, pointing from you toward the destination
@@ -632,6 +639,10 @@ export function initGridClassic(ctx) {
       msg: '',
       last: performance.now(),
       raf: 0,
+      startCard: true, // the briefing: up until you tap Go
+      guess: null,
+      peeks: 0,
+      peekUntil: 0,
     };
     document.body.classList.add('gridding', 'gridclassic');
     wrap.hidden = false;
@@ -643,12 +654,7 @@ export function initGridClassic(ctx) {
     if (prefs.arrows) drawArrows();
     else arrowsG.replaceChildren();
     beginBlock();
-    if (entry) {
-      g.msg = `Coming in from ${entry.from}: ${entry.where}.`;
-      g.msgAt = performance.now() + 6000; // keep it up a while
-    }
-    // a quick look at the whole grid first, then zoom in (skipped with reduced motion)
-    g.view = prefs.mapFirst && ctx.dur(1) ? 'intro' : 'follow';
+    g.view = 'follow'; // with Map first, the look at the whole grid comes after the briefing
     g.introUntil = null; // set on the first frame drawn, so a slow page load doesn't eat the intro
     g.camNow = null;
     render();
@@ -667,6 +673,10 @@ export function initGridClassic(ctx) {
 
   const onKey = (e) => {
     if (!g || g.done) return;
+    if (g.startCard) {
+      if (e.key === 'Enter') go0();
+      return;
+    }
     if (e.key === 'ArrowLeft') press('L');
     else if (e.key === 'ArrowRight') press('R');
     else if (e.key === ' ') togglePause();
@@ -721,7 +731,7 @@ export function initGridClassic(ctx) {
     for (const ev of ['contextmenu', 'selectstart']) wrap.addEventListener(ev, (e) => e.preventDefault());
     wrap.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
     wrap.addEventListener('pointerdown', (e) => {
-      if (!g || g.done) return;
+      if (!g || g.done || g.startCard) return;
       if (g.view === 'intro') {
         startFollow();
         return;
@@ -817,7 +827,11 @@ export function initGridClassic(ctx) {
       g.introFrames = (g.introFrames || 0) + 1;
       if (now >= g.introUntil && g.introFrames >= 24) startFollow();
     }
-    if (g.view !== 'intro' && !g.paused && !g.done && !g.waiting && g.next) {
+    if (g.peekUntil && now >= g.peekUntil) {
+      g.peekUntil = 0;
+      render();
+    }
+    if (g.view !== 'intro' && !g.startCard && !g.paused && !g.done && !g.waiting && g.next) {
       g.t += dt / (blockSeconds(g.next.len) * (g.home ? HOME_SPEED : g.goTo ? GOTO_SPEED : g.boost ? HOLD_SPEED : 1));
       if (g.t >= 1) arrive();
     }
@@ -889,7 +903,7 @@ export function initGridClassic(ctx) {
   }
 
   function press(side) {
-    if (!g || g.done) return;
+    if (!g || g.done || g.startCard) return;
     if (g.waiting) {
       // stopped at a corner: turn now
       const d2 = (side === 'L' ? LEFT : RIGHT)[g.cur.d];
@@ -935,9 +949,53 @@ export function initGridClassic(ctx) {
     ctx.store.set('gridClassicRuns', runs);
     g.result = `<div class="fb ${ok ? 'ok' : 'no'}">${ok ? '✓' : '•'} You made it: ${mi(g.driven)} mi${
       g.wrong ? `, ${g.wrong} wrong-way ${g.wrong === 1 ? 'try' : 'tries'}` : ''
-    }. Shortest legal route: ${mi(g.best.cost)} mi${ratio <= 1.02 ? ' (that was it)' : ''}.</div>
+    }. Shortest legal route: ${mi(g.best.cost)} mi${ratio <= 1.02 ? ' (that was it)' : ''}.${
+      g.guess ? ` Start guess ${g.guess.ok ? '✓' : '✗'}.` : ''
+    }${g.peeks ? ` ${g.peeks} peek${g.peeks === 1 ? '' : 's'}.` : ''}</div>
       <div class="hint"><span class="gg-key you"></span> your route · <span class="gg-key best"></span> shortest: ${esc(describe(g.best.path))}</div>
       <button class="primary" id="ggAgain">Another route</button>`;
+    render();
+  }
+
+  // ---- the briefing ---------------------------------------------------------------
+  const cornerName = (ai, s) => `${aveName(ai, s)} & ${streetName(s)}`;
+  function briefYou() {
+    const c = g.cur;
+    const at = `at <b>${esc(cornerName(c.ai, c.s))}</b>`;
+    if (g.entry) return `From <b>${esc(g.entry.from.replace(/ \(.*\)$/, ''))}</b>: ${esc(g.entry.where)} · ${at}`;
+    return `${where()} · ${at}`;
+  }
+  function briefTo() {
+    const t = g.target;
+    const tgt = `${aveName(t.ai, t.s)} & ${ord(t.s)} St`;
+    return `<b>${esc(t.name || tgt)}</b>${t.name ? ` · ${esc(tgt)}` : ''}`;
+  }
+  /** The guess: which way is the destination from here, before any pointer says so (grid frame: uptown = up). */
+  function guessSide(side) {
+    if (!g || !g.startCard || g.guess) return;
+    const c = g.cur, t = g.target;
+    const toward = (Math.atan2(X(t.ai) - X(c.ai), (t.s - c.s) * FT_PER_STREET) * 180) / Math.PI;
+    const h = ROT[c.d];
+    const ok = okSides(h, toward).includes(side);
+    guesses.add(ok);
+    g.guess = { pick: side, ok, said: `${sideWords(h, toward)}: ${toGo()}` };
+    render();
+  }
+  function go0() {
+    if (!g || !g.startCard) return;
+    g.startCard = false;
+    // with Map first, a quick look at the whole grid, then zoom in (skipped with reduced motion)
+    if (prefs.mapFirst && ctx.dur(1)) {
+      g.view = 'intro';
+      g.introUntil = null;
+      g.introFrames = 0;
+    }
+    render();
+  }
+  function peek() {
+    if (!g || g.done || g.startCard) return;
+    g.peeks++;
+    g.peekUntil = performance.now() + PEEK_MS;
     render();
   }
 
@@ -960,21 +1018,23 @@ export function initGridClassic(ctx) {
     const tgt = `${esc(aveName(g.target.ai, g.target.s))} & ${ord(g.target.s)} St`;
     ctx.hud(
       `<div class="qkind">🚕 Drive the grid${g.entry ? ` · from ${esc(g.entry.from.replace(/ \(.*\)$/, ''))}` : ''}</div><div class="q">Get to ${g.target.name ? `<b>${esc(g.target.name)}</b> (${tgt})` : `<b>${tgt}</b>`}</div>
-       ${g.done ? '' : `<div class="hint">${where()}${g.queued ? ` · turning <b>${g.queued === 'L' ? 'left' : 'right'}</b> at the next corner` : ''} · ${esc(toGo())} to go</div>`}`
+       ${g.done || g.startCard ? '' : `<div class="hint">${where()}${g.queued ? ` · turning <b>${g.queued === 'L' ? 'left' : 'right'}</b> at the next corner` : ''}${showWords() ? ` · <b>${esc(toGo())}</b> to go` : ''}</div>`}`
     );
     const btn = (side, label) =>
       `<button class="ggturn${g.queued === side ? ' on' : ''}" data-side="${side}" ${g.done ? 'disabled' : ''}>${label}</button>`;
     ctx.sheet(
       `${g.opts.header()}<div id="qbody">
-        ${g.done ? g.result : `<div class="ggctl">${btn('L', '◀ Left')}${btn('R', 'Right ▶')}</div>
+        ${g.done ? g.result : g.startCard ? briefingHTML({ you: briefYou(), to: briefTo(), guess: g.guess }) : `<div class="ggctl">${btn('L', '◀ Left')}${btn('R', 'Right ▶')}</div>
         <div class="ggmsg${g.msg ? '' : ' muted'}">${g.msg ? esc(g.msg) : g.waiting ? 'Stopped at the corner: pick a way.' : 'Left/Right turn at the next corner. Tap a corner ahead to zip straight there; hold the map to speed up.'}</div>`}
         <div class="ggbar">
-          ${g.done ? '' : `<button id="ggPause">${g.paused ? '▶ Go' : '⏸ Pause'}</button>`}
+          ${g.done || g.startCard ? '' : `<button id="ggPause">${g.paused ? '▶ Go' : '⏸ Pause'}</button>`}
+          ${!g.done && !g.startCard && prefs.guide === 'off' ? `<button id="ggPeek">👁 Peek</button>` : ''}
           <button id="ggOptsBtn" aria-expanded="${!!prefs.optsOpen}">Options ${prefs.optsOpen ? '▴' : '▾'}</button>
         </div>
         <div class="ggopts"${prefs.optsOpen ? '' : ' hidden'}>
           <select id="ggArea" aria-label="Area">${[['all', '14th–110th'], ['midtown', 'Midtown (14th–59th)'], ['uptown', 'Uptown (57th–110th)']].map(([k, v]) => `<option value="${k}"${prefs.area === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggFrom" aria-label="Start">${[['both', 'Start: mixed'], ['entries', 'Start: tunnels & bridges'], ['anywhere', 'Start: anywhere']].map(([k, v]) => `<option value="${k}"${prefs.from === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
+          <select id="ggGuide" aria-label="Guide">${Object.entries(GUIDES).map(([k, v]) => `<option value="${k}"${prefs.guide === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggPace" aria-label="Speed">${Object.keys(PACE).map((p) => `<option value="${p}"${prefs.pace === p ? ' selected' : ''}>${p[0].toUpperCase() + p.slice(1)}</option>`).join('')}</select>
           <label><input type="checkbox" id="ggArrows"${prefs.arrows ? ' checked' : ''}/> One-way arrows</label>
           <label><input type="checkbox" id="ggMapFirst"${prefs.mapFirst ? ' checked' : ''}/> Map first</label>
@@ -984,6 +1044,13 @@ export function initGridClassic(ctx) {
     g.opts.bindHeader();
     for (const b of document.querySelectorAll('.ggturn')) b.addEventListener('click', () => press(b.dataset.side));
     document.getElementById('ggPause')?.addEventListener('click', togglePause);
+    document.getElementById('ggPeek')?.addEventListener('click', peek);
+    if (g.startCard) bindBriefing(guessSide, go0);
+    document.getElementById('ggGuide').addEventListener('change', (e) => {
+      prefs.guide = e.target.value;
+      savePrefs();
+      render();
+    });
     document.getElementById('ggOptsBtn').addEventListener('click', () => {
       prefs.optsOpen = !prefs.optsOpen;
       savePrefs();
