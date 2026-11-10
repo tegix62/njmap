@@ -2351,3 +2351,14 @@ body.ink .prow .typebtn {
 #ggMore {
   min-width: 44px;
 }
+
+#ggMark {
+  touch-action: manipulation;
+  min-width: 44px;
+}
+.ggend .flagged {
+  flex: 1 1 100%;
+  border-color: #b45309;
+  color: #b45309;
+  font-weight: 700;
+}

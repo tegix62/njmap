@@ -783,6 +783,60 @@ for li in kl:
                 px, py = x, y
             geoms.append(flat)
     link_out.append([jre[L['from']], jre[L['to']], L['name'], gi, round(L['b0']), round(L['b1'])])
+
+# ---- crossing a corner along the real connecting pieces, not a straight line --------------
+# Where one road ends and the next begins inside a merged corner (up to 50 m wide: bridge and
+# tunnel approaches, divided avenues), the straight line between them can cut across blocks
+# that have no road. The pieces that join them are in the city's data: follow those.
+import heapq
+def inside_path(c, src, dst):
+    if src == dst:
+        return []
+    dist, prev, h = {src: 0.0}, {}, [(0.0, src)]
+    while h:
+        dd, u = heapq.heappop(h)
+        if u == dst:
+            break
+        if dd > dist[u]:
+            continue
+        for k in out_raw[u]:
+            v = draw[k][1]
+            if cl[v] != c:
+                continue
+            nd = dd + edges[draw[k][2]][5]
+            if nd < dist.get(v, 1e18):
+                dist[v], prev[v] = nd, (u, k)
+                heapq.heappush(h, (nd, v))
+    if dst not in prev:
+        return None
+    seq, v = [], dst
+    while v != src:
+        u, k = prev[v]
+        seq.append(k)
+        v = u
+    return [q for k in reversed(seq) for q in draw[k][3]]
+xings, xlen_max, xmissing = {}, 0.0, 0
+for li in kl:
+    L = links[li]
+    end_pt = L['pts'][-1]
+    for lo in turns[li]:
+        if lo not in keep_l:
+            continue
+        nxt = links[lo]
+        chord = metres(end_pt, nxt['pts'][0])
+        if chord <= 6:
+            continue
+        path = inside_path(cl[L['end']], L['end'], nxt['start'])
+        if path is None:
+            xmissing += 1
+            continue
+        flat, px, py = [], 0, 0
+        for q in path:
+            x, y = enc(q)
+            flat += [x - px, y - py]
+            px, py = x, y
+        geoms.append(flat)
+        xings[f"{lre[li]}>{lre[lo]}"] = len(geoms) - 1
 data = {
     'version': 2,
     'source': f"NYC street centerline (CSCL), NYC Open Data, last edited {latest[:10]}",
@@ -794,6 +848,7 @@ data = {
     'links': link_out,
     'turns': turn_out,
     'cuts': cuts,
+    'xings': xings,
     'feeders': sorted(lre[li] for li in feed_l),
     'entries': entries_out,
     'places': places,

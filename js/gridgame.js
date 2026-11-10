@@ -134,6 +134,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
       return pts;
     });
     const feeders = new Set(d.feeders);
+    const xingGeo = new Map(); // "fromLink>toLink" -> the road pieces joining them inside the corner
+    for (const [key, gi] of Object.entries(d.xings || {})) xingGeo.set(key, geo[gi]);
     const out = nodes.map(() => []);
     const inn = nodes.map(() => []);
     // links between corners, directed; a two-way block is two links sharing a shape
@@ -178,7 +180,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const real = (n) => d.jdeg[n] >= 3; // three or more roads meet: a corner you could turn at
     const streetsAt = (n) => new Set([...out[n], ...inn[n]].map((e) => e.name.replace(/^[EW] (\d+\w\w) St$/, '$1 St'))).size;
     const gy = nodes.map((p) => gridXY(p)[1]);
-    G = { d, nodes, edges, out, inn, coreJ, cuts, real, streetsAt, label, plain, gy, RAMP, places: d.places, entries: d.entries, areas: d.areas };
+    G = { d, nodes, edges, out, inn, coreJ, cuts, real, streetsAt, xingGeo, label, plain, gy, RAMP, places: d.places, entries: d.entries, areas: d.areas };
     G.dataKey = `${d.source}|${edges.length}|${nodes.length}`;
     // each block once (a two-way block's two links share a shape), for coverage
     G.shapeLen = new Map();
@@ -286,6 +288,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       seen.add(e.shape);
       streets.push({ type: 'Feature', properties: { name: short(e.name) }, geometry: { type: 'LineString', coordinates: e.pts } });
     }
+    for (const pts of G.xingGeo.values()) streets.push({ type: 'Feature', properties: { name: '' }, geometry: { type: 'LineString', coordinates: pts } });
     streetsFC = { type: 'FeatureCollection', features: streets };
   }
   let streetsFC = null;
@@ -1057,7 +1060,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   function go(nx, carryOn = false) {
     logEv('go', nx.id, carryOn ? 'on' : 'turn');
     g.cruise = carryOn ? g.cruise + 1 : 0;
-    g.e = legOf(g.e.pts[g.e.pts.length - 1], nx);
+    g.e = legOf(g.e.pts[g.e.pts.length - 1], nx, g.e.id);
     g.s = 0;
     g.waiting = false;
     enterEdge(nx);
@@ -1067,12 +1070,22 @@ export function initGridGame(ctx, areaId = 'downtown') {
    * Link nx as driven from point a (where the last road ended): a straight cross
    * through the corner, then the road. The rest (name, choices, id) is nx's own.
    */
-  function legOf(a, nx) {
-    const ch = metres(a, nx.pts[0]);
-    if (ch < 0.5) return nx;
+  function legOf(a, nx, fromId) {
+    // the road pieces joining the two inside the corner, if the city's data has them; else straight across
+    const via = fromId != null ? G.xingGeo.get(`${fromId}>${nx.id}`) : null;
+    const lead = [a];
+    if (via) for (const q of via) if (metres(lead[lead.length - 1], q) > 0.3) lead.push(q);
+    if (metres(lead[lead.length - 1], nx.pts[0]) > 0.3) lead.push(nx.pts[0]);
+    if (lead.length < 2) return nx; // already there
+    let ch = 0;
+    const cum = [0];
+    for (let i = 1; i < lead.length; i++) {
+      ch += metres(lead[i - 1], lead[i]);
+      cum.push(ch);
+    }
     const leg = Object.create(nx);
-    leg.pts = [a, ...nx.pts];
-    leg.cum = [0, ...nx.cum.map((c) => c + ch)];
+    leg.pts = [...lead, ...nx.pts.slice(1)];
+    leg.cum = [...cum, ...nx.cum.slice(1).map((c) => c + ch)];
     leg.len = nx.len + ch;
     leg.chord = ch;
     return leg;
@@ -1110,6 +1123,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       if (what === 'zip') return `${tt} Go-to ${G.label(a)}`;
       if (what === 'stop') return `${tt} stopped at ${G.edges[a] ? G.label(G.edges[a].to) : a}`;
       if (what === 'msg') return `${tt} “${a}”`;
+      if (what === 'flag') return `${tt} ⚑ MARKED on ${L(a)} (${b} m in, ${c}) → ${G.edges[a] ? G.label(G.edges[a].to) : ''}`;
       if (what === 'hint') return `${tt} hint`;
       if (what === 'done') return `${tt} done: ${a} m (shortest ${b})${c ? `, ${c} wrong-way` : ''}`;
       return `${tt} ${[what, a, b, c, d].filter((x) => x != null).join(' ')}`;
@@ -1187,7 +1201,15 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const r = g.report;
     const ta = document.getElementById('ggNote');
     ta?.addEventListener('input', () => (r.note = ta.value));
-    const title = () => `${AREA.title}: ${r.kind === 'off' ? `something's off${r.snap ? ` at ${r.snap.corner}` : ''}` : `round to ${r.log.target}`}`;
+    const marks = r.log.ev.filter((x) => x[1] === 'flag');
+    const title = () =>
+      `${AREA.title}: ${
+        r.kind === 'off'
+          ? marks.length
+            ? `${marks.length} marked spot${marks.length === 1 ? '' : 's'}, round to ${r.log.target}`
+            : `something's off${r.snap ? ` at ${r.snap.corner}` : ''}`
+          : `round to ${r.log.target}`
+      }`;
     document.getElementById('ggSend')?.addEventListener('click', () => sendIssue(reportText(r.kind, r.log, r.snap, r.note), title()));
     document.getElementById('ggCopy')?.addEventListener('click', (e) => copyText(reportText(r.kind, r.log, r.snap, r.note), e.target));
     document.getElementById('ggBack')?.addEventListener('click', closeReport);
@@ -1609,6 +1631,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
         <button id="ggSame">↻ Same route</button>
         <button id="ggSave"${saved ? ' disabled' : ''}>${saved ? '★ Saved' : '☆ Save trip'}</button>
         <button id="ggLog">📋 Round log</button>
+        ${g.flags ? `<button id="ggFlagSend" class="flagged">⚑ Send the ${g.flags} spot${g.flags === 1 ? '' : 's'} you marked</button>` : ''}
       </div>`;
     render();
   }
@@ -1733,6 +1756,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
         <div class="ggbar">
           ${g.done || g.startCard ? '' : `<button id="ggPause" aria-label="${g.paused ? 'Resume' : 'Pause'}">${g.paused ? '▶ Go' : '⏸ Pause'}</button>`}
           ${!g.done && !g.startCard && !g.report ? `<button id="ggFast" aria-label="Hold to go faster">⏩ Hold</button>` : ''}
+          ${!g.done && !g.startCard && !g.report ? `<button id="ggMark" aria-label="Mark this spot">⚑</button>` : ''}
           ${!g.done && !g.startCard && prefs.guide === 'off' ? `<button id="ggPeek">👁 Peek</button>` : ''}
           ${hintReady() ? `<button id="ggHint">💡 Hint</button>` : ''}
           <button id="ggMore" aria-expanded="${!!g.more}" aria-label="More">${g.more ? '✕' : '⋯'}</button>
@@ -1771,6 +1795,16 @@ export function initGridGame(ctx, areaId = 'downtown') {
     document.getElementById('ggPause')?.addEventListener('click', togglePause);
     document.getElementById('ggPeek')?.addEventListener('click', peek);
     document.getElementById('ggHint')?.addEventListener('click', showHint);
+    // one tap, no pause: mark where something went wrong; send it from the end screen
+    document.getElementById('ggMark')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (!g || g.done || g.startCard) return;
+      g.flags = (g.flags || 0) + 1;
+      logEv('flag', g.e.id, Math.round(g.s), g.waiting ? 'stopped' : 'moving');
+      const b = document.getElementById('ggMark');
+      if (b) b.textContent = `⚑ ${g.flags}`;
+    });
+    document.getElementById('ggFlagSend')?.addEventListener('click', () => openReport('off'));
     document.getElementById('ggOff')?.addEventListener('click', () => {
       g.more = false;
       openReport('off');
