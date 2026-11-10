@@ -2377,9 +2377,12 @@ body.ink .prow .typebtn {
   font-weight: 700;
 }
 .ggchips.plan {
-  flex-wrap: wrap;
-  overflow: visible;
-  padding-bottom: 2px;
+  /* every corner you could turn at, nearest first, in one row you can swipe along */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
 }
 .ggplan .gp-bar {
   display: flex;
@@ -2426,4 +2429,30 @@ body.ink .prow .typebtn {
 }
 .gg-hood.fade {
   opacity: 0;
+}
+
+/* the shortest way's car in the end-of-round race, and where the two ways parted */
+.gg-bestcar svg {
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
+}
+.gg-split {
+  background: #15803d;
+  color: #fff;
+  font: 600 12px/1.2 system-ui, sans-serif;
+  padding: 5px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.gg-split:empty {
+  display: none;
+}
+.ggplan .gp-bar #ggMark,
+.ggplan .gp-bar #ggMore {
+  margin-left: 0;
+}
+
+.ggbar[hidden] {
+  display: none;
 }
