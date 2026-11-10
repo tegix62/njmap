@@ -490,6 +490,32 @@ export function initGridGame(ctx, areaId = 'downtown') {
   offEl.innerHTML = DIR_SVG;
   offEl.hidden = true;
   document.body.appendChild(offEl);
+  // neighborhoods, in passing: a small name pill when you cross into a new one, gone in a moment
+  const hoodEl = document.createElement('div');
+  hoodEl.className = 'gg-hood';
+  hoodEl.hidden = true;
+  document.body.appendChild(hoodEl);
+  let hoodTimer = 0;
+  /** Note where we are; announce a NEW neighborhood briefly (quiet = just keep the list for the end screen). */
+  function noteHood(p, quiet = false) {
+    if (!g || !p) return;
+    const m = ctx.locate(p);
+    const name = m ? m.n : null;
+    if (!name || name === g.hoodNow) return;
+    const first = g.hoodNow == null;
+    g.hoodNow = name;
+    if (g.passed[g.passed.length - 1] !== name) g.passed.push(name);
+    if (first || quiet) return; // the start is already said; a fast ride just keeps the list
+    hoodEl.innerHTML = `<b>${esc(name)}</b>`;
+    hoodEl.style.top = `${ctx.padding().top + 6}px`;
+    hoodEl.hidden = false;
+    hoodEl.classList.remove('fade');
+    void hoodEl.offsetWidth;
+    clearTimeout(hoodTimer);
+    hoodTimer = setTimeout(() => hoodEl.classList.add('fade'), 2200);
+    setTimeout(() => hoodEl.classList.contains('fade') && (hoodEl.hidden = true), 2900);
+    logEv('hood', name);
+  }
 
   /** Screen direction (degrees, 0 = up) and straight-line metres from the car to the destination. */
   function aim() {
@@ -762,6 +788,9 @@ export function initGridGame(ctx, areaId = 'downtown') {
       labels: prefs.labels, kind: g.kind, route: g.route, target: g.target.name || g.target.label, best: Math.round(g.best.cost), ev: [],
     };
     logEv('start', g.e.id, Math.round(g.s));
+    g.passed = [];
+    g.hoodNow = null;
+    noteHood(g.trail[0] || g.e.pts[0], true);
     enterEdge(g.e);
     g.msg = '';
     render();
@@ -773,6 +802,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   }
 
   function stop() {
+    hoodEl.hidden = true;
     if (!g) return;
     keepLog();
     cancelAnimationFrame(g.raf);
@@ -1033,6 +1063,10 @@ export function initGridGame(ctx, areaId = 'downtown') {
         : posOnEdge(g.e, g.s);
     g.pos = p;
     g.bnow = b;
+    if (!g.startCard && !g.done && now - (g.hoodAt || 0) > 250) {
+      g.hoodAt = now;
+      noteHood(p, !!(g.plan && g.plan.riding));
+    }
     const hc = `${gridDir(b)}${onGrid(g.e.name, b) ? '' : compassWord(b)}${choices(g.e).named ? 'n' : ''}`;
     if (hc !== g.lastHC) {
       g.lastHC = hc;
@@ -1068,6 +1102,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       }
     }
     g.trail.push(...e.pts.slice(1));
+    noteHood(e.pts[e.pts.length - 1], true); // (a fast ride can cross a small one between frames)
     setData('gg-trail', line(g.trail));
     if (g.msg && performance.now() - g.msgAt > 3500) g.msg = '';
     if (n === g.target.node) return finish();
@@ -1885,6 +1920,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     }${g.peeks ? ` · ${g.peeks} peek${g.peeks === 1 ? '' : 's'}` : ''}${g.hints ? ` · ${g.hints} hint${g.hints === 1 ? '' : 's'}` : ''}</div>
       ${fixed ? `<div class="hint">✓ ${esc(g.mistake.corner)}: got it this time</div>` : ''}
       ${missed ? `<div class="hint">↺ ${esc(missed)} (it'll come back)</div>` : ''}
+      ${g.passed && g.passed.length > 1 ? `<div class="hint">🏘 Through: ${g.passed.map(esc).join(' → ')}</div>` : ''}
       <div class="hint"><span class="gg-key you"></span> you <span class="gg-key best"></span> best: ${esc(describe(g.best.path))}</div>
       <div class="hint">Driven: ${Math.round(cover * 100)}% of ${AREA.of} blocks${g.newBlocks ? ` (+${g.newBlocks} new${cover - prevCover >= 0.005 ? `, +${Math.round((cover - prevCover) * 100)}%` : ''})` : ''}</div>
       <div class="ggend">
