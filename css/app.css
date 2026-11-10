@@ -2456,3 +2456,19 @@ body.ink .prow .typebtn {
 .ggbar[hidden] {
   display: none;
 }
+
+/* the result stays short enough to fit above the tab bar: one row of small buttons, the long text folded */
+.ggend button:not(.primary) {
+  white-space: nowrap;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+.ggdet summary {
+  cursor: pointer;
+  font-size: 13px;
+  opacity: 0.7;
+  padding: 2px 0;
+}
+.ggdet .hint {
+  margin-top: 4px;
+}

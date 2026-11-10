@@ -881,6 +881,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   }
 
   const onKey = (e) => {
+    if (e.target && e.target.closest && e.target.closest('textarea, input, select, [contenteditable]')) return; // typing a note is not driving
     if (!g || g.done || g.loading) return;
     if (g.startCard) {
       if (e.key === 'Enter') go0();
@@ -2039,14 +2040,17 @@ export function initGridGame(ctx, areaId = 'downtown') {
       ${fixed ? `<div class="hint">✓ ${esc(g.mistake.corner)}: got it this time</div>` : ''}
       ${missed ? `<div class="hint">↺ ${esc(missed)} (it'll come back)</div>` : ''}
       ${g.passed && g.passed.length > 1 ? `<div class="hint">🏘 Through: ${g.passed.map(esc).join(' → ')}</div>` : ''}
-      <div class="hint"><span class="gg-key you"></span> you <span class="gg-key best"></span> best: ${esc(describe(g.best.path))}</div>
-      <div class="hint">Driven: ${Math.round(cover * 100)}% of ${AREA.of} blocks${g.newBlocks ? ` (+${g.newBlocks} new${cover - prevCover >= 0.005 ? `, +${Math.round((cover - prevCover) * 100)}%` : ''})` : ''}</div>
+      <div class="hint"><span class="gg-key you"></span> you <span class="gg-key best"></span> shortest</div>
+      <details class="ggdet"><summary>Details</summary>
+        <div class="hint">Shortest: ${esc(describe(g.best.path))}</div>
+        <div class="hint">Driven: ${Math.round(cover * 100)}% of ${AREA.of} blocks${g.newBlocks ? ` (+${g.newBlocks} new${cover - prevCover >= 0.005 ? `, +${Math.round((cover - prevCover) * 100)}%` : ''})` : ''}</div>
+      </details>
       <div class="ggend">
         <button class="primary" id="ggAgain">Another route</button>
-        <button id="ggRace">▶ Watch again</button>
-        <button id="ggSame">↻ Same route</button>
-        <button id="ggSave"${saved ? ' disabled' : ''}>${saved ? '★ Saved' : '☆ Save trip'}</button>
-        <button id="ggLog">📋 Round log</button>
+        <button id="ggRace">▶ Replay</button>
+        <button id="ggSame">↻ Same</button>
+        <button id="ggSave"${saved ? ' disabled' : ''}>${saved ? '★ Saved' : '☆ Save'}</button>
+        <button id="ggLog">📋 Log</button>
         ${g.flags ? `<button id="ggFlagSend" class="flagged">⚑ Send the ${g.flags} spot${g.flags === 1 ? '' : 's'} you marked</button>` : ''}
       </div>`;
     render();

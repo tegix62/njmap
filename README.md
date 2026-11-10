@@ -62,6 +62,11 @@ The screen is built in two layers. The first is what you can take in at a glance
 
 **End of a round:** one sequence, not two. In plan style the shortest way's car (green) rides out alongside yours (blue) during the ride itself, by the same distance, and the camera frames both, zooming out as they pull apart; when it ends, the label where the two ways parted (*"the shortest way went Park Ave"*) appears if yours was clearly longer. After a drive you made in real time, both ride out together right after you arrive, at the ride's fast pace (2 to 4.5 seconds). **▶ Watch again** replays it.
 
+
+**Typing a report note:** the game's keys (space = pause, arrows = turn) are ignored while you type in a text box. Before, a space re-drew the panel under your fingers and the iPhone keyboard closed.
+
+**Result screen:** short enough to fit above the tab bar: stars, the one-line summary, neighborhoods, a legend, a folded *Details* (the shortest route in words, blocks driven) and one row of buttons (Replay, Same, Save, Log).
+
 **Button feel:** every button presses in to 94% and springs back (`js/motion.js`, spring stiffness 1019, damping 42: the feel lab's "snappy" spring made 40% faster). It uses the `scale` property so it can't clash with a button's own transform, a quick tap still shows its press (70 ms minimum), and it's skipped under reduced-motion. Further feedback (wrong-turn shake, star landings, panel curves) is still being chosen.
 
 ## Getting around the app

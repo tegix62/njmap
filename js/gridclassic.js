@@ -672,6 +672,7 @@ export function initGridClassic(ctx) {
   }
 
   const onKey = (e) => {
+    if (e.target && e.target.closest && e.target.closest('textarea, input, select, [contenteditable]')) return; // typing a note is not driving
     if (!g || g.done) return;
     if (g.startCard) {
       if (e.key === 'Enter') go0();
