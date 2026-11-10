@@ -533,6 +533,25 @@ export function initGridGame(ctx, areaId = 'downtown') {
   const HOOD_REST = { fill: 0.07, line: 0.6 };
   const HOOD_PULSE = { fill: 0.2, line: 1 };
   let hoodTimer = 0;
+  // the name of the outlined neighborhood stays in view, just under the top card, for as long as it's outlined
+  const hoodTag = document.createElement('div');
+  hoodTag.className = 'gg-hoodtag';
+  hoodTag.hidden = true;
+  document.body.appendChild(hoodTag);
+  function placeHoodTag() {
+    if (hoodTag.hidden) return;
+    hoodTag.style.top = `${Math.round(ctx.padding().top - 6)}px`;
+  }
+  function setHoodTag(name, pulse) {
+    hoodTag.textContent = name || '';
+    hoodTag.hidden = !name;
+    placeHoodTag();
+    if (pulse) {
+      hoodTag.classList.remove('pulse');
+      void hoodTag.offsetWidth;
+      hoodTag.classList.add('pulse');
+    }
+  }
   function highlightHood(m, pulse) {
     if (!m || !m.geom || !map.getSource('gg-hood')) return;
     const polys = m.geom.type === 'Polygon' ? [m.geom.coordinates] : m.geom.coordinates;
@@ -543,12 +562,14 @@ export function initGridGame(ctx, areaId = 'downtown') {
       map.setPaintProperty('gg-hood-fill', 'fill-opacity', v.fill);
       map.setPaintProperty('gg-hood-line', 'line-opacity', v.line);
     };
+    setHoodTag(m.n, pulse);
     clearTimeout(hoodTimer);
     lvl(pulse ? HOOD_PULSE : HOOD_REST);
     if (pulse) hoodTimer = setTimeout(() => map.getLayer('gg-hood-fill') && lvl(HOOD_REST), 1500);
   }
   function clearHood() {
     clearTimeout(hoodTimer);
+    setHoodTag('');
     if (!map.getSource('gg-hood')) return;
     setData('gg-hood', EMPTY);
     map.setPaintProperty('gg-hood-fill', 'fill-opacity', 0);
@@ -2227,6 +2248,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   // ---- words on screen -------------------------------------------------------------------
   function render() {
     if (!g) return;
+    requestAnimationFrame(placeHoodTag);
     if (g.loading) {
       ctx.hud(`<div class="qkind">🚕 ${AREA.title}</div><div class="q">Loading the street map…</div>`);
       ctx.sheet(`${g.opts.header()}`);

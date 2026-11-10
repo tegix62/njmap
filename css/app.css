@@ -2494,3 +2494,43 @@ body.ink .prow .typebtn {
 .gg-tag[hidden] {
   display: none;
 }
+
+/* the outlined neighborhood's name, kept in view under the top card */
+.gg-hoodtag {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  max-width: calc(100vw - 32px);
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #0b7a68;
+  color: #fff;
+  font: 700 13px/1.25 system-ui, sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.gg-hoodtag[hidden] {
+  display: none;
+}
+.gg-hoodtag.pulse {
+  animation: gg-hoodpulse 1.4s ease-out;
+}
+@keyframes gg-hoodpulse {
+  0% {
+    transform: translateX(-50%) scale(1.18);
+    background: #12a58c;
+  }
+  100% {
+    transform: translateX(-50%) scale(1);
+    background: #0b7a68;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gg-hoodtag.pulse {
+    animation: none;
+  }
+}
