@@ -36,6 +36,7 @@ const PACE = { relaxed: 2, easy: 1, normal: 0.72, fast: 0.5 }; // relaxed: at le
 const BLOCK_MIN_S = 1;
 const GOTO_SPEED = 0.18; // fraction of the block time: heading to a tapped corner,
 const HOLD_SPEED = 0.25; // holding the map,
+const RIDE_F = { quick: 0.07, steady: 0.14, slow: 0.26 }; // the plan's ride, as a fraction of the block time
 const HOME_SPEED = 0.07; // and on the home stretch
 const AVENUE_RULE = {
   '1st Ave': 'U', '2nd Ave': 'D', '3rd Ave': 'U', 'Lexington Ave': 'D', 'Madison Ave': 'U', '5th Ave': 'D',
@@ -369,7 +370,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     // the border you just crossed: the new neighborhood tinted, its edge near you dashed; both fade in a moment
     map.addSource('gg-hood', { type: 'geojson', data: EMPTY });
     map.addLayer({ id: 'gg-hood-fill', type: 'fill', source: 'gg-hood', filter: ['==', ['get', 'k'], 'f'], paint: { 'fill-color': '#0b7a68', 'fill-opacity': 0, 'fill-opacity-transition': { duration: 500 } } });
-    map.addLayer({ id: 'gg-hood-line', type: 'line', source: 'gg-hood', filter: ['==', ['get', 'k'], 'l'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#0b7a68', 'line-width': 4, 'line-dasharray': [1.6, 1.2], 'line-opacity': 0, 'line-opacity-transition': { duration: 500 } } });
+    map.addLayer({ id: 'gg-hood-line', type: 'line', source: 'gg-hood', filter: ['==', ['get', 'k'], 'l'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#0b7a68', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.8, 14, 1.4, 16, 2.4, 17.5, 3.4], 'line-opacity': 0, 'line-opacity-transition': { duration: 500 } } });
     map.addLayer({ id: 'gg-best', type: 'line', source: 'gg-best', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#15803d', 'line-width': 4.5, 'line-dasharray': [2, 1.5] } });
     map.addLayer({ id: 'gg-trail', type: 'line', source: 'gg-trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#2b4fb3', 'line-width': 6, 'line-opacity': 0.55 } });
     map.addLayer({
@@ -496,79 +497,84 @@ export function initGridGame(ctx, areaId = 'downtown') {
   const splitEl = document.createElement('div');
   splitEl.className = 'gg-split';
   const splitMk = new maplibregl.Marker({ element: splitEl, anchor: 'bottom', offset: [0, -6] });
+  // street-name tags that appear for a moment where a car turns onto another street, in the end ride
+  function makeTag(cls, offset) {
+    const el = document.createElement('div');
+    el.className = `gg-tag ${cls}`;
+    el.hidden = true;
+    const mk = new maplibregl.Marker({ element: el, anchor: 'left', offset });
+    return { el, mk, t: 0 };
+  }
+  const youTag = makeTag('you', [16, -18]);
+  const bestTag = makeTag('best', [16, 16]);
+  function showTag(tag, text, at) {
+    tag.el.textContent = text;
+    tag.el.hidden = false;
+    tag.el.classList.remove('fade');
+    tag.mk.setLngLat(at).addTo(map);
+    clearTimeout(tag.t);
+    tag.t = setTimeout(() => tag.el.classList.add('fade'), 1300);
+  }
+  function hideTags() {
+    for (const t of [youTag, bestTag]) {
+      clearTimeout(t.t);
+      t.el.hidden = true;
+      t.mk.remove();
+    }
+  }
   // off-screen pointer to the destination
   const offEl = document.createElement('div');
   offEl.className = 'gg-off';
   offEl.innerHTML = DIR_SVG;
   offEl.hidden = true;
   document.body.appendChild(offEl);
-  // neighborhoods, in passing: a small name pill when you cross into a new one, gone in a moment
-  const hoodEl = document.createElement('div');
-  hoodEl.className = 'gg-hood';
-  hoodEl.hidden = true;
-  document.body.appendChild(hoodEl);
+  // neighborhoods in passing: the one you're in is outlined softly on the map and the outline
+  // pulses when you cross into another. The name is in the top card.
+  const HOOD_REST = { fill: 0.07, line: 0.6 };
+  const HOOD_PULSE = { fill: 0.2, line: 1 };
   let hoodTimer = 0;
-  /** Draw the stretch of the new neighborhood's edge near the crossing (plus a light tint), then fade it. */
-  function showHoodBorder(m, p) {
+  function highlightHood(m, pulse) {
     if (!m || !m.geom || !map.getSource('gg-hood')) return;
-    const X = 84400, Y = 111000, R = 650;
-    const dist = (a, b, c) => {
-      // metres from point a to segment b-c
-      const ax = (a[0] - b[0]) * X, ay = (a[1] - b[1]) * Y, bx = (c[0] - b[0]) * X, by = (c[1] - b[1]) * Y;
-      const l2 = bx * bx + by * by;
-      const t = l2 ? Math.max(0, Math.min(1, (ax * bx + ay * by) / l2)) : 0;
-      return Math.hypot(ax - t * bx, ay - t * by);
-    };
     const polys = m.geom.type === 'Polygon' ? [m.geom.coordinates] : m.geom.coordinates;
     const feats = [{ type: 'Feature', properties: { k: 'f' }, geometry: m.geom }];
-    const lines = [];
-    for (const poly of polys) {
-      for (const ring of poly) {
-        let cur = [];
-        for (let i = 0; i + 1 < ring.length; i++) {
-          if (dist(p, ring[i], ring[i + 1]) < R) {
-            if (!cur.length) cur.push(ring[i]);
-            cur.push(ring[i + 1]);
-          } else {
-            if (cur.length > 1) lines.push(cur);
-            cur = [];
-          }
-        }
-        if (cur.length > 1) lines.push(cur);
-      }
-    }
-    for (const c of lines) feats.push({ type: 'Feature', properties: { k: 'l' }, geometry: { type: 'LineString', coordinates: c } });
+    for (const poly of polys) for (const ring of poly) feats.push({ type: 'Feature', properties: { k: 'l' }, geometry: { type: 'LineString', coordinates: ring } });
     setData('gg-hood', { type: 'FeatureCollection', features: feats });
-    map.setPaintProperty('gg-hood-fill', 'fill-opacity', 0.12);
-    map.setPaintProperty('gg-hood-line', 'line-opacity', 0.95);
-    clearTimeout(g.borderTimer);
-    g.borderTimer = setTimeout(() => {
-      if (!map.getLayer('gg-hood-fill')) return;
-      map.setPaintProperty('gg-hood-fill', 'fill-opacity', 0);
-      map.setPaintProperty('gg-hood-line', 'line-opacity', 0);
-    }, 3000);
+    const lvl = (v) => {
+      map.setPaintProperty('gg-hood-fill', 'fill-opacity', v.fill);
+      map.setPaintProperty('gg-hood-line', 'line-opacity', v.line);
+    };
+    clearTimeout(hoodTimer);
+    lvl(pulse ? HOOD_PULSE : HOOD_REST);
+    if (pulse) hoodTimer = setTimeout(() => map.getLayer('gg-hood-fill') && lvl(HOOD_REST), 1500);
   }
-  /** Note where we are; announce a NEW neighborhood briefly (quiet = just keep the list for the end screen). */
+  function clearHood() {
+    clearTimeout(hoodTimer);
+    if (!map.getSource('gg-hood')) return;
+    setData('gg-hood', EMPTY);
+    map.setPaintProperty('gg-hood-fill', 'fill-opacity', 0);
+    map.setPaintProperty('gg-hood-line', 'line-opacity', 0);
+  }
+  /** In the end ride: outline whichever neighborhood your car is in. */
+  function watchHood(p) {
+    const m = ctx.locate(p);
+    if (!m || m.n === g.raceHood) return;
+    const first = g.raceHood == null;
+    g.raceHood = m.n;
+    highlightHood(m, !first);
+  }
+  /** Note where we are: keep the neighborhoods driven through, and outline the current one. */
   function noteHood(p, quiet = false) {
     if (!g || !p) return;
     const m = ctx.locate(p);
     const name = m ? m.n : null;
     if (!name || name === g.hoodNow) return;
     const first = g.hoodNow == null;
-    const prevName = g.hoodNow;
     g.hoodNow = name;
-    if (!planning() && g.passed[g.passed.length - 1] !== name) g.passed.push(name); // the plan's ghost jumps around: only real driving counts
-    if (first || quiet) return; // the start is already said; a fast ride just keeps the list
-    hoodEl.innerHTML = `${prevName ? `<span>${esc(prevName)} →</span> ` : ''}<b>${esc(name)}</b>`;
-    showHoodBorder(m, p);
-    hoodEl.style.top = `${ctx.padding().top + 6}px`;
-    hoodEl.hidden = false;
-    hoodEl.classList.remove('fade');
-    void hoodEl.offsetWidth;
-    clearTimeout(hoodTimer);
-    hoodTimer = setTimeout(() => hoodEl.classList.add('fade'), 2200);
-    setTimeout(() => hoodEl.classList.contains('fade') && (hoodEl.hidden = true), 2900);
+    if (!planning() && !g.done && g.passed[g.passed.length - 1] !== name) g.passed.push(name); // the plan's ghost jumps around: only real driving counts
+    highlightHood(m, !first && !quiet);
+    if (first || quiet) return;
     logEv('hood', name);
+    if (!planning() && !g.report && !g.startCard && !g.check && !g.done) render(); // the top card names it
   }
 
   /** Screen direction (degrees, 0 = up) and straight-line metres from the car to the destination. */
@@ -856,11 +862,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   }
 
   function stop() {
-    hoodEl.hidden = true;
-    if (map.getLayer('gg-hood-line')) {
-      map.setPaintProperty('gg-hood-fill', 'fill-opacity', 0);
-      map.setPaintProperty('gg-hood-line', 'line-opacity', 0);
-    }
+    clearHood();
     if (!g) return;
     keepLog();
     cancelAnimationFrame(g.raf);
@@ -869,6 +871,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     carMk.remove();
     bestMk.remove();
     splitMk.remove();
+    hideTags();
     offEl.hidden = true;
     lockMap(false);
     declutter(false);
@@ -1079,7 +1082,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   /** Seconds this block takes (the classic rhythm). */
   const blockSeconds = (len) => Math.max(BLOCK_MIN_S, 0.55 + len / 168) * PACE[prefs.pace];
   function updateSpeed() {
-    const f = g.home ? HOME_SPEED : g.goTo != null ? GOTO_SPEED : g.boost ? HOLD_SPEED : 1;
+    const f = g.home ? (g.plan && g.plan.riding ? RIDE_F[prefs.rideSpeed] || RIDE_F.steady : HOME_SPEED) : g.goTo != null ? GOTO_SPEED : g.boost ? HOLD_SPEED : 1;
     g.v = g.e.len / (blockSeconds(g.e.len) * f);
     if (g.goTo != null) g.v = Math.max(g.v, g.gotoV || 0);
     return g.v;
@@ -1137,6 +1140,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     if (g.bestRide && g.plan && g.plan.riding && !g.done) {
       const ab = atLine(g.bestRide, Math.max(0, g.driven + g.s));
       g.bestPos = ab.p;
+      tagFor(bestTag, g.bestRide.marks, Math.max(0, g.driven + g.s), ab.p, g, 'bestMarkI');
       bestMk.setLngLat(ab.p);
       if (ab.brg != null) bestMk.setRotation(ab.brg);
       setData('gg-best', line([...g.bestRide.pts.slice(0, ab.k), ab.p]));
@@ -1168,7 +1172,12 @@ export function initGridGame(ctx, areaId = 'downtown') {
         const bp = g.bestPos || p;
         const sep = meters(p, bp);
         const c = [(p[0] + bp[0]) / 2, (p[1] + bp[1]) / 2];
-        map.easeTo({ center: c, zoom: Math.max(14.2, ZOOM - Math.log2(Math.max(1, sep / 260))), bearing: GRID, offset: [0, oy], duration: 0 });
+        // keep both cars well inside the open map: their gap may use half of the short side
+        const mpp = (78271.5 * Math.cos((p[1] * Math.PI) / 180)) / Math.pow(2, ZOOM);
+        const openH = H - pad.top - pad.bottom;
+        const allowed = 0.5 * Math.min(window.innerWidth, openH);
+        const z = Math.max(12.5, ZOOM - Math.log2(Math.max(1, sep / (mpp * allowed))));
+        map.easeTo({ center: c, zoom: z, bearing: GRID, offset: [0, pad.top + openH * 0.5 - H / 2], duration: 0 });
       } else {
         g.camKey = null;
         map.easeTo({ center: p, zoom: ZOOM, bearing: GRID, offset: [0, oy], duration: 0 });
@@ -1191,6 +1200,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
         g.newBlocks++;
       }
     }
+    (g.marks || (g.marks = [])).push({ idx: g.trail.length - 1, name: e.name });
     g.trail.push(...e.pts.slice(1));
     noteHood(e.pts[e.pts.length - 1], true); // (a fast ride can cross a small one between frames)
     setData('gg-trail', line(g.trail));
@@ -1212,6 +1222,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     if (g.plan && g.plan.riding) {
       g.plan.i++;
       g.pick = g.plan.route[g.plan.i] || null;
+      if (g.pick && short(g.pick.name) !== short(e.name) && !G.RAMP.test(g.pick.name)) showTag(youTag, short(g.pick.name), G.nodes[n]);
     }
     if (g.auto) autopilot(e);
     if (!c.decision) {
@@ -1712,6 +1723,45 @@ export function initGridGame(ctx, areaId = 'downtown') {
     }
     return out;
   }
+  /**
+   * The corners offered as chips: a handful (6), not all of them. Always the corner the shortest way
+   * needs, a couple before it and a few past it (one of them close), so there's something to get wrong
+   * and a different mix on another try. Fixed for as long as the plan stands at this spot.
+   */
+  function planChips() {
+    const p = g.plan;
+    const key = `${p.cur.id}:${p.curS | 0}:${p.route.length}`;
+    if (p.chipKey === key && p.chipNodes) return p.chipNodes.map((n) => p.chipAll.find((c) => c.node === n));
+    const all = planCorners(p.cur).map((c, i) => ({ ...c, idx: i }));
+    const chain = aheadChain(p.cur, 70, 7000);
+    const r = shortest(p.cur, g.target.node, p.curS);
+    let k = 0;
+    while (r && k + 1 < r.path.length && chain[k + 1] && r.path[k + 1] === chain[k + 1].via) k++;
+    const needNode = chain[k] ? chain[k].node : g.target.node;
+    let n = all.findIndex((c) => c.node === needNode);
+    if (n < 0) n = Math.max(0, all.findIndex((c) => chain.findIndex((x) => x.node === c.node) >= k));
+    const pickRand = (arr, m) => {
+      const a = arr.slice(), out = [];
+      while (a.length && out.length < m) out.push(a.splice(Math.floor(Math.random() * a.length), 1)[0]);
+      return out;
+    };
+    const before = all.slice(0, n), after = all.slice(n + 1), MAX = 6;
+    let nb = Math.min(before.length, 2);
+    let na = Math.min(after.length, MAX - 1 - nb);
+    nb = Math.min(before.length, MAX - 1 - na);
+    const near = after.slice(0, 3);
+    const chosen = [all[n]].filter(Boolean);
+    if (na) {
+      const first = pickRand(near, 1);
+      chosen.push(...first, ...pickRand(after.filter((c) => !first.includes(c)), na - first.length));
+    }
+    chosen.push(...pickRand(before, nb));
+    chosen.sort((a, b) => a.idx - b.idx);
+    p.chipKey = key;
+    p.chipAll = all;
+    p.chipNodes = chosen.map((c) => c.node);
+    return chosen;
+  }
   function startPlan() {
     g.plan = { route: [g.e], cur: g.e, phase: 'corner', pos: g.trail[0], curS: g.s, s0: g.s, hist: [], riding: false };
     g.waiting = true;
@@ -1827,10 +1877,10 @@ export function initGridGame(ctx, areaId = 'downtown') {
       </div>`;
     if (p.phase === 'done') return ctl(`<div class="bq">🏁 That gets you there.</div><button class="primary" id="ggRide">🚕 Ride it ▶</button>`);
     if (p.phase === 'corner') {
-      const cs = planCorners(p.cur);
-      const lab = (c, i) => (prefs.labels ? short(c.name) : `+${i + 1}`);
+      const cs = planChips();
+      const lab = (c) => (prefs.labels ? short(c.name) : `+${c.idx + 1}`);
       return ctl(`<div class="bq">${p.route.length === 1 ? 'Where do you turn?' : 'Next, where do you turn?'}</div>
-        <div class="ggchips plan">${cs.map((c, i) => `<button class="ggchip" data-node="${c.node}">${c.node === g.target.node ? '🏁 ' : ''}${esc(lab(c, i))}</button>`).join('') || '<span class="muted">No turns ahead on this road.</span>'}</div>`);
+        <div class="ggchips plan">${cs.map((c, i) => `<button class="ggchip" data-node="${c.node}">${c.node === g.target.node ? '🏁 ' : ''}${esc(lab(c))}</button>`).join('') || '<span class="muted">No turns ahead on this road.</span>'}</div>`);
     }
     const c = choices(p.cur);
     const at = prefs.labels ? G.label(p.cur.to) : 'this corner';
@@ -1869,10 +1919,16 @@ export function initGridGame(ctx, areaId = 'downtown') {
     g.path = [];
     setData('gg-trail', EMPTY);
     // one sequence: the shortest way's car rides out alongside yours, by the same distance
-    const bc = [];
-    g.best.path.forEach((e) => bc.push(...e.pts));
+    const bc = [], bm = [];
+    g.best.path.forEach((e) => {
+      bm.push({ idx: bc.length, name: e.name });
+      bc.push(...e.pts);
+    });
     g.bestCoords = bc;
     g.bestRide = prepLine(bc);
+    g.bestRide.marks = bm.map((m) => ({ d: g.bestRide.cum[m.idx], name: m.name }));
+    g.bestMarkI = 0;
+    g.marks = [];
     g.bestPos = bc[0];
     setData('gg-best', EMPTY);
     bestMk.setLngLat(bc[0]).addTo(map);
@@ -1986,7 +2042,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     // is on screen, so the framing allows for its height)
     const all = [...g.trail, ...bestCoords];
     const round = g;
-    setTimeout(() => g === round && g.done && ctx.fit(all, 16, { bearing: GRID, duration: 900 }), 900); // a beat at the pin first
+    setTimeout(() => g === round && g.done && ctx.fit(all, 16, { bearing: GRID, duration: 900, margin: 56 }), 900); // a beat at the pin first
     if (!g.rodeBoth) setTimeout(() => g === round && g.done && startRace(), 1900); // (a planned ride already was the race)
     const mi = (m) => (m / 1609.34).toFixed(2).replace(/0$/, '');
     const ratio = g.driven / g.best.cost;
@@ -2057,6 +2113,16 @@ export function initGridGame(ctx, areaId = 'downtown') {
   }
 
   const meters = (a, b) => Math.hypot((b[0] - a[0]) * 84400, (b[1] - a[1]) * 111000);
+  /** Show the street name when a car passes the start of a street with a different name from the one before. */
+  function tagFor(tag, marks, d, p, holder, key) {
+    let i = holder[key] || 0;
+    while (i + 1 < marks.length && marks[i + 1].d <= d) i++;
+    if (i !== (holder[key] || 0)) {
+      const prev = marks[i - 1] || marks[0], cur = marks[i];
+      if (short(cur.name) !== short(prev.name) && !G.RAMP.test(cur.name)) showTag(tag, short(cur.name), p);
+    }
+    holder[key] = i;
+  }
   function prepLine(pts) {
     const cum = [0];
     for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + meters(pts[i - 1], pts[i]));
@@ -2080,10 +2146,26 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const id = (g.raceId = (g.raceId || 0) + 1);
     const prep = prepLine, at = atLine;
     const you = prep(g.trail), best = prep(g.bestCoords);
+    const youMarks = (g.marks || []).map((m) => ({ d: you.cum[Math.max(0, Math.min(m.idx, you.cum.length - 1))], name: m.name }));
+    const bestMarks = [], seen = [];
+    g.best.path.forEach((e) => {
+      seen.push(e);
+    });
+    {
+      let idx = 0;
+      for (const e of seen) {
+        bestMarks.push({ d: best.cum[Math.min(idx, best.cum.length - 1)], name: e.name });
+        idx += e.pts.length;
+      }
+    }
+    const rs = { y: 0, b: 0 };
     const total = Math.max(you.len, best.len);
-    const ms = Math.max(2200, Math.min(4500, total * 1.4));
-    const speed = total / ms;
+    const ms = { quick: [2200, 4500, 1.4], steady: [4500, 9000, 3], slow: [7000, 14000, 5] }[prefs.rideSpeed] || [4500, 9000, 3];
+    const dur = Math.max(ms[0], Math.min(ms[1], total * ms[2]));
+    const speed = total / dur;
     g.replay = true;
+    g.raceHood = null;
+    hideTags();
     carMk.setLngLat(you.pts[0]);
     bestMk.setLngLat(best.pts[0]).addTo(map);
     if (g.split) splitMk.setLngLat(g.split.at).addTo(map);
@@ -2096,6 +2178,9 @@ export function initGridGame(ctx, areaId = 'downtown') {
       if (g !== round || g.raceId !== id || !g.done) return;
       const d = Math.max(0, (now - t0) * speed);
       const ay = at(you, d), ab = at(best, d);
+      tagFor(youTag, youMarks, d, ay.p, rs, 'y');
+      tagFor(bestTag, bestMarks, d, ab.p, rs, 'b');
+      watchHood(ay.p);
       carMk.setLngLat(ay.p);
       if (ay.brg != null) lastY = ay.brg;
       carMk.setRotation(lastY);
@@ -2249,6 +2334,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
           <select id="ggFrom" aria-label="Start">${[['both', 'Start: mixed'], ['entries', 'Start: tunnels & bridges'], ['anywhere', 'Start: anywhere']].map(([k, v]) => `<option value="${k}"${prefs.from === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggStyle" aria-label="Play style">${[['plan', 'Play: plan, then ride'], ['drive', 'Play: free drive']].map(([k, v]) => `<option value="${k}"${prefs.style === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggGuide" aria-label="Guide">${Object.entries(GUIDES).map(([k, v]) => `<option value="${k}"${prefs.guide === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
+          <select id="ggRideSpeed" aria-label="Ride and replay speed">${[['quick', 'Replay: quick'], ['steady', 'Replay: steady'], ['slow', 'Replay: slow']].map(([k, v]) => `<option value="${k}"${(prefs.rideSpeed || 'steady') === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggPace" aria-label="Speed">${Object.keys(PACE).map((p) => `<option value="${p}"${prefs.pace === p ? ' selected' : ''}>${p[0].toUpperCase() + p.slice(1)}</option>`).join('')}</select>
           <details class="ggmoreopts">
             <summary>More options</summary>
@@ -2351,6 +2437,10 @@ export function initGridGame(ctx, areaId = 'downtown') {
     restartOn('ggArea', 'area');
     restartOn('ggFrom', 'from');
     restartOn('ggStyle', 'style');
+    document.getElementById('ggRideSpeed').addEventListener('change', (e) => {
+      prefs.rideSpeed = e.target.value;
+      savePrefs();
+    });
     document.getElementById('ggPace').addEventListener('change', (e) => {
       prefs.pace = e.target.value;
       savePrefs();

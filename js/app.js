@@ -372,7 +372,7 @@ async function main() {
           [b[0], b[1]],
           [b[2], b[3]],
         ],
-        { padding: ctx.padding(), maxZoom, bearing: opts.bearing ?? map.getBearing(), duration: ctx.dur(opts.duration ?? 800), essential: true }
+        { padding: (() => { const p = ctx.padding(), m = opts.margin || 0; return { top: p.top + m, bottom: p.bottom + m, left: p.left + m, right: p.right + m }; })(), maxZoom, bearing: opts.bearing ?? map.getBearing(), duration: ctx.dur(opts.duration ?? 800), essential: true }
       );
     },
     /** "12 mi NW of Clifton" style phrase: where `to` sits relative to `from`. */

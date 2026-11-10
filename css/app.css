@@ -2377,12 +2377,10 @@ body.ink .prow .typebtn {
   font-weight: 700;
 }
 .ggchips.plan {
-  /* every corner you could turn at, nearest first, in one row you can swipe along */
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  padding-bottom: 6px;
-  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
-  mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+  /* a handful of corners, nearest first; every one is fully visible and tappable */
+  flex-wrap: wrap;
+  overflow: visible;
+  padding-bottom: 2px;
 }
 .ggplan .gp-bar {
   display: flex;
@@ -2471,4 +2469,28 @@ body.ink .prow .typebtn {
 }
 .ggdet .hint {
   margin-top: 4px;
+}
+
+/* street names where a car turns, in the end ride */
+.gg-tag {
+  font: 700 13px/1.2 system-ui, sans-serif;
+  color: #fff;
+  padding: 4px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  transition: opacity 0.5s ease;
+}
+.gg-tag.you {
+  background: #2b4fb3;
+}
+.gg-tag.best {
+  background: #15803d;
+}
+.gg-tag.fade {
+  opacity: 0;
+}
+.gg-tag[hidden] {
+  display: none;
 }
