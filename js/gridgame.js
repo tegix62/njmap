@@ -377,6 +377,22 @@ export function initGridGame(ctx, areaId = 'downtown') {
       },
       paint: { 'text-color': '#4f483e', 'text-halo-color': '#ffffff', 'text-halo-width': 1.8 },
     });
+    // famous and need-to-know spots, in passing: a small dot and an italic name that gives way to street names
+    map.addSource('gg-poi', { type: 'geojson', data: EMPTY });
+    const lmInk = (map.getLayer('landmark-label') && map.getPaintProperty('landmark-label', 'text-color')) || '#4f483e';
+    map.addLayer({
+      id: 'gg-poi-dot', type: 'circle', source: 'gg-poi', minzoom: 14.6,
+      layout: { visibility: 'none' },
+      paint: { 'circle-radius': 4, 'circle-color': typeof lmInk === 'string' ? lmInk : '#4f483e', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.5 },
+    });
+    map.addLayer({
+      id: 'gg-poi-label', type: 'symbol', source: 'gg-poi', minzoom: 14.6,
+      layout: {
+        visibility: 'none', 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Italic'], 'text-size': 12,
+        'text-anchor': 'top', 'text-offset': [0, 0.7], 'text-max-width': 7, 'text-optional': true,
+      },
+      paint: { 'text-color': typeof lmInk === 'string' ? lmInk : '#4f483e', 'text-halo-color': '#ffffff', 'text-halo-width': 1.8 },
+    });
     map.addLayer({
       id: 'gg-arrows', type: 'symbol', source: 'gg-arrows',
       layout: {
@@ -399,6 +415,23 @@ export function initGridGame(ctx, areaId = 'downtown') {
   const line = (coords) => ({ type: 'FeatureCollection', features: coords.length > 1 ? [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } }] : [] });
   const point = (p, props = {}) => ({ type: 'FeatureCollection', features: p ? [{ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: p } }] : [] });
   /** Hard mode: street names off the map for the round. */
+  /** The area's famous and need-to-know spots: the app's landmark list plus the game's named places, within reach of its streets. */
+  function poiFeatures() {
+    const near = (pt) => G.nodes.some((n) => metres(n, pt) < 260);
+    const pts = [];
+    const add = (name, pt, tier) => {
+      const clean = name.replace(/ \(.*\)$/, '').replace(/^the /i, '');
+      if (!near(pt) || pts.some((q) => metres(q.pt, pt) < 110 || q.name.toLowerCase() === clean.toLowerCase())) return;
+      pts.push({ name: clean, pt, tier });
+    };
+    for (const l of ctx.region.landmarks || []) add(l.name, l.pt, 0);
+    for (const pl of G.places) add(pl.name, G.nodes[pl.node], 1);
+    return { type: 'FeatureCollection', features: pts.map((q) => ({ type: 'Feature', properties: { name: q.name }, geometry: { type: 'Point', coordinates: q.pt } })) };
+  }
+  /** Show them once the round is under way (not during the briefing, where they'd give the answer away). */
+  function showPoi(on) {
+    for (const id of ['gg-poi-dot', 'gg-poi-label']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+  }
   function showLabels(on) {
     const vis = (id, v) => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', v ? 'visible' : 'none');
     // driving: the game's own streets and names; the end-of-round overview and the rest of
@@ -718,6 +751,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     setData('gg-goto', EMPTY);
     setData('gg-streets', streetsFC || EMPTY);
     setData('gg-arrows', arrowsFC || EMPTY);
+    setData('gg-poi', G.poi || (G.poi = poiFeatures()));
+    showPoi(false);
     showArrows();
     showLabels(prefs.labels);
     showCover();
@@ -750,6 +785,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     document.body.classList.remove('gridding');
     for (const id of ['gg-trail', 'gg-best', 'gg-target', 'gg-goto', 'gg-cover']) setData(id, EMPTY);
     showLabels(true);
+    showPoi(false);
     if (map.getLayer('gg-arrows')) map.setLayoutProperty('gg-arrows', 'visibility', 'none');
     map.setGlobalStateProperty('quiet', ctx.mode === 'practice');
   }
@@ -901,7 +937,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
 
   // ---- check-ins: "You're heading downtown. Which side is the Hudson?" ----------------------
   function maybeCheckIn(now) {
-    if (!prefs.checkins || g.startCard || g.auto || g.check || g.done || g.waiting || g.home || g.goTo != null || g.queued || g.paused || g.view !== 'follow') return;
+    if (true || !prefs.checkins || g.startCard || g.auto || g.check || g.done || g.waiting || g.home || g.goTo != null || g.queued || g.paused || g.view !== 'follow') return;
     if (now - g.lastCheck < CHECK_EVERY_MS || !g.e.core || g.e.len < 60 || g.s < g.e.len * 0.25 || g.s > g.e.len * 0.6) return;
     if (!prefs.labels && Math.random() < 0.6) {
       // hard mode: which street is this? (the real one and two nearby)
@@ -1002,7 +1038,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       g.lastHC = hc;
       render(); // the compass words on Left / Right follow your heading
     }
-    maybeCheckIn(now);
+    // (no spontaneous check-ins: nothing interrupts the round)
     carMk.setLngLat(p);
     carMk.setRotation(b);
     carEl.classList.toggle('sigL', g.queued === 'L');
@@ -1342,6 +1378,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       }, 1700);
     }
     if (prefs.style === 'plan') startPlan();
+    showPoi(true);
     render();
   }
   /** The briefing's guess: which way is the destination, before any arrow says so. */
@@ -2009,7 +2046,6 @@ export function initGridGame(ctx, areaId = 'downtown') {
             <label><input type="checkbox" id="ggCover"${prefs.cover ? ' checked' : ''}/> Show streets I've driven</label>
             <label><input type="checkbox" id="ggTrips"${prefs.trips ? ' checked' : ''}/> Mix in my saved trips</label>
             <label><input type="checkbox" id="ggMapFirst"${prefs.mapFirst ? ' checked' : ''}/> Map first</label>
-            <label><input type="checkbox" id="ggChecks"${prefs.checkins ? ' checked' : ''}/> Check-ins</label>
             ${earlierLogs()}
           </details>
         </div>
@@ -2109,10 +2145,6 @@ export function initGridGame(ctx, areaId = 'downtown') {
     });
     document.getElementById('ggMapFirst').addEventListener('change', (e) => {
       prefs.mapFirst = e.target.checked;
-      savePrefs();
-    });
-    document.getElementById('ggChecks').addEventListener('change', (e) => {
-      prefs.checkins = e.target.checked;
       savePrefs();
     });
     document.getElementById('ggArrows').addEventListener('change', (e) => {
