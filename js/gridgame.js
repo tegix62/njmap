@@ -731,6 +731,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     g.msg = '';
     render();
     map.jumpTo({ center: g.trail[0], zoom: ZOOM, bearing: GRID });
+    // plan, then ride: the plan screen is the start (where you are, where you're going, then the plan)
+    if (prefs.style === 'plan') go0();
     g.raf = requestAnimationFrame(tick);
     window.addEventListener('keydown', onKey);
   }
@@ -1648,8 +1650,10 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const p = g.plan;
     const runs = planCrumbs();
     const crumbs = runs.length ? runs.slice(-4).map((r) => `<b>${esc(short(r.name))}</b> <span class="muted">${r.dir}</span>`).join(' <span class="muted">→</span> ') : '';
+    const first = p.route.length === 1;
     const ctl = (html) => `<div class="ggplan">
-        <div class="gp-route">${crumbs ? `🧭 ${runs.length > 4 ? '… → ' : ''}${crumbs}` : ''}</div>
+        ${first ? `<div class="gp-here"><span class="bic">📍</span> ${briefYou()}</div>` : ''}
+        <div class="gp-route">${!first && crumbs ? `🧭 ${runs.length > 4 ? '… → ' : ''}${crumbs}` : ''}</div>
         ${html}
         <div class="ggmsg${g.msg ? '' : ' muted'}">${g.msg ? esc(g.msg) : ''}</div>
         <div class="gp-bar">
@@ -1803,7 +1807,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     // stars: there; the shortest way with no wrong-way tries; and that, without peeking or an
     // arrow, having guessed the way at the start
     const shortestWay = ratio <= 1.03 && !g.wrong;
-    const stars = 1 + (shortestWay ? 1 : 0) + (shortestWay && !g.peeks && !g.hints && prefs.guide !== 'arrow' && g.guess && g.guess.ok ? 1 : 0);
+    const stars = 1 + (shortestWay ? 1 : 0) + (shortestWay && !g.peeks && !g.hints && prefs.guide !== 'arrow' && (prefs.style === 'plan' || (g.guess && g.guess.ok)) ? 1 : 0);
     const key = routeKey(g.route);
     const bests = mem.get('best', {});
     const before = bests[key] || 0;
@@ -1834,7 +1838,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const cover = coverage();
     const starStr = (n) => '★'.repeat(n) + '☆'.repeat(3 - n);
     const saved = mem.get('trips', []).some((t) => routeKey(t) === key);
-    g.result = `<div class="ggstars" title="★ there · ★★ the shortest way · ★★★ and no peeks or arrow, start guess right">${starStr(stars)}${
+    g.result = `<div class="ggstars" title="★ there · ★★ the shortest way · ★★★ and no hints${prefs.style === 'plan' ? '' : ' or peeks, start guess right'}">${starStr(stars)}${
       before ? ` <span class="muted">best ${starStr(Math.max(before, stars))}</span>` : ''
     }</div>
       <div class="fb ${ok ? 'ok' : 'no'}">${mi(g.driven)} mi${ratio <= 1.03 ? ' · the shortest' : ` · shortest ${mi(g.best.cost)}`}${
@@ -1917,8 +1921,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const plan = g.queued ? ` <b class="gg-plan">${g.queued === 'L' ? '◀ left there' : 'right ▶ there'}</b>` : g.pick ? ` <b class="gg-plan">→ ${esc(short(g.pick.name))}</b>` : '';
     const nextTxt = nt ? ` · next ${prefs.labels ? `<b>${esc(nt.name)}</b> ` : 'corner '}<span class="gg-ways">${ways}</span>${plan}` : plan;
     const where = prefs.labels
-      ? `${pl ? '🧭 Planned to' : '📍'} ${here ? `${esc(here)} · ` : ''}<b>${esc(short(curE.name))}</b> ${headWord(curE.name, hbw)}${nextTxt}`
-      : `${pl ? '🧭 Planned to' : '📍'} ${here ? `${esc(here)} · ` : ''}heading <b>${headWord(curE.name, hbw)}</b>${nextTxt}`; // hard mode: no street names
+      ? `${pl && pl.route.length > 1 ? '🧭 Planned to' : '📍'} ${here ? `${esc(here)} · ` : ''}<b>${esc(short(curE.name))}</b> ${headWord(curE.name, hbw)}${nextTxt}`
+      : `${pl && pl.route.length > 1 ? '🧭 Planned to' : '📍'} ${here ? `${esc(here)} · ` : ''}heading <b>${headWord(curE.name, hbw)}</b>${nextTxt}`; // hard mode: no street names
     ctx.hud(
       g.startCard
         ? '' // the briefing says it all: the top card would only repeat it
@@ -1933,7 +1937,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
            ? ''
            : `${showGuide() || showWords() ? `<div class="hint gg-go">${showGuide() ? `<span class="gg-dir" title="Which way the destination is">${DIR_SVG}</span><b class="gg-dist"></b>` : ''}${
                showWords() && !showGuide() ? `<span class="gg-words"></span>` : ''
-             }</div>` : ''}<div class="hint gg-where">${where}</div>`
+             }</div>` : ''}${pl && pl.route.length === 1 ? '' : `<div class="hint gg-where">${where}</div>`}`
        }`
     );
     if (!g.done && g.pos && showGuide()) updateDir(aim());
