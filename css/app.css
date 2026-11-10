@@ -2362,3 +2362,38 @@ body.ink .prow .typebtn {
   color: #b45309;
   font-weight: 700;
 }
+
+/* ---- Plan & ride ----------------------------------------------------------- */
+.ggplan {
+  display: grid;
+  gap: 8px;
+}
+.ggplan .gp-route {
+  font-size: 14px;
+  line-height: 1.35;
+  min-height: 1.2em;
+}
+.ggplan .bq {
+  font-weight: 700;
+}
+.ggchips.plan {
+  flex-wrap: wrap;
+  overflow: visible;
+  padding-bottom: 2px;
+}
+.ggplan .gp-bar {
+  display: flex;
+  gap: 8px;
+}
+.ggplan .gp-bar button {
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(31, 27, 22, 0.2);
+  background: transparent;
+  color: inherit;
+}
+.ggplan .gp-bar button:disabled {
+  opacity: 0.35;
+}

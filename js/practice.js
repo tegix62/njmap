@@ -40,7 +40,7 @@ const DESC = {
   mix: 'A bit of everything.',
   rapid: 'Timed one-tap rounds, three lives.',
   dropin: 'Drop each town into its county.',
-  gridmid: 'Drive Midtown: avenues, numbered streets and the real one-ways.',
+  gridmid: 'Drive Midtown: plan the route avenue by avenue and street by street, then ride it.',
   gridgame: 'Drive Downtown: the tangle below 14th St, tunnels and bridges in.',
   gridclassic: 'The original: a straightened grid, 14th to 110th St.',
   frames: 'Left, right and compass: face every direction.',
