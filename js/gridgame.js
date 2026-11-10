@@ -1133,6 +1133,13 @@ export function initGridGame(ctx, areaId = 'downtown') {
       render(); // the compass words on Left / Right follow your heading
     }
     // (no spontaneous check-ins: nothing interrupts the round)
+    if (g.bestRide && g.plan && g.plan.riding && !g.done) {
+      const ab = atLine(g.bestRide, Math.max(0, g.driven + g.s));
+      g.bestPos = ab.p;
+      bestMk.setLngLat(ab.p);
+      if (ab.brg != null) bestMk.setRotation(ab.brg);
+      setData('gg-best', line([...g.bestRide.pts.slice(0, ab.k), ab.p]));
+    }
     if (!g.replay) {
       carMk.setLngLat(p);
       carMk.setRotation(b);
@@ -1154,6 +1161,13 @@ export function initGridGame(ctx, areaId = 'downtown') {
           g.camP = p;
           map.easeTo({ center: p, zoom: ZOOM, bearing: GRID, offset: [0, oy], duration: Math.min(650, 260 + far * 0.25), easing: (t) => 1 - Math.pow(1 - t, 3) });
         }
+      } else if (g.plan && g.plan.riding && g.bestRide) {
+        // both cars in view: centre between them, zoom out as far as they're apart
+        g.camKey = null;
+        const bp = g.bestPos || p;
+        const sep = meters(p, bp);
+        const c = [(p[0] + bp[0]) / 2, (p[1] + bp[1]) / 2];
+        map.easeTo({ center: c, zoom: Math.max(14.2, ZOOM - Math.log2(Math.max(1, sep / 260))), bearing: GRID, offset: [0, oy], duration: 0 });
       } else {
         g.camKey = null;
         map.easeTo({ center: p, zoom: ZOOM, bearing: GRID, offset: [0, oy], duration: 0 });
@@ -1853,6 +1867,14 @@ export function initGridGame(ctx, areaId = 'downtown') {
     g.driven = -g.s;
     g.path = [];
     setData('gg-trail', EMPTY);
+    // one sequence: the shortest way's car rides out alongside yours, by the same distance
+    const bc = [];
+    g.best.path.forEach((e) => bc.push(...e.pts));
+    g.bestCoords = bc;
+    g.bestRide = prepLine(bc);
+    g.bestPos = bc[0];
+    setData('gg-best', EMPTY);
+    bestMk.setLngLat(bc[0]).addTo(map);
     render();
   }
   /** The corners you could zip to, straight on along this road: [{node, via, name}]. */
@@ -1952,13 +1974,19 @@ export function initGridGame(ctx, areaId = 'downtown') {
         g.split = { at: i === 0 ? G.edges[bp[0]].pts[0] : G.nodes[G.edges[bp[i - 1]].to], first: short(G.edges[bp[i]].name) };
       }
     }
-    setData('gg-best', EMPTY);
+    g.rodeBoth = !!g.bestRide;
+    if (g.rodeBoth) {
+      setData('gg-best', line(bestCoords));
+      bestMk.setLngLat(bestCoords[bestCoords.length - 1]).addTo(map);
+      if (g.split) splitMk.setLngLat(g.split.at).addTo(map);
+      splitEl.textContent = g.split ? `the shortest way went ${g.split.first}` : '';
+    } else setData('gg-best', EMPTY);
     // zoom out to show the whole drive, yours and the shortest (after the result
     // is on screen, so the framing allows for its height)
     const all = [...g.trail, ...bestCoords];
     const round = g;
     setTimeout(() => g === round && g.done && ctx.fit(all, 16, { bearing: GRID, duration: 900 }), 900); // a beat at the pin first
-    setTimeout(() => g === round && g.done && startRace(), 1900);
+    if (!g.rodeBoth) setTimeout(() => g === round && g.done && startRace(), 1900); // (a planned ride already was the race)
     const mi = (m) => (m / 1609.34).toFixed(2).replace(/0$/, '');
     const ratio = g.driven / g.best.cost;
     const ok = ratio <= 1.15 && !g.wrong;
@@ -2024,30 +2052,32 @@ export function initGridGame(ctx, areaId = 'downtown') {
     render();
   }
 
-  /** The end of a round: your ride and the shortest way ride out together at the same speed. */
+  const meters = (a, b) => Math.hypot((b[0] - a[0]) * 84400, (b[1] - a[1]) * 111000);
+  function prepLine(pts) {
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + meters(pts[i - 1], pts[i]));
+    return { pts, cum, len: cum[cum.length - 1] };
+  }
+  /** Where `d` metres along a prepared line is: position, heading, and the index it has reached. */
+  function atLine(r, d) {
+    d = Math.min(d, r.len);
+    let k = 1;
+    while (k < r.cum.length - 1 && r.cum[k] < d) k++;
+    const a = r.pts[k - 1], b = r.pts[k] || a, seg = r.cum[k] - r.cum[k - 1] || 1;
+    const t = Math.max(0, Math.min(1, (d - r.cum[k - 1]) / seg));
+    const p = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+    const brg = (Math.atan2((b[0] - a[0]) * 84400, (b[1] - a[1]) * 111000) * 180) / Math.PI;
+    return { p, brg: a === b ? null : brg, k };
+  }
+  /** The end of a round, after a drive you made in real time: both ways ride out together, fast. */
   function startRace() {
     if (!g || !g.done || !g.bestCoords || !g.trail.length) return;
     const round = g;
     const id = (g.raceId = (g.raceId || 0) + 1);
-    const M = (a, b) => Math.hypot((b[0] - a[0]) * 84400, (b[1] - a[1]) * 111000);
-    const prep = (pts) => {
-      const cum = [0];
-      for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + M(pts[i - 1], pts[i]));
-      return { pts, cum, len: cum[cum.length - 1] };
-    };
-    const at = (r, d) => {
-      d = Math.min(d, r.len);
-      let k = 1;
-      while (k < r.cum.length - 1 && r.cum[k] < d) k++;
-      const a = r.pts[k - 1], b = r.pts[k] || a, seg = r.cum[k] - r.cum[k - 1] || 1;
-      const t = Math.max(0, Math.min(1, (d - r.cum[k - 1]) / seg));
-      const p = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
-      const brg = (Math.atan2((b[0] - a[0]) * 84400, (b[1] - a[1]) * 111000) * 180) / Math.PI;
-      return { p, brg: a === b ? null : brg, k };
-    };
+    const prep = prepLine, at = atLine;
     const you = prep(g.trail), best = prep(g.bestCoords);
     const total = Math.max(you.len, best.len);
-    const ms = Math.max(4500, Math.min(10000, total * 8));
+    const ms = Math.max(2200, Math.min(4500, total * 1.4));
     const speed = total / ms;
     g.replay = true;
     carMk.setLngLat(you.pts[0]);
