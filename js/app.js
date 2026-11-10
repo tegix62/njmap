@@ -1,4 +1,5 @@
 /* global maplibregl, topojson */
+import './motion.js';
 import { bbox, makeLocator, bearing, distanceMi, compass16, dirWord } from './geo.js';
 import { resolveGroups } from './confusables.js';
 import { store } from './store.js';

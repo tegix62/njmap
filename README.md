@@ -56,6 +56,9 @@ The screen is built in two layers. The first is what you can take in at a glance
 - **Your notes**: add a note to any town or road, e.g. *"Use 23 instead of 287 at rush hour"*. Notes show up in Explore, and Drive reads a road's note aloud the first time you drive it. They stay on your phone; Settings can export and import them as a file.
 - **On the map**: river and lake names, and 31 landmarks (stadiums, malls, train stations, parks, colleges).
 
+
+**Button feel:** every button presses in to 94% and springs back (`js/motion.js`, spring stiffness 1019, damping 42: the feel lab's "snappy" spring made 40% faster). It uses the `scale` property so it can't clash with a button's own transform, a quick tap still shows its press (70 ms minimum), and it's skipped under reduced-motion. Further feedback (wrong-turn shake, star landings, panel curves) is still being chosen.
+
 ## Getting around the app
 
 - **First launch:** before anything else you pick **New Jersey** or **New York City** (remembered). The tab bar's **⇄ NJ / NYC** button switches maps from any screen, and Settings has the same switch at the top. The page title follows the map.
