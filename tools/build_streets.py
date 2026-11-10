@@ -638,6 +638,31 @@ for li in kl:
         problems.append(f'two ways out on one button after link {li}')
     turn_out.append([x for lo in opts for x in (lre[lo], SLOT[sl[lo]])])
 
+# ---- why a road ends: what carries straight on that the game leaves out ----------------------
+# A road that ends in a turn here may carry on as a ramp or tunnel (W 30th St becomes the
+# Lincoln Tunnel entrance) or past the edge of the area: say so, instead of just stopping.
+cuts = {}
+for li in kl:
+    L = links[li]
+    kept_opts = [lo for lo in turns[li] if lo in keep_l]
+    if not kept_opts or any(abs(adiff(links[lo]['b0'], L['b1'])) <= 35 for lo in kept_opts):
+        continue
+    best = None
+    for lo in links_from[L['to']]:
+        O = links[lo]
+        if lo in keep_l or O['start'] not in reach_in(L['end']) or draw[O['raws'][0]][2] == draw[L['raws'][-1]][2]:
+            continue
+        a = abs(adiff(O['b0'], L['b1']))
+        if a <= 35 and (best is None or a < best[0]):
+            best = (a, lo)
+    if best:
+        O = links[best[1]]
+        ramp = any(NOT_STREET.search(edges[draw[k][2]][6]) or edges[draw[k][2]][7] == '4' for k in O['raws'])
+        if ramp:
+            cuts[str(lre[li])] = names[O['name']]
+        elif not below14(O['to']):
+            cuts[str(lre[li])] = ''  # the street goes on, past the edge of this area
+
 # ---- entries, places, check -----------------------------------------------------------------------
 def landing(li):
     """the first core link on the way in from link li"""
@@ -768,6 +793,7 @@ data = {
     'geoms': geoms,
     'links': link_out,
     'turns': turn_out,
+    'cuts': cuts,
     'feeders': sorted(lre[li] for li in feed_l),
     'entries': entries_out,
     'places': places,

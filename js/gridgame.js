@@ -164,6 +164,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       edges[i].opts = opts;
     });
     const coreJ = new Set(edges.filter((e) => e.core).map((e) => e.from));
+    const cuts = d.cuts || {}; // link id -> what the road carries on as that the game leaves out ('' = past the edge of the area)
     const RAMP = /entrance|exit|\bramp|\bRp\b|Bridge|Tunnel|Expwy|\bEp\b|\bEn\b|\bEt\b/i;
     const HWY = /Drive|\bDr\b|\bDrv\b|Hwy|Pkwy|Expwy|FDR/i;
     const label = (n) => {
@@ -175,8 +176,9 @@ export function initGridGame(ctx, areaId = 'downtown') {
     // an ordinary street corner: no highway or ramp meets here (for random starts and destinations)
     const plain = (n) => [...out[n], ...inn[n]].every((e) => !RAMP.test(e.name) && !HWY.test(e.name));
     const real = (n) => d.jdeg[n] >= 3; // three or more roads meet: a corner you could turn at
+    const streetsAt = (n) => new Set([...out[n], ...inn[n]].map((e) => e.name.replace(/^[EW] (\d+\w\w) St$/, '$1 St'))).size;
     const gy = nodes.map((p) => gridXY(p)[1]);
-    G = { d, nodes, edges, out, inn, coreJ, real, label, plain, gy, RAMP, places: d.places, entries: d.entries, areas: d.areas };
+    G = { d, nodes, edges, out, inn, coreJ, cuts, real, streetsAt, label, plain, gy, RAMP, places: d.places, entries: d.entries, areas: d.areas };
     G.dataKey = `${d.source}|${edges.length}|${nodes.length}`;
     // each block once (a two-way block's two links share a shape), for coverage
     G.shapeLen = new Map();
@@ -603,7 +605,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   /** A destination for a round that starts on link e0. */
   function pickTarget(e0, s0, entry) {
     const coreNodes = [];
-    for (let n = 0; n < G.nodes.length; n++) if (isCore(n) && G.real(n) && G.plain(n) && inArea(n)) coreNodes.push(n);
+    for (let n = 0; n < G.nodes.length; n++) if (isCore(n) && G.real(n) && G.plain(n) && G.streetsAt(n) >= 2 && inArea(n)) coreNodes.push(n);
     const places = G.places.filter((p) => inArea(p.node));
     for (let tries = 0; tries < 200; tries++) {
       const target = places.length && Math.random() < 0.7 ? { ...rand(places) } : { name: null, node: rand(coreNodes) };
@@ -619,7 +621,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   }
   function pickRandom() {
     const coreNodes = [];
-    for (let n = 0; n < G.nodes.length; n++) if (isCore(n) && G.real(n) && G.plain(n) && inArea(n)) coreNodes.push(n);
+    for (let n = 0; n < G.nodes.length; n++) if (isCore(n) && G.real(n) && G.plain(n) && G.streetsAt(n) >= 2 && inArea(n)) coreNodes.push(n);
     const places = G.places.filter((p) => inArea(p.node));
     const entries = G.entries.filter((en) => inArea(en.landsAt));
     const useEntry = entries.length && (prefs.from === 'entries' || (prefs.from === 'both' && Math.random() < 0.5));
@@ -1031,7 +1033,9 @@ export function initGridGame(ctx, areaId = 'downtown') {
       }
       g.queued = null;
       g.pick = null;
-      return stopHere(`Road ends: only ${side === 'L' ? '◀ left' : 'right ▶'} onto ${short(c.only.name)}`);
+      const cut = G.cuts[e.id];
+      const why = cut ? `${short(e.name)} goes on as ${cut.replace(/\bEn\b/i, 'Entrance')} (not in this game)` : cut === '' ? `${short(e.name)} goes on past this area` : 'Road ends';
+      return stopHere(`${why}: only ${side === 'L' ? '◀ left' : 'right ▶'} onto ${short(c.only.name)}`);
     }
     if (g.pick) {
       const p = g.pick;
@@ -1220,8 +1224,9 @@ export function initGridGame(ctx, areaId = 'downtown') {
     g.goTo = null;
     setData('gg-goto', EMPTY);
     g.s = g.e.len;
-    if (msg && !g.msg) say(msg);
-    if (!g.msg) {
+    // why the car stopped always shows; only a fresh wrong-way refusal (just said) stays up over the default
+    if (msg) say(msg);
+    else if (!g.msg || !g.msg.startsWith('⛔') || performance.now() - g.msgAt > 4000) {
       const c0 = choices(g.e);
       if (c0.named) say(`${G.label(g.e.to)}: which way?`);
       else {
@@ -1255,7 +1260,16 @@ export function initGridGame(ctx, areaId = 'downtown') {
         break;
       }
     }
-    say(`⛔ ${why || `No road to the ${side === 'L' ? 'left' : 'right'}`}`);
+    say(`⛔ ${why || `No road to the ${side === 'L' ? 'left' : 'right'}`}${tryInstead(e)}`);
+  }
+  /** After a refusal: the first move of the shortest way from the end of link e ("Try ◀ left onto 1st Ave"). */
+  function tryInstead(e) {
+    const r = shortest(e, g.target.node, e.len);
+    const nx = r && r.path[1];
+    if (!nx) return '';
+    const c = choices(e);
+    const how = nx === c.left ? '◀ left' : nx === c.right ? 'right ▶' : nx === c.straight ? '▲ straight' : nx === c.only ? (turnOf(e, nx) < 0 ? '◀ left' : 'right ▶') : '';
+    return how ? `. Try ${how} onto ${short(nx.name)}` : '';
   }
   /** Leave the briefing and drive: the destination appears (with Map first, a look at both first). */
   function go0() {
@@ -1535,7 +1549,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     // zoom out to show the whole drive, yours and the shortest (after the result
     // is on screen, so the framing allows for its height)
     const all = [...g.trail, ...bestCoords];
-    requestAnimationFrame(() => g && g.done && ctx.fit(all, 16, { bearing: GRID, duration: 900 }));
+    const round = g;
+    setTimeout(() => g === round && g.done && ctx.fit(all, 16, { bearing: GRID, duration: 900 }), 900); // a beat at the pin first
     const mi = (m) => (m / 1609.34).toFixed(2).replace(/0$/, '');
     const ratio = g.driven / g.best.cost;
     const ok = ratio <= 1.15 && !g.wrong;
