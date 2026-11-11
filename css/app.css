@@ -2980,3 +2980,69 @@ body.gridding #hud .gg-go {
   font-size: 13px;
   letter-spacing: 0.3px;
 }
+
+/* the avenue ruler: every avenue, west to east, the way its traffic runs, the one you're on lit */
+.gg-ruler {
+  position: fixed;
+  left: 10px;
+  right: 10px;
+  bottom: 300px;
+  z-index: 3;
+  height: 36px;
+  padding: 3px 14px 0;
+  border-radius: 12px;
+  background: rgba(255, 253, 248, 0.9);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.22);
+  pointer-events: none;
+}
+.gg-ruler[hidden] {
+  display: none;
+}
+.gg-rtrack {
+  position: relative;
+  height: 100%;
+}
+.gg-rtrack .t {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+  color: #5a5145;
+  opacity: 0.8;
+}
+.gg-rtrack .t i {
+  font-style: normal;
+  font-size: 8px;
+  height: 9px;
+  color: #8a7f6c;
+}
+.gg-rtrack .t b {
+  font: 700 10px system-ui, sans-serif;
+  margin-top: 1px;
+}
+.gg-rtrack .t.on {
+  opacity: 1;
+  color: #fff;
+  background: #3b2f1e;
+  border-radius: 7px;
+  padding: 1px 5px 2px;
+  top: -1px;
+}
+.gg-rtrack .t.on i {
+  color: #f2c14e;
+  font-size: 9px;
+}
+.gg-rtrack .you {
+  position: absolute;
+  bottom: 1px;
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 7px solid #2b4fb3;
+  transition: left 0.15s linear;
+}

@@ -791,6 +791,56 @@ export function initGridGame(ctx, areaId = 'downtown') {
       hoodTag.classList.add('pulse');
     }
   }
+  // ---- the avenue ruler (Midtown): every avenue in order, west to east, with the way its traffic runs; the one you're on lit ----
+  const AVES = [ // west to east: short label, street name(s), flow (U uptown, D downtown, B both, '' mixed or unknown)
+    ['12th', ['12th Ave (West Side Hwy)'], ''], ['11th', ['11th Ave'], ''], ['10th', ['10th Ave'], 'U'], ['9th', ['9th Ave'], 'D'],
+    ['8th', ['8th Ave'], 'U'], ['7th', ['7th Ave'], 'D'], ['6th', ['6th Ave'], 'U'], ['5th', ['5th Ave'], 'D'], ['Mad', ['Madison Ave'], 'U'],
+    ['Park', ['Park Ave', 'Park Ave S', 'Park Ave Viaduct'], 'B'], ['Lex', ['Lexington Ave'], 'D'], ['3rd', ['3rd Ave'], 'U'],
+    ['2nd', ['2nd Ave'], 'D'], ['1st', ['1st Ave'], 'U'],
+  ];
+  const FLOW = { U: '▲', D: '▼', B: '◆', '': '' };
+  const ruler = document.createElement('div');
+  ruler.className = 'gg-ruler';
+  ruler.hidden = true;
+  ruler.innerHTML = `<div class="gg-rtrack">${AVES.map(([lab, , f], i) => `<span class="t f${f || 'x'}" data-i="${i}" style="left:${(i / (AVES.length - 1)) * 100}%"><i>${FLOW[f]}</i><b>${lab}</b></span>`).join('')}<span class="you"></span></div>`;
+  document.body.appendChild(ruler);
+  let aveX = null; // each avenue's position across the grid, metres
+  function avenuePositions() {
+    if (aveX) return aveX;
+    aveX = AVES.map(([, names]) => {
+      const xs = [];
+      for (const e of G.edges) if (e.core && names.includes(e.name)) xs.push(gridXY(e.pts[Math.floor(e.pts.length / 2)])[0]);
+      xs.sort((a, b) => a - b);
+      return xs.length ? xs[Math.floor(xs.length / 2)] : null;
+    });
+    return aveX;
+  }
+  function updateRuler(p) {
+    const live = !!(g && !g.loading && !g.done && !g.startCard && areaId === 'midtown' && p);
+    ruler.hidden = !live;
+    if (!live) return;
+    const xs = avenuePositions();
+    const x = gridXY(p)[0];
+    let pos = 0;
+    const have = xs.map((v, i) => [v, i]).filter(([v]) => v != null);
+    if (x <= have[0][0]) pos = have[0][1];
+    else if (x >= have[have.length - 1][0]) pos = have[have.length - 1][1];
+    else {
+      for (let k = 0; k < have.length - 1; k++) {
+        const [a, ia] = have[k], [b, ib] = have[k + 1];
+        if (x >= a && x <= b) {
+          pos = ia + ((x - a) / (b - a)) * (ib - ia);
+          break;
+        }
+      }
+    }
+    const you = ruler.querySelector('.you');
+    you.style.left = `${(pos / (AVES.length - 1)) * 100}%`;
+    const on = g.e ? AVES.findIndex(([, names]) => names.includes(g.e.name)) : -1;
+    for (const t of ruler.querySelectorAll('.t')) t.classList.toggle('on', +t.dataset.i === on);
+    const pad = ctx.padding();
+    ruler.style.bottom = `${Math.max(8, pad.bottom - 4)}px`;
+  }
   let LM_ALL = [], LM_ICONS = {}, LM_PICS = {};
   const lmNorm = (x) => x.toLowerCase().replace(/^the /, '').replace(/ \(.*\)$/, '').replace(/[^a-z0-9 ]/g, '');
   /** The landmark a dot or destination is, by name. */
@@ -1660,6 +1710,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     clearHood();
     hideLmTag();
     document.body.classList.remove('gg-end');
+    ruler.hidden = true;
     stopFlow();
     setData('gg-corridor', EMPTY);
     lmRingMk.remove();
@@ -1963,6 +2014,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       g.hoodAt = now;
       noteHood(p, false, planning() ? null : b);
       noteLandmarks(p, b, now);
+      updateRuler(p);
     }
     const hc = `${gridDir(b)}${onGrid(g.e.name, b) ? '' : compassWord(b)}${choices(g.e).named ? 'n' : ''}`;
     if (hc !== g.lastHC) {
@@ -2894,6 +2946,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     g.done = true;
     g.waiting = true;
     stopFlow(); // (the highlighted streets stay on the end map, still)
+    ruler.hidden = true;
     offEl.hidden = true;
     showLabels(prefs.labels);
     syncLmSeen();
@@ -3140,6 +3193,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     if (!g) return;
     requestAnimationFrame(placeHoodTag);
     requestAnimationFrame(layoutLmTag);
+    requestAnimationFrame(() => g && updateRuler(g.pos || (g.trail && g.trail[0])));
     if (g.done && g.view === 'overview') g.view = 'follow';
     document.body.classList.toggle('gg-end', !!g.done);
     if (g.loading) {
