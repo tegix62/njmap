@@ -122,6 +122,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   async function load() {
     if (G) return G;
     const [d, lmAll, lmIcons, lmPics] = await Promise.all([fetch(DATA_URL).then((r) => r.json()), fetch('data/landmarks.json').then((r) => r.json()).catch(() => []), fetch('data/landmark-icons.json').then((r) => r.json()).catch(() => ({})), fetch('data/landmark-credits.json').then((r) => r.json()).catch(() => ({}))]);
+    LM_ALL = lmAll;
     LM_ICONS = lmIcons;
     LM_PICS = lmPics;
     const [ox, oy] = d.origin;
@@ -598,7 +599,14 @@ export function initGridGame(ctx, areaId = 'downtown') {
       hoodTag.classList.add('pulse');
     }
   }
-  let LM_ICONS = {}, LM_PICS = {};
+  let LM_ALL = [], LM_ICONS = {}, LM_PICS = {};
+  const lmNorm = (x) => x.toLowerCase().replace(/^the /, '').replace(/ \(.*\)$/, '').replace(/[^a-z0-9 ]/g, '');
+  /** The landmark a dot or destination is, by name. */
+  function lmFind(name) {
+    const a = lmNorm(name || '');
+    if (!a) return null;
+    return LM_ALL.find((l) => lmNorm(l.n) === a) || LM_ALL.find((l) => a.length > 4 && (lmNorm(l.n).includes(a) || a.includes(lmNorm(l.n)))) || null;
+  }
   /** A landmark's picture: our silhouette if we drew one, else a small photo from Wikimedia Commons (credited in Settings), else nothing. */
   const lmPic = (n) => (LM_ICONS[n] ? `<svg viewBox="0 0 64 64" fill="currentColor" aria-hidden="true">${LM_ICONS[n]}</svg>` : LM_PICS[n] ? `<img src="${esc(LM_PICS[n].img)}" alt="" />` : '');
   /** Tap a landmark's name (the callout, or on the result screen) for its photo, name, note and credit; the drive waits meanwhile. */
@@ -617,9 +625,10 @@ export function initGridGame(ctx, areaId = 'downtown') {
     lmCardPaused = null;
   }
   function openLmCard(name) {
+    const l = lmFind(name);
+    if (l) name = l.n;
     const pic = LM_PICS[name];
-    const l = (G && G.landmarks || []).find((x) => x.n === name) || { n: name, note: '' };
-    if (!pic) return;
+    if (!l && !pic) return false;
     clearTimeout(lmTimer);
     lmTag.hidden = true;
     if (g && !g.done && lmCardPaused === null) {
@@ -627,13 +636,16 @@ export function initGridGame(ctx, areaId = 'downtown') {
       g.paused = true; // the car waits while you look
       render();
     }
-    const by = pic.author ? `${esc(pic.author)}, ` : '';
-    lmCard.innerHTML = `<div class="gg-lmcard-in"><img src="${esc(pic.img)}" alt="${esc(name)}" /><b>${esc(name)}</b><span>${esc(l.note)}</span><small>Photo: ${by}${esc(pic.license)} · <a href="${esc(pic.page)}" target="_blank" rel="noopener">Wikimedia Commons</a></small><button type="button" class="gg-lmcard-x">Back to the drive</button></div>`;
+    const by = pic && pic.author ? `${esc(pic.author)}, ` : '';
+    const visual = pic ? `<img src="${esc(pic.img)}" alt="${esc(name)}" />` : LM_ICONS[name] ? `<i class="gg-lmcard-ico"><svg viewBox="0 0 64 64" fill="currentColor" aria-hidden="true">${LM_ICONS[name]}</svg></i>` : '';
+    lmCard.innerHTML = `<div class="gg-lmcard-in">${visual}<b>${esc(name)}</b><span>${esc(l ? l.note : '')}</span>${pic ? `<small>Photo: ${by}${esc(pic.license)} · <a href="${esc(pic.page)}" target="_blank" rel="noopener">Wikimedia Commons</a></small>` : ''}<button type="button" class="gg-lmcard-x">Back to the drive</button></div>`;
     lmCard.hidden = false;
+    return true;
   }
   document.addEventListener('click', (ev) => {
     const el = ev.target.closest && ev.target.closest('[data-lm]');
-    if (el && el.dataset.lm && !lmCard.contains(el)) return openLmCard(el.dataset.lm);
+    // (Drive Midtown and Drive Downtown each have their own callout and result lines: act only on this game's)
+    if (el && el.dataset.lm && !lmCard.contains(el) && (el === lmTag || el.dataset.gg === areaId)) return openLmCard(el.dataset.lm);
     if (!lmCard.hidden && (ev.target === lmCard || ev.target.closest('.gg-lmcard-x'))) closeLmCard();
   });
   // "By the way": a famous building or place within a block of you, named for a few seconds, once per round
@@ -642,6 +654,39 @@ export function initGridGame(ctx, areaId = 'downtown') {
   lmTag.hidden = true;
   document.body.appendChild(lmTag);
   let lmTimer = 0;
+  /**
+   * Where the callout goes: one of a few resting spots round the edges of the free map area (never the
+   * middle), whichever is least busy right now (few streets and dots, clear of the car and the destination),
+   * leaning to the side the landmark is on. Chosen once per callout, so it just fades in and stays put.
+   */
+  function placeLmTag(lp) {
+    const pad = ctx.padding();
+    const cr = map.getContainer().getBoundingClientRect();
+    const W = window.innerWidth, w = lmTag.offsetWidth, h = lmTag.offsetHeight;
+    const L = 12, R = Math.max(12, pad.right - 8), T = pad.top + 6, B = window.innerHeight - pad.bottom - 6;
+    const midY = T + (B - T - h) * 0.42;
+    const spots = [
+      { x: L, y: T }, { x: W - R - w, y: T },
+      { x: L, y: midY }, { x: W - R - w, y: midY },
+      { x: L, y: B - h }, { x: W - R - w, y: B - h },
+    ].filter((s) => s.y >= T - 1 && s.y + h <= B + 1);
+    const avoid = [carEl].filter(Boolean).map((el) => el.getBoundingClientRect());
+    const tp = map.project(lp);
+    const layers = ['gg-streets', 'gg-poi-dot', 'gg-trail', 'gg-best', 'gg-target', 'gg-goto'].filter((id) => map.getLayer(id));
+    let best = null;
+    for (const s of spots) {
+      const box = [[s.x - cr.left, s.y - cr.top], [s.x + w - cr.left, s.y + h - cr.top]];
+      let sc = layers.length ? map.queryRenderedFeatures(box, { layers }).length : 0;
+      if (map.getLayer('gg-target')) sc += 100 * map.queryRenderedFeatures(box, { layers: ['gg-target'] }).length; // the destination dot stays clear
+      for (const a of avoid) if (a.right > s.x - 10 && a.left < s.x + w + 10 && a.bottom > s.y - 10 && a.top < s.y + h + 10) sc += 200;
+      const dx = tp.x + cr.left - (s.x + w / 2);
+      sc += Math.hypot(dx, tp.y + cr.top - (s.y + h / 2)) / 90; // near its landmark, a little
+      if (!best || sc < best.sc) best = { s, sc };
+    }
+    const s = best ? best.s : { x: L, y: T };
+    lmTag.style.left = `${Math.round(s.x)}px`;
+    lmTag.style.top = `${Math.round(s.y)}px`;
+  }
   function hideLmTag() {
     clearTimeout(lmTimer);
     lmTag.hidden = true;
@@ -665,11 +710,11 @@ export function initGridGame(ctx, areaId = 'downtown') {
     g.lmAt = now;
     const side = best.d < 35 ? 'right here' : Math.abs(rel) < 35 ? 'ahead' : rel > 0 ? 'on your right' : 'on your left';
     const pic = lmPic(best.l.n);
-    lmTag.dataset.lm = LM_PICS[best.l.n] ? best.l.n : '';
-    lmTag.innerHTML = `${pic ? `<i>${pic}</i>` : ''}<div><b>${esc(best.l.n)}</b><span>${side}${LM_PICS[best.l.n] ? ' · 📷 tap' : ''}</span></div>`; // the picture and a name, nothing to read: the note is on the result screen
+    lmTag.dataset.lm = best.l.n;
+    lmTag.innerHTML = `${pic ? `<i>${pic}</i>` : ''}<div><b>${esc(best.l.n)}</b><span>${side} · tap</span></div>`; // the picture and a name, nothing to read: the note is on the result screen
     lmTag.classList.toggle('nopic', !pic);
-    lmTag.style.top = `${Math.round(ctx.padding().top + 26)}px`;
     lmTag.hidden = false;
+    placeLmTag(best.l.p);
     clearTimeout(lmTimer);
     lmTimer = setTimeout(hideLmTag, 5000);
     if (!planning()) (g.lmSeen || (g.lmSeen = [])).push(best.l); // only real driving counts for the result
@@ -1968,11 +2013,28 @@ export function initGridGame(ctx, areaId = 'downtown') {
   cont.addEventListener('pointermove', (e) => {
     if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 14) down.moved = true;
   });
+  /** A tap on a landmark's dot, or on the red destination dot when it's a landmark: its photo, name and note. */
+  function tapLandmark(sx, sy) {
+    const r = cont.getBoundingClientRect();
+    const x = sx - r.left, y = sy - r.top;
+    const layers = ['gg-target', 'gg-poi-dot'].filter((id) => map.getLayer(id));
+    if (!layers.length) return false;
+    const hits = map.queryRenderedFeatures([[x - 20, y - 20], [x + 20, y + 20]], { layers });
+    for (const f of hits) {
+      const name = f.layer.id === 'gg-target' ? g.target && g.target.name : f.properties && f.properties.name;
+      if (name && openLmCard(name)) return true;
+    }
+    return false;
+  }
   const up = (e, cancel) => {
     clearTimeout(holdTimer);
     const wasBoost = g && g.boost;
     if (g) g.boost = false;
     carEl.classList.remove('boost');
+    if (!cancel && down && !down.moved && !wasBoost && g && !g.loading && tapLandmark(e.clientX, e.clientY)) {
+      down = null;
+      return;
+    }
     if (!cancel && down && !down.moved && !wasBoost && active() && !g.paused && !g.check) tapAt(e.clientX, e.clientY);
     down = null;
   };
@@ -2432,7 +2494,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const brg = (Math.atan2((b[0] - a[0]) * 84400, (b[1] - a[1]) * 111000) * 180) / Math.PI;
     return { p, brg: a === b ? null : brg, k };
   }
-  const lmLink = (l) => (LM_PICS[l.n] ? `<a href="#" class="lmlink" data-lm="${esc(l.n)}" onclick="return false">${esc(l.n)} 📷</a>` : esc(l.n));
+  const lmLink = (l) => `<a href="#" class="lmlink" data-lm="${esc(l.n)}" data-gg="${areaId}" onclick="return false">${esc(l.n)}${LM_PICS[l.n] ? ' 📷' : ''}</a>`;
   /** The end screen: the famous places you passed, and what's by your destination. */
   function lmResultLines() {
     if (prefs.landmarks === false || !G.landmarks) return '';
@@ -2785,6 +2847,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     _graph: () => G,
     _reportText: () => (g && g.report ? reportText(g.report.kind, g.report.log, g.report.snap, g.report.note) : null),
     _plan: { planCorner: (n) => planCorner(n), planTurn: (sd) => planTurn(sd), planPick: (id) => planPick(id), planStep: (id) => planStep(G.edges[id]), planUndo: () => planUndo(), startRide: () => startRide(), render: () => render() },
+    _lm: { note: (p, h) => { g.lmAt = 0; g.lmShown = new Set(); g.lmPlan = new Set(); noteLandmarks(p, h, performance.now() + 9e6); }, open: (n) => openLmCard(n), tap: (x, y) => tapLandmark(x, y) },
     _model: { pickEntry, entryStart, choices, moves, shortest, straightTo, aheadChain, load, rule, describe, atTarget, arrivalSide, arrivalOK, chooseQuad, twoWay },
     _speed: () => (g && !g.loading && g.e ? speedNow() : 0),
     _mem: () => mem,

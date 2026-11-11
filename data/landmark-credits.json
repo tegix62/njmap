@@ -1,4 +1,25 @@
 {
+ "Charging Bull": {
+  "img": "img/landmarks/charging-bull.jpg",
+  "file": "Bowling Green td (2018-12-13) 06 - 26 Broadway, Charging Bull.jpg",
+  "author": "Tdorante10",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Bowling_Green_td_(2018-12-13)_06_-_26_Broadway,_Charging_Bull.jpg"
+ },
+ "Cooper Union": {
+  "img": "img/landmarks/cooper-union.jpg",
+  "file": "The Cooper Union Foundation Building 002.jpg",
+  "author": "Kidfly182",
+  "license": "CC BY 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:The_Cooper_Union_Foundation_Building_002.jpg"
+ },
+ "Empire State Building": {
+  "img": "img/landmarks/empire-state-building.jpg",
+  "file": "Empire_State_Building_(aerial_view).jpg",
+  "author": "Sam Valadi",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Empire_State_Building_(aerial_view).jpg"
+ },
  "Grand Central Terminal": {
   "img": "img/landmarks/grand-central-terminal.jpg",
   "file": "Image-Grand_central_Station_Outside_Night_2.jpg",
@@ -22,10 +43,10 @@
  },
  "Rockefeller Center": {
   "img": "img/landmarks/rockefeller-center.jpg",
-  "file": "Rockefeller_Center_logo.svg",
-  "author": "Rockefeller Group/Mitsubishi Estate",
+  "file": "GE_Building_by_David_Shankbone.JPG",
+  "author": "David Shankbone",
   "license": "Public domain",
-  "page": "https://commons.wikimedia.org/wiki/File:Rockefeller_Center_logo.svg"
+  "page": "https://commons.wikimedia.org/wiki/File:GE_Building_by_David_Shankbone.JPG"
  },
  "Radio City Music Hall": {
   "img": "img/landmarks/radio-city-music-hall.jpg",
@@ -75,6 +96,13 @@
   "author": "Balou46",
   "license": "CC BY-SA 4.0",
   "page": "https://commons.wikimedia.org/wiki/File:NYC-manhattan-macys.jpg"
+ },
+ "Flatiron Building": {
+  "img": "img/landmarks/flatiron-building.jpg",
+  "file": "Edificio_Fuller_(Flatiron)_en_2010_desde_el_Empire_State_crop_boxin.jpg",
+  "author": "Imelenchon (original work)",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Edificio_Fuller_(Flatiron)_en_2010_desde_el_Empire_State_crop_boxin.jpg"
  },
  "Madison Square Park": {
   "img": "img/landmarks/madison-square-park.jpg",
@@ -181,6 +209,20 @@
   "license": "CC BY 2.0",
   "page": "https://commons.wikimedia.org/wiki/File:Oculus_World_Trade_Center_-_August_18_2016.jpg"
  },
+ "City Hall": {
+  "img": "img/landmarks/city-hall.jpg",
+  "file": "New_York_City_Hall_exterior,_October_2016.jpg",
+  "author": "MusikAnimal",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:New_York_City_Hall_exterior,_October_2016.jpg"
+ },
+ "Brooklyn Bridge": {
+  "img": "img/landmarks/brooklyn-bridge.jpg",
+  "file": "Brooklyn_Bridge_and_the_Lower_Manhattan_skyline_from_Pebble_Beach,_New_York.jpg",
+  "author": "Christian David",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Brooklyn_Bridge_and_the_Lower_Manhattan_skyline_from_Pebble_Beach,_New_York.jpg"
+ },
  "Stock Exchange": {
   "img": "img/landmarks/stock-exchange.jpg",
   "file": "New_York_Stock_Exchange_Facade_2015.jpg",
@@ -209,12 +251,12 @@
   "license": "CC BY-SA 2.0",
   "page": "https://commons.wikimedia.org/wiki/File:Spirit_of_America_-_Staten_Island_Ferry.jpg"
  },
- "Cooper Union": {
-  "img": "img/landmarks/cooper-union.jpg",
-  "file": "Cooper_Union.svg",
-  "author": "Doyle Partners",
-  "license": "Public domain",
-  "page": "https://commons.wikimedia.org/wiki/File:Cooper_Union.svg"
+ "Washington Square Arch": {
+  "img": "img/landmarks/washington-square-arch.jpg",
+  "file": "Washington_Square_Arch_(40430304445).jpg",
+  "author": "Nan Palmero from San Antonio, TX, USA",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Washington_Square_Arch_(40430304445).jpg"
  },
  "Katz's Delicatessen": {
   "img": "img/landmarks/katz-s-delicatessen.jpg",
