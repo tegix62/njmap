@@ -66,7 +66,10 @@
       <button role="tab" data-mode="drive"><span class="ti">◉</span>Drive</button>
       <button role="tab" data-mode="explore"><span class="ti">⌕</span>Explore</button>
       <button role="tab" data-mode="practice"><span class="ti">✎</span>Practice</button>
-      <button id="regionBtn" aria-label="Switch between New Jersey and New York City"><span class="ti">⇄</span><span id="regionBtnLabel">NJ</span></button>
+      <div id="regionTog" role="group" aria-label="Map">
+        <button data-region="nj" aria-label="New Jersey">NJ</button>
+        <button data-region="manhattan" aria-label="New York City">NYC</button>
+      </div>
       <button id="settingsBtn" aria-label="Settings"><span class="ti">⚙</span>Settings</button>
     </nav>
 

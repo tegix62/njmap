@@ -1166,59 +1166,6 @@ details.more summary {
   font-size: 14px;
 }
 
-/* Drop in */
-.piece {
-  position: fixed;
-  left: 0;
-  top: 0;
-  z-index: 4;
-  touch-action: none;
-  cursor: grab;
-  will-change: transform;
-  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.25));
-}
-.piece svg {
-  display: block;
-  overflow: visible;
-}
-.piece path {
-  fill: rgba(43, 79, 179, 0.32);
-  stroke: #1e3a8a;
-  stroke-width: 2;
-}
-.piece span {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  white-space: nowrap;
-  font-weight: 800;
-  font-size: 14px;
-  color: #1f1b16;
-  background: rgba(255, 255, 255, 0.85);
-  padding: 1px 6px;
-  border-radius: 6px;
-  pointer-events: none;
-}
-.piece.held {
-  cursor: grabbing;
-  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35));
-}
-.piece.snap {
-  transition: transform 0.25s ease-out;
-}
-.piece.shake {
-  animation: shake 0.35s;
-}
-@keyframes shake {
-  0%, 100% { margin-left: 0; }
-  25% { margin-left: -8px; }
-  75% { margin-left: 8px; }
-}
-body.dropping #fabs,
-body.dropping #edges {
-  display: none;
-}
 .chip.sec.located::before {
   content: '● ';
   font-size: 9px;
@@ -2159,8 +2106,26 @@ body.gridding .maplibregl-canvas {
   margin-top: 12px;
   width: 100%;
 }
-#regionBtn {
+#regionTog {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 7px 10px;
+}
+#tabs #regionTog button {
+  flex: 1;
+  min-height: 0;
+  border-radius: 8px;
   font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  color: var(--panel-muted);
+  background: rgba(255, 255, 255, 0.08);
+}
+#tabs #regionTog button.on {
+  color: #fff;
+  background: var(--accent, #2b4fb3);
 }
 .seg {
   display: grid;
@@ -2941,4 +2906,65 @@ body.gridding #hud .gg-go {
 .spine {
   color: #d99a00;
   font-size: 0.85em;
+}
+
+/* Practice: the main modes as tiles; the rest is under "More" */
+.ptiles {
+  display: flex;
+  gap: 6px;
+}
+.ptile {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 7px 9px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background: rgba(127, 127, 127, 0.14);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.ptile b {
+  font-size: 13.5px;
+  line-height: 1.2;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ptile small {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.ptile small {
+  font-size: 11px;
+  opacity: 0.65;
+  line-height: 1.2;
+}
+.ptile.on {
+  border-color: var(--accent, #2b4fb3);
+  background: rgba(43, 79, 179, 0.12);
+}
+.ptile.more {
+  flex: 0.8 1 0;
+}
+.ptiles + .prow,
+.ptiles + .score {
+  margin-top: 6px;
+}
+#pickDlg .precent.quizzes .pchip {
+  font-size: 12.5px;
+  padding: 5px 10px;
+}
+#pickDlg .pchip.on {
+  border-color: var(--accent, #2b4fb3);
+  background: rgba(43, 79, 179, 0.1);
 }

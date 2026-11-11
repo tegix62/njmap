@@ -27,7 +27,6 @@ const TYPES = {
   findpt: 'Find the lake or mountain',
   today: '☀ Today (2 min)',
   rapid: '⚡ Rapid round',
-  dropin: '🧩 Drop in (county puzzle)',
   gridmid: '🚕 Drive Midtown (new)',
   gridgame: '🚕 Drive Downtown (new)',
   gridclassic: '🚕 Drive Midtown (classic grid)',
@@ -39,7 +38,6 @@ const DESC = {
   today: 'A short set picked for you today. The best place to start.',
   mix: 'A bit of everything.',
   rapid: 'Timed one-tap rounds, three lives.',
-  dropin: 'Drop each town into its county.',
   gridmid: 'Drive Midtown: plan the route avenue by avenue and street by street, then ride it.',
   gridgame: 'Drive Downtown: plan the route through the tangle below 14th St, then ride it. Tunnels and bridges in.',
   gridclassic: 'The original: a straightened grid, 14th to 110th St.',
@@ -48,10 +46,15 @@ const DESC = {
 };
 // How the kinds group in the picker (anything not listed lands in Quizzes)
 const GROUPS = [
-  ['Start here', ['today', 'mix']],
-  ['Games', ['rapid', 'dropin']],
-  ['Driving practice', ['gridmid', 'gridgame', 'gridclassic', 'frames']],
+  ['A short daily set', ['today']],
+  ['Driving practice', ['gridgame', 'gridclassic', 'frames']],
 ];
+// The modes that get a tile at the top of Practice (the rest are under "More")
+const TILE_LABEL = {
+  rapid: ['⚡ Rapid', '2 min'],
+  mix: ['∞ Mixed', 'endless'],
+  gridmid: ['🚕 Drive', 'Midtown'],
+};
 // How long the map takes to turn and move to the next question
 const QUESTION_MOVE_MS = 1200;
 // One-tap kinds that work against a clock
@@ -65,9 +68,10 @@ export function initPractice(ctx) {
   const R = ctx.region;
   L = ctx.theme.label;
   const CFG_KEY = R.id === 'nj' ? 'practice' : `practice.${R.id}`;
-  const cfg = { type: 'today', area: R.wellKnown ? 'known' : 'all', ...store.get(CFG_KEY, {}) };
+  const cfg = { type: R.gridAngle ? 'gridmid' : 'rapid', area: R.wellKnown ? 'known' : 'all', ...store.get(CFG_KEY, {}) };
   const SC = R.gridAngle ? 0.12 : 1; // Manhattan distances are short
-  const allowed = ['today', 'mix', 'rapid', ...(R.gridAngle ? ['gridmid', 'gridgame', 'gridclassic'] : []), 'frames', 'dropin', ...R.quizTypes, 'trip'];
+  const allowed = ['today', 'mix', 'rapid', ...(R.gridAngle ? ['gridmid', 'gridgame', 'gridclassic'] : []), 'frames', ...R.quizTypes, 'trip'];
+  if (cfg.type === 'dropin') cfg.type = 'rapid'; // (the county puzzle is gone)
   if (!allowed.includes(cfg.type)) cfg.type = 'mix';
   // the whole-island game isn't reliable yet: anyone on it moves to the classic once
   if (cfg.type === 'gridgame' && !store.get('classicBack', false)) {
@@ -549,8 +553,6 @@ export function initPractice(ctx) {
     stopRapidTimer();
     if (cfg.type === 'today') return nextToday();
     if (cfg.type === 'rapid') return nextRapid();
-    if (cfg.type === 'dropin') return startDropIn();
-    ctx.dropin.stop();
     if (cfg.type !== 'gridgame') ctx.gridgame.stop();
     if (cfg.type !== 'gridmid') ctx.gridmid.stop();
     if (cfg.type !== 'gridclassic') ctx.gridclassic.stop();
@@ -779,16 +781,6 @@ export function initPractice(ctx) {
     ctx.gridclassic.start({ header: () => header(), bindHeader: () => bindHeader() });
   }
 
-  // ---- Drop in ------------------------------------------------------------------
-  function startDropIn() {
-    q = { kind: 'dropin', m: null, answered: false };
-    ctx.clearHighlights();
-    ctx.reveal([]);
-    ctx.line(null);
-    ctx.showLabels(false);
-    ctx.dropin.start({ pool: pool(), area: cfg.area, header: () => header(), bindHeader: () => bindHeader(), record });
-  }
-
   // ---- rendering ------------------------------------------------------------
   function header() {
     const opts = (o) =>
@@ -811,36 +803,34 @@ export function initPractice(ctx) {
     if (cfg.type === 'today') {
       const t = todayState();
       const dots = t.items.map((_, k) => `<span class="${k < t.i ? 'd done' : k === t.i && !t.done ? 'd now' : 'd'}"></span>`).join('');
-      return `<div class="prow">
-        ${typeBtn()}
+      return `${typeBtn()}<div class="prow">
         <select id="qArea" aria-label="Area">${area}</select>
       </div><div class="score todaybar"><span class="dots">${dots}</span>${streak() ? `<span>🔥 ${streak()} day${streak() === 1 ? '' : 's'}</span>` : ''}</div>`;
     }
     if (cfg.type === 'gridgame' || cfg.type === 'gridmid' || cfg.type === 'gridclassic' || cfg.type === 'frames')
       // these have no use for the neighborhood/town list
-      return `<div class="prow">
-        ${typeBtn()}
-      </div><div class="score"></div>`;
-    if ((cfg.type === 'rapid' && !rapid.on) || cfg.type === 'dropin')
-      return `<div class="prow">
-        ${typeBtn()}
+      return `${typeBtn()}<div class="score"></div>`;
+    if (cfg.type === 'rapid' && !rapid.on)
+      return `${typeBtn()}<div class="prow">
         <select id="qArea" aria-label="Area">${area}</select>
       </div><div class="score"></div>`;
     if (cfg.type === 'rapid' && rapid.on)
-      return `<div class="prow">
-        ${typeBtn()}
+      return `${typeBtn()}<div class="prow">
         <select id="qArea" aria-label="Area">${area}</select>
       </div><div class="score"><span class="lives">${'♥'.repeat(Math.max(0, rapid.lives))}${'♡'.repeat(Math.max(0, 3 - rapid.lives))}</span> · ${rapid.score} right · round ${rapid.round}</div>`;
-    return `<div class="prow">
-        ${typeBtn()}
+    return `${typeBtn()}<div class="prow">
         <select id="qArea" aria-label="Area">${area}</select>
       </div>
       <div class="score">${due ? `<span class="due">${due} due for review</span> · ` : ''}${score.right}/${score.total}${score.total ? ` · ${pct}%` : ''}${score.streak > 1 ? ` · streak ${score.streak}` : ''}</div>`;
   }
 
-  /** The button that shows what you're practicing and opens the picker. */
+  /** The main modes as tiles (New York: Drive Midtown first), and a "More" button for everything else. */
   function typeBtn() {
-    return `<button id="qType" class="typebtn" aria-haspopup="dialog" aria-label="Choose what to practice">${esc(TYPES[cfg.type] || cfg.type)} <span class="caret">▾</span></button>`;
+    const tiles = (R.gridAngle ? ['gridmid', 'rapid', 'mix'] : ['rapid', 'mix']).filter((k) => allowed.includes(k));
+    const other = !tiles.includes(cfg.type);
+    return `<div class="ptiles">${tiles
+      .map((k) => `<button class="ptile${cfg.type === k ? ' on' : ''}" data-type="${k}" aria-pressed="${cfg.type === k}"><b>${esc(TILE_LABEL[k][0])}</b><small>${esc(TILE_LABEL[k][1])}</small></button>`)
+      .join('')}<button id="qType" class="ptile more${other ? ' on' : ''}" aria-haspopup="dialog" aria-label="More ways to practice"><b>${other ? esc(TYPES[cfg.type] || cfg.type) : 'More'}</b><small>${other ? 'change ▾' : 'quizzes ▾'}</small></button></div>`;
   }
   function chooseType(t) {
     if (!allowed.includes(t)) return;
@@ -861,17 +851,20 @@ export function initPractice(ctx) {
     }
     const card = (k) =>
       `<button class="pcard${k === cfg.type ? ' on' : ''}" data-type="${k}"><span class="pt">${esc(TYPES[k])}</span>${DESC[k] ? `<span class="pd">${esc(DESC[k])}</span>` : ''}</button>`;
-    const used = new Set(GROUPS.flatMap(([, ks]) => ks));
+    const used = new Set([...GROUPS.flatMap(([, ks]) => ks), 'rapid', 'mix', 'gridmid']);
     const groups = GROUPS.map(([name, ks]) => [name, ks.filter((k) => allowed.includes(k))]);
     groups.push(['Quizzes', allowed.filter((k) => !used.has(k))]);
+    const quizChip = (k) => `<button class="pchip${k === cfg.type ? ' on' : ''}" data-type="${k}">${esc(TYPES[k])}</button>`;
     const recent = store.get('practice.recent', []).filter((k) => allowed.includes(k) && k !== cfg.type).slice(0, 3);
-    dlg.innerHTML = `<h2>Practice</h2>
+    dlg.innerHTML = `<h2>More ways to practice</h2>
       ${recent.length ? `<div class="pgroup"><div class="pname">Recently</div><div class="precent">${recent.map((k) => `<button class="pchip" data-type="${k}">${esc(TYPES[k])}</button>`).join('')}</div></div>` : ''}
       ${groups
         .filter(([, ks]) => ks.length)
         .map(
           ([name, ks]) =>
-            `<div class="pgroup"><div class="pname">${name}</div><div class="pcards${name === 'Quizzes' ? ' compact' : ''}">${ks.map(card).join('')}</div></div>`
+            name === 'Quizzes'
+              ? `<div class="pgroup"><div class="pname">${name}</div><div class="precent quizzes">${ks.map(quizChip).join('')}</div></div>`
+              : `<div class="pgroup"><div class="pname">${name}</div><div class="pcards">${ks.map(card).join('')}</div></div>`
         )
         .join('')}
       <button class="primary" id="pickClose">Close</button>`;
@@ -886,6 +879,7 @@ export function initPractice(ctx) {
   }
   function bindHeader() {
     document.getElementById('qType').addEventListener('click', openPicker);
+    for (const b of document.querySelectorAll('.ptile[data-type]')) b.addEventListener('click', () => b.dataset.type !== cfg.type && chooseType(b.dataset.type));
     document.getElementById('qArea')?.addEventListener('change', (e) => {
       cfg.area = e.target.value;
       store.set(CFG_KEY, cfg);
@@ -1612,13 +1606,12 @@ export function initPractice(ctx) {
         q = null;
         return next();
       }
-      if (q && !q.answered && !q.rapid && q.kind !== 'dropin' && q.kind !== 'gridgame' && q.kind !== 'frames' && q.kind !== 'rapidend') show();
+      if (q && !q.answered && !q.rapid && q.kind !== 'gridgame' && q.kind !== 'frames' && q.kind !== 'rapidend') show();
       else next();
     },
     leave() {
       stopRapidTimer();
       rapid.on = false;
-      ctx.dropin.stop();
       ctx.gridgame.stop();
       ctx.gridmid.stop();
       ctx.gridclassic.stop();

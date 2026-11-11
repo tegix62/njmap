@@ -12,7 +12,6 @@ import { buildStyle, MUNI_LABEL_IDS, PLACE_LAYER_IDS } from './style.js';
 import { THEMES } from './theme.js';
 import { activeRegion, switchRegion, ALL_REGIONS, needsRegionChoice, setRegion, REGION_BLURB } from './region.js';
 import { initAnchors } from './anchors.js';
-import { initDropIn } from './dropin.js';
 import { initGridGame } from './gridgame.js';
 import { initGridClassic } from './gridclassic.js';
 import { initFrames } from './frames.js';
@@ -72,7 +71,10 @@ async function main() {
   document.body.dataset.region = region.id;
   document.title = `${REGION_BLURB[region.id]?.tag === 'NJ' ? 'NJ' : 'Manhattan'} Townfinder`;
   const tag = REGION_BLURB[region.id]?.tag || region.id;
-  document.getElementById('regionBtnLabel').textContent = tag;
+  for (const b of document.querySelectorAll('#regionTog button')) {
+    b.classList.toggle('on', b.dataset.region === region.id);
+    b.setAttribute('aria-pressed', String(b.dataset.region === region.id));
+  }
   document.getElementById('map').setAttribute('aria-label', `Map of ${REGION_BLURB[region.id]?.name || region.name}`);
   const [topo, sectionsByKey] = await Promise.all([
     fetch(region.data).then((r) => r.json()),
@@ -552,7 +554,6 @@ async function main() {
   window.addEventListener('resize', updateEdges);
 
   ctx.anchors = initAnchors(ctx); // before the modes, so it can claim map taps
-  ctx.dropin = initDropIn(ctx);
   ctx.gridgame = initGridGame(ctx, 'downtown');
   ctx.gridmid = initGridGame(ctx, 'midtown');
   ctx.gridclassic = initGridClassic(ctx);
@@ -635,12 +636,10 @@ async function main() {
   };
   for (const b of document.querySelectorAll('#regionSeg button'))
     b.addEventListener('click', () => b.dataset.region !== region.id && switchRegion(b.dataset.region));
-  // the tab-bar button: switch maps from anywhere
+  // the tab bar's NJ | NYC toggle: one tap switches maps, from anywhere
   const regionDlg = $('#regionDlg');
-  $('#regionBtn').addEventListener('click', () => {
-    regionCards($('#regionChoices'), region.id, (id) => (id === region.id ? regionDlg.close() : switchRegion(id)));
-    regionDlg.showModal();
-  });
+  for (const b of document.querySelectorAll('#regionTog button'))
+    b.addEventListener('click', () => b.dataset.region !== region.id && switchRegion(b.dataset.region));
   $('#closeRegion').addEventListener('click', () => regionDlg.close());
   regionDlg.addEventListener('click', (e) => e.target === regionDlg && regionDlg.close());
   $('#settingsBtn').addEventListener('click', () => {
