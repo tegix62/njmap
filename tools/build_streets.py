@@ -865,6 +865,21 @@ def near_junction(pt, r=45):
         if d < r and (best is None or d < best[0]):
             best = (d, c)
     return best
+# Coming down from the GWB by the east side (Harlem River Drive to the FDR Drive), the FDR's southbound
+# exit at E 53rd St (exit 11, "southbound exit only" on Wikipedia's exit list; the city's ramp data puts its
+# end at 53rd St and Sutton Pl S) puts you on E 53rd St heading west. The 49th and 34th St exits land on
+# spur streets this map leaves out, and 42nd St has no southbound exit.
+FDR_STARTS = [('the GWB (down the FDR, E 53rd St exit)', (-73.96255, 40.75482), 'E 53rd St')]
+if AREA == 'midtown':
+    for label, pt, street in FDR_STARTS:
+        h = near_junction(pt, 30)
+        cand = [li for li in links_from.get(h[1], []) if li in core_l and names[links[li]['name']] == street] if h else []
+        if cand:
+            li = cand[0]
+            entries_out.append({'from': label, 'via': street, 'link': lre[li], 'landsAt': jre[links[li]['from']]})
+            place_report.append(f'  start {label}: link {lre[li]} on {street}')
+        else:
+            place_report.append(f'  start {label}: NOT FOUND')
 for pl in places:
     if pl['name'] == 'the Lincoln Tunnel entrance (to NJ)':
         defs = []
