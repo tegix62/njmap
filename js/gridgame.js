@@ -1436,15 +1436,28 @@ export function initGridGame(ctx, areaId = 'downtown') {
   // ---- reports: something's off / the round's log, to GitHub or the clipboard ------------------
   const REPO = 'tegix62/njmap';
   /** Where you are and what the corner ahead allows, right now. */
+  /** What was on screen, in words (the top card and the panel), so a report shows what you saw. */
+  function screenText() {
+    const t = (id) => ((document.getElementById(id) || {}).innerText || '').replace(/\s+/g, ' ').trim();
+    return `${t('hud')} || ${t('sheet')}`.slice(0, 520);
+  }
+  /** The state of play: where the car is, or in the plan where the ghost car is, and what it offers. */
   function snapshot() {
-    const c = choices(g.e);
+    const P = planning() ? g.plan : null;
+    const e = P ? P.cur : g.e;
+    const c = choices(e);
     const nm = (o) => (o ? `${short(o.name)} #${o.id}` : '-');
-    const nt = nextTurnCorner();
+    const nt = P ? null : nextTurnCorner();
+    const btns = (sel) => [...document.querySelectorAll(sel)].map((x) => x.textContent.replace(/\s+/g, ' ').trim());
     return {
-      link: g.e.id, on: g.e.name, s: Math.round(g.s), len: Math.round(g.e.len), corner: G.label(g.e.to), waiting: g.waiting,
+      link: e.id, on: e.name, s: Math.round(P ? P.curS : g.s), len: Math.round(e.len), corner: G.label(e.to), waiting: P ? true : g.waiting,
+      plan: P ? P.phase : null,
       left: nm(c.left), straight: nm(c.straight), right: nm(c.right), named: c.named ? c.options.map(nm) : null, only: nm(c.only),
       queued: g.queued, pick: g.pick ? nm(g.pick) : null, next: nt ? `${nt.name} (${G.label(nt.via.to)})` : null, msg: g.msg || null,
       where: (hood(g.pos || g.trail[0]) || '').replace(/ \(.*\)$/, ''),
+      target: `${g.target.name || g.target.label}${g.target.quad ? ` (${g.target.quad} corner)` : g.target.gates ? ' (tunnel ramp)' : ''}`,
+      shown: { chips: btns('.ggchip'), turns: btns('.ggturn'), picks: btns('.ggpick') },
+      screen: screenText(),
     };
   }
   /** The log in words, a line per event (needs this area's street data). */
@@ -1461,7 +1474,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       if (what === 'zip') return `${tt} Go-to ${G.label(a)}`;
       if (what === 'stop') return `${tt} stopped at ${G.edges[a] ? G.label(G.edges[a].to) : a}`;
       if (what === 'msg') return `${tt} “${a}”`;
-      if (what === 'flag') return `${tt} ⚑ MARKED on ${L(a)} (${b} m in, ${c}) → ${G.edges[a] ? G.label(G.edges[a].to) : ''}`;
+      if (what === 'flag') return `${tt} ⚑ MARKED on ${L(a)} (${b} m in, ${c}) → ${d && d.corner ? d.corner : G.edges[a] ? G.label(G.edges[a].to) : ''}`;
       if (what === 'plan') return `${tt} plan: ${a === 'turn' ? `turn onto ${L(b)}` : a === 'corner' ? `go to ${G.label(b)}` : a === 'refused' ? `tried ${b === 'L' ? 'left' : b === 'R' ? 'right' : 'straight'} (refused)` : a}`;
       if (what === 'ride') return `${tt} ride`;
       if (what === 'hint') return `${tt} hint`;
@@ -1478,7 +1491,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
       [
         head,
         note ? `> ${note.replace(/\n/g, '\n> ')}` : '',
-        snap ? `At **${snap.corner}** (${snap.where}), on ${snap.on}${snap.waiting ? ', stopped' : ''}. Ahead: ◀ ${snap.left} · ▲ ${snap.straight} · ▶ ${snap.right}${snap.named ? ` · named: ${snap.named.join(', ')}` : ''}${snap.only !== '-' ? ` · only: ${snap.only}` : ''}${snap.next ? ` · next corner: ${snap.next}` : ''}${snap.queued ? ` · queued ${snap.queued}` : ''}${snap.msg ? ` · message: “${snap.msg}”` : ''}` : '',
+        snap ? `At **${snap.corner}** (${snap.where}), on ${snap.on}${snap.plan ? `, planning (${snap.plan})` : snap.waiting ? ', stopped' : ''}. Ahead: ◀ ${snap.left} · ▲ ${snap.straight} · ▶ ${snap.right}${snap.named ? ` · named: ${snap.named.join(', ')}` : ''}${snap.only !== '-' ? ` · only: ${snap.only}` : ''}${snap.next ? ` · next corner: ${snap.next}` : ''}${snap.queued ? ` · queued ${snap.queued}` : ''}${snap.msg ? ` · message: “${snap.msg}”` : ''}` : '',
+        ...log.ev.filter((x) => x[1] === 'flag' && x[5]).slice(-4).map((x) => `⚑ ${x[0].toFixed(1)}s at **${x[5].corner}** (${x[5].where}, ${x[4]}): chips [${(x[5].shown.chips || []).join(', ')}] turns [${(x[5].shown.turns || []).join(', ')}] picks [${(x[5].shown.picks || []).join(', ')}]; screen: “${x[5].screen}”`),
         `To ${log.target} · ${log.kind} round · pace ${log.pace} · guide ${log.guide}${log.labels ? '' : ' · hard mode'} · ${log.at}`,
         tl.length ? '```\n' + tl.join('\n') + '\n```' : '',
         '<details><summary>log (for replay)</summary>\n\n```json\n' + rw + '\n```\n</details>',
@@ -2501,7 +2515,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
       e.preventDefault();
       if (!g || g.done || g.startCard) return;
       g.flags = (g.flags || 0) + 1;
-      logEv('flag', g.e.id, Math.round(g.s), g.waiting ? 'stopped' : 'moving');
+      const snap = snapshot();
+      logEv('flag', snap.link, snap.s, snap.plan ? `plan:${snap.plan}` : g.waiting ? 'stopped' : 'moving', { corner: snap.corner, where: snap.where, shown: snap.shown, screen: snap.screen });
       const b = document.getElementById('ggMark');
       if (b) b.textContent = `⚑ ${g.flags}`;
     });
@@ -2603,7 +2618,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     // for tests
     _state: () => g,
     _graph: () => G,
-    _plan: { planCorner: (n) => planCorner(n), planTurn: (sd) => planTurn(sd), planPick: (id) => planPick(id), startRide: () => startRide(), render: () => render() },
+    _reportText: () => (g && g.report ? reportText(g.report.kind, g.report.log, g.report.snap, g.report.note) : null),
+    _plan: { planCorner: (n) => planCorner(n), planTurn: (sd) => planTurn(sd), planPick: (id) => planPick(id), planStep: (id) => planStep(G.edges[id]), planUndo: () => planUndo(), startRide: () => startRide(), render: () => render() },
     _model: { pickEntry, entryStart, choices, moves, shortest, straightTo, aheadChain, load, rule, describe, atTarget, arrivalSide, arrivalOK, chooseQuad, twoWay },
     _speed: () => (g && !g.loading && g.e ? speedNow() : 0),
     _mem: () => mem,

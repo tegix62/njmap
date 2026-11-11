@@ -84,6 +84,9 @@ The screen is built in two layers. The first is what you can take in at a glance
 
 **Fewer repeats and clearer corners:** a new round never goes to the same place as the round before it. Where two streets cross at one corner (5th Ave and Broadway at 23rd St), the chip and the top card name both (*"5th Ave / Broadway"*), so a chip never names one street for a corner you'd reach by the other.
 
+
+**Reports carry what you saw:** a ⚑ mark or *Something's off* taken while planning now records where the ghost car was (the corner and the plan step), not where the real car started, and keeps the words on screen at that moment (the top card and panel), the chips, turn buttons and picks you were shown, and the target with its corner or ramp. The issue text lists the last four marked screens, so a bug can be reconstructed without the game still being open.
+
 **Button feel:** every button presses in to 94% and springs back (`js/motion.js`, spring stiffness 1019, damping 42: the feel lab's "snappy" spring made 40% faster). It uses the `scale` property so it can't clash with a button's own transform, a quick tap still shows its press (70 ms minimum), and it's skipped under reduced-motion. Further feedback (wrong-turn shake, star landings, panel curves) is still being chosen.
 
 ## Getting around the app
