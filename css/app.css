@@ -2534,3 +2534,48 @@ body.ink .prow .typebtn {
     animation: none;
   }
 }
+
+/* "by the way": a famous place close to you, named for a few seconds under the neighborhood tag */
+.gg-lmtag {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  max-width: calc(100vw - 32px);
+  padding: 6px 12px 7px;
+  border-radius: 14px;
+  background: #3b2f1e;
+  color: #fff;
+  font: 600 13px/1.25 system-ui, sans-serif;
+  text-align: center;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  animation: gg-lmin 0.3s ease-out;
+}
+.gg-lmtag[hidden] {
+  display: none;
+}
+.gg-lmtag b {
+  font-weight: 800;
+}
+.gg-lmtag span {
+  opacity: 0.8;
+  font-weight: 500;
+}
+.gg-lmtag small {
+  display: block;
+  font-weight: 400;
+  opacity: 0.75;
+  font-size: 11.5px;
+}
+@keyframes gg-lmin {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gg-lmtag {
+    animation: none;
+  }
+}

@@ -121,7 +121,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   // ---- the graph -------------------------------------------------------------------
   async function load() {
     if (G) return G;
-    const d = await fetch(DATA_URL).then((r) => r.json());
+    const [d, lmAll] = await Promise.all([fetch(DATA_URL).then((r) => r.json()), fetch('data/landmarks.json').then((r) => r.json()).catch(() => [])]);
     const [ox, oy] = d.origin;
     const nodes = []; // junctions (real intersections)
     for (let i = 0; i < d.junctions.length; i += 2) nodes.push([ox + d.junctions[i] / d.scale, oy + d.junctions[i + 1] / d.scale]);
@@ -184,6 +184,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const gy = nodes.map((p) => gridXY(p)[1]);
     G = { d, nodes, edges, out, inn, coreJ, cuts, real, streetsAt, xingGeo, label, plain, gy, RAMP, places: d.places, entries: d.entries, areas: d.areas };
     G.dataKey = `${d.source}|${edges.length}|${nodes.length}`;
+    // famous buildings and places worth knowing, for the "right next to you" callouts: the ones near this map's streets
+    G.landmarks = lmAll.filter((l) => nodes.some((nd) => Math.hypot((nd[0] - l.p[0]) * 84400, (nd[1] - l.p[1]) * 111000) < 170));
     // A tunnel isn't a curb: you get in by driving onto one of its entrance ramps. The street data names
     // them (the Lincoln Tunnel's: gateDefs, from the Port Authority and city data; the Holland's: the street
     // that carries straight on into the ramp, from the city's data), so a round ends when you drive onto one.
@@ -576,6 +578,42 @@ export function initGridGame(ctx, areaId = 'downtown') {
       void hoodTag.offsetWidth;
       hoodTag.classList.add('pulse');
     }
+  }
+  // "By the way": a famous building or place within a block of you, named for a few seconds, once per round
+  const lmTag = document.createElement('div');
+  lmTag.className = 'gg-lmtag';
+  lmTag.hidden = true;
+  document.body.appendChild(lmTag);
+  let lmTimer = 0;
+  function hideLmTag() {
+    clearTimeout(lmTimer);
+    lmTag.hidden = true;
+  }
+  /** Name a landmark that's close, and which side it's on; at most one at a time, a few seconds apart. */
+  function noteLandmarks(p, heading, now) {
+    if (!g || prefs.landmarks === false || !G.landmarks || now - (g.lmAt || 0) < 5500) return;
+    // the plan's ghost car and the real drive each get a landmark once (a corner you planned past is still new on the ride)
+    const shown = planning() ? g.lmPlan || (g.lmPlan = new Set()) : g.lmShown || (g.lmShown = new Set());
+    let best = null;
+    for (const [i, l] of G.landmarks.entries()) {
+      if (shown.has(i)) continue;
+      const d = metres(p, l.p);
+      if (d < 115 && (!best || d < best.d)) best = { i, l, d };
+    }
+    if (!best) return;
+    const bearing = ((Math.atan2((best.l.p[0] - p[0]) * 84400, (best.l.p[1] - p[1]) * 111000) * 180) / Math.PI + 360) % 360;
+    const rel = ((bearing - heading + 540) % 360) - 180;
+    if (best.d >= 35 && Math.abs(rel) > 145) return; // already behind you: not worth a callout
+    shown.add(best.i);
+    g.lmAt = now;
+    const side = best.d < 35 ? 'right here' : Math.abs(rel) < 35 ? 'ahead' : rel > 0 ? 'on your right' : 'on your left';
+    lmTag.innerHTML = `<b>${esc(best.l.n)}</b> <span>${side}</span><small>${esc(best.l.note)}</small>`;
+    lmTag.style.top = `${Math.round(ctx.padding().top + 26)}px`;
+    lmTag.hidden = false;
+    clearTimeout(lmTimer);
+    lmTimer = setTimeout(hideLmTag, 4200);
+    if (!planning()) (g.lmSeen || (g.lmSeen = [])).push(best.l); // only real driving counts for the result
+    logEv('lm', best.l.n, side);
   }
   function highlightHood(m, pulse) {
     if (!m || !m.geom || !map.getSource('gg-hood')) return;
@@ -1025,6 +1063,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
 
   function stop() {
     clearHood();
+    hideLmTag();
     if (!g) return;
     keepLog();
     cancelAnimationFrame(g.raf);
@@ -1301,6 +1340,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     if (!g.startCard && !g.done && now - (g.hoodAt || 0) > 250) {
       g.hoodAt = now;
       noteHood(p);
+      noteLandmarks(p, b, now);
     }
     const hc = `${gridDir(b)}${onGrid(g.e.name, b) ? '' : compassWord(b)}${choices(g.e).named ? 'n' : ''}`;
     if (hc !== g.lastHC) {
@@ -2201,6 +2241,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
 
   function finish() {
     logEv('done', Math.round(g.driven), Math.round(g.best.cost), g.wrong);
+    hideLmTag();
     g.done = true;
     g.waiting = true;
     offEl.hidden = true;
@@ -2283,6 +2324,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       ${fixed ? `<div class="hint">✓ ${esc(g.mistake.corner)}: got it this time</div>` : ''}
       ${missed ? `<div class="hint">↺ ${esc(missed)} (it'll come back)</div>` : ''}
       ${g.passed && g.passed.length > 1 ? `<div class="hint">🏘 Through: ${g.passed.map(esc).join(' → ')}</div>` : ''}
+      ${lmResultLines()}
       <div class="hint"><span class="gg-key you"></span> you <span class="gg-key best"></span> shortest</div>
       <details class="ggdet"><summary>Details</summary>
         <div class="hint">Shortest: ${esc(describe(g.best.path))}</div>
@@ -2325,6 +2367,17 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const p = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
     const brg = (Math.atan2((b[0] - a[0]) * 84400, (b[1] - a[1]) * 111000) * 180) / Math.PI;
     return { p, brg: a === b ? null : brg, k };
+  }
+  /** The end screen: the famous places you passed, and what's by your destination. */
+  function lmResultLines() {
+    if (prefs.landmarks === false || !G.landmarks) return '';
+    const seen = [...new Map((g.lmSeen || []).map((l) => [l.n, l])).values()].slice(0, 5);
+    const tp = targetPoint();
+    const names = new Set(seen.map((l) => l.n));
+    const norm = (x) => x.toLowerCase().replace(/^the /, '').replace(/ \(.*\)$/, '');
+    const isTarget = (l) => !!g.target.name && (norm(g.target.name).includes(norm(l.n)) || norm(l.n).includes(norm(g.target.name)));
+    const by = G.landmarks.filter((l) => !names.has(l.n) && metres(tp, l.p) < 170 && !isTarget(l)).slice(0, 3);
+    return `${seen.length ? `<div class="hint">🏛 Passed: ${seen.map((l) => esc(l.n)).join(' · ')}</div>` : ''}${by.length ? `<div class="hint">📍 By your destination: ${by.map((l) => esc(l.n)).join(' · ')}</div>` : ''}`;
   }
   /** The end of a round, after a drive you made in real time: both ways ride out together, fast. */
   function startRace() {
@@ -2529,6 +2582,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
             <summary>More options</summary>
             <label><input type="checkbox" id="ggArrows"${prefs.arrows ? ' checked' : ''}/> One-way arrows</label>
             <label><input type="checkbox" id="ggLabels"${prefs.labels ? ' checked' : ''}/> Street names (off: hard mode)</label>
+            <label><input type="checkbox" id="ggLandmarks"${prefs.landmarks === false ? '' : ' checked'}/> Landmark callouts ("by the way, that's the Chrysler Building")</label>
             <label><input type="checkbox" id="ggCover"${prefs.cover ? ' checked' : ''}/> Show streets I've driven</label>
             <label><input type="checkbox" id="ggTrips"${prefs.trips ? ' checked' : ''}/> Mix in my saved trips</label>
             <label><input type="checkbox" id="ggMapFirst"${prefs.mapFirst ? ' checked' : ''}/> Map first</label>
@@ -2601,6 +2655,11 @@ export function initGridGame(ctx, areaId = 'downtown') {
       });
     toggle('ggLabels', 'labels', () => g && !g.done && showLabels(prefs.labels));
     toggle('ggCover', 'cover', showCover);
+    document.getElementById('ggLandmarks').addEventListener('change', (e) => {
+      prefs.landmarks = e.target.checked;
+      savePrefs();
+      if (!e.target.checked) hideLmTag();
+    });
     toggle('ggTrips', 'trips');
     if (g.startCard) bindBriefing(guessSide, go0);
     document.getElementById('ggGuide').addEventListener('change', (e) => {
