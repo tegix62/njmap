@@ -25,6 +25,8 @@ TITLES = {
     'Natural History Museum': 'American Museum of Natural History', "Zabar's": "Zabar's", 'Frick Collection': 'Frick Collection',
     'The Met': 'Metropolitan Museum of Art', 'Guggenheim': 'Solomon R. Guggenheim Museum', 'Mount Sinai Hospital': 'Mount Sinai Hospital (Manhattan)',
     'Queensboro Bridge': 'Queensboro Bridge', 'Roosevelt Island Tram': 'Roosevelt Island Tramway',
+    'Columbia University': 'Columbia University', 'Cathedral of St. John the Divine': 'Cathedral of St. John the Divine', 'Riverside Church': 'Riverside Church (New York City)',
+    "Grant's Tomb": "General Grant National Memorial", 'Apollo Theater': 'Apollo Theater',
 }
 
 # where the article's lead image is a logo or drawing, a chosen Commons file instead

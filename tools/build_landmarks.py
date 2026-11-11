@@ -73,13 +73,19 @@ L = [
     ('Mount Sinai Hospital', 'MOUNT SINAI HOSPITAL', 'Madison Ave & 99th St', (-73.9524, 40.7900)),
     ('Queensboro Bridge', 'QUEENSBORO BRIDGE', 'Manhattan end at 59th St & 2nd Ave', (-73.9610, 40.7585)),
     ('Roosevelt Island Tram', 'ROOSEVELT ISLAND TRAMWAY', '2nd Ave & 60th St, the cable car to the island', (-73.9648, 40.7612)),
+    ('Columbia University', 'COLUMBIA UNIVERSITY', 'Broadway & 116th St, the College Walk gates', (-73.9626, 40.8075)),
+    ('Cathedral of St. John the Divine', 'CATHEDRAL OF ST JOHN THE DIVINE', 'Amsterdam Ave & 112th St, the largest cathedral in the US', (-73.9619, 40.8036)),
+    ('Riverside Church', 'RIVERSIDE CHURCH', 'Riverside Dr & 120th St, the tall Gothic tower', (-73.9631, 40.8112)),
+    ("Grant's Tomb", "GRANT'S TOMB", 'Riverside Dr & 122nd St', (-73.9633, 40.8135)),
+    ('Apollo Theater', 'APOLLO THEATER', 'W 125th St, Harlem, Amateur Night', (-73.9500, 40.8100)),
 ]
 FORCE_FALLBACK = {'Penn Station', 'Federal Hall', 'Charging Bull', 'Oculus', "Katz's Delicatessen", 'Washington Square Arch',
                   'Staten Island Ferry', 'Brooklyn Bridge', 'Trinity Church', 'Morgan Library', 'Waldorf Astoria', 'Trump Tower',
                   'Tudor City', 'Bryant Park', 'New York Public Library', "St. Patrick's Cathedral", 'Times Square', '9/11 Memorial',
                   'Plaza Hotel', 'Woolworth Building', 'Cooper Union', 'Battery Park',
                   'Lincoln Center', 'Strawberry Fields', 'The Dakota', 'Natural History Museum', "Zabar's", 'Frick Collection', 'The Met',
-                  'Guggenheim', 'Mount Sinai Hospital', 'Queensboro Bridge', 'Roosevelt Island Tram'}
+                  'Guggenheim', 'Mount Sinai Hospital', 'Queensboro Bridge', 'Roosevelt Island Tram',
+                  'Columbia University', 'Cathedral of St. John the Divine', 'Riverside Church', "Grant's Tomb", 'Apollo Theater'}
 
 
 def poi(q):

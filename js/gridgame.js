@@ -85,7 +85,7 @@ function gridXY(p) {
 export const DRIVE_AREAS = {
   downtown: { data: 'data/downtown-streets.json', title: 'Drive Downtown', span: 'below 14th St', of: "downtown's" },
   midtown: { data: 'data/midtown-streets.json', title: 'Drive Midtown', span: '14th–60th St', of: "Midtown's" },
-  uptown: { data: 'data/uptown-streets.json', title: 'Drive Uptown', span: '60th–110th St', of: "Uptown's" },
+  uptown: { data: 'data/uptown-streets.json', title: 'Drive Uptown', span: '60th–125th St', of: "Uptown's" },
 };
 
 export function initGridGame(ctx, areaId = 'downtown') {
@@ -236,7 +236,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     // The grid's own coordinates: across (x) of each avenue, up (y) of each numbered street, so a
     // point can be put into "streets and avenues". Avenues keep one column north of 59th under
     // their uptown names (9th Ave is Columbus Ave, 10th is Amsterdam, 11th is West End).
-    const ALIAS = { 'Central Park West': '8th Ave', 'Columbus Ave': '9th Ave', 'Amsterdam Ave': '10th Ave', 'West End Ave': '11th Ave', 'Park Ave S': 'Park Ave' };
+    const ALIAS = { 'Central Park West': '8th Ave', 'Frederick Douglass Blvd': '8th Ave', 'Adam Clayton Powell Jr Blvd': '7th Ave', 'Lenox Ave': '6th Ave', 'Columbus Ave': '9th Ave', 'Amsterdam Ave': '10th Ave', 'West End Ave': '11th Ave', 'Park Ave S': 'Park Ave' };
     const AVES = new Set(['1st Ave', '2nd Ave', '3rd Ave', 'Lexington Ave', 'Park Ave', 'Madison Ave', '5th Ave', '6th Ave', '7th Ave', '8th Ave', '9th Ave', '10th Ave', '11th Ave']);
     const ax = new Map(), sy = new Map();
     for (const e of edges) {
@@ -753,7 +753,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   // Uptown (directions from the street data: Amsterdam, Madison, 3rd and 1st run uptown; Columbus, 5th, Lexington and 2nd downtown)
   const AVES_UP = [
     ['Riv', ['Riverside Dr'], 'B'], ['WEnd', ['West End Ave'], 'B'], ['Amst', ['Amsterdam Ave'], 'U'], ['Col', ['Columbus Ave'], 'D'],
-    ['CPW', ['Central Park West'], 'B'], ['5th', ['5th Ave'], 'D'], ['Mad', ['Madison Ave'], 'U'], ['Park', ['Park Ave'], 'B'],
+    ['CPW', ['Central Park West', 'Frederick Douglass Blvd'], 'B'], ['ACP', ['Adam Clayton Powell Jr Blvd'], 'B'], ['Lenox', ['Lenox Ave'], 'B'], ['5th', ['5th Ave'], 'D'], ['Mad', ['Madison Ave'], 'U'], ['Park', ['Park Ave'], 'B'],
     ['Lex', ['Lexington Ave'], 'D'], ['3rd', ['3rd Ave'], 'U'], ['2nd', ['2nd Ave'], 'D'], ['1st', ['1st Ave'], 'U'], ['York', ['York Ave'], 'B'],
   ];
   const AVES = areaId === 'uptown' ? AVES_UP : AVES_MID;
@@ -1253,7 +1253,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const y = G.gy[n], A = G.areas;
     if (a === 'downtown') return y < A['14'];
     if (a === 'midtown') return y >= A['14'] - 150 && y <= A['59'] + 150;
-    if (a === 'uptown') return y >= A['59'] - 150 && y <= A['110'] + 150;
+    if (a === 'uptown') return y >= A['59'] - 150 && y <= (A['125'] || A['110']) + 150;
     return y > A['110'];
   }
   const isCore = (n) => G.coreJ.has(n);
@@ -1957,7 +1957,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const h = gridDir(g.bnow);
     let thing, dir;
     if (h === 'U' || h === 'D') {
-      const harlem = G.gy[g.e.from] > G.areas['110'] + 800;
+      const harlem = G.gy[g.e.from] > (G.areas['125'] ? G.areas['125'] - 200 : G.areas['110'] + 800);
       [thing, dir] = Math.random() < 0.5 ? ['the Hudson', 'W'] : [harlem ? 'the Harlem River' : 'the East River', 'E'];
     } else [thing, dir] = Math.random() < 0.5 ? ['uptown', 'U'] : ['downtown', 'D'];
     // which hand that direction is on, facing h

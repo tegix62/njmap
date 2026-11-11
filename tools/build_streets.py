@@ -39,7 +39,7 @@ src, out, report = sys.argv[1:4]
 # --downtown: the streets below 14th St only, no highways, ramps, tunnels or bridges
 # (rounds from a tunnel or bridge start where it lands on a street)
 # --midtown: the same, between 14th and 59th St
-# --uptown: the same, between 59th and 110th St (Central Park and the Upper East and West Sides)
+# --uptown: the same, between 59th and 125th St (Central Park and the Upper East and West Sides)
 AREA = 'downtown' if '--downtown' in sys.argv[4:] else 'midtown' if '--midtown' in sys.argv[4:] else 'uptown' if '--uptown' in sys.argv[4:] else None
 DOWNTOWN = AREA is not None  # streets only, one area
 raw = json.load(open(src))
@@ -349,7 +349,7 @@ keep = core | feeders
 CROSSINGS = [
     (r'HOLLAND', 'the Holland Tunnel'), (r'LINCOLN TUN', 'the Lincoln Tunnel'), (r'HUGH L CAREY|BATTERY TUN', 'the Brooklyn-Battery Tunnel'),
     (r'QUEENS MIDTOWN', 'the Queens-Midtown Tunnel'), (r'BROOKLYN BR', 'the Brooklyn Bridge'), (r'MANHATTAN BR', 'the Manhattan Bridge'),
-    (r'WILLIAMSBURG', 'the Williamsburg Bridge'), (r'QUEENSBORO|QBORO', 'the Queensboro Bridge'), (r'RFK|TRIBOROUGH', 'the RFK (Triborough) Bridge'),
+    (r'WILLIAMSBURG', 'the Williamsburg Bridge'), (r'QUEENSBORO|QBORO', 'the Queensboro Bridge'), (r'RFK|TRIBOROUGH|ROBERT F KENNEDY', 'the RFK (Triborough) Bridge'),
     (r'GEORGE WASHINGTON|GWB|TRANS MANHATTAN|CROSS BRONX', 'the George Washington Bridge'), (r'HENRY HUDSON', 'the Henry Hudson Pkwy (from the Bronx)'),
     (r'HARLEM RIVER', 'the Harlem River Drive'), (r'MADISON AVE BR', 'the Madison Ave Bridge'), (r'145 ST BR', 'the 145th St Bridge'),
     (r'MACOMBS', 'the Macombs Dam Bridge'), (r'3 AVE BR', 'the 3rd Ave Bridge'), (r'BROADWAY BR', 'the Broadway Bridge'),
@@ -381,7 +381,7 @@ for a, b, nid, d, pts, L, rawname, *_rw in edges:
     m = re.match(r'^[EW] (\d+) ST$', rawname)
     if m:
         street_y[int(m.group(1))].append(gy(a))
-areas = {str(s): round(sorted(street_y[s])[len(street_y[s]) // 2]) for s in (14, 59, 110) if street_y.get(s)}
+areas = {str(s): round(sorted(street_y[s])[len(street_y[s]) // 2]) for s in (14, 59, 110, 125) if street_y.get(s)}
 
 # ---- named destinations, snapped to a real intersection --------------------------------------
 PLACES = [
@@ -406,8 +406,8 @@ PLACES = [
     ('Columbus Circle', (-73.9819, 40.7681), None), ('Lincoln Center', (-73.9835, 40.7725), None),
     ('the Natural History Museum', (-73.9740, 40.7813), None), ('the Met', (-73.9632, 40.7794), None),
     ('the Guggenheim', (-73.9590, 40.7830), None), ("Bloomingdale's", (-73.9675, 40.7620), None),
-    ("Zabar's", (-73.9800, 40.7850), None), ('Mount Sinai Hospital', (-73.9529, 40.7900), None),
-    ('Columbia University', (-73.9626, 40.8075), None), ('the Apollo Theater', (-73.9500, 40.8100), None),
+    ("Zabar's", (-73.9798, 40.7871), None), ('Mount Sinai Hospital', (-73.9529, 40.7900), None),
+    ('Columbia University', (-73.9626, 40.8075), None), ('the Cathedral of St. John the Divine', (-73.9619, 40.8036), None), ('Riverside Church', (-73.9631, 40.8112), None), ("Grant's Tomb", (-73.9633, 40.8135), None), ('the Apollo Theater', (-73.9500, 40.8100), None),
     ('the George Washington Bridge (Manhattan end)', (-73.9465, 40.8507), None), ('the Cloisters', (-73.9319, 40.8649), None),
 ]
 # ---- intersections: the pieces of one real corner become one ------------------------------
@@ -591,7 +591,7 @@ if DOWNTOWN:
     NOT_STREET = re.compile(r'FDR|ROOSEVELT|TUNNEL|TUNL|UNDERPASS|\bBRG\b|BRIDGE (?!ST$)|BRIDGE$|\bEN\b|\bET\b|\bEX\b|ENTRANCE|EXIT|\bRP\b|RAMP|EXPWY|EXPY|\bEP\b')  # (the Park Ave Viaduct round Grand Central is an ordinary two-way street, level 17: it stays; the FDR's viaduct is caught by FDR)
     # the area's edge streets themselves are in (14th St for both; 59th St for Midtown)
     # (Midtown takes in 60th St: the Queensboro Bridge lets you out there)
-    Y_LO, Y_HI = ((-1e9, areas['14'] + 40) if AREA == 'downtown' else (areas['59'] - 40, areas['110'] + 110) if AREA == 'uptown' else (areas['14'] - 40, areas['59'] + 110))
+    Y_LO, Y_HI = ((-1e9, areas['14'] + 40) if AREA == 'downtown' else (areas['59'] - 40, areas['125'] + 110) if AREA == 'uptown' else (areas['14'] - 40, areas['59'] + 110))
     def below14(c):  # in the area
         return Y_LO <= grid_xy(*centroid[c])[1] <= Y_HI
     street_l = {li for li, L in enumerate(links)
