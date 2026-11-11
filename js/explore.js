@@ -1,6 +1,7 @@
 import { bearing, compass8, ARROWS } from './geo.js';
 import { roadsInTown, roadsFrom, draftNote, countyNum } from './roads.js';
 import { editNote } from './notes.js';
+import { buildingFeatures } from './city3d.js';
 
 let L; // label colors of the active theme (set in initExplore)
 
@@ -43,6 +44,62 @@ export function initExplore(ctx) {
   for (const l of ctx.landmarks) extra.push([`${l.name} — ${l.m.n}`, { m: l.m, landmark: l }]);
   extra.sort((a, b) => a[0].localeCompare(b[0])).forEach(([label, v]) => addOption(label, v));
   document.body.appendChild(list);
+
+  // ---- 3D (Manhattan): the buildings stand up and the camera tilts; two fingers (or right-drag) tilt and turn it ----
+  const x3d = document.getElementById('x3d');
+  let on3d = false, bld = 0; // bld: 0 not loaded, 1 loading, 2 in the map
+  const TILT = 58;
+  async function ensureBuildings() {
+    if (bld) return;
+    bld = 1;
+    try {
+      const d = await fetch('data/buildings-midtown.json').then((r) => r.json());
+      if (!map.getSource('x3d')) {
+        map.addSource('x3d', { type: 'geojson', data: { type: 'FeatureCollection', features: buildingFeatures(d) } });
+        const first = map.getStyle().layers.find((l) => l.type === 'symbol');
+        map.addLayer(
+          {
+            id: 'x3d', type: 'fill-extrusion', source: 'x3d', minzoom: 13.5,
+            paint: {
+              'fill-extrusion-color': ['case', ['has', 'c'], ['get', 'c'], ['interpolate', ['linear'], ['get', 'h'], 6, '#e9e3d6', 60, '#d6cdbb', 200, '#bdb29d', 300, '#a99d88']],
+              'fill-extrusion-height': ['get', 'h'],
+              'fill-extrusion-base': ['coalesce', ['get', 'b'], 0],
+              'fill-extrusion-opacity': ['interpolate', ['linear'], ['zoom'], 13.5, 0, 14.2, 0.94],
+              'fill-extrusion-vertical-gradient': true,
+            },
+          },
+          first && first.id
+        );
+      }
+      bld = 2;
+    } catch {
+      bld = 0;
+    }
+  }
+  function set3d(v, animate = true) {
+    on3d = v;
+    if (x3d) {
+      x3d.classList.toggle('on', v);
+      x3d.setAttribute('aria-pressed', String(v));
+    }
+    if (v) {
+      ensureBuildings();
+      map.touchPitch.enable();
+      map.setMaxPitch(70);
+    } else {
+      map.touchPitch.disable();
+    }
+    const o = { pitch: v ? TILT : 0, duration: animate ? ctx.dur(700) : 0 };
+    if (v && ctx.region.gridAngle) {
+      // the building data covers Midtown (14th to 59th St): from anywhere else, go there
+      const c = map.getCenter();
+      if (c.lat < 40.74 || c.lat > 40.772 || c.lng < -74.015 || c.lng > -73.96) o.center = [-73.9855, 40.7545];
+      if (map.getZoom() < 14.3 || o.center) o.zoom = 15;
+    }
+    if (!v) o.bearing = 0;
+    map.easeTo(o);
+  }
+  if (x3d) x3d.addEventListener('click', () => set3d(!on3d));
 
   map.on('click', (e) => {
     if (ctx.mode !== 'explore' || e.handledByAnchor) return;
@@ -448,6 +505,7 @@ export function initExplore(ctx) {
       render();
     },
     leave() {
+      if (on3d) set3d(false, false);
       ctx.focus(null);
       ctx.focusRoad(null);
       ctx.clearHighlights();

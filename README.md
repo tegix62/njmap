@@ -20,6 +20,7 @@ The screen is built in two layers. The first is what you can take in at a glance
   - *Trips:* each drive's route and the towns you passed are saved on your phone for a recap afterwards.
 - **Heading-up or north-up**: tap the compass button. N/E/S/W markers stay on the edges of the map either way.
 - **Explore**
+  - *3D (Manhattan):* the **3D** button tilts the map and stands the buildings up at their real heights, with stepped models for the famous towers (Empire State, Chrysler, 30 Rock and others). Two fingers tilt and turn it. The building data covers Midtown (14th to 59th St), so the button takes you there if you're elsewhere; Downtown and Uptown stay flat for now.
   - *Villages:* opening a town's Villages tab labels every village it can place right on the map. Locations come from GeoNames, and are only used when they fall inside that town; others are looked up in the background map when you tap them.
   - *At a glance:* the card is short (name, county, distance), and the map does the rest: the selected town's neighbors are tinted and labeled, and everything else fades.
   - *One tap:* tabs for Borders (the neighbors as a list, with directions), Villages, Roads, Landmarks, My notes and Sound-alikes, one open at a time. Tapping a road highlights it on the map and lists where it **leads to** ("I-80 → Passaic (SE 1.9 mi), Little Falls (W 2.8 mi)…").
