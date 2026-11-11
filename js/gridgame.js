@@ -121,7 +121,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
   // ---- the graph -------------------------------------------------------------------
   async function load() {
     if (G) return G;
-    const [d, lmAll, lmIcons, lmPics] = await Promise.all([fetch(DATA_URL).then((r) => r.json()), fetch('data/landmarks.json').then((r) => r.json()).catch(() => []), fetch('data/landmark-icons.json').then((r) => r.json()).catch(() => ({})), fetch('data/landmark-credits.json').then((r) => r.json()).catch(() => ({}))]);
+    const [d, lmAll, lmIcons, lmPics, adv] = await Promise.all([fetch(DATA_URL).then((r) => r.json()), fetch('data/landmarks.json').then((r) => r.json()).catch(() => []), fetch('data/landmark-icons.json').then((r) => r.json()).catch(() => ({})), fetch('data/landmark-credits.json').then((r) => r.json()).catch(() => ({})), fetch('data/advisories-summary.json').then((r) => r.json()).catch(() => null)]);
+    ADV = adv;
     LM_ALL = lmAll;
     LM_ICONS = lmIcons;
     LM_PICS = lmPics;
@@ -979,7 +980,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
   // The advisory gave about 120 days from April 22, 2026, and closures were still announced in late
   // September; the real end date (thought to be around January or February 2027) isn't confirmed, so this
   // date is an assumption. Options: Auto (follows the clock in New York), Always on, Off.
-  const DETOUR_THROUGH = '2027-02-28';
+  const DETOUR_THROUGH = '2027-02-28'; // (only used when the advisory log can't be read)
+  let ADV = null; // data/advisories-summary.json: from the Port Authority's own alert feed, refreshed by a scheduled job
   function lteDetourOn() {
     const mode = prefs.lteDetour || 'auto';
     if (mode === 'on') return true;
@@ -987,7 +989,10 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: '2-digit', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date()).map((p) => [p.type, p.value]));
     const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(parts.weekday);
     const hour = +parts.hour;
-    if (`${parts.year}-${parts.month}-${parts.day}` > DETOUR_THROUGH) return false;
+    // is the detour still running? The alert feed says when the Expressway was last closed overnight; without it, a guessed end date
+    if (ADV && ADV.lastExpresswayClosure) {
+      if (Date.now() - Date.parse(ADV.lastExpresswayClosure) > 21 * 864e5) return false;
+    } else if (`${parts.year}-${parts.month}-${parts.day}` > DETOUR_THROUGH) return false;
     return (hour >= 23 && day >= 2 && day <= 4) || (hour < 5 && day >= 3 && day <= 5);
   }
   /** Point each tunnel destination at the entrances open right now (the detour's, or the usual ones). */

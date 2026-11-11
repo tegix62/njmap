@@ -22,7 +22,7 @@ Downtown: Stock Exchange (Wall & Broad, SW), Washington Square Park (Washington 
 
 ## Entries to check
 
-- Lincoln Tunnel entrance ramps: 30th St / 10th Ave, W 33rd St, Dyer Ave northbound (34th to 36th), 9th Ave southbound ramp at 36th. Overnight (Tue to Thu, 11 pm to 5 am) the game uses Galvin Plaza (W 40th St) as the only way in, until `DETOUR_THROUGH` (2027-02-28, a guess: set the real date).
+- Lincoln Tunnel entrance ramps: 30th St / 10th Ave, W 33rd St, Dyer Ave northbound (34th to 36th), 9th Ave southbound ramp at 36th. Overnight (Tue to Thu, 11 pm to 5 am) the game uses Galvin Plaza (W 40th St) as the only way in, while the Port Authority's alert feed still shows overnight Expressway closures (the game reads `data/advisories-summary.json`; the last closure alert in it is 5 Nov 2026). `DETOUR_THROUGH` (2027-02-28) is only the fallback when that file can't be read.
 - GWB starts: down the West Side Highway (12th Ave near 59th), I-87 / I-278 / FDR exit 8 then E 38th St and 1st Ave (from Google Maps), and the FDR exit at E 53rd St.
 - UN: security checkpoint at 46th St & 2nd Ave and a drop-off on the north side of 46th near 1st Ave (from a 2023 UN briefing; not in the game).
 
