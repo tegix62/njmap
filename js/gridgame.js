@@ -1135,6 +1135,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const m = ctx.locate(p);
     return m ? `${m.n}${m.c && m.c !== m.n ? ` (${m.c})` : ''}` : null;
   }
+  /** What a way out is called on its button: the ramp up to the Park Ave Viaduct is "Park Ave" in the city's data, but it's the viaduct. */
+  const optName = (o) => (o.name === 'Park Ave' && /Viaduct/.test(G.label(o.to)) ? 'Park Ave Viaduct' : short(o.name));
   /** The cross street at the end of edge e (the next corner), if it's a real intersection. */
   function crossAt(e) {
     const names = [];
@@ -2116,7 +2118,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       const picks = c.options
         .map((o) => ({ o, d: turnOf(p.cur, o) }))
         .sort((a, b) => a.d - b.d)
-        .map(({ o }) => `<button class="ggpick" data-link="${o.id}"><span class="gg-arr" style="transform:rotate(${(o.b0 - GRID).toFixed(0)}deg)">${DIR_SVG}</span><span class="nm">${esc(short(o.name))} <small>${esc(leadsTo(o))}</small></span></button>`)
+        .map(({ o }) => `<button class="ggpick" data-link="${o.id}"><span class="gg-arr" style="transform:rotate(${(o.b0 - GRID).toFixed(0)}deg)">${DIR_SVG}</span><span class="nm">${esc(optName(o))} <small>${esc(leadsTo(o))}</small></span></button>`)
         .join('');
       return ctl(`<div class="bq">At <b>${esc(at)}</b>: which way?</div><div class="ggctl named">${picks}</div>`);
     }
@@ -2538,7 +2540,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
         .sort((a, b) => a.d - b.d)
         .map(
           ({ o }) =>
-            `<button class="ggpick${g.pick === o ? ' on' : ''}" data-link="${o.id}"><span class="gg-arr" style="transform:rotate(${(o.b0 - GRID).toFixed(0)}deg)">${DIR_SVG}</span><span class="nm">${esc(short(o.name))} <small>${esc(leadsTo(o))}</small></span></button>`
+            `<button class="ggpick${g.pick === o ? ' on' : ''}" data-link="${o.id}"><span class="gg-arr" style="transform:rotate(${(o.b0 - GRID).toFixed(0)}deg)">${DIR_SVG}</span><span class="nm">${esc(optName(o))} <small>${esc(leadsTo(o))}</small></span></button>`
         )
         .join('');
     ctx.sheet(

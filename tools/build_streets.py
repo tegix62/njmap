@@ -569,13 +569,17 @@ for li, L in enumerate(links):
         if abs(adiff(O['b0'], L['b1'])) > UTURN:
             continue  # a U-turn (across a median, or back the way you came)
         ok.append(lo)
+    def viaduct_at(c):
+        return any('VIADUCT' in edges[i][6].upper() for i in ext[c])
     if AREA:
         # the same road twice the same way out of a corner (a service lane beside the
         # avenue, a duplicated roadbed in the city's data): one button, the plain block
         one = []
         for lo in sorted(ok, key=lambda x: links[x]['len']):
             O = links[lo]
-            if any(links[x]['name'] == O['name'] and abs(adiff(links[x]['b0'], O['b0'])) < 15 for x in one):
+            # (the ramp up to the Park Ave Viaduct beside the ground-level avenue goes on somewhere else: a real choice)
+            if any(links[x]['name'] == O['name'] and abs(adiff(links[x]['b0'], O['b0'])) < 15
+                   and not (viaduct_at(links[x]['to']) or viaduct_at(O['to'])) for x in one):
                 continue
             one.append(lo)
         ok = one
@@ -583,7 +587,7 @@ for li, L in enumerate(links):
 
 turns_full = turns
 if DOWNTOWN:
-    NOT_STREET = re.compile(r'FDR|ROOSEVELT|TUNNEL|TUNL|UNDERPASS|\bBRG\b|BRIDGE (?!ST$)|BRIDGE$|\bEN\b|\bET\b|\bEX\b|ENTRANCE|EXIT|\bRP\b|RAMP|EXPWY|EXPY|VIADUCT|\bEP\b')
+    NOT_STREET = re.compile(r'FDR|ROOSEVELT|TUNNEL|TUNL|UNDERPASS|\bBRG\b|BRIDGE (?!ST$)|BRIDGE$|\bEN\b|\bET\b|\bEX\b|ENTRANCE|EXIT|\bRP\b|RAMP|EXPWY|EXPY|\bEP\b')  # (the Park Ave Viaduct round Grand Central is an ordinary two-way street, level 17: it stays; the FDR's viaduct is caught by FDR)
     # the area's edge streets themselves are in (14th St for both; 59th St for Midtown)
     # (Midtown takes in 60th St: the Queensboro Bridge lets you out there)
     Y_LO, Y_HI = (-1e9, areas['14'] + 40) if AREA == 'downtown' else (areas['14'] - 40, areas['59'] + 110)
@@ -799,7 +803,7 @@ CORNERS = {
     'One World Trade Center': (('Vesey St', 'Greenwich St'), ['SW']),
     'the Stock Exchange (Wall St)': (('Broad St', 'Wall St'), ['SW']),   # 11 Wall St, south of Wall, west of Broad
     'Union Square': (None, ['NE', 'SE']),
-    'Grand Central': (None, ['NE']),
+    'Grand Central': (('Park Ave', 'E 42nd St'), ['NE']),      # the terminal is north-east of Park Ave & 42nd St
     'the Empire State Building': (None, ['NW']),
     'Madison Square Garden': (None, ['SE']),
     'Port Authority': (None, ['NW', 'SW']),
