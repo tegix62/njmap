@@ -2851,9 +2851,11 @@ export function initGridGame(ctx, areaId = 'downtown') {
       </div>`;
     if (p.phase === 'done') return ctl(`<div class="bq">🏁 That gets you there.</div><button class="primary" id="ggRide">🚕 Ride it ▶</button>`);
     if (p.phase === 'corner') {
-      const cs = planChips();
+      let cs = planChips();
+      if (p.allChips) cs = p.chipAll; // "All": every corner on this road ahead, not the usual sample
       const lab = (c) => (prefs.labels ? short(c.name) : `+${c.idx + 1}`);
-      return ctl(`<div class="ggchips plan">${cs.map((c, i) => `<button class="ggchip" data-node="${c.node}">${atTarget(c.via, c.node) ? '🏁 ' : ''}${esc(lab(c))}</button>`).join('') || '<span class="muted">No turns ahead on this road.</span>'}</div>`);
+      const more = p.chipAll && p.chipAll.length > cs.length || p.allChips ? `<button class="ggchipmore" type="button">${p.allChips ? '◂ Fewer' : 'All ▸'}</button>` : '';
+      return ctl(`<div class="ggchips plan">${cs.map((c, i) => `<button class="ggchip" data-node="${c.node}">${atTarget(c.via, c.node) ? '🏁 ' : ''}${esc(lab(c))}</button>`).join('') || '<span class="muted">No turns ahead on this road.</span>'}${more}</div>`);
     }
     const c = choices(p.cur);
     const at = prefs.labels ? G.label(p.cur.to) : 'this corner';
@@ -3403,6 +3405,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       if (log) openReport('log', log);
     });
     if (g.report) bindReport();
+    document.querySelector('.ggchipmore')?.addEventListener('click', () => { if (g && g.plan) { g.plan.allChips = !g.plan.allChips; render(); } });
     for (const b of document.querySelectorAll('.ggchip')) b.addEventListener('click', (e) => e.detail === 0 && goToNode(+b.dataset.node)); // (a keyboard "click"; touches go through chipTap below, so the row can scroll)
     for (const b of document.querySelectorAll('.ggname')) onTap(b, () => answerName(b.dataset.name));
     const fast = document.getElementById('ggFast');

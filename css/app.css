@@ -3157,3 +3157,6 @@ body.gridding #hud.open .gg-how {
 .fab3d { display: none; font-size: 15px; color: #101828; }
 body[data-mode='explore'][data-region='manhattan'] .fab3d { display: grid; }
 .fab3d.on { background: #101828; color: #fff; }
+
+/* plan: "All ▸" shows every corner on the road ahead, not just the sample */
+.ggchips.plan .ggchipmore { flex: none; border: 1px dashed currentColor; background: transparent; color: inherit; opacity: 0.75; border-radius: 999px; padding: 6px 12px; font: inherit; cursor: pointer; }
