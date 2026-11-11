@@ -121,7 +121,9 @@ export function initGridGame(ctx, areaId = 'downtown') {
   // ---- the graph -------------------------------------------------------------------
   async function load() {
     if (G) return G;
-    const [d, lmAll] = await Promise.all([fetch(DATA_URL).then((r) => r.json()), fetch('data/landmarks.json').then((r) => r.json()).catch(() => [])]);
+    const [d, lmAll, lmIcons, lmPics] = await Promise.all([fetch(DATA_URL).then((r) => r.json()), fetch('data/landmarks.json').then((r) => r.json()).catch(() => []), fetch('data/landmark-icons.json').then((r) => r.json()).catch(() => ({})), fetch('data/landmark-credits.json').then((r) => r.json()).catch(() => ({}))]);
+    LM_ICONS = lmIcons;
+    LM_PICS = lmPics;
     const [ox, oy] = d.origin;
     const nodes = []; // junctions (real intersections)
     for (let i = 0; i < d.junctions.length; i += 2) nodes.push([ox + d.junctions[i] / d.scale, oy + d.junctions[i + 1] / d.scale]);
@@ -596,6 +598,9 @@ export function initGridGame(ctx, areaId = 'downtown') {
       hoodTag.classList.add('pulse');
     }
   }
+  let LM_ICONS = {}, LM_PICS = {};
+  /** A landmark's picture: our silhouette if we drew one, else a small photo from Wikimedia Commons (credited in Settings), else nothing. */
+  const lmPic = (n) => (LM_ICONS[n] ? `<svg viewBox="0 0 64 64" fill="currentColor" aria-hidden="true">${LM_ICONS[n]}</svg>` : LM_PICS[n] ? `<img src="${esc(LM_PICS[n].img)}" alt="" />` : '');
   // "By the way": a famous building or place within a block of you, named for a few seconds, once per round
   const lmTag = document.createElement('div');
   lmTag.className = 'gg-lmtag';
@@ -624,11 +629,13 @@ export function initGridGame(ctx, areaId = 'downtown') {
     shown.add(best.i);
     g.lmAt = now;
     const side = best.d < 35 ? 'right here' : Math.abs(rel) < 35 ? 'ahead' : rel > 0 ? 'on your right' : 'on your left';
-    lmTag.innerHTML = `<b>${esc(best.l.n)}</b> <span>${side}</span><small>${esc(best.l.note)}</small>`;
+    const pic = lmPic(best.l.n);
+    lmTag.innerHTML = `${pic ? `<i>${pic}</i>` : ''}<div><b>${esc(best.l.n)}</b><span>${side}</span></div>`; // the picture and a name, nothing to read: the note is on the result screen
+    lmTag.classList.toggle('nopic', !pic);
     lmTag.style.top = `${Math.round(ctx.padding().top + 26)}px`;
     lmTag.hidden = false;
     clearTimeout(lmTimer);
-    lmTimer = setTimeout(hideLmTag, 4200);
+    lmTimer = setTimeout(hideLmTag, 5000);
     if (!planning()) (g.lmSeen || (g.lmSeen = [])).push(best.l); // only real driving counts for the result
     logEv('lm', best.l.n, side);
   }

@@ -1,0 +1,12 @@
+{
+ "Chrysler Building": "<path d=\"M32 1l1.2 10h-2.4z\"/><path d=\"M32 9c-5 1-8 5-8 10h16c0-5-3-9-8-10z\"/><path d=\"M26 19h12v5h4v6h-20v-6h4z\"/><path d=\"M21 30h22v8h3v24H18V38h3z\"/><path fill=\"none\" stroke=\"#fff\" stroke-width=\"1.1\" d=\"M26 19c0-5 3-8 6-8m6 8c0-5-3-8-6-8M24.5 14c1.5-2 4-3.4 7.5-3.4s6 1.4 7.5 3.4\"/>",
+ "Empire State Building": "<path d=\"M31.4 1h1.2v11h-1.2z\"/><path d=\"M30 12h4v6h-4zM28 18h8v8h-8zM24 26h16v8H24zM19 34h26v10H19zM13 44h38v18H13z\"/>",
+ "Flatiron Building": "<path d=\"M29 6h6l12 56H17z\"/><path fill=\"none\" stroke=\"#fff\" stroke-width=\"1.3\" d=\"M32 12v50M26 22h12M23 36h18M20 50h24\"/>",
+ "One World Trade Center": "<path d=\"M31.5 0h1v9h-1z\"/><path d=\"M32 8l9 8 4 46H19l4-46z\"/><path fill=\"none\" stroke=\"#fff\" stroke-width=\"1.2\" d=\"M32 12v50M26 20l-3 42M38 20l3 42\"/>",
+ "Woolworth Building": "<path d=\"M32 1l7 12v9H25v-9z\"/><path d=\"M19 28h4v-6h18v6h4v14H19zM12 42h40v20H12z\"/><path d=\"M18 24l2-5 2 5zM42 24l2-5 2 5z\"/><path fill=\"none\" stroke=\"#fff\" stroke-width=\"1.1\" d=\"M32 22v20M27 30v12M37 30v12\"/>",
+ "Brooklyn Bridge": "<path fill-rule=\"evenodd\" d=\"M8 12l5-5 5 5v44H8zM11.5 56V32a1.5 1.5 0 013 0v24zM46 12l5-5 5 5v44H46zM49.5 56V32a1.5 1.5 0 013 0v24z\"/><path fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" d=\"M0 55Q7 36 13 9M13 9Q32 56 51 9M51 9Q57 36 64 55M20 44l0 12M28 50v6M36 50v6M44 44v12\"/><path d=\"M0 56h64v4H0z\"/>",
+ "Washington Square Arch": "<path fill-rule=\"evenodd\" d=\"M12 12h40v4H12zM15 16h34v46H15zM24 62V42a8 8 0 0116 0v20z\"/><path fill=\"none\" stroke=\"#fff\" stroke-width=\"1.1\" d=\"M15 26h34\"/>",
+ "United Nations": "<path d=\"M22 4h20v44H22z\"/><path d=\"M4 60l8-12h46l5 12z\"/><path fill=\"none\" stroke=\"#fff\" stroke-width=\"1.1\" d=\"M22 12h20M22 20h20M22 28h20M22 36h20M32 4v44\"/>",
+ "Trinity Church": "<path d=\"M32 0l4 24H28z\"/><path d=\"M27 24h10v22H27z\"/><path fill-rule=\"evenodd\" d=\"M6 46h52v16H6zM14 62V54a3 3 0 016 0v8zM29 62v-8a3 3 0 016 0v8zM44 62v-8a3 3 0 016 0v8z\"/><path d=\"M26 25l-4 4v17h5zM38 25l4 4v17h-5z\"/>",
+ "City Hall": "<path d=\"M31 2h2v6h-2z\"/><path d=\"M26 22a6 8 0 0112 0zM27 22h10v10H27z\"/><path fill-rule=\"evenodd\" d=\"M13 32h38v8H13zM5 40h54v22H5zM11 62V50a3 3 0 016 0v12zM22 62V50a3 3 0 016 0v12zM36 62V50a3 3 0 016 0v12zM47 62V50a3 3 0 016 0v12z\"/>"
+}
