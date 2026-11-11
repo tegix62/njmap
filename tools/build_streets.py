@@ -591,7 +591,7 @@ if DOWNTOWN:
     NOT_STREET = re.compile(r'FDR|ROOSEVELT|TUNNEL|TUNL|UNDERPASS|\bBRG\b|BRIDGE (?!ST$)|BRIDGE$|\bEN\b|\bET\b|\bEX\b|ENTRANCE|EXIT|\bRP\b|RAMP|EXPWY|EXPY|\bEP\b')  # (the Park Ave Viaduct round Grand Central is an ordinary two-way street, level 17: it stays; the FDR's viaduct is caught by FDR)
     # the area's edge streets themselves are in (14th St for both; 59th St for Midtown)
     # (Midtown takes in 60th St: the Queensboro Bridge lets you out there)
-    Y_LO, Y_HI = ((-1e9, areas['14'] + 40) if AREA == 'downtown' else (areas['59'] - 40, areas['125'] + 110) if AREA == 'uptown' else (areas['14'] - 40, areas['59'] + 110))
+    Y_LO, Y_HI = ((-1e9, areas['14'] + 40) if AREA == 'downtown' else (areas['59'] - 250, areas['125'] + 110) if AREA == 'uptown' else (areas['14'] - 40, areas['59'] + 110))
     def below14(c):  # in the area
         return Y_LO <= grid_xy(*centroid[c])[1] <= Y_HI
     street_l = {li for li, L in enumerate(links)
