@@ -26,7 +26,7 @@
 
 import { framesStats } from './frames.js';
 import { GUIDES, PEEK_MS, okSides, sideWords, guessRecord, briefingHTML, bindBriefing } from './briefing.js';
-import { buildingFeatures } from './city3d.js';
+import { buildingFeatures, applySurveyTowers, loadSurveyTowers } from './city3d.js';
 
 const CHECK_EVERY_MS = 35000; // a check-in at most this often
 const GRID = 29; // the grid is turned ~29° clockwise from north
@@ -721,9 +721,9 @@ export function initGridGame(ctx, areaId = 'downtown') {
     if (bldgBusy || map.__ggBldgReady || !G) return;
     bldgBusy = true;
     try {
-      const files = await Promise.all(BLDG_FILES.map((f) => fetch(`data/buildings-${f}.json`).then((r) => r.json())));
+      const [towers, ...files] = await Promise.all([loadSurveyTowers(), ...BLDG_FILES.map((f) => fetch(`data/buildings-${f}.json`).then((r) => r.json()))]);
       const feats = [];
-      for (const d of files) for (const f of buildingFeatures(d)) {
+      for (const f of applySurveyTowers(files.flatMap((d) => buildingFeatures(d)), towers)) {
         f.properties.z = zoneOfY(gridXY(f.geometry.coordinates[0][0])[1]);
         feats.push(f);
       }

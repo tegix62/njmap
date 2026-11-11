@@ -1,7 +1,7 @@
 import { bearing, compass8, ARROWS } from './geo.js';
 import { roadsInTown, roadsFrom, draftNote, countyNum } from './roads.js';
 import { editNote } from './notes.js';
-import { buildingFeatures } from './city3d.js';
+import { buildingFeatures, applySurveyTowers, loadSurveyTowers } from './city3d.js';
 
 let L; // label colors of the active theme (set in initExplore)
 
@@ -63,9 +63,9 @@ export function initExplore(ctx) {
       if (part[name] !== undefined || !near(c, box)) continue;
       part[name] = 0;
       try {
-        const d = await fetch(`data/buildings-${name}.json`).then((r) => r.json());
+        const [d, towers] = await Promise.all([fetch(`data/buildings-${name}.json`).then((r) => r.json()), loadSurveyTowers()]);
         const id = 'x3d-' + name;
-        map.addSource(id, { type: 'geojson', data: { type: 'FeatureCollection', features: buildingFeatures(d) } });
+        map.addSource(id, { type: 'geojson', data: { type: 'FeatureCollection', features: applySurveyTowers(buildingFeatures(d), towers) } });
         const first = map.getStyle().layers.find((l) => l.type === 'symbol');
         map.addLayer(
           {

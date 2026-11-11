@@ -13,5 +13,7 @@ open(os.path.join(ROOT, 'credits.html'), 'w').write(f'''<!doctype html>
 <h1>Photo credits</h1>
 <p>Landmark photos come from Wikimedia Commons under the licenses below (CC BY, CC BY-SA or public domain), reduced in size. The building silhouettes are drawn for this app. <a href="./">Back to the app</a></p>
 <ul>{rows}</ul>
+<h2>3D buildings</h2>
+<p>Building heights come from NYC Open Data building footprints. The shapes of about 190 of the tallest towers (their setbacks, crowns and spires) are cut from the NYC 3D Model by Community District, published by the NYC Department of City Planning from the 2014 aerial survey of the NYC Department of Information Technology and Telecommunications.</p>
 ''')
 print(len(c), 'credits')

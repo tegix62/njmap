@@ -70,3 +70,55 @@ export function buildingFeatures(d) {
   }
   return feats;
 }
+
+let towersPromise = null;
+/** The surveyed towers (data/towers.json, built by tools/build_towers.py from NYC Planning's 2014 3D model), once. */
+export function loadSurveyTowers() {
+  if (!towersPromise) towersPromise = fetch('data/towers.json').then((r) => r.json()).catch(() => ({ t: [] }));
+  return towersPromise;
+}
+const ringCentre = (ring) => {
+  let x = 0, y = 0;
+  for (const p of ring) { x += p[0]; y += p[1]; }
+  return [x / ring.length, y / ring.length];
+};
+const mDist = (a, b) => Math.hypot((a[0] - b[0]) * 84200, (a[1] - b[1]) * 111000);
+/**
+ * Swap a building for its surveyed shape. For each surveyed tower, the building (in `feats`, from buildingFeatures) that
+ * stands in the same place (centre within 45 m) with about the same height (survey within 0.75 to 1.3 times it) is
+ * replaced by the survey's stack of slabs; a tower with no such building is left out (it was demolished, or built since
+ * and still a block here), and a stylized model standing there is replaced too, keeping its colour.
+ */
+export function applySurveyTowers(feats, towers) {
+  if (!towers || !towers.t || !towers.t.length) return feats;
+  const info = feats.map((f) => ({ c: ringCentre(f.geometry.coordinates[0]), h: f.properties.h, model: f.properties.c !== undefined, color: f.properties.c }));
+  const drop = new Set(), add = [];
+  for (const [lon, lat, H, slabs] of towers.t) {
+    let best = -1, bd = 45;
+    info.forEach((o, i) => {
+      if (drop.has(i)) return;
+      const d = mDist(o.c, [lon, lat]);
+      if (d < bd && !o.model && H >= o.h * 0.75 && H <= o.h * 1.4) { bd = d; best = i; }
+    });
+    // (a model's pieces: any piece of one within 45 m, tallest piece at about the height)
+    const pieces = [];
+    info.forEach((o, i) => { if (o.model && !drop.has(i) && mDist(o.c, [lon, lat]) < 45) pieces.push(i); });
+    if (best < 0 && !pieces.length) continue;
+    if (pieces.length) {
+      const top = Math.max(...pieces.map((i) => info[i].h));
+      if (!(H >= top * 0.75 && H <= top * 1.4)) continue;
+    }
+    const color = pieces.length ? info[pieces[0]].color : null;
+    if (best >= 0) drop.add(best);
+    pieces.forEach((i) => drop.add(i));
+    const kx = 1 / 84200, ky = 1 / 111000;
+    for (const [b, t, flat] of slabs) {
+      const ring = [];
+      for (let k = 0; k < flat.length; k += 2) ring.push([lon + (flat[k] / 10) * kx, lat + (flat[k + 1] / 10) * ky]);
+      ring.push(ring[0]);
+      const shade = Math.min(1, t / H);
+      add.push({ type: 'Feature', properties: { h: t, b, c: color || (shade > 0.8 ? '#e6dfce' : '#d8d0be') }, geometry: { type: 'Polygon', coordinates: [ring] } });
+    }
+  }
+  return feats.filter((_, i) => !drop.has(i)).concat(add);
+}
