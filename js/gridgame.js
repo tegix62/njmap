@@ -580,6 +580,39 @@ export function initGridGame(ctx, areaId = 'downtown') {
   const HOOD_REST = { fill: 0.07, line: 0.6 };
   const HOOD_PULSE = { fill: 0.2, line: 1 };
   let hoodTimer = 0;
+  // "Where am I?": a small magnifier that pulls the map back to all of Manhattan (you, and the red dot) and back again
+  const MANHATTAN = [[-74.03, 40.695], [-73.9, 40.882]];
+  const ovBtn = document.createElement('button');
+  ovBtn.type = 'button';
+  ovBtn.className = 'gg-ov';
+  ovBtn.hidden = true;
+  ovBtn.setAttribute('aria-label', 'Where am I in Manhattan?');
+  ovBtn.setAttribute('aria-pressed', 'false');
+  ovBtn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="6.2" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M7.4 10h5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  document.body.appendChild(ovBtn);
+  function placeOv() {
+    const live = !!(g && !g.loading && !g.done && !g.startCard);
+    ovBtn.hidden = !live;
+    if (g && g.done && g.view === 'overview') g.view = 'follow';
+    ovBtn.classList.toggle('on', !!(g && g.view === 'overview'));
+    ovBtn.setAttribute('aria-pressed', String(!!(g && g.view === 'overview')));
+    ovBtn.style.top = `${Math.round(ctx.padding().top + 8)}px`;
+  }
+  function toggleOverview() {
+    if (!g || g.loading || g.done) return;
+    if (g.view === 'overview') {
+      g.view = 'follow';
+      g.camKey = null;
+      carEl.classList.remove('gg-ovcar');
+    } else {
+      g.view = 'overview';
+      carEl.classList.add('gg-ovcar');
+      const pad = ctx.padding();
+      map.fitBounds(MANHATTAN, { padding: { top: pad.top + 6, bottom: pad.bottom + 6, left: 16, right: 56 }, bearing: GRID, duration: ctx.dur(700), essential: true });
+    }
+    placeOv();
+  }
+  ovBtn.addEventListener('click', toggleOverview);
   // the name of the outlined neighborhood stays in view, just under the top card, for as long as it's outlined
   const hoodTag = document.createElement('div');
   hoodTag.className = 'gg-hoodtag';
@@ -1171,6 +1204,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
   function stop() {
     clearHood();
     hideLmTag();
+    ovBtn.hidden = true;
+    carEl.classList.remove('gg-ovcar');
     if (!g) return;
     keepLog();
     cancelAnimationFrame(g.raf);
@@ -2035,7 +2070,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       down = null;
       return;
     }
-    if (!cancel && down && !down.moved && !wasBoost && active() && !g.paused && !g.check) tapAt(e.clientX, e.clientY);
+    if (!cancel && down && !down.moved && !wasBoost && active() && !g.paused && !g.check && g.view !== 'overview') tapAt(e.clientX, e.clientY);
     down = null;
   };
   cont.addEventListener('pointerup', (e) => up(e, false));
@@ -2595,6 +2630,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   function render() {
     if (!g) return;
     requestAnimationFrame(placeHoodTag);
+    placeOv();
     if (g.loading) {
       ctx.hud(`<div class="qkind">🚕 ${AREA.title}</div><div class="q">Loading the street map…</div>`);
       ctx.sheet(`${g.opts.header()}`);

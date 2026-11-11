@@ -232,3 +232,5 @@ Location only works over HTTPS (or on `localhost`). To try it on a computer, run
 - Manhattan neighborhoods: © OpenStreetMap contributors (ODbL), via an Overpass snapshot from January 2019, with gaps filled from NYC Department of City Planning's 2020 Neighborhood Tabulation Areas (public domain).
 - Background map: © OpenStreetMap contributors, via [OpenFreeMap](https://openfreemap.org/) (free, no API key).
 - [MapLibre GL JS](https://maplibre.org/) (BSD-3), [topojson-client](https://github.com/topojson/topojson-client) (ISC), Noto Sans (SIL OFL). Their licenses are in `lib/` and `fonts/`.
+
+**Where am I?** A small magnifier button, top right of the map during a round in either Drive game. Tap it to pull back to all of Manhattan (you, the red destination dot and the neighborhoods); tap again to return to the drive. The round carries on while you look; map taps are ignored in the wide view.
