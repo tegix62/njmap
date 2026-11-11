@@ -406,6 +406,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       }
     }
     if (map.getSource('gg-trail')) return;
+    map.addSource('gg-bldg', { type: 'geojson', data: EMPTY });
     map.addSource('gg-streets', { type: 'geojson', data: streetsFC || EMPTY });
     const roadCol = map.getLayer('road-mid') && map.getPaintProperty('road-mid', 'line-color');
     map.addLayer(
@@ -420,6 +421,20 @@ export function initGridGame(ctx, areaId = 'downtown') {
         },
       },
       map.getLayer('road-minor') ? 'road-minor' : undefined // under the background map's roads: where its tiles load, they draw on top
+    );
+    map.addLayer(
+      {
+        id: 'gg-bldg', type: 'fill-extrusion', source: 'gg-bldg', layout: { visibility: 'none' },
+        paint: {
+          // a plain stand-in for the city: stone gray, darker the taller it is; the building a landmark sits in is amber
+          'fill-extrusion-color': ['case', ['==', ['get', 'lm'], 1], '#d9962b', ['interpolate', ['linear'], ['get', 'h'], 6, '#e9e3d6', 60, '#d6cdbb', 200, '#bdb29d', 300, '#a99d88']],
+          'fill-extrusion-height': ['get', 'h'],
+          'fill-extrusion-base': 0,
+          'fill-extrusion-opacity': 0.94,
+          'fill-extrusion-vertical-gradient': true,
+        },
+      },
+      'gg-streets'
     );
     map.addSource('gg-trail', { type: 'geojson', data: EMPTY });
     map.addSource('gg-best', { type: 'geojson', data: EMPTY });
@@ -526,6 +541,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     // the app: the background map's own
     const inGame = !!(g && !g.loading && !g.done);
     vis('gg-streets', !!(g && !g.loading)); // (the end map keeps them too: the base map's own are faint there)
+    applyTilt();
     vis('gg-hoods-border', !!(g && !g.loading));
     vis('gg-elev-case', inGame);
     vis('gg-elev', inGame);
@@ -623,6 +639,53 @@ export function initGridGame(ctx, areaId = 'downtown') {
   let hoodTimer = 0;
   // "Where am I?": a magnifier button in the bottom tray that pulls the map back to the neighborhood-sized view and back again
   const OV_BTN = () => `<button id="ggOv" class="${g.view === 'overview' ? 'on' : ''}" aria-pressed="${g.view === 'overview'}" aria-label="Where am I?"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="6.2" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>`;
+  // ---- 3D: the camera tilts to a driver's angle and the buildings stand up (Midtown; heights from NYC's building footprints) ----
+  const TILT_DEG = 55;
+  const tiltOn = () => !!prefs.tilt && areaId === 'midtown';
+  /** The camera's tilt now: tilted only in the close-up follow view (the wide "where am I" view and the end screens stay flat). */
+  const camPitch = () => (tiltOn() && g && !g.done && (g.view === 'follow' || g.view === 'peek') ? TILT_DEG : 0);
+  const driveZoom = () => (ZOOM + (camPitch() ? 0.5 : 0));
+  const TILT_BTN = () => (areaId === 'midtown' ? `<button id="ggTilt" class="${tiltOn() ? 'on' : ''}" aria-pressed="${tiltOn()}" aria-label="3D view"><b>3D</b></button>` : '');
+  let bldgState = 0; // 0 not loaded, 1 loading, 2 loaded
+  async function loadBuildings() {
+    if (bldgState || areaId !== 'midtown') return;
+    bldgState = 1;
+    try {
+      const d = await fetch('data/buildings-midtown.json').then((r) => r.json());
+      const feats = [];
+      for (const b of d.b) {
+        const ring = [];
+        let x = 0, y = 0;
+        for (let i = 2; i < b.length; i += 2) {
+          x += b[i];
+          y += b[i + 1];
+          ring.push([d.o[0] + x / d.s, d.o[1] + y / d.s]);
+        }
+        ring.push(ring[0]);
+        feats.push({ type: 'Feature', properties: { h: b[0], lm: b[1] }, geometry: { type: 'Polygon', coordinates: [ring] } });
+      }
+      setData('gg-bldg', { type: 'FeatureCollection', features: feats });
+      bldgState = 2;
+    } catch {
+      bldgState = 0;
+    }
+  }
+  function applyTilt() {
+    if (!map.getLayer('gg-bldg')) return;
+    map.setLayoutProperty('gg-bldg', 'visibility', tiltOn() && g && !g.done ? 'visible' : 'none');
+    if (tiltOn()) loadBuildings();
+  }
+  function toggleTilt() {
+    if (!g || g.loading || g.done) return;
+    prefs.tilt = !prefs.tilt;
+    savePrefs();
+    applyTilt();
+    const p = g.pos || g.trail[g.trail.length - 1];
+    const pad = ctx.padding();
+    const H = window.innerHeight;
+    map.easeTo({ center: p, zoom: g.view === 'overview' ? OV_ZOOM : driveZoom(), bearing: GRID, pitch: camPitch(), offset: [0, pad.top + (H - pad.top - pad.bottom) * 0.62 - H / 2], duration: ctx.dur(600) });
+    render();
+  }
   const OV_ZOOM = 13.1; // ~3 km across: Midtown and the neighborhoods round it, named
   function toggleOverview() {
     if (!g || g.loading || g.done || g.peek) return;
@@ -633,7 +696,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const pad = ctx.padding();
     const H = window.innerHeight;
     // instant: no animation, then the frame loop keeps it centred on the car
-    map.jumpTo({ center: p, zoom: g.view === 'overview' ? OV_ZOOM : ZOOM, bearing: GRID, offset: [0, pad.top + (H - pad.top - pad.bottom) * 0.62 - H / 2] });
+    map.jumpTo({ center: p, zoom: g.view === 'overview' ? OV_ZOOM : driveZoom(), bearing: GRID, pitch: camPitch(), offset: [0, pad.top + (H - pad.top - pad.bottom) * 0.62 - H / 2] });
     render();
   }
   // the name of the outlined neighborhood stays in view, just under the top card, for as long as it's outlined
@@ -948,7 +1011,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     // slide back to the car, then the frame loop carries on following it
     const p = g.pos || g.trail[g.trail.length - 1];
     g.camHold = performance.now() + 560;
-    map.easeTo({ center: p, zoom: g.view === 'overview' ? OV_ZOOM : ZOOM, bearing: GRID, offset: [0, camOffsetY()], duration: ctx.dur(520), easing: (t) => 1 - Math.pow(1 - t, 3) });
+    map.easeTo({ center: p, zoom: g.view === 'overview' ? OV_ZOOM : driveZoom(), bearing: GRID, pitch: camPitch(), offset: [0, camOffsetY()], duration: ctx.dur(520), easing: (t) => 1 - Math.pow(1 - t, 3) });
     render();
   }
   function highlightHood(m, pulse, from) {
@@ -1515,7 +1578,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     enterEdge(g.e);
     g.msg = '';
     render();
-    map.jumpTo({ center: g.trail[0], zoom: ZOOM, bearing: GRID });
+    map.jumpTo({ center: g.trail[0], zoom: ZOOM, bearing: GRID, pitch: 0 });
     // plan, then ride: the plan screen is the start (where you are, where you're going, then the plan)
     if (prefs.style === 'plan') go0();
     g.raf = requestAnimationFrame(tick);
@@ -1851,7 +1914,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     carEl.classList.toggle('sigL', g.queued === 'L');
     carEl.classList.toggle('sigR', g.queued === 'R');
     if ((g.view === 'follow' || g.view === 'overview') && !g.done && !(g.camHold > performance.now())) {
-      const ZM = g.view === 'overview' ? OV_ZOOM : ZOOM; // (the wide, neighborhood-sized view follows the car too)
+      const ZM = g.view === 'overview' ? OV_ZOOM : driveZoom();
+      const PT = camPitch(); // (the wide, neighborhood-sized view follows the car too)
       const pad = ctx.padding();
       const H = window.innerHeight;
       // the car a little below the middle of the open area: more road ahead
@@ -1864,7 +1928,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
           g.camKey = key;
           const far = g.camP ? Math.hypot((p[0] - g.camP[0]) * 84400, (p[1] - g.camP[1]) * 111000) : 0;
           g.camP = p;
-          map.easeTo({ center: p, zoom: ZM, bearing: GRID, offset: [0, oy], duration: Math.min(650, 260 + far * 0.25), easing: (t) => 1 - Math.pow(1 - t, 3) });
+          map.easeTo({ center: p, zoom: ZM, bearing: GRID, pitch: PT, offset: [0, oy], duration: Math.min(650, 260 + far * 0.25), easing: (t) => 1 - Math.pow(1 - t, 3) });
         }
       } else if (g.plan && g.plan.riding && g.bestRide) {
         // both cars in view: centre between them, zoom out as far as they're apart
@@ -1877,10 +1941,10 @@ export function initGridGame(ctx, areaId = 'downtown') {
         const openH = H - pad.top - pad.bottom;
         const allowed = 0.5 * Math.min(window.innerWidth, openH);
         const z = Math.max(12.5, ZOOM - Math.log2(Math.max(1, sep / (mpp * allowed))));
-        map.easeTo({ center: c, zoom: z, bearing: GRID, offset: [0, pad.top + openH * 0.5 - H / 2], duration: 0 });
+        map.easeTo({ center: c, zoom: z, bearing: GRID, pitch: 0, offset: [0, pad.top + openH * 0.5 - H / 2], duration: 0 });
       } else {
         g.camKey = null;
-        map.easeTo({ center: p, zoom: ZM, bearing: GRID, offset: [0, oy], duration: 0 });
+        map.easeTo({ center: p, zoom: ZM, bearing: GRID, pitch: PT, offset: [0, oy], duration: 0 });
       }
     }
     pointToTarget();
@@ -2611,7 +2675,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
           <button id="ggUndo"${p.hist.length ? '' : ' disabled'}>↶ Undo</button>
           <button id="ggHint">💡 Hint</button>
           <button id="ggMark" aria-label="Mark this spot">⚑</button>
-          ${OV_BTN()}
+          ${OV_BTN()}${TILT_BTN()}
           <button id="ggMore" aria-expanded="${!!g.more}" aria-label="More">${g.more ? '✕' : '⋯'}</button>
         </div>
       </div>`;
@@ -3096,7 +3160,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
           ${g.done || g.startCard || g.plan ? '' : `<button id="ggPause" aria-label="${g.paused ? 'Resume' : 'Pause'}">${g.paused ? '▶ Go' : '⏸ Pause'}</button>`}
           ${!g.done && !g.startCard && !g.report && !g.plan ? `<button id="ggFast" aria-label="Hold to go faster">⏩ Hold</button>` : ''}
           ${!g.done && !g.startCard && !g.report && !(g.plan && !g.plan.riding) ? `<button id="ggMark" aria-label="Mark this spot">⚑</button>` : ''}
-          ${!g.done && !g.startCard && !g.report ? OV_BTN() : ''}
+          ${!g.done && !g.startCard && !g.report ? OV_BTN() + TILT_BTN() : ''}
           ${!g.done && !g.startCard && prefs.guide === 'off' ? `<button id="ggPeek">👁 Peek</button>` : ''}
           ${hintReady() && !g.plan ? `<button id="ggHint">💡 Hint</button>` : ''}
           ${g.plan && !g.plan.riding && !g.done ? '' : `<button id="ggMore" aria-expanded="${!!g.more}" aria-label="More">${g.more ? '✕' : '⋯'}</button>`}
@@ -3138,6 +3202,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     for (const b of document.querySelectorAll('.ggpick:not(.ggname)')) onTap(b, () => pickLink(+b.dataset.link));
     document.getElementById('ggPause')?.addEventListener('click', togglePause);
     { const ov = document.getElementById('ggOv'); if (ov) onTap(ov, toggleOverview); }
+    { const tb = document.getElementById('ggTilt'); if (tb) onTap(tb, toggleTilt); }
     document.getElementById('ggPeek')?.addEventListener('click', peek);
     document.getElementById('ggHint')?.addEventListener('click', showHint);
     document.getElementById('ggUndo')?.addEventListener('click', planUndo);

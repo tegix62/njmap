@@ -2971,3 +2971,12 @@ body.gridding #hud .gg-go {
   border-color: var(--accent, #2b4fb3);
   background: rgba(43, 79, 179, 0.1);
 }
+
+#ggTilt.on {
+  background: #3b2f1e;
+  color: #fff;
+}
+#ggTilt b {
+  font-size: 13px;
+  letter-spacing: 0.3px;
+}
