@@ -210,6 +210,59 @@ def root(u):
 for e in edges:
     e[0], e[1] = root(e[0]), root(e[1])
 edges = [e for e in edges if e[0] != e[1]]
+# The city's data sometimes leaves a gap of a few metres in the middle of a block (W 53rd St between
+# 5th and 6th Ave stops 10 m short of its other half, so the block fell out of the network). Where two
+# dangling ends of the SAME street lie within GAP_M of each other, point the same way and carry traffic
+# the same way, join them and pull the lines together.
+GAP_M = 16
+degree = Counter()
+for a, b, *_r in edges:
+    degree[a] += 1; degree[b] += 1
+def dangling_end(e, u):
+    """(unit vector pointing back along the road from its end at u, True if traffic arrives at u)"""
+    p = e[4]
+    q0, q1 = (p[-1], p[-2]) if e[1] == u else (p[0], p[1])
+    vx, vy = (q1[0] - q0[0]) * KX, (q1[1] - q0[1]) * KY
+    L = math.hypot(vx, vy) or 1e-9
+    into = e[3] == 0 or (e[3] == 1 and e[1] == u) or (e[3] == -1 and e[0] == u)
+    outof = e[3] == 0 or (e[3] == 1 and e[0] == u) or (e[3] == -1 and e[1] == u)
+    return (vx / L, vy / L), into, outof
+ends = defaultdict(list)  # node -> [edge] for degree-1 nodes
+for e in edges:
+    for u in (e[0], e[1]):
+        if degree[u] == 1:
+            ends[u].append(e)
+bridged = []
+used = set()
+dang = list(ends)
+for i, u in enumerate(dang):
+    for v in dang[i + 1:]:
+        if u in used or v in used:
+            continue
+        if metres(nodes[u], nodes[v]) > GAP_M:
+            continue
+        eu, ev = ends[u][0], ends[v][0]
+        if eu is ev or eu[2] != ev[2]:
+            continue
+        (ux, uy), u_in, u_out = dangling_end(eu, u)
+        (vx, vy), v_in, v_out = dangling_end(ev, v)
+        # the two roads leave the gap in opposite directions (a straight continuation)
+        if ux * vx + uy * vy > -0.8:
+            continue
+        # and traffic passes through: one end takes it in, the other lets it out (or either is two-way)
+        if not ((u_in and v_out) or (u_out and v_in)):
+            continue
+        used.update((u, v))
+        bridged.append((u, v))
+for u, v in bridged:
+    for e in edges:
+        for ix, end in ((0, 0), (1, -1)):
+            if e[ix] == u:
+                e[4] = list(e[4]); e[4][end] = nodes[v]
+                e[5] = sum(metres(e[4][k], e[4][k + 1]) for k in range(len(e[4]) - 1))
+                e[ix] = v
+edges = [e for e in edges if e[0] != e[1]]
+print(f'joined {len(bridged)} gaps of up to {GAP_M} m between ends of the same street', file=sys.stderr)
 
 # ---- directed graph; keep the strongly connected core and what feeds into it -------------------
 out_adj, in_adj = defaultdict(list), defaultdict(list)

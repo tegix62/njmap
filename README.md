@@ -87,6 +87,9 @@ The screen is built in two layers. The first is what you can take in at a glance
 
 **Reports carry what you saw:** a ⚑ mark or *Something's off* taken while planning now records where the ghost car was (the corner and the plan step), not where the real car started, and keeps the words on screen at that moment (the top card and panel), the chips, turn buttons and picks you were shown, and the target with its corner or ramp. The issue text lists the last four marked screens, so a bug can be reconstructed without the game still being open.
 
+
+**Gaps in the city's street data:** the centerline data sometimes breaks a block a few metres short of its other half (W 53rd St between 5th and 6th Ave stopped 10 m short, so the block fell out of the network and you couldn't go straight across 5th Ave towards MoMA). The builder now joins two dangling ends of the same street that lie within 16 m of each other, point the same way and carry traffic the same way (5 joins in each area). Because the data changed, progress saved against the old street map (saved trips, stars, marked mistakes, driven blocks) starts fresh.
+
 **Button feel:** every button presses in to 94% and springs back (`js/motion.js`, spring stiffness 1019, damping 42: the feel lab's "snappy" spring made 40% faster). It uses the `scale` property so it can't clash with a button's own transform, a quick tap still shows its press (70 ms minimum), and it's skipped under reduced-motion. Further feedback (wrong-turn shake, star landings, panel curves) is still being chosen.
 
 ## Getting around the app
