@@ -256,10 +256,12 @@ export function initPractice(ctx) {
   function makeBorders(p) {
     const cands = p.filter((m) => m.neighbors.length >= 3);
     const m = pick(cands.length ? cands : munis.filter((x) => x.neighbors.length >= 3));
+    if (!m.neighbors.length) return makeName(p); // an island (Randalls Island) touches nothing here: "what borders it?" has no answer
     const right = rand(m.neighbors);
     const touching = new Set([m.id, ...m.neighbors.map((o) => o.id)]);
     const ring2 = [...new Set(m.neighbors.flatMap((o) => o.neighbors))].filter((o) => !touching.has(o.id));
     const wrong = ring2.sort((a, b) => distanceMi(m.pt, a.pt) - distanceMi(m.pt, b.pt)).slice(0, 6);
+    if (wrong.length < 1) return makeName(p);
     return { kind: 'borders', m, right, choices: shuffle([right, ...shuffle(wrong).slice(0, 3)]) };
   }
 
