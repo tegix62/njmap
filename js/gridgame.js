@@ -116,6 +116,13 @@ export function initGridGame(ctx, areaId = 'downtown') {
   if (prefs.style !== 'plan' && prefs.style !== 'drive') prefs.style = 'drive';
   if (!AREAS[prefs.area]) prefs.area = 'all';
   const savePrefs = () => ctx.store.set(`${areaId}Prefs`, prefs);
+  // Downtown used to default to the free, real-time drive (the car moves, you tap each turn). It now plays like Midtown: plan the
+  // route corner by corner, then ride it. Anyone who had the old default moves over once; the Options menu still has the free drive.
+  if (areaId === 'downtown' && !prefs.planDefault) {
+    prefs.style = 'plan';
+    prefs.planDefault = true;
+    savePrefs();
+  }
   const rounds = () => ctx.store.get(`${areaId}Runs`, { n: 0 }).n; // finished rounds, for first-time help
 
   // ---- the graph -------------------------------------------------------------------

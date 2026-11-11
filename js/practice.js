@@ -41,7 +41,7 @@ const DESC = {
   rapid: 'Timed one-tap rounds, three lives.',
   dropin: 'Drop each town into its county.',
   gridmid: 'Drive Midtown: plan the route avenue by avenue and street by street, then ride it.',
-  gridgame: 'Drive Downtown: the tangle below 14th St, tunnels and bridges in.',
+  gridgame: 'Drive Downtown: plan the route through the tangle below 14th St, then ride it. Tunnels and bridges in.',
   gridclassic: 'The original: a straightened grid, 14th to 110th St.',
   frames: 'Left, right and compass: face every direction.',
   trip: 'Quiz yourself on your last drive.',
