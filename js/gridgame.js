@@ -184,6 +184,21 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const gy = nodes.map((p) => gridXY(p)[1]);
     G = { d, nodes, edges, out, inn, coreJ, cuts, real, streetsAt, xingGeo, label, plain, gy, RAMP, places: d.places, entries: d.entries, areas: d.areas };
     G.dataKey = `${d.source}|${edges.length}|${nodes.length}`;
+    // A tunnel isn't a curb: you get in by driving onto its entrance ramp. The city's data says which
+    // streets carry straight on into one (W 30th St and Dyer Ave for the Lincoln Tunnel, Watts St for
+    // the Holland), so those streets' ends are the real way in, wherever the old corner was.
+    G.gateSets = new Map();
+    const GATE_RULE = { 'the lincoln tunnel entrance (to nj)': /^Lincoln Tunnel entrance/i, 'the holland tunnel entrance (to nj)': /^Holland Tunnel entrance/i };
+    for (const pl of G.places) {
+      const rule = GATE_RULE[pl.name.toLowerCase()];
+      if (!rule) continue;
+      const gates = Object.entries(G.cuts).filter(([, txt]) => rule.test(txt || '')).map(([id]) => edges[+id]).filter(Boolean);
+      if (!gates.length) continue;
+      pl.gates = gates.map((e) => e.id);
+      pl.node = gates[0].to;
+      const set = new Set(pl.gates);
+      for (const e of gates) G.gateSets.set(e.to, set);
+    }
     // The George Washington Bridge is far uptown, off this map: a trip from it comes down the West
     // Side Highway, so it starts on the northernmost southbound stretch of 12th Ave.
     if (areaId === 'midtown' && !G.entries.some((en) => /George Washington/.test(en.from))) {
@@ -689,7 +704,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const side = arrivalSide(e, quad);
     return side === 'right' || (side === 'left' && !twoWay(e));
   }
-  const atTarget = (e, node) => node === g.target.node && arrivalOK(e, g.target.quad);
+  const atTarget = (e, node) => (g.target.gates ? g.target.gates.includes(e.id) : node === g.target.node && arrivalOK(e, g.target.quad));
   // The corner each landmark really occupies, relative to the intersection the game sends you to
   // (from the street map; places with no single corner, like neighborhoods and tunnels, aren't listed
   // and get any corner you can pull up to).
@@ -729,7 +744,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     while (heap.size) {
       const { e, c } = heap.pop();
       if (c > dist.get(e.id)) continue;
-      if (e.to === t && arrivalOK(e, qd)) {
+      const gs = G.gateSets.get(t);
+      if (gs ? gs.has(e.id) : e.to === t && arrivalOK(e, qd)) {
         const path = [e];
         let k = e.id;
         while (prev.has(k)) {
@@ -798,8 +814,10 @@ export function initGridGame(ctx, areaId = 'downtown') {
   function roundFrom(rt) {
     const e0 = G.edges[rt.e0];
     if (!e0 || !G.nodes[rt.target.node]) return null;
-    const quad = rt.target.quad || chooseQuad(rt.target.node, rt.target.name);
-    if (!quad) return null;
+    const pl = G.places.find((p) => p.name === rt.target.name && p.gates);
+    if (pl) rt = { ...rt, target: { ...rt.target, node: pl.node, gates: pl.gates, quad: null } };
+    const quad = pl ? null : rt.target.quad || chooseQuad(rt.target.node, rt.target.name);
+    if (!pl && !quad) return null;
     const best = shortest(e0, rt.target.node, rt.s0 || 0, quad);
     if (!best) return null;
     const entry = rt.entry != null ? G.entries.find((en) => en.link === rt.entry && en.from === rt.entryFrom) || null : null;
@@ -834,8 +852,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     for (let tries = 0; tries < 200; tries++) {
       const target = places.length && Math.random() < 0.7 ? { ...rand(places) } : { name: null, node: rand(coreNodes) };
       target.label = G.label(target.node);
-      target.quad = chooseQuad(target.node, target.name);
-      if (!target.quad) continue;
+      target.quad = target.gates ? null : chooseQuad(target.node, target.name);
+      if (!target.gates && !target.quad) continue;
       const dm = metres(G.nodes[e0.from], G.nodes[target.node]);
       if (dm < 400 || dm > 2800) continue;
       if (straightTo(e0, target.node)) continue;
@@ -863,8 +881,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     for (let tries = 0; tries < 300; tries++) {
       const target = places.length && Math.random() < 0.7 ? { ...rand(places) } : { name: null, node: rand(coreNodes) };
       target.label = G.label(target.node);
-      target.quad = chooseQuad(target.node, target.name);
-      if (!target.quad) continue;
+      target.quad = target.gates ? null : chooseQuad(target.node, target.name);
+      if (!target.gates && !target.quad) continue;
       let e0, s0 = 0, entry = null;
       if (useEntry) {
         entry = pickEntry(entries);
@@ -874,8 +892,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
         const same = crossing(entry.from);
         const back = same && places.find((p) => crossing(p.name) === same);
         if (back && wantBack) {
-          Object.assign(target, back, { label: G.label(back.node), quad: chooseQuad(back.node, back.name) });
-          if (!target.quad) continue;
+          Object.assign(target, back, { label: G.label(back.node), quad: back.gates ? null : chooseQuad(back.node, back.name) });
+          if (!target.gates && !target.quad) continue;
         } else if (target.name && same && same === crossing(target.name)) continue;
         ({ e: e0, s: s0 } = entryStart(entry));
       } else {
@@ -1120,7 +1138,12 @@ export function initGridGame(ctx, areaId = 'downtown') {
     return null;
   }
   /** The briefing: where you're going. */
-  const cornerTag = (t) => (t.quad ? ` <span class="muted">· ${t.quad} corner</span>` : '');
+  const cornerTag = (t) =>
+    t.gates
+      ? ` <span class="muted">· in via ${[...new Set(t.gates.map((id) => short(G.edges[id].name)))].join(' or ')}</span>`
+      : t.quad
+        ? ` <span class="muted">· ${t.quad} corner</span>`
+        : '';
   function briefTo() {
     const t = g.target;
     const why =
@@ -1310,10 +1333,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     noteHood(e.pts[e.pts.length - 1], true); // (a fast ride can cross a small one between frames)
     setData('gg-trail', line(g.trail));
     if (g.msg && performance.now() - g.msgAt > 3500) g.msg = '';
-    if (n === g.target.node) {
-      if (atTarget(e, n)) return finish();
-      say(wrongSide(e)); // the right corner, the wrong way in: carry on round the block
-    }
+    if (atTarget(e, n)) return finish();
+    if (n === g.target.node && !g.target.gates) say(wrongSide(e)); // the right corner, the wrong way in: carry on round the block
     const c = choices(e);
     if (g.goTo === n) {
       if (!c.decision && c.only) {
@@ -2575,7 +2596,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     // for tests
     _state: () => g,
     _graph: () => G,
-    _plan: { planCorner: (n) => planCorner(n), render: () => render() },
+    _plan: { planCorner: (n) => planCorner(n), planTurn: (sd) => planTurn(sd), planPick: (id) => planPick(id), startRide: () => startRide(), render: () => render() },
     _model: { pickEntry, entryStart, choices, moves, shortest, straightTo, aheadChain, load, rule, describe, atTarget, arrivalSide, arrivalOK, chooseQuad, twoWay },
     _speed: () => (g && !g.loading && g.e ? speedNow() : 0),
     _mem: () => mem,
