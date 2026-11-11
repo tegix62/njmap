@@ -84,12 +84,13 @@ function gridXY(p) {
 export const DRIVE_AREAS = {
   downtown: { data: 'data/downtown-streets.json', title: 'Drive Downtown', span: 'below 14th St', of: "downtown's" },
   midtown: { data: 'data/midtown-streets.json', title: 'Drive Midtown', span: '14th–60th St', of: "Midtown's" },
+  uptown: { data: 'data/uptown-streets.json', title: 'Drive Uptown', span: '60th–110th St', of: "Uptown's" },
 };
 
 export function initGridGame(ctx, areaId = 'downtown') {
   const AREA = DRIVE_AREAS[areaId];
   const DATA_URL = AREA.data;
-  const AREAS = { all: `All of ${areaId === 'downtown' ? 'downtown' : 'Midtown'} (${AREA.span})` };
+  const AREAS = { all: `All of ${areaId === 'downtown' ? 'downtown' : areaId === 'uptown' ? 'Uptown' : 'Midtown'} (${AREA.span})` };
   const { map } = ctx;
   let G = null; // the street graph, once loaded
   let g = null; // the running round
@@ -99,7 +100,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   // working out where the address is is the useful part).
   // from: 'both' (half the rounds start at a tunnel or bridge), 'entries', 'anywhere'
   // checkins: now and then the car pauses and asks which side the Hudson (or uptown) is
-  const prefs = { style: areaId === 'midtown' ? 'plan' : 'drive', pace: 'relaxed', guide: 'words', labels: true, cover: false, trips: true, arrows: false, mapFirst: false, area: 'all', from: 'both', optsOpen: false, checkins: true, ...ctx.store.get(`${areaId}Prefs`, {}) };
+  const prefs = { style: areaId === 'downtown' ? 'drive' : 'plan', pace: 'relaxed', guide: 'words', labels: true, cover: false, trips: true, arrows: false, mapFirst: false, area: 'all', from: 'both', optsOpen: false, checkins: true, ...ctx.store.get(`${areaId}Prefs`, {}) };
   const fstats = framesStats(ctx.store);
   const guesses = guessRecord(ctx.store);
   // what's remembered between rounds: tied to this build of the street data (link ids change when it's rebuilt)
@@ -225,10 +226,16 @@ export function initGridGame(ctx, areaId = 'downtown') {
       south.sort((a, b) => nodes[b.from][1] - nodes[a.from][1]);
       if (south[0]) G.entries = [...G.entries, { from: 'the GWB (down the West Side Highway)', via: south[0].name, link: south[0].id, landsAt: south[0].to }];
     }
+    // Uptown: the GWB comes down the Henry Hudson Parkway and into Riverside Drive, so it starts on the northernmost southbound stretch of that.
+    if (areaId === 'uptown' && !G.entries.some((en) => /George Washington/.test(en.from))) {
+      const south = edges.filter((e) => e.core && e.name === 'Riverside Dr' && Math.abs(((e.b0 - (GRID + 180) + 540) % 360) - 180) < 50);
+      south.sort((a, b) => nodes[b.from][1] - nodes[a.from][1]);
+      if (south[0]) G.entries = [...G.entries, { from: 'the GWB (down Riverside Drive)', via: south[0].name, link: south[0].id, landsAt: south[0].to }];
+    }
     // The grid's own coordinates: across (x) of each avenue, up (y) of each numbered street, so a
     // point can be put into "streets and avenues". Avenues keep one column north of 59th under
     // their uptown names (9th Ave is Columbus Ave, 10th is Amsterdam, 11th is West End).
-    const ALIAS = { 'Columbus Ave': '9th Ave', 'Amsterdam Ave': '10th Ave', 'West End Ave': '11th Ave', 'Park Ave S': 'Park Ave' };
+    const ALIAS = { 'Central Park West': '8th Ave', 'Columbus Ave': '9th Ave', 'Amsterdam Ave': '10th Ave', 'West End Ave': '11th Ave', 'Park Ave S': 'Park Ave' };
     const AVES = new Set(['1st Ave', '2nd Ave', '3rd Ave', 'Lexington Ave', 'Park Ave', 'Madison Ave', '5th Ave', '6th Ave', '7th Ave', '8th Ave', '9th Ave', '10th Ave', '11th Ave']);
     const ax = new Map(), sy = new Map();
     for (const e of edges) {
@@ -792,12 +799,19 @@ export function initGridGame(ctx, areaId = 'downtown') {
     }
   }
   // ---- the avenue ruler (Midtown): every avenue in order, west to east, with the way its traffic runs; the one you're on lit ----
-  const AVES = [ // west to east: short label, street name(s), flow (U uptown, D downtown, B both, '' mixed or unknown)
+  const AVES_MID = [ // west to east: short label, street name(s), flow (U uptown, D downtown, B both, '' mixed or unknown)
     ['12th', ['12th Ave (West Side Hwy)'], ''], ['11th', ['11th Ave'], ''], ['10th', ['10th Ave'], 'U'], ['9th', ['9th Ave'], 'D'],
     ['8th', ['8th Ave'], 'U'], ['7th', ['7th Ave'], 'D'], ['6th', ['6th Ave'], 'U'], ['5th', ['5th Ave'], 'D'], ['Mad', ['Madison Ave'], 'U'],
     ['Park', ['Park Ave', 'Park Ave S', 'Park Ave Viaduct'], 'B'], ['Lex', ['Lexington Ave'], 'D'], ['3rd', ['3rd Ave'], 'U'],
     ['2nd', ['2nd Ave'], 'D'], ['1st', ['1st Ave'], 'U'],
   ];
+  // Uptown (directions from the street data: Amsterdam, Madison, 3rd and 1st run uptown; Columbus, 5th, Lexington and 2nd downtown)
+  const AVES_UP = [
+    ['Riv', ['Riverside Dr'], 'B'], ['WEnd', ['West End Ave'], 'B'], ['Amst', ['Amsterdam Ave'], 'U'], ['Col', ['Columbus Ave'], 'D'],
+    ['CPW', ['Central Park West'], 'B'], ['5th', ['5th Ave'], 'D'], ['Mad', ['Madison Ave'], 'U'], ['Park', ['Park Ave'], 'B'],
+    ['Lex', ['Lexington Ave'], 'D'], ['3rd', ['3rd Ave'], 'U'], ['2nd', ['2nd Ave'], 'D'], ['1st', ['1st Ave'], 'U'], ['York', ['York Ave'], 'B'],
+  ];
+  const AVES = areaId === 'uptown' ? AVES_UP : AVES_MID;
   const FLOW = { U: '▲', D: '▼', B: '◆', '': '' };
   const ruler = document.createElement('div');
   ruler.className = 'gg-ruler';
@@ -845,7 +859,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     if (ruler.classList.contains('full')) rulerFullTimer = setTimeout(() => ruler.classList.remove('full'), 5000);
   });
   function updateRuler(p) {
-    const live = !!(g && !g.loading && !g.done && !g.startCard && areaId === 'midtown' && p);
+    const live = !!(g && !g.loading && !g.done && !g.startCard && (areaId === 'midtown' || areaId === 'uptown') && p);
     ruler.hidden = !live;
     if (!live) return;
     const xs = avenuePositions();
@@ -2514,7 +2528,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     return [part(ds, 'street', 'uptown', 'downtown'), part(da, 'avenue', 'east', 'west')].filter(Boolean).join(' · ') || 'right here';
   }
   function relWords(p, tp) {
-    if (areaId === 'midtown') return countWords(p, tp); // a regular grid: count in streets and avenues
+    if (areaId === 'midtown' || areaId === 'uptown') return countWords(p, tp); // a regular grid: count in streets and avenues
     const a = gridXY(p), b = gridXY(tp);
     const up = (b[1] - a[1]) / 1609.34, east = (b[0] - a[0]) / 1609.34;
     const part = (v, pos, neg) => (Math.abs(v) < 0.05 ? null : `${Math.abs(v) < 0.1 ? '<0.1' : Math.abs(v).toFixed(1)} mi ${v > 0 ? pos : neg}`);

@@ -556,6 +556,7 @@ async function main() {
   ctx.anchors = initAnchors(ctx); // before the modes, so it can claim map taps
   ctx.gridgame = initGridGame(ctx, 'downtown');
   ctx.gridmid = initGridGame(ctx, 'midtown');
+  ctx.gridup = initGridGame(ctx, 'uptown');
   ctx.gridclassic = initGridClassic(ctx);
   ctx.frames = initFrames(ctx);
   for (const m of munis) ctx.setKnow(m);

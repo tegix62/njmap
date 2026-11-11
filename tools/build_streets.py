@@ -39,7 +39,8 @@ src, out, report = sys.argv[1:4]
 # --downtown: the streets below 14th St only, no highways, ramps, tunnels or bridges
 # (rounds from a tunnel or bridge start where it lands on a street)
 # --midtown: the same, between 14th and 59th St
-AREA = 'downtown' if '--downtown' in sys.argv[4:] else 'midtown' if '--midtown' in sys.argv[4:] else None
+# --uptown: the same, between 59th and 110th St (Central Park and the Upper East and West Sides)
+AREA = 'downtown' if '--downtown' in sys.argv[4:] else 'midtown' if '--midtown' in sys.argv[4:] else 'uptown' if '--uptown' in sys.argv[4:] else None
 DOWNTOWN = AREA is not None  # streets only, one area
 raw = json.load(open(src))
 DRIVABLE = {'1', '2', '3', '4', '9'}  # street, highway, bridge, tunnel, ramp
@@ -590,7 +591,7 @@ if DOWNTOWN:
     NOT_STREET = re.compile(r'FDR|ROOSEVELT|TUNNEL|TUNL|UNDERPASS|\bBRG\b|BRIDGE (?!ST$)|BRIDGE$|\bEN\b|\bET\b|\bEX\b|ENTRANCE|EXIT|\bRP\b|RAMP|EXPWY|EXPY|\bEP\b')  # (the Park Ave Viaduct round Grand Central is an ordinary two-way street, level 17: it stays; the FDR's viaduct is caught by FDR)
     # the area's edge streets themselves are in (14th St for both; 59th St for Midtown)
     # (Midtown takes in 60th St: the Queensboro Bridge lets you out there)
-    Y_LO, Y_HI = (-1e9, areas['14'] + 40) if AREA == 'downtown' else (areas['14'] - 40, areas['59'] + 110)
+    Y_LO, Y_HI = ((-1e9, areas['14'] + 40) if AREA == 'downtown' else (areas['59'] - 40, areas['110'] + 110) if AREA == 'uptown' else (areas['14'] - 40, areas['59'] + 110))
     def below14(c):  # in the area
         return Y_LO <= grid_xy(*centroid[c])[1] <= Y_HI
     street_l = {li for li, L in enumerate(links)
