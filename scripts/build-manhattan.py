@@ -6,8 +6,9 @@ Sources
 - Everyday names: OpenStreetMap neighborhood boundaries (admin_level=10),
   © OpenStreetMap contributors, ODbL. Snapshot via Overpass, 2019-01-27,
   from simboli/Snowflake-snowpark-geo-classification-python.
-- Complete coverage: NYC Department of City Planning, 2020 Neighborhood
-  Tabulation Areas (public domain), from takumanken/thesis.
+- Land and complete coverage: NYC Department of City Planning, 2020
+  Neighborhood Tabulation Areas, clipped to the shoreline (public domain),
+  from NYC Open Data (dataset 9nt8-h7nd).
 
 Method
 1. Manhattan's land = the union of its 2020 NTAs (minus Liberty, Ellis and
@@ -35,7 +36,8 @@ from shapely.ops import unary_union, polylabel
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OSM = "https://raw.githubusercontent.com/simboli/Snowflake-snowpark-geo-classification-python/43befda19ac382c1efffbee76ff64adbf0e78b29/USA%20New%20York%20City%20neighborhood%2020190128.geojson"
-NTA = "https://raw.githubusercontent.com/takumanken/thesis/4e79ce489d1460d30924d2064d0cf7585b8b7d94/application/frontend/assets/geojson/2020_nyc_neighborhood_tabulation_areas_nta.geojson"
+# Shoreline-clipped (the earlier file reached out over the rivers and the harbor)
+NTA = "https://data.cityofnewyork.us/resource/9nt8-h7nd.geojson?boroname=Manhattan&$limit=100"
 
 LAT0 = 40.78
 KX = 111320 * math.cos(math.radians(LAT0))  # m per degree lon

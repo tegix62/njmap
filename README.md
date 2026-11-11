@@ -4,7 +4,7 @@ A phone web app for learning New Jersey's 564 municipalities and Manhattan's nei
 
 **Two maps.** Switch between them in Settings → Map. When your GPS shows you've crossed into the other region's area, Drive offers a one-tap switch.
 - **New Jersey:** 564 towns, grouped by county.
-- **Manhattan:** 58 neighborhoods by the names people actually use, grouped Downtown (below 14th St), Midtown (14th–59th), Uptown (59th–110th) and Upper Manhattan.
+- **Manhattan:** 57 neighborhoods by the names people actually use, grouped Downtown (below 14th St), Midtown (14th–59th), Uptown (59th–110th) and Upper Manhattan.
 
 The screen is built in two layers. The first is what you can take in at a glance while driving. Everything else is one tap away, so the screen never asks you to read a paragraph at 50 mph.
 
@@ -115,7 +115,7 @@ The screen is built in two layers. The first is what you can take in at a glance
   - *Point uptown* (the 29° tilt)
   - *Which is farther uptown?*
   - Sound-alikes: SoHo/NoHo/NoMad/Tribeca, Hudson Yards/Hudson Square/Hudson Heights, the Hills, the Heights, Kips Bay/Turtle Bay…
-- **Neighborhood map:** OpenStreetMap's neighborhood boundaries, where the smaller, more specific name wins (Times Square over Midtown). Gaps are filled from NYC's official 2020 Neighborhood Tabulation Areas. Nolita isn't in the OpenStreetMap snapshot, so it falls under Little Italy. Rebuild with `python3 scripts/build-manhattan.py` (needs `pip install shapely`).
+- **Neighborhood map:** OpenStreetMap's neighborhood boundaries, where the smaller, more specific name wins (Times Square over Midtown). Gaps are filled from NYC's official 2020 Neighborhood Tabulation Areas, and everything is clipped to the **real shoreline** (NYC's shoreline-clipped areas, so no neighborhood reaches out over the rivers or the harbor; Highbridge Park, a thin strip, now belongs to its neighbors). Nolita isn't in the OpenStreetMap snapshot, so it falls under Little Italy. Rebuild with `python3 scripts/build-manhattan.py` (needs `pip install shapely`).
 - **Debatable answers stay out of quizzes.** Some landmarks sit where people disagree on the neighborhood, like Penn Station (Chelsea? Midtown? the Garment District?). Those are shown on the map but never asked as "which neighborhood?".
 
 Everything Manhattan-specific lives in `js/places/manhattan.js`: crossings, avenue directions, landmarks, road notes (FDR Drive, West Side Highway / Henry Hudson Parkway, Harlem River Drive…) and sound-alikes. New Jersey's equivalent is `js/places/nj.js`.
@@ -206,7 +206,7 @@ Location only works over HTTPS (or on `localhost`). To try it on a computer, run
 | `js/regions.js` | North / Central / South Jersey by county |
 | `js/region.js`, `js/places/*.js` | The active map and each region's settings, words and knowledge |
 | `js/grid.js` | Manhattan grid directions and nearest intersection |
-| `data/manhattan.topo.json` | 58 Manhattan neighborhoods in 4 areas |
+| `data/manhattan.topo.json` | 57 Manhattan neighborhoods in 4 areas |
 | `js/geo.js` | Distance, bearing, point-in-polygon |
 | `data/nj.topo.json` | 564 municipalities + 21 counties (TopoJSON) |
 | `data/sections.json` | Villages, sections and local names, by municipality |
