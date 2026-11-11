@@ -34,10 +34,16 @@ def tags(msg, template):
             t.append(name)
     return t
 
+MAX_BYTES = 3_000_000  # a few days of alerts are ~100 KB; a long backfill (--since months ago) can be a couple of MB
+
 def fetch(since):
     req = urllib.request.Request(API + since, headers={'User-Agent': UA})
     with urllib.request.urlopen(req, timeout=60) as r:
-        return json.load(r)
+        body = r.read(MAX_BYTES + 1)
+    if len(body) > MAX_BYTES:
+        sys.exit(f'The feed answered with more than {MAX_BYTES} bytes: stopping (use a later --since)')
+    print(f'fetched {len(body) // 1024} KB since {since}')
+    return json.loads(body)
 
 def main():
     since = (datetime.date.today() - datetime.timedelta(days=4)).isoformat()
@@ -65,28 +71,10 @@ def main():
     with open(LOG, 'w') as f:
         json.dump(log, f, ensure_ascii=False, separators=(',', ':'))
     print(f'{added} new, {updated} changed; {len(log["alerts"])} in the log')
-    write_summary(log['alerts'])
-
-def write_summary(alerts):
-    """A small file for the app (the full log is too big to load): when the Lincoln Tunnel Expressway was last
-    closed overnight (so the game knows whether the detour is still running) and the recent tube closures."""
-    lin = [a for a in alerts if 'lincoln' in a['facility']]
-    closed = [a for a in lin if re.search(r'expressway (is )?closed', a['msg'], re.I)]
-    tubes = [a for a in lin if re.search(r'(north|center|south) tube', a['msg'], re.I) and re.search(r'closed', a['msg'], re.I) and 'cleared' not in a['tags']]
-    now = datetime.datetime.now(datetime.timezone.utc)
-    cut = (now - datetime.timedelta(days=45)).strftime('%Y-%m-%dT%H:%M:%SZ')
-    out = {'updated': now.strftime('%Y-%m-%dT%H:%M:%SZ'),
-           'lastExpresswayClosure': closed[-1]['ts'] if closed else None,
-           'expresswayClosures': [a['ts'] for a in closed if a['ts'] >= cut],
-           'tubeClosures': [{'ts': a['ts'], 'msg': a['msg']} for a in tubes if a['ts'] >= cut][-20:],
-           'alertsInLog': len(alerts)}
-    path = os.path.join(ROOT, 'data/advisories-summary.json')
-    if os.path.exists(path):
-        prev = json.load(open(path))
-        if {k: v for k, v in prev.items() if k != 'updated'} == {k: v for k, v in out.items() if k != 'updated'}:
-            return  # nothing new: leave the file alone
-    with open(path, 'w') as f:
-        json.dump(out, f, ensure_ascii=False, indent=1)
+    # the small file the game reads
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import build_scenarios
+    build_scenarios.main()
 
 if __name__ == '__main__':
     main()

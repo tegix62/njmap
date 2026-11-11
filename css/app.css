@@ -2760,3 +2760,16 @@ body.ink .prow .typebtn {
 .gg-lmlead circle.d {
   fill: #3b2f1e;
 }
+
+/* the tunnel's conditions (practice time, which tubes), on their own small line under the destination */
+.gg-how {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--panel-muted, #6b6257);
+}
+body.gg-end .gg-how {
+  display: none;
+}

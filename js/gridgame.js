@@ -121,8 +121,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
   // ---- the graph -------------------------------------------------------------------
   async function load() {
     if (G) return G;
-    const [d, lmAll, lmIcons, lmPics, adv] = await Promise.all([fetch(DATA_URL).then((r) => r.json()), fetch('data/landmarks.json').then((r) => r.json()).catch(() => []), fetch('data/landmark-icons.json').then((r) => r.json()).catch(() => ({})), fetch('data/landmark-credits.json').then((r) => r.json()).catch(() => ({})), fetch('data/advisories-summary.json').then((r) => r.json()).catch(() => null)]);
-    ADV = adv;
+    const [d, lmAll, lmIcons, lmPics, adv] = await Promise.all([fetch(DATA_URL).then((r) => r.json()), fetch('data/landmarks.json').then((r) => r.json()).catch(() => []), fetch('data/landmark-icons.json').then((r) => r.json()).catch(() => ({})), fetch('data/landmark-credits.json').then((r) => r.json()).catch(() => ({})), fetch('data/lincoln-scenarios.json').then((r) => r.json()).catch(() => null)]);
+    SCN_DATA = adv;
     LM_ALL = lmAll;
     LM_ICONS = lmIcons;
     LM_PICS = lmPics;
@@ -380,7 +380,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     return { img: x.getImageData(0, 0, w * r, h * r), opts: { pixelRatio: r } };
   }
   function ensureLayers() {
-    for (const [id, col] of [['gg-chev', '#1f1b16'], ['gg-chev-exc', '#c47a00']]) {
+    for (const [id, col] of [['gg-chev', '#1f1b16'], ['gg-chev-exc', '#c47a00'], ['gg-chev-hl', '#9a5b00']]) {
       if (!map.hasImage(id)) {
         const { img, opts } = chevron(col);
         map.addImage(id, img, opts);
@@ -417,6 +417,14 @@ export function initGridGame(ctx, areaId = 'downtown') {
     map.addSource('gg-hood', { type: 'geojson', data: EMPTY });
     map.addLayer({ id: 'gg-hood-fill', type: 'fill', source: 'gg-hood', filter: ['==', ['get', 'k'], 'f'], paint: { 'fill-color': '#0b7a68', 'fill-opacity': 0, 'fill-opacity-transition': { duration: 500 } } });
     map.addLayer({ id: 'gg-hood-line', type: 'line', source: 'gg-hood', filter: ['==', ['get', 'k'], 'l'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#0b7a68', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.8, 14, 1.4, 16, 2.4, 17.5, 3.4], 'line-opacity': 0, 'line-opacity-transition': { duration: 500 } } });
+    // the streets that lead into the tunnel entrance for this round's conditions: a soft highlight, slow arrows flowing the way to go
+    map.addSource('gg-corridor', { type: 'geojson', data: EMPTY });
+    map.addLayer({ id: 'gg-corridor-glow', type: 'line', source: 'gg-corridor', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#f5a524', 'line-opacity': 0.3, 'line-width': ['interpolate', ['linear'], ['zoom'], 12.5, 4, 15, 14, 17, 26], 'line-blur': 1.5 } });
+    map.addLayer({ id: 'gg-corridor-flow', type: 'line', source: 'gg-corridor', layout: { 'line-cap': 'butt', 'line-join': 'round' }, paint: { 'line-color': '#b45309', 'line-opacity': 0.85, 'line-width': ['interpolate', ['linear'], ['zoom'], 12.5, 1.5, 15, 3.5, 17, 6], 'line-dasharray': [0, 4, 3] } });
+    map.addLayer({
+      id: 'gg-corridor-chev', type: 'symbol', source: 'gg-corridor', minzoom: 14,
+      layout: { 'symbol-placement': 'line', 'symbol-spacing': 70, 'icon-image': 'gg-chev-hl', 'icon-size': ['interpolate', ['linear'], ['zoom'], 14, 0.6, 17, 1], 'icon-rotation-alignment': 'map', 'icon-keep-upright': false, 'icon-allow-overlap': true, 'icon-ignore-placement': true },
+    });
     map.addLayer({ id: 'gg-best', type: 'line', source: 'gg-best', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#15803d', 'line-width': 4.5, 'line-dasharray': [2, 1.5] } });
     map.addLayer({ id: 'gg-trail', type: 'line', source: 'gg-trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#2b4fb3', 'line-width': 6, 'line-opacity': 0.55 } });
     map.addLayer({
@@ -980,24 +988,60 @@ export function initGridGame(ctx, areaId = 'downtown') {
   // The advisory gave about 120 days from April 22, 2026, and closures were still announced in late
   // September; the real end date (thought to be around January or February 2027) isn't confirmed, so this
   // date is an assumption. Options: Auto (follows the clock in New York), Always on, Off.
-  const DETOUR_THROUGH = '2027-02-28'; // (only used when the advisory log can't be read)
-  let ADV = null; // data/advisories-summary.json: from the Port Authority's own alert feed, refreshed by a scheduled job
-  function lteDetourOn() {
+  const DETOUR_THROUGH = '2027-02-28'; // (only used when the alert history can't be read)
+  let SCN_DATA = null; // data/lincoln-scenarios.json: how often the Lincoln Tunnel was in each state, by weekday and hour, from the Port Authority's alerts
+  let scn = null; // this round's practice time and Lincoln Tunnel conditions: { day, hour, min, kind: 'usual' | 'expressway' | 'northtube', label, say }
+  const DAYNAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const SCN_SAY = {
+    usual: 'all tubes open',
+    expressway: 'Expressway closed overnight: north on 10th or 11th Ave to Galvin Plaza',
+    northtube: 'North Tube to NJ closed (Center Tube open): on 10th Ave turn right on 40th St to Galvin Plaza',
+  };
+  const mkScn = (day, hour, min, kind) => ({
+    day, hour, min, kind, say: SCN_SAY[kind],
+    label: `${DAYNAMES[day]} ${hour % 12 || 12}:${String(min).padStart(2, '0')} ${hour < 12 ? 'am' : 'pm'}`,
+  });
+  const nyNow = () => {
+    const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date()).map((p) => [p.type, p.value]));
+    return { day: DAYNAMES.indexOf(parts.weekday), hour: +parts.hour, min: +parts.minute, date: `${parts.year}-${parts.month}-${parts.day}` };
+  };
+  /** Is the overnight detour still running at all? The alert history says when the Expressway was last closed; without it, a guessed end date. */
+  const detourRunning = (date) => (SCN_DATA && SCN_DATA.lastExpresswayClosure ? Date.now() - Date.parse(SCN_DATA.lastExpresswayClosure) <= 21 * 864e5 : date <= DETOUR_THROUGH);
+  /** The real clock: the Tue-Thu 11 pm to 5 am Expressway closure, if it's still running. */
+  function realKind() {
+    const t = nyNow();
+    if (!detourRunning(t.date)) return 'usual';
+    return (t.hour >= 23 && t.day >= 2 && t.day <= 4) || (t.hour < 5 && t.day >= 3 && t.day <= 5) ? 'expressway' : 'usual';
+  }
+  const wpick = (w) => {
+    let r = Math.random() * w.reduce((x, y) => x + y, 0);
+    for (let i = 0; i < w.length; i++) if ((r -= w[i]) < 0) return i;
+    return w.length - 1;
+  };
+  /**
+   * A practice time and the Lincoln Tunnel's state at that time. Varied (the default): a random weekday and hour, mornings,
+   * days and evenings most often, then the state from how often the real alert history had the Expressway closed, or the
+   * North Tube closed to New Jersey, in that weekday-hour (so the odd ones are rarer, and come in the hours they really happen).
+   */
+  function pickScenario(saved) {
+    if (saved && saved.kind) return mkScn(saved.day, saved.hour, saved.min, saved.kind);
     const mode = prefs.lteDetour || 'auto';
-    if (mode === 'on') return true;
-    if (mode === 'off') return false;
-    const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: '2-digit', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date()).map((p) => [p.type, p.value]));
-    const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(parts.weekday);
-    const hour = +parts.hour;
-    // is the detour still running? The alert feed says when the Expressway was last closed overnight; without it, a guessed end date
-    if (ADV && ADV.lastExpresswayClosure) {
-      if (Date.now() - Date.parse(ADV.lastExpresswayClosure) > 21 * 864e5) return false;
-    } else if (`${parts.year}-${parts.month}-${parts.day}` > DETOUR_THROUGH) return false;
-    return (hour >= 23 && day >= 2 && day <= 4) || (hour < 5 && day >= 3 && day <= 5);
+    const t = nyNow();
+    if (mode === 'now' || (mode === 'auto' && !SCN_DATA)) return mkScn(t.day, t.hour, t.min, realKind());
+    if (mode === 'on') return mkScn(3, 0 + Math.floor(Math.random() * 5), Math.floor(Math.random() * 60), 'expressway');
+    const hw = SCN_DATA ? SCN_DATA.hourWeight : Array(24).fill(1);
+    const dw = SCN_DATA ? SCN_DATA.dayWeight : Array(7).fill(1);
+    const day = wpick(dw), hour = wpick(hw), min = Math.floor(Math.random() * 60);
+    if (mode === 'off' || !SCN_DATA) return mkScn(day, hour, min, 'usual');
+    const i = day * 24 + hour;
+    const pe = detourRunning(t.date) ? SCN_DATA.pExpressway[i] : 0;
+    const pn = SCN_DATA.pNorthTube[i];
+    const r = Math.random();
+    return mkScn(day, hour, min, r < pe ? 'expressway' : r < pe + (1 - pe) * pn ? 'northtube' : 'usual');
   }
   /** Point each tunnel destination at the entrances open right now (the detour's, or the usual ones). */
   function applyGates() {
-    const night = lteDetourOn();
+    const night = (scn ? scn.kind : realKind()) !== 'usual';
     for (const pl of G.places) {
       if (!pl.gateList) continue;
       const hasNight = pl.gateList.some((x) => x.night);
@@ -1008,14 +1052,64 @@ export function initGridGame(ctx, areaId = 'downtown') {
       pl.gateNodes = [...new Set(act.map((x) => x.node))];
       pl.node = act[0].node;
       pl.detour = hasNight && night;
+      const when = scn && hasNight ? `${scn.label} · ` : '';
       pl.how = pl.detour
-        ? 'overnight detour: north on 10th or 11th Ave to Galvin Plaza'
+        ? `${when}${scn ? scn.say : SCN_SAY.expressway}`
         : hasNight
-          ? 'in via the 30th St, 33rd St, Dyer Ave or 9th Ave ramps'
+          ? `${when}${scn ? 'tubes open: ' : ''}in via the 30th St, 33rd St, Dyer Ave or 9th Ave ramps`
           : `in via ${[...new Set(act.map((x) => x.label))].join(' or ')}`;
       const set = new Set(pl.gates);
       for (const n of pl.gateNodes) G.gateSets.set(n, set);
     }
+  }
+  // ---- the entrance streets: highlighted, with slow arrows, for the conditions this round ----
+  /** The links that lead you into this tunnel entrance now: the detour's 10th and 11th Ave northbound, or the ramps' own approach streets. */
+  function corridorEdges(pl) {
+    const out = new Set(pl.gates || []);
+    if (!pl.gates || !pl.gates.length) return out;
+    if (pl.detour) {
+      const gn = G.nodes[pl.node];
+      for (const e of G.edges) {
+        if (e.name !== '10th Ave' && e.name !== '11th Ave') continue;
+        if (angd(e.b0, GRID) > 40) continue; // northbound only
+        const to = G.nodes[e.to];
+        const south = (gn[1] - to[1]) * 111000; // metres south of the plaza
+        if (south > -40 && south < 1100) out.add(e.id);
+      }
+    } else {
+      for (const id of pl.gates) {
+        let e = G.edges[id], run = 0;
+        while (run < 300) {
+          const p = G.inn[e.from].find((x) => short(x.name) === short(e.name) && angd(x.b1, e.b0) < 50 && !out.has(x.id));
+          if (!p) break;
+          out.add(p.id);
+          run += p.len;
+          e = p;
+        }
+      }
+    }
+    return out;
+  }
+  const DASH_FRAMES = [[0, 4, 3], [0.5, 4, 2.5], [1, 4, 2], [1.5, 4, 1.5], [2, 4, 1], [2.5, 4, 0.5], [3, 4, 0], [0, 0.5, 3, 3.5], [0, 1, 3, 3], [0, 1.5, 3, 2.5], [0, 2, 3, 2], [0, 2.5, 3, 1.5], [0, 3, 3, 1], [0, 3.5, 3, 0.5]];
+  let flowTimer = 0;
+  function stopFlow() {
+    clearInterval(flowTimer);
+    flowTimer = 0;
+  }
+  /** Show (or with null, clear) the entrance streets; the dashes move along them in the direction of travel, slowly. */
+  function setCorridor(pl) {
+    stopFlow();
+    if (!map.getSource('gg-corridor')) return;
+    if (!pl || !pl.gates) return setData('gg-corridor', EMPTY);
+    const feats = [...corridorEdges(pl)].map((id) => ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: G.edges[id].pts } }));
+    setData('gg-corridor', { type: 'FeatureCollection', features: feats });
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let i = 0;
+    flowTimer = setInterval(() => {
+      if (!map.getLayer('gg-corridor-flow')) return stopFlow();
+      i = (i + 1) % DASH_FRAMES.length;
+      map.setPaintProperty('gg-corridor-flow', 'line-dasharray', DASH_FRAMES[i]);
+    }, 170);
   }
   // ---- the curb: every destination is one corner of an intersection (NE, SE, SW or NW on the grid) ----
   // You finish by arriving with that corner on your right, as a driver would pull up to the curb.
@@ -1150,7 +1244,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const entry = rt.entry != null ? G.entries.find((en) => en.link === rt.entry && en.from === rt.entryFrom) || null : null;
     return { e0, s0: rt.s0 || 0, target: { ...rt.target, quad, label: G.label(rt.target.node) }, best, entry };
   }
-  const routeOf = (r) => ({ e0: r.e0.id, s0: r.s0, target: { name: r.target.name, node: r.target.node, quad: r.target.quad }, entry: r.entry ? r.entry.link : null, entryFrom: r.entry ? r.entry.from : null });
+  const routeOf = (r) => ({ e0: r.e0.id, s0: r.s0, target: { name: r.target.name, node: r.target.node, quad: r.target.quad }, entry: r.entry ? r.entry.link : null, entryFrom: r.entry ? r.entry.from : null, scn });
   const routeKey = (rt) => `${rt.e0}:${Math.round(rt.s0 || 0)}>${rt.target.node}${rt.target.quad || ''}`;
   let lastTargetNode = null; // a new round never goes to the same place as the one before
   function pickRound(forced) {
@@ -1256,6 +1350,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       return;
     }
     if (g !== token) return;
+    scn = pickScenario(forced && forced.scn);
     applyGates();
     const r = pickRound(forced);
     if (r) lastTargetNode = r.target.node;
@@ -1289,6 +1384,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     setData('gg-target', EMPTY); // shown once you've driven off (it would give the briefing's guess away)
     setData('gg-trail', EMPTY);
     setData('gg-best', EMPTY);
+    setCorridor(null);
     setData('gg-lmseen', EMPTY);
     setData('gg-goto', EMPTY);
     setData('gg-streets', streetsFC || EMPTY);
@@ -1301,7 +1397,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     showCover();
     carMk.setLngLat(g.trail[0]).addTo(map);
     g.log = {
-      t0: performance.now(), at: new Date().toISOString(), area: areaId, data: G.dataKey, pace: prefs.pace, guide: prefs.guide,
+      t0: performance.now(), at: new Date().toISOString(), area: areaId, data: G.dataKey, scn: scn ? `${scn.label} ${scn.kind}` : null, pace: prefs.pace, guide: prefs.guide,
       labels: prefs.labels, kind: g.kind, route: g.route, target: g.target.name || g.target.label, best: Math.round(g.best.cost), ev: [],
     };
     logEv('start', g.e.id, Math.round(g.s));
@@ -1322,6 +1418,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     clearHood();
     hideLmTag();
     document.body.classList.remove('gg-end');
+    stopFlow();
+    setData('gg-corridor', EMPTY);
     lmRingMk.remove();
     carEl.classList.remove('gg-ovcar');
     if (!g) return;
@@ -1484,7 +1582,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   /** The briefing: where you're going. */
   const cornerTag = (t) =>
     t.gates
-      ? ` <span class="muted">· ${esc(t.how || `in via ${[...new Set(t.gates.map((id) => short(G.edges[id].name)))].join(' or ')}`)}</span>`
+      ? `<span class="gg-how">${esc(t.how || `in via ${[...new Set(t.gates.map((id) => short(G.edges[id].name)))].join(' or ')}`)}</span>`
       : t.quad
         ? ` <span class="muted">· ${t.quad} corner</span>`
         : '';
@@ -1995,6 +2093,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     g.goAt = performance.now();
     const tp = G.nodes[g.target.node];
     setData('gg-target', point(targetPoint(), { name: g.target.name || g.target.label }));
+    setCorridor(g.target.gates ? G.places.find((x) => x.name === g.target.name && x.gates) : null);
     if (prefs.mapFirst && ctx.dur(1)) {
       g.view = 'intro';
       ctx.fit([g.pos || g.trail[0], tp], 15, { bearing: GRID, duration: 700 });
@@ -2530,6 +2629,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     hideLmTag();
     g.done = true;
     g.waiting = true;
+    stopFlow(); // (the highlighted streets stay on the end map, still)
     offEl.hidden = true;
     showLabels(prefs.labels);
     syncLmSeen();
@@ -2615,6 +2715,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       <details class="ggdet"><summary>Details</summary>
         ${before ? `<div class="hint">Best so far: ${starStr(Math.max(before, stars))}</div>` : ''}
         ${through ? `<div class="hint">🏘 Through: ${through}</div>` : ''}
+        ${g.target.gates && scn ? `<div class="hint">🕒 ${esc(scn.label)}: ${esc(scn.say)}${scn.kind !== 'usual' && SCN_DATA && SCN_DATA.quotes ? `. A real alert: “${esc(SCN_DATA.quotes[scn.kind === 'expressway' ? 'expressway' : 'northTube'] || '')}”` : ''}</div>` : ''}
         <div class="hint">Shortest: ${esc(describe(g.best.path))}</div>
         <div class="hint">Driven: ${Math.round(cover * 100)}% of ${AREA.of} blocks${g.newBlocks ? ` (+${g.newBlocks} new${cover - prevCover >= 0.005 ? `, +${Math.round((cover - prevCover) * 100)}%` : ''})` : ''}</div>
       </details>
@@ -2868,7 +2969,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
           <select id="ggStyle" aria-label="Play style">${[['plan', 'Play: plan, then ride'], ['drive', 'Play: free drive']].map(([k, v]) => `<option value="${k}"${prefs.style === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggGuide" aria-label="Guide">${Object.entries(GUIDES).map(([k, v]) => `<option value="${k}"${prefs.guide === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggRideSpeed" aria-label="Ride and replay speed">${[['quick', 'Replay: quick'], ['steady', 'Replay: steady'], ['slow', 'Replay: slow']].map(([k, v]) => `<option value="${k}"${(prefs.rideSpeed || 'steady') === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
-          <select id="ggDetour" aria-label="Lincoln Tunnel overnight detour">${[['auto', 'Lincoln detour: auto (Tue–Thu nights)'], ['on', 'Lincoln detour: always on'], ['off', 'Lincoln detour: off']].map(([k, v]) => `<option value="${k}"${(prefs.lteDetour || 'auto') === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
+          <select id="ggDetour" aria-label="Lincoln Tunnel overnight detour">${[['auto', 'Lincoln Tunnel: varied times, real patterns'], ['now', 'Lincoln Tunnel: the real time now'], ['on', 'Lincoln Tunnel: always the overnight detour'], ['off', 'Lincoln Tunnel: always the usual entrances']].map(([k, v]) => `<option value="${k}"${(prefs.lteDetour || 'auto') === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggPace" aria-label="Speed">${Object.keys(PACE).map((p) => `<option value="${p}"${prefs.pace === p ? ' selected' : ''}>${p[0].toUpperCase() + p.slice(1)}</option>`).join('')}</select>
           <details class="ggmoreopts">
             <summary>More options</summary>
