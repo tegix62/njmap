@@ -2506,7 +2506,7 @@ body.ink .prow .typebtn {
   left: 12px;
   top: 0;
   z-index: 4;
-  max-width: min(200px, 56vw);
+  max-width: min(170px, 48vw);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -2523,7 +2523,7 @@ body.ink .prow .typebtn {
   max-width: 100%;
   padding: 3px 10px 3px 3px;
   border-radius: 12px;
-  background: #3b2f1e;
+  background: rgba(59, 47, 30, 0.9);
   color: #fff;
   pointer-events: auto;
   cursor: pointer;
@@ -2981,19 +2981,25 @@ body.gridding #hud .gg-go {
   letter-spacing: 0.3px;
 }
 
-/* the avenue ruler: every avenue, west to east, the way its traffic runs, the one you're on lit */
+/* the avenue ruler: small by default (the avenue you're nearest and the one each side, with the way each runs); tap for every avenue */
 .gg-ruler {
   position: fixed;
-  left: 10px;
-  right: 10px;
+  left: 12px;
+  width: 150px;
   bottom: 300px;
   z-index: 3;
-  height: 36px;
-  padding: 3px 14px 0;
-  border-radius: 12px;
-  background: rgba(255, 253, 248, 0.9);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.22);
-  pointer-events: none;
+  height: 25px;
+  padding: 2px 12px 0;
+  border-radius: 9px;
+  background: rgba(255, 253, 248, 0.82);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  transition: width 0.2s;
+}
+.gg-ruler.full {
+  width: calc(100vw - 24px);
+  height: 30px;
+  background: rgba(255, 253, 248, 0.94);
 }
 .gg-ruler[hidden] {
   display: none;
@@ -3007,42 +3013,45 @@ body.gridding #hud .gg-go {
   top: 0;
   transform: translateX(-50%);
   display: flex;
-  flex-direction: column;
   align-items: center;
+  gap: 2px;
   line-height: 1;
   color: #5a5145;
-  opacity: 0.8;
+  opacity: 0.7;
+  white-space: nowrap;
 }
 .gg-rtrack .t i {
   font-style: normal;
-  font-size: 8px;
-  height: 9px;
+  font-size: 7px;
   color: #8a7f6c;
 }
 .gg-rtrack .t b {
   font: 700 10px system-ui, sans-serif;
-  margin-top: 1px;
 }
 .gg-rtrack .t.on {
   opacity: 1;
   color: #fff;
   background: #3b2f1e;
-  border-radius: 7px;
-  padding: 1px 5px 2px;
-  top: -1px;
+  border-radius: 6px;
+  padding: 1px 5px;
 }
 .gg-rtrack .t.on i {
   color: #f2c14e;
-  font-size: 9px;
 }
 .gg-rtrack .you {
   position: absolute;
-  bottom: 1px;
+  bottom: 0;
   width: 0;
   height: 0;
   transform: translateX(-50%);
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-bottom: 7px solid #2b4fb3;
-  transition: left 0.15s linear;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 5px solid #2b4fb3;
+}
+.gg-ruler.full .t {
+  flex-direction: column;
+  gap: 0;
+}
+.gg-ruler.full .t i {
+  height: 8px;
 }

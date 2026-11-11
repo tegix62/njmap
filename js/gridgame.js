@@ -815,6 +815,12 @@ export function initGridGame(ctx, areaId = 'downtown') {
     });
     return aveX;
   }
+  let rulerFullTimer = 0;
+  ruler.addEventListener('click', () => {
+    ruler.classList.toggle('full');
+    clearTimeout(rulerFullTimer);
+    if (ruler.classList.contains('full')) rulerFullTimer = setTimeout(() => ruler.classList.remove('full'), 5000);
+  });
   function updateRuler(p) {
     const live = !!(g && !g.loading && !g.done && !g.startCard && areaId === 'midtown' && p);
     ruler.hidden = !live;
@@ -834,12 +840,23 @@ export function initGridGame(ctx, areaId = 'downtown') {
         }
       }
     }
-    const you = ruler.querySelector('.you');
-    you.style.left = `${(pos / (AVES.length - 1)) * 100}%`;
+    const N = AVES.length;
+    const full = ruler.classList.contains('full');
+    // small: the avenue nearest you and the one on each side; full (tap it): every avenue
+    const start = Math.max(0, Math.min(N - 3, Math.round(pos) - 1));
+    const span = full ? N - 1 : 2;
+    const from = full ? 0 : start;
+    for (const t of ruler.querySelectorAll('.t')) {
+      const i = +t.dataset.i;
+      const show = full || (i >= start && i <= start + 2);
+      t.style.display = show ? '' : 'none';
+      t.style.left = `${((i - from) / span) * 100}%`;
+    }
+    ruler.querySelector('.you').style.left = `${(Math.max(0, Math.min(span, pos - from)) / span) * 100}%`;
     const on = g.e ? AVES.findIndex(([, names]) => names.includes(g.e.name)) : -1;
     for (const t of ruler.querySelectorAll('.t')) t.classList.toggle('on', +t.dataset.i === on);
     const pad = ctx.padding();
-    ruler.style.bottom = `${Math.max(8, pad.bottom - 4)}px`;
+    ruler.style.bottom = `${Math.max(8, pad.bottom - 2)}px`;
   }
   let LM_ALL = [], LM_ICONS = {}, LM_PICS = {};
   const lmNorm = (x) => x.toLowerCase().replace(/^the /, '').replace(/ \(.*\)$/, '').replace(/[^a-z0-9 ]/g, '');
@@ -936,22 +953,23 @@ export function initGridGame(ctx, areaId = 'downtown') {
   }
   function placeLmTag(lp) {
     const cr = map.getContainer().getBoundingClientRect();
-    const { T, B, R } = freeBand();
-    const W = window.innerWidth, w = 190, h = 100;
-    const spots = [{ x: 12, y: T }, { x: W - R - w, y: T }, { x: 12, y: T + 110 }, { x: W - R - w, y: T + 110 }].filter((q) => q.y + h <= B);
+    const { T, B } = freeBand();
+    const W = window.innerWidth, w = 170, h = 100;
+    // the two top corners, against the screen edge (never toward the middle); the busier one is passed over
+    const spots = [{ side: 'L', x: 12 }, { side: 'R', x: W - 12 - w }].filter(() => T + h <= B);
     const avoid = [carEl].filter(Boolean).map((el) => el.getBoundingClientRect());
     const tp = map.project(lp);
     const layers = ['gg-streets', 'gg-poi-dot', 'gg-trail', 'gg-best', 'gg-target', 'gg-goto'].filter((id) => map.getLayer(id));
     let best = null;
     for (const q of spots) {
-      const box = [[q.x - cr.left, q.y - cr.top], [q.x + w - cr.left, q.y + h - cr.top]];
+      const box = [[q.x - cr.left, T - cr.top], [q.x + w - cr.left, T + h - cr.top]];
       let sc = layers.length ? map.queryRenderedFeatures(box, { layers }).length : 0;
       if (map.getLayer('gg-target')) sc += 100 * map.queryRenderedFeatures(box, { layers: ['gg-target'] }).length; // the destination dot stays clear
-      for (const a of avoid) if (a.right > q.x - 10 && a.left < q.x + w + 10 && a.bottom > q.y - 10 && a.top < q.y + h + 10) sc += 200;
-      sc += Math.hypot(tp.x + cr.left - (q.x + w / 2), tp.y + cr.top - (q.y + h / 2)) / 90; // near its landmark, a little
+      for (const a of avoid) if (a.right > q.x - 10 && a.left < q.x + w + 10 && a.bottom > T - 10 && a.top < T + h + 10) sc += 200;
+      sc += Math.abs(tp.x + cr.left - (q.x + w / 2)) / 120; // the side its landmark is on, a little
       if (!best || sc < best.sc) best = { q, sc };
     }
-    lmSpot = best ? { x: best.q.x, y: best.q.y } : { x: 12, y: T };
+    lmSpot = { side: best ? best.q.side : 'L', y: T };
     layoutLmTag();
   }
   /** Keep the stack inside the free band (the panel below changes height as you drive); with no room, it waits. */
@@ -960,7 +978,10 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const { T, B } = freeBand();
     const h = lmTag.offsetHeight;
     const y = Math.max(T, Math.min(lmSpot.y, B - h));
-    lmTag.style.left = `${Math.round(lmSpot.x)}px`;
+    const right = lmSpot.side === 'R';
+    lmTag.style.left = right ? 'auto' : '12px';
+    lmTag.style.right = right ? '12px' : 'auto';
+    lmTag.style.alignItems = right ? 'flex-end' : 'flex-start';
     lmTag.style.top = `${Math.round(y)}px`;
     lmTag.style.visibility = B - T < h ? 'hidden' : 'visible';
     updateLead();
