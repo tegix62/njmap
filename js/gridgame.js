@@ -174,8 +174,11 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const label = (n) => {
       const names = [];
       for (const e of [...out[n], ...inn[n]]) if (!names.includes(e.name)) names.push(e.name);
-      const streets = names.filter((x) => !RAMP.test(x));
-      return (streets.length >= 2 ? streets : names).slice(0, 2).join(' & ');
+      // E 37th St and W 37th St meet at 5th Ave: one street, not two
+      const base = (x) => x.replace(/^[EW] (\d+\w\w) St$/, '$1 St');
+      const uniq = (a) => a.filter((x, i) => a.findIndex((y) => base(y) === base(x)) === i);
+      const streets = uniq(names.filter((x) => !RAMP.test(x)));
+      return (streets.length >= 2 ? streets : uniq(names)).slice(0, 2).join(' & ');
     };
     // an ordinary street corner: no highway or ramp meets here (for random starts and destinations)
     const plain = (n) => [...out[n], ...inn[n]].every((e) => !RAMP.test(e.name) && !HWY.test(e.name));
@@ -1155,7 +1158,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   /** The cross street at the end of edge e (the next corner), if it's a real intersection. */
   function crossAt(e) {
     const names = [];
-    for (const o of [...G.out[e.to], ...G.inn[e.to]]) if (o.name !== e.name && !names.includes(o.name)) names.push(o.name);
+    for (const o of [...G.out[e.to], ...G.inn[e.to]]) if (short(o.name) !== short(e.name) && !names.includes(o.name)) names.push(o.name);
     // streets, not ramps; where two cross at one corner (5th Ave and Broadway at 23rd St) name both,
     // so a chip never says "5th Ave" for a corner you'd reach by Broadway
     const streets = [...new Set(names.filter((x) => !G.RAMP.test(x)).map(short))];
