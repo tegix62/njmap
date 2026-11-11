@@ -815,6 +815,29 @@ export function initGridGame(ctx, areaId = 'downtown') {
     });
     return aveX;
   }
+  // ⚑ mark a spot, 🔍 where am I, 3D: small round buttons floating at the map's right edge, just above the panel
+  const fab = document.createElement('div');
+  fab.className = 'gg-fab';
+  fab.hidden = true;
+  document.body.appendChild(fab);
+  function placeFab() {
+    fab.style.bottom = `${Math.max(8, ctx.padding().bottom - 2)}px`;
+  }
+  function renderFab() {
+    const live = !!(g && !g.loading && !g.done && !g.startCard && !g.report);
+    fab.hidden = !live;
+    if (!live) return;
+    fab.innerHTML = `${TILT_BTN()}${OV_BTN()}<button id="ggMark" aria-label="Mark this spot">⚑</button>`;
+    placeFab();
+  }
+  let hudOpenTimer = 0;
+  document.getElementById('hud').addEventListener('click', () => {
+    if (!g || g.loading) return; // (the other Drive game's instance stays out of it)
+    const h = document.getElementById('hud');
+    h.classList.toggle('open');
+    clearTimeout(hudOpenTimer);
+    if (h.classList.contains('open')) hudOpenTimer = setTimeout(() => h.classList.remove('open'), 6000);
+  });
   let rulerFullTimer = 0;
   ruler.addEventListener('click', () => {
     ruler.classList.toggle('full');
@@ -1732,6 +1755,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     hideLmTag();
     document.body.classList.remove('gg-end');
     ruler.hidden = true;
+    fab.hidden = true;
     stopFlow();
     setData('gg-corridor', EMPTY);
     lmRingMk.remove();
@@ -2819,8 +2843,6 @@ export function initGridGame(ctx, areaId = 'downtown') {
         <div class="gp-bar">
           <button id="ggUndo"${p.hist.length ? '' : ' disabled'}>↶ Undo</button>
           <button id="ggHint">💡 Hint</button>
-          <button id="ggMark" aria-label="Mark this spot">⚑</button>
-          ${OV_BTN()}${TILT_BTN()}
           <button id="ggMore" aria-expanded="${!!g.more}" aria-label="More">${g.more ? '✕' : '⋯'}</button>
         </div>
       </div>`;
@@ -2828,8 +2850,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     if (p.phase === 'corner') {
       const cs = planChips();
       const lab = (c) => (prefs.labels ? short(c.name) : `+${c.idx + 1}`);
-      return ctl(`<div class="bq">${p.route.length === 1 ? 'Where do you turn?' : 'Next, where do you turn?'}</div>
-        <div class="ggchips plan">${cs.map((c, i) => `<button class="ggchip" data-node="${c.node}">${atTarget(c.via, c.node) ? '🏁 ' : ''}${esc(lab(c))}</button>`).join('') || '<span class="muted">No turns ahead on this road.</span>'}</div>`);
+      return ctl(`<div class="ggchips plan">${cs.map((c, i) => `<button class="ggchip" data-node="${c.node}">${atTarget(c.via, c.node) ? '🏁 ' : ''}${esc(lab(c))}</button>`).join('') || '<span class="muted">No turns ahead on this road.</span>'}</div>`);
     }
     const c = choices(p.cur);
     const at = prefs.labels ? G.label(p.cur.to) : 'this corner';
@@ -2968,6 +2989,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     g.waiting = true;
     stopFlow(); // (the highlighted streets stay on the end map, still)
     ruler.hidden = true;
+    fab.hidden = true;
     offEl.hidden = true;
     showLabels(prefs.labels);
     syncLmSeen();
@@ -3214,7 +3236,10 @@ export function initGridGame(ctx, areaId = 'downtown') {
     if (!g) return;
     requestAnimationFrame(placeHoodTag);
     requestAnimationFrame(layoutLmTag);
-    requestAnimationFrame(() => g && updateRuler(g.pos || (g.trail && g.trail[0])));
+    requestAnimationFrame(() => {
+      if (g) updateRuler(g.pos || (g.trail && g.trail[0]));
+      placeFab();
+    });
     if (g.done && g.view === 'overview') g.view = 'follow';
     document.body.classList.toggle('gg-end', !!g.done);
     if (g.loading) {
@@ -3289,6 +3314,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
             `<button class="ggpick${g.pick === o ? ' on' : ''}" data-link="${o.id}"><span class="gg-arr" style="transform:rotate(${(o.b0 - GRID).toFixed(0)}deg)">${DIR_SVG}</span><span class="nm">${esc(optName(o))}${spineMark(o.name)} <small>${esc(leadsTo(o))}</small></span></button>`
         )
         .join('');
+    renderFab();
     ctx.sheet(
       `${showHeader() ? g.opts.header() : ''}<div id="qbody">
         ${g.report ? reportHTML() : g.done ? g.result : g.startCard ? briefingHTML({ you: briefYou(), to: briefTo(), guess: g.guess }) : g.plan ? (g.plan.riding ? '<div class="ggmsg"><b>🚕 Riding your route…</b></div>' : planHTML()) : g.check && g.check.kind === 'name' ? `<div class="ggctl named">${g.check.options.map((n) => `<button class="ggpick ggname" data-name="${esc(n)}"><span class="nm">${esc(short(n))}</span></button>`).join('')}</div>` : `${chipsRow()}${named ? `<div class="ggctl named">${pickBtns()}</div>` : `<div class="ggctl${canStraight ? ' three' : ''}">${btn('L', '◀ Left')}${canStraight ? btn('S', '▲ Straight') : ''}${btn('R', 'Right ▶')}</div>`}
@@ -3306,8 +3332,6 @@ export function initGridGame(ctx, areaId = 'downtown') {
         <div class="ggbar"${g.plan && !g.plan.riding && !g.done ? ' hidden' : ''}>
           ${g.done || g.startCard || g.plan ? '' : `<button id="ggPause" aria-label="${g.paused ? 'Resume' : 'Pause'}">${g.paused ? '▶ Go' : '⏸ Pause'}</button>`}
           ${!g.done && !g.startCard && !g.report && !g.plan ? `<button id="ggFast" aria-label="Hold to go faster">⏩ Hold</button>` : ''}
-          ${!g.done && !g.startCard && !g.report && !(g.plan && !g.plan.riding) ? `<button id="ggMark" aria-label="Mark this spot">⚑</button>` : ''}
-          ${!g.done && !g.startCard && !g.report ? OV_BTN() + TILT_BTN() : ''}
           ${!g.done && !g.startCard && prefs.guide === 'off' ? `<button id="ggPeek">👁 Peek</button>` : ''}
           ${hintReady() && !g.plan ? `<button id="ggHint">💡 Hint</button>` : ''}
           ${g.plan && !g.plan.riding && !g.done ? '' : `<button id="ggMore" aria-expanded="${!!g.more}" aria-label="More">${g.more ? '✕' : '⋯'}</button>`}
