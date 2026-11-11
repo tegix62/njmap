@@ -47,19 +47,29 @@ export function initExplore(ctx) {
 
   // ---- 3D (Manhattan): the buildings stand up and the camera tilts; two fingers (or right-drag) tilt and turn it ----
   const x3d = document.getElementById('x3d');
-  let on3d = false, bld = 0; // bld: 0 not loaded, 1 loading, 2 in the map
+  let on3d = false;
   const TILT = 58;
+  // one file per part of the island, loaded when the view first reaches it (lat1, lon1, lat2, lon2)
+  const PARTS = {
+    midtown: [40.74, -74.015, 40.772, -73.96],
+    downtown: [40.699, -74.026, 40.741, -73.968],
+    uptown: [40.771, -74.005, 40.88, -73.9],
+  };
+  const part = {}; // name -> 0 loading / 1 in the map
+  const near = (c, [la1, lo1, la2, lo2], pad = 0.012) => c.lat > la1 - pad && c.lat < la2 + pad && c.lng > lo1 - pad && c.lng < lo2 + pad;
   async function ensureBuildings() {
-    if (bld) return;
-    bld = 1;
-    try {
-      const d = await fetch('data/buildings-midtown.json').then((r) => r.json());
-      if (!map.getSource('x3d')) {
-        map.addSource('x3d', { type: 'geojson', data: { type: 'FeatureCollection', features: buildingFeatures(d) } });
+    const c = map.getCenter();
+    for (const [name, box] of Object.entries(PARTS)) {
+      if (part[name] !== undefined || !near(c, box)) continue;
+      part[name] = 0;
+      try {
+        const d = await fetch(`data/buildings-${name}.json`).then((r) => r.json());
+        const id = 'x3d-' + name;
+        map.addSource(id, { type: 'geojson', data: { type: 'FeatureCollection', features: buildingFeatures(d) } });
         const first = map.getStyle().layers.find((l) => l.type === 'symbol');
         map.addLayer(
           {
-            id: 'x3d', type: 'fill-extrusion', source: 'x3d', minzoom: 13.5,
+            id, type: 'fill-extrusion', source: id, minzoom: 13.5,
             paint: {
               'fill-extrusion-color': ['case', ['has', 'c'], ['get', 'c'], ['interpolate', ['linear'], ['get', 'h'], 6, '#e9e3d6', 60, '#d6cdbb', 200, '#bdb29d', 300, '#a99d88']],
               'fill-extrusion-height': ['get', 'h'],
@@ -70,12 +80,13 @@ export function initExplore(ctx) {
           },
           first && first.id
         );
+        part[name] = 1;
+      } catch {
+        delete part[name]; // try again at the next move
       }
-      bld = 2;
-    } catch {
-      bld = 0;
     }
   }
+  map.on('moveend', () => { if (on3d) ensureBuildings(); });
   function set3d(v, animate = true) {
     on3d = v;
     if (x3d) {
@@ -91,10 +102,8 @@ export function initExplore(ctx) {
     }
     const o = { pitch: v ? TILT : 0, duration: animate ? ctx.dur(700) : 0 };
     if (v && ctx.region.gridAngle) {
-      // the building data covers Midtown (14th to 59th St): from anywhere else, go there
-      const c = map.getCenter();
-      if (c.lat < 40.74 || c.lat > 40.772 || c.lng < -74.015 || c.lng > -73.96) o.center = [-73.9855, 40.7545];
-      if (map.getZoom() < 14.3 || o.center) o.zoom = 15;
+      // the buildings only stand at street scale
+      if (map.getZoom() < 14.3) o.zoom = 15;
     }
     if (!v) o.bearing = 0;
     map.easeTo(o);

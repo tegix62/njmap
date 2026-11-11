@@ -8,12 +8,18 @@ Source: NYC Open Data "Building Footprints" (data.cityofnewyork.us, dataset 5zhs
   {"o": [lon0, lat0], "s": 100000, "b": [[heightMetres, flag, dx, dy, dx, dy, ...], ...]}
 
 flag 1 = the building a landmark (data/landmarks.json) sits in, so the game can colour it.
-Usage: python3 -I tools/build_buildings.py            (needs data.cityofnewyork.us)
+Usage: python3 -I tools/build_buildings.py [midtown|downtown|uptown]   (needs data.cityofnewyork.us)
 """
-import json, math, os, urllib.parse, urllib.request
+import json, math, os, sys, urllib.parse, urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BOX = (40.7400, -74.0150, 40.7720, -73.9600)  # Midtown: lat1, lon1, lat2, lon2
+# area -> (lat1, lon1, lat2, lon2); the boxes overlap a little so no seam shows
+AREAS = {
+    'midtown': (40.7400, -74.0150, 40.7720, -73.9600),
+    'downtown': (40.6990, -74.0260, 40.7410, -73.9680),
+    'uptown': (40.7710, -74.0050, 40.8800, -73.9000),
+}
+BOX = AREAS['midtown']
 URL = 'https://data.cityofnewyork.us/resource/5zhs-2jue.json'
 S = 100000
 TOWERS = [
@@ -34,16 +40,28 @@ TOWERS = [
     ('Time Warner Center', -73.98287, 40.76846, 229),
     ('Metropolitan Life Tower', -73.98720, 40.74146, 213),
     ('Seagram Building', -73.97200, 40.75800, 157),
+    # Downtown
+    ('One World Trade Center', -74.01310, 40.71270, 417),
+    ('Woolworth Building', -74.00797, 40.71264, 241),
+    ('8 Spruce Street', -74.00570, 40.71070, 265),
+    ('Municipal Building', -74.00440, 40.71270, 178),
 ]
 MIN_H_M = 6.0      # drop anything lower than this (sheds, garages)
 MIN_AREA_M2 = 40.0  # and anything smaller than this
+THIN = {'uptown': (9.0, 90.0)}  # Uptown is mostly low rows of houses: fewer, bigger, to keep the file small
 TOL_M = 1.2        # outline simplification
 
 def fetch():
-    q = urllib.parse.urlencode({'$select': 'the_geom,height_roof', '$where': 'within_box(the_geom,%s,%s,%s,%s) AND height_roof IS NOT NULL' % BOX, '$limit': 50000})
-    req = urllib.request.Request(URL + '?' + q, headers={'User-Agent': 'njmap-building-packer/1.0'})
-    with urllib.request.urlopen(req, timeout=120) as r:
-        return json.load(r)
+    rows, off = [], 0
+    while True:  # pages of 20,000, in a fixed order
+        q = urllib.parse.urlencode({'$select': 'the_geom,height_roof', '$where': 'within_box(the_geom,%s,%s,%s,%s) AND height_roof IS NOT NULL' % BOX, '$order': ':id', '$limit': 20000, '$offset': off})
+        req = urllib.request.Request(URL + '?' + q, headers={'User-Agent': 'njmap-building-packer/1.0'})
+        with urllib.request.urlopen(req, timeout=180) as r:
+            page = json.load(r)
+        rows += page
+        if len(page) < 20000:
+            return rows
+        off += 20000
 
 def metres(a, b):
     return math.hypot((b[0] - a[0]) * 84200, (b[1] - a[1]) * 111000)
@@ -101,6 +119,11 @@ def inside(pt, ring):
     return c
 
 def main():
+    global BOX
+    area = sys.argv[1] if len(sys.argv) > 1 else 'midtown'
+    BOX = AREAS[area]
+    global MIN_H_M, MIN_AREA_M2
+    MIN_H_M, MIN_AREA_M2 = THIN.get(area, (MIN_H_M, MIN_AREA_M2))
     rows = fetch()
     lm = json.load(open(os.path.join(ROOT, 'data/landmarks.json')))
     lpts = [(l['n'], l['p']) for l in lm]
@@ -152,7 +175,7 @@ def main():
             print(f'  model {name}: footprint {best[0]:.0f} m from the point, roof {best[2]:.0f} m (expected {eh})')
         else:
             print(f'  NO footprint for {name} near ({lon}, {lat}) at about {eh} m')
-    path = os.path.join(ROOT, 'data/buildings-midtown.json')
+    path = os.path.join(ROOT, 'data/buildings-%s.json' % area)
     with open(path, 'w') as f:
         json.dump({'o': list(origin), 's': S, 'm': models, 'b': out}, f, separators=(',', ':'))
     print(f'{len(rows)} footprints -> {len(out)} buildings, {os.path.getsize(path) // 1024} KB; landmarks found inside a footprint: {len(flagged)} of {len(lpts)}')

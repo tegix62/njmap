@@ -21,6 +21,10 @@ export const TOWERS = {
     'Time Warner Center': { color: '#aeb9c2', tiers: [{ h: 0.25, s: 1 }, { b: 0.25, h: 1, s: [0.42, 1], c: [0.24, 0.5] }, { b: 0.25, h: 1, s: [0.42, 1], c: [0.76, 0.5] }] },
     'Metropolitan Life Tower': { color: '#e6dfcf', tiers: [{ h: 0.4, s: 1 }, { h: 0.72, s: 0.7 }, { h: 0.9, s: 0.5 }, { h: 1, s: 0.3, color: '#bfd3c6' }] },
     'Seagram Building': { color: '#6e5d4b', tiers: [{ h: 1, s: 1 }] },
+    'One World Trade Center': { color: '#b9c7d1', tiers: [{ h: 0.12, s: 1, color: '#9fb0bb' }, { h: 0.45, s: 0.92 }, { h: 0.75, s: 0.82 }, { h: 1, s: 0.7 }], mast: { m: 124, s: 0.03, color: '#dfe5e9' } },
+    'Woolworth Building': { color: '#e2dccb', tiers: [{ h: 0.42, s: 1 }, { h: 0.74, s: 0.58 }, { h: 0.88, s: 0.44 }, { h: 0.95, s: 0.34, color: '#8fb3a0' }, { h: 1, s: 0.14, color: '#8fb3a0' }] },
+    '8 Spruce Street': { color: '#aab6bf', tiers: [{ h: 0.3, s: 1 }, { h: 0.55, s: 0.92 }, { h: 0.78, s: 0.85 }, { h: 1, s: 0.78 }] },
+    'Municipal Building': { color: '#d9ceb8', tiers: [{ h: 0.5, s: 1 }, { h: 0.72, s: 0.6 }, { h: 0.9, s: 0.38 }, { h: 1, s: 0.14, color: '#c9a24a' }] },
   };
   /** A building's outline as the stacked pieces of its model (Polygon features with a height and a base). */
 export function towerFeatures(ring, H, model) {
