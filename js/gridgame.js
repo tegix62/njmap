@@ -271,6 +271,9 @@ export function initGridGame(ctx, areaId = 'downtown') {
   }
   /** Turn angle from link e onto link o (+ = right). */
   const turnOf = (e, o) => angleDiff(o.b0, e.b1);
+  /** The road carries on from e into o: a gentle bend, or the same road changing level (Park Ave's ramp up onto its viaduct bends sharply but is no corner). */
+  const baseRoad = (n) => n.replace(/ Viaduct$/, '');
+  const carries = (e, o) => Math.abs(turnOf(e, o)) <= 50 || baseRoad(e.name) === baseRoad(o.name);
 
   // ---- rules of thumb ------------------------------------------------------------------
   const streetNum = (name) => {
@@ -331,15 +334,20 @@ export function initGridGame(ctx, areaId = 'downtown') {
     // then the streets you're driving would be missing
     const seen = new Set();
     const streets = [];
+    elevFC.features.length = 0;
     for (const e of G.edges) {
       if (seen.has(e.shape)) continue;
       seen.add(e.shape);
-      streets.push({ type: 'Feature', properties: { name: short(e.name) }, geometry: { type: 'LineString', coordinates: e.pts } });
+      // the Park Ave Viaduct and the ramp up to it: raised roadway, tinted so it reads as passing over the cross streets
+      const raised = /Viaduct/.test(e.name) || (e.name === 'Park Ave' && (/Viaduct/.test(G.label(e.to)) || /Viaduct/.test(G.label(e.from))));
+      streets.push({ type: 'Feature', properties: { name: short(e.name), el: raised ? 1 : 0 }, geometry: { type: 'LineString', coordinates: e.pts } });
+      if (raised) elevFC.features.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: e.pts } });
     }
     for (const pts of G.xingGeo.values()) streets.push({ type: 'Feature', properties: { name: '' }, geometry: { type: 'LineString', coordinates: pts } });
     streetsFC = { type: 'FeatureCollection', features: streets };
   }
   let streetsFC = null;
+  const elevFC = { type: 'FeatureCollection', features: [] };
   const EMPTY = { type: 'FeatureCollection', features: [] };
   /** A chevron pointing along the line (+x), as a map image: the font the map ships
    *  has only basic Latin, so a '›' text arrow drew nothing. */
@@ -395,6 +403,10 @@ export function initGridGame(ctx, areaId = 'downtown') {
     map.addSource('gg-cover', { type: 'geojson', data: EMPTY });
     map.addLayer({ id: 'gg-cover', type: 'line', source: 'gg-cover', layout: { 'line-cap': 'round' }, paint: { 'line-color': '#16a34a', 'line-width': 3, 'line-opacity': 0.35 } });
     // the border you just crossed: the new neighborhood tinted, its edge near you dashed; both fade in a moment
+    map.addSource('gg-elev', { type: 'geojson', data: elevFC });
+    const elevW = ['interpolate', ['linear'], ['zoom'], 14.5, 3, 16, 9, 17, 14];
+    map.addLayer({ id: 'gg-elev-case', type: 'line', source: 'gg-elev', layout: { 'line-cap': 'butt', 'line-join': 'round', visibility: 'none' }, paint: { 'line-color': '#7c4a14', 'line-width': ['interpolate', ['linear'], ['zoom'], 14.5, 4.5, 16, 12, 17, 18], 'line-opacity': ['interpolate', ['linear'], ['zoom'], 14.4, 0, 15, 0.9] } });
+    map.addLayer({ id: 'gg-elev', type: 'line', source: 'gg-elev', layout: { 'line-cap': 'butt', 'line-join': 'round', visibility: 'none' }, paint: { 'line-color': '#f2d9a8', 'line-width': elevW, 'line-opacity': ['interpolate', ['linear'], ['zoom'], 14.4, 0, 15, 1] } });
     map.addSource('gg-hood', { type: 'geojson', data: EMPTY });
     map.addLayer({ id: 'gg-hood-fill', type: 'fill', source: 'gg-hood', filter: ['==', ['get', 'k'], 'f'], paint: { 'fill-color': '#0b7a68', 'fill-opacity': 0, 'fill-opacity-transition': { duration: 500 } } });
     map.addLayer({ id: 'gg-hood-line', type: 'line', source: 'gg-hood', filter: ['==', ['get', 'k'], 'l'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#0b7a68', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.8, 14, 1.4, 16, 2.4, 17.5, 3.4], 'line-opacity': 0, 'line-opacity-transition': { duration: 500 } } });
@@ -470,6 +482,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     // the app: the background map's own
     const inGame = !!(g && !g.loading && !g.done);
     vis('gg-streets', inGame);
+    vis('gg-elev-case', inGame);
+    vis('gg-elev', inGame);
     vis('gg-street-names', inGame && on);
     vis('road-name', !inGame); // in the game, the names come from its own street data (same names as everywhere else in it)
   }
@@ -850,7 +864,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       seen.add(cur.id);
       const c = choices(cur);
       // the car stops at a named corner, and where the road ends in a turn
-      const nx = c.decision ? (c.named ? null : c.straight) : c.only && Math.abs(turnOf(cur, c.only)) <= 50 ? c.only : null;
+      const nx = c.decision ? (c.named ? null : c.straight) : c.only && carries(cur, c.only) ? c.only : null;
       if (!nx) break;
       m += nx.len;
       cur = nx;
@@ -1037,6 +1051,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     setData('gg-best', EMPTY);
     setData('gg-goto', EMPTY);
     setData('gg-streets', streetsFC || EMPTY);
+    setData('gg-elev', elevFC);
     setData('gg-arrows', arrowsFC || EMPTY);
     setData('gg-poi', G.poi || (G.poi = poiFeatures()));
     showPoi(false);
@@ -1218,7 +1233,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const chain = g.waiting ? [{ node: g.e.to, via: g.e }] : aheadChain(g.e, 40, 3000);
     for (const { via } of chain) {
       const c = choices(via);
-      if (c.decision || (c.only && Math.abs(turnOf(via, c.only)) > 50)) return { via, c, name: short(crossAt(via) || G.label(via.to)) };
+      if (c.decision || (c.only && !carries(via, c.only))) return { via, c, name: short(crossAt(via) || G.label(via.to)) };
     }
     return null;
   }
@@ -1443,7 +1458,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     if (!c.decision) {
       if (!c.only) return stopHere('Dead end.');
       const d = turnOf(e, c.only);
-      if (Math.abs(d) <= 50) return go(c.only, true); // the road carries on
+      if (carries(e, c.only)) return go(c.only, true); // the road carries on
       // the road ends and the only way on is a turn: the car doesn't turn by itself
       const side = d < 0 ? 'L' : 'R';
       if (g.queued === side || g.pick === c.only || g.home) {
@@ -1946,7 +1961,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const out = [];
     for (const { node, via } of aheadChain(cur, 70, 7000)) {
       const c = choices(via);
-      const eventful = c.decision || (c.only && Math.abs(turnOf(via, c.only)) > 50) || atTarget(via, node);
+      const eventful = c.decision || (c.only && !carries(via, c.only)) || atTarget(via, node);
       if (G.real(node) && eventful) out.push({ node, via, name: crossAt(via) || G.label(node) });
       if (atTarget(via, node) || out.length >= max) break;
     }
