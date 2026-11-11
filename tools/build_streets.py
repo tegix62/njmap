@@ -897,6 +897,22 @@ if AREA == 'midtown':
             place_report.append(f'  start {label}: link {lre[li]} on {street}')
         else:
             place_report.append(f'  start {label}: NOT FOUND')
+if AREA == 'uptown':
+    # The FDR Drive's southbound exits that put you straight on a street here. A "way in" link (one nothing in the area
+    # drives into) counts when one of the city's own "FDR DRIVE EXIT n SB" ramps ends within 200 m of its start: the label
+    # comes from the ramp's name in the data, not from memory.
+    ROADS = {'FDR DRIVE': 'the FDR Drive', 'HENRY HUDSON': 'the Henry Hudson Parkway'}
+    exits = [(f'{ROADS[m.group(1)]} (exit {m.group(2)})', pt) for e in edges for m in [re.match(r'(FDR DRIVE|HENRY HUDSON) ?(?:P[A-Z]*)? ?(?:EXIT|ET) (\d+) SB$', e[6])] if m for pt in e[4]]
+    best_for = {}  # exit number -> (distance, link): of the way-in links near an exit's ramp, the closest one is where it lands
+    for li in sorted(feed_l):
+        if any(lo in keep_l for lo in turns[li]) and not any(li in turns[o] for o in feed_l | core_l if o != li):
+            near = min(((metres(centroid[links[li]['from']], pt), n) for n, pt in exits), default=None)
+            if near and near[0] < 200 and landing(li) is not None and (near[1] not in best_for or near[0] < best_for[near[1]][0]):
+                best_for[near[1]] = (near[0], li)
+    for n, (dist, li) in sorted(best_for.items()):
+        land = landing(li)
+        entries_out.append({'from': n, 'via': names[links[li]['name']], 'link': lre[li], 'landsAt': jre[links[land]['from']]})
+        place_report.append(f"  entry {n}: link {lre[li]} on {names[links[li]['name']]} ({dist:.0f} m from the exit ramp)")
 for pl in places:
     if pl['name'] == 'the Lincoln Tunnel entrance (to NJ)':
         defs = []
