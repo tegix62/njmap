@@ -1896,6 +1896,23 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const streets = nx ? `${short(g.e.name)} & ${nx}` : short(g.e.name);
     return `${placeText(name, streets, p)} <span class="muted">· facing ${headWord(g.e.name, g.e.b0)}</span>`;
   }
+  /**
+   * The corner chips are a row that scrolls sideways, so a touch can't be claimed on touch-down (that would stop the scroll).
+   * A chip fires when the finger lifts without having moved; it's remembered by the corner it names, so it still counts if
+   * the panel is redrawn under the finger.
+   */
+  let chipDown = null;
+  document.addEventListener('pointerdown', (e) => {
+    const b = e.target.closest && e.target.closest('.ggchip');
+    chipDown = b && g && !g.loading ? { node: +b.dataset.node, x: e.clientX, y: e.clientY, t: performance.now() } : null;
+  });
+  document.addEventListener('pointerup', (e) => {
+    const d = chipDown;
+    chipDown = null;
+    if (!d || !g || g.loading) return;
+    if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 10 && performance.now() - d.t < 800) goToNode(d.node);
+  });
+  document.addEventListener('pointercancel', () => (chipDown = null));
   /** Act on touch-down (and on a keyboard "click", which has no pointer). */
   function onTap(el, fn) {
     el.addEventListener('pointerdown', (e) => {
@@ -3400,7 +3417,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       if (log) openReport('log', log);
     });
     if (g.report) bindReport();
-    for (const b of document.querySelectorAll('.ggchip')) onTap(b, () => goToNode(+b.dataset.node));
+    for (const b of document.querySelectorAll('.ggchip')) b.addEventListener('click', (e) => e.detail === 0 && goToNode(+b.dataset.node)); // (a keyboard "click"; touches go through chipTap below, so the row can scroll)
     for (const b of document.querySelectorAll('.ggname')) onTap(b, () => answerName(b.dataset.name));
     const fast = document.getElementById('ggFast');
     if (fast) {
