@@ -76,6 +76,41 @@ def polygon_triangles(pts):
     return [(tuple(order[0]), tuple(order[i]), tuple(order[i + 1])) for i in range(1, len(order) - 1)]
 
 
+def roof_polygons(brep):
+    """A roof surface as flat or sloped polygons, each an array of (x, y, z) corners in feet."""
+    tris = brep_triangles(brep)
+    return [np.array(t) for t in tris]
+
+
+def roof_above(roofs, z):
+    """The ground-plan of every part of the roofs that is at least z high: what a slanted roof or a dome leaves of the building at height z."""
+    parts = []
+    for P in roofs:
+        if P[:, 2].max() < z:
+            continue
+        out = []
+        for a, b in zip(P, np.roll(P, -1, axis=0)):
+            ina, inb = a[2] >= z, b[2] >= z
+            if ina:
+                out.append(a[:2])
+            if ina != inb:
+                u = (z - a[2]) / (b[2] - a[2])
+                out.append(a[:2] + u * (b[:2] - a[:2]))
+        if len(out) >= 3:
+            try:
+                q = Polygon(out).buffer(0)
+                if not q.is_empty:
+                    parts.append(q)
+            except Exception:
+                pass
+    if not parts:
+        return None
+    try:
+        return unary_union(parts).buffer(0.6).buffer(-0.6)
+    except Exception:
+        return None
+
+
 def outline_at(tri, z):
     lo, hi = tri[:, :, 2].min(1), tri[:, :, 2].max(1)
     use = tri[(lo <= z) & (hi >= z)]
@@ -101,12 +136,19 @@ def outline_at(tri, z):
     return None if p.is_empty else p
 
 
-def slabs_of(tri, z0, z1):
+def slabs_of(tri, z0, z1, roofs=()):
     """[(base ft, top ft, polygon)] from slicing the triangles between z0 and z1."""
     cuts = []
     z = z0 + STEP / 2
     while z < z1:
-        cuts.append((z, outline_at(tri, z)))
+        p = outline_at(tri, z)
+        r = roof_above(roofs, z) if len(roofs) else None
+        if r is not None and not r.is_empty:
+            try:
+                p = r if p is None else unary_union([p, r]).buffer(0)
+            except Exception:
+                pass
+        cuts.append((z, p))
         z += STEP
     slabs = []
     for z, p in cuts:
@@ -143,11 +185,11 @@ def main():
                 fps.append(Polygon(pts).buffer(0))
         elif name in ('Buildings::Facade Surface', 'Buildings::RoofTop Surface'):
             bb = o.Geometry.GetBoundingBox()
-            surf.append((o.Geometry, (bb.Min.X + bb.Max.X) / 2 * U, (bb.Min.Y + bb.Max.Y) / 2 * U, bb.Min.Z * U, bb.Max.Z * U))
+            surf.append((o.Geometry, (bb.Min.X + bb.Max.X) / 2 * U, (bb.Min.Y + bb.Max.Y) / 2 * U, bb.Min.Z * U, bb.Max.Z * U, 'Roof' in name))
     print(f'{src}: {len(fps)} footprints, {len(surf)} surfaces, read in {time.time() - t0:.0f}s', flush=True)
     tree = STRtree(fps)
     owned = [[] for _ in fps]
-    for k, (g, x, y, a, b) in enumerate(surf):
+    for k, (g, x, y, a, b, _roof) in enumerate(surf):
         for i in tree.query(Point(x, y)):
             if fps[i].buffer(3).contains(Point(x, y)):
                 owned[i].append(k)
@@ -161,13 +203,15 @@ def main():
         if (z1 - z0) * FT < min_m:
             continue
         try:
-            tri = []
+            tri, roofs = [], []
             for k in ks:
                 tri += brep_triangles(surf[k][0])
+                if surf[k][5]:
+                    roofs += roof_polygons(surf[k][0])
             if not tri:
                 continue
             tri = np.array(tri)
-            slabs = slabs_of(tri, z0, z1)
+            slabs = slabs_of(tri, z0, z1, roofs)
         except Exception as e:
             print(f'  skipped a building: {e}', flush=True)
             continue
