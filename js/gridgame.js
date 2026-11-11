@@ -184,21 +184,24 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const gy = nodes.map((p) => gridXY(p)[1]);
     G = { d, nodes, edges, out, inn, coreJ, cuts, real, streetsAt, xingGeo, label, plain, gy, RAMP, places: d.places, entries: d.entries, areas: d.areas };
     G.dataKey = `${d.source}|${edges.length}|${nodes.length}`;
-    // A tunnel isn't a curb: you get in by driving onto its entrance ramp. The city's data says which
-    // streets carry straight on into one (W 30th St and Dyer Ave for the Lincoln Tunnel, Watts St for
-    // the Holland), so those streets' ends are the real way in, wherever the old corner was.
+    // A tunnel isn't a curb: you get in by driving onto one of its entrance ramps. The street data names
+    // them (the Lincoln Tunnel's: gateDefs, from the Port Authority and city data; the Holland's: the street
+    // that carries straight on into the ramp, from the city's data), so a round ends when you drive onto one.
     G.gateSets = new Map();
-    const GATE_RULE = { 'the lincoln tunnel entrance (to nj)': /^Lincoln Tunnel entrance/i, 'the holland tunnel entrance (to nj)': /^Holland Tunnel entrance/i };
+    const GATE_RULE = { 'the holland tunnel entrance (to nj)': /^Holland Tunnel entrance/i };
     for (const pl of G.places) {
+      if (pl.gateDefs) {
+        pl.gateList = pl.gateDefs.flatMap((gd) =>
+          G.inn[gd.node].filter((e) => e.core && gd.streets.some((st) => short(st) === short(e.name))).map((e) => ({ id: e.id, node: gd.node, night: gd.night, label: gd.label }))
+        );
+        continue;
+      }
       const rule = GATE_RULE[pl.name.toLowerCase()];
       if (!rule) continue;
       const gates = Object.entries(G.cuts).filter(([, txt]) => rule.test(txt || '')).map(([id]) => edges[+id]).filter(Boolean);
-      if (!gates.length) continue;
-      pl.gates = gates.map((e) => e.id);
-      pl.node = gates[0].to;
-      const set = new Set(pl.gates);
-      for (const e of gates) G.gateSets.set(e.to, set);
+      if (gates.length) pl.gateList = gates.map((e) => ({ id: e.id, node: e.to, night: false, label: short(e.name) }));
     }
+    applyGates();
     // The George Washington Bridge is far uptown, off this map: a trip from it comes down the West
     // Side Highway, so it starts on the northernmost southbound stretch of 12th Ave.
     if (areaId === 'midtown' && !G.entries.some((en) => /George Washington/.test(en.from))) {
@@ -683,6 +686,45 @@ export function initGridGame(ctx, areaId = 'downtown') {
   }
   const isCore = (n) => G.coreJ.has(n);
   /** Shortest legal route (moves the buttons can make, no U-turns) from edge e0, s metres along it, to node t. */
+  // ---- the Lincoln Tunnel's overnight detour (Port Authority advisory, "Phase 1A (Dyer Deck Overs)") ----
+  // The Expressway is closed 11 pm to 5 am on Tuesday, Wednesday and Thursday nights, and 9th Ave's entrance
+  // ramps are closed with it: New Jersey-bound traffic goes north on 10th or 11th Ave to Galvin Plaza.
+  // The advisory gave about 120 days from April 22, 2026, and closures were still announced in late
+  // September; the real end date (thought to be around January or February 2027) isn't confirmed, so this
+  // date is an assumption. Options: Auto (follows the clock in New York), Always on, Off.
+  const DETOUR_THROUGH = '2027-02-28';
+  function lteDetourOn() {
+    const mode = prefs.lteDetour || 'auto';
+    if (mode === 'on') return true;
+    if (mode === 'off') return false;
+    const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: '2-digit', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date()).map((p) => [p.type, p.value]));
+    const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(parts.weekday);
+    const hour = +parts.hour;
+    if (`${parts.year}-${parts.month}-${parts.day}` > DETOUR_THROUGH) return false;
+    return (hour >= 23 && day >= 2 && day <= 4) || (hour < 5 && day >= 3 && day <= 5);
+  }
+  /** Point each tunnel destination at the entrances open right now (the detour's, or the usual ones). */
+  function applyGates() {
+    const night = lteDetourOn();
+    for (const pl of G.places) {
+      if (!pl.gateList) continue;
+      const hasNight = pl.gateList.some((x) => x.night);
+      const act = pl.gateList.filter((x) => !hasNight || x.night === night);
+      if (!act.length) continue;
+      for (const n of pl.gateNodes || []) G.gateSets.delete(n);
+      pl.gates = act.map((x) => x.id);
+      pl.gateNodes = [...new Set(act.map((x) => x.node))];
+      pl.node = act[0].node;
+      pl.detour = hasNight && night;
+      pl.how = pl.detour
+        ? 'overnight detour: north on 10th or 11th Ave to Galvin Plaza'
+        : hasNight
+          ? 'in via the 30th St, 33rd St, Dyer Ave or 9th Ave ramps'
+          : `in via ${[...new Set(act.map((x) => x.label))].join(' or ')}`;
+      const set = new Set(pl.gates);
+      for (const n of pl.gateNodes) G.gateSets.set(n, set);
+    }
+  }
   // ---- the curb: every destination is one corner of an intersection (NE, SE, SW or NW on the grid) ----
   // You finish by arriving with that corner on your right, as a driver would pull up to the curb.
   // On a one-way street the left curb counts too (you can stop on either side there).
@@ -808,7 +850,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const e0 = G.edges[rt.e0];
     if (!e0 || !G.nodes[rt.target.node]) return null;
     const pl = G.places.find((p) => p.name === rt.target.name && p.gates);
-    if (pl) rt = { ...rt, target: { ...rt.target, node: pl.node, gates: pl.gates, quad: null } };
+    if (pl) rt = { ...rt, target: { ...rt.target, node: pl.node, gates: pl.gates, how: pl.how, detour: pl.detour, quad: null } };
     const quad = pl ? null : rt.target.quad || chooseQuad(rt.target.node, rt.target.name);
     if (!pl && !quad) return null;
     const best = shortest(e0, rt.target.node, rt.s0 || 0, quad);
@@ -921,6 +963,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       return;
     }
     if (g !== token) return;
+    applyGates();
     const r = pickRound(forced);
     if (r) lastTargetNode = r.target.node;
     if (!r) {
@@ -1140,7 +1183,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   /** The briefing: where you're going. */
   const cornerTag = (t) =>
     t.gates
-      ? ` <span class="muted">· in via ${[...new Set(t.gates.map((id) => short(G.edges[id].name)))].join(' or ')}</span>`
+      ? ` <span class="muted">· ${esc(t.how || `in via ${[...new Set(t.gates.map((id) => short(G.edges[id].name)))].join(' or ')}`)}</span>`
       : t.quad
         ? ` <span class="muted">· ${t.quad} corner</span>`
         : '';
@@ -2480,6 +2523,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
           <select id="ggStyle" aria-label="Play style">${[['plan', 'Play: plan, then ride'], ['drive', 'Play: free drive']].map(([k, v]) => `<option value="${k}"${prefs.style === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggGuide" aria-label="Guide">${Object.entries(GUIDES).map(([k, v]) => `<option value="${k}"${prefs.guide === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggRideSpeed" aria-label="Ride and replay speed">${[['quick', 'Replay: quick'], ['steady', 'Replay: steady'], ['slow', 'Replay: slow']].map(([k, v]) => `<option value="${k}"${(prefs.rideSpeed || 'steady') === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
+          <select id="ggDetour" aria-label="Lincoln Tunnel overnight detour">${[['auto', 'Lincoln detour: auto (Tue–Thu nights)'], ['on', 'Lincoln detour: always on'], ['off', 'Lincoln detour: off']].map(([k, v]) => `<option value="${k}"${(prefs.lteDetour || 'auto') === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggPace" aria-label="Speed">${Object.keys(PACE).map((p) => `<option value="${p}"${prefs.pace === p ? ' selected' : ''}>${p[0].toUpperCase() + p.slice(1)}</option>`).join('')}</select>
           <details class="ggmoreopts">
             <summary>More options</summary>
@@ -2583,6 +2627,10 @@ export function initGridGame(ctx, areaId = 'downtown') {
     restartOn('ggArea', 'area');
     restartOn('ggFrom', 'from');
     restartOn('ggStyle', 'style');
+    document.getElementById('ggDetour').addEventListener('change', (e) => {
+      prefs.lteDetour = e.target.value;
+      savePrefs();
+    });
     document.getElementById('ggRideSpeed').addEventListener('change', (e) => {
       prefs.rideSpeed = e.target.value;
       savePrefs();

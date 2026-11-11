@@ -847,6 +847,36 @@ for nm, pt, ramp in PLACES:
         place_report.append(f'SKIPPED {nm}: nearest corner has only one street')
     else:
         place_report.append(f'SKIPPED {nm}: nearest intersection {hit[0]:.0f} m away' if hit else f'SKIPPED {nm}')
+# The Lincoln Tunnel's real car entrances from the street grid (Port Authority and city data): where each
+# entrance ramp starts, and which streets lead onto it. 'night' = the one open while the Expressway is
+# closed overnight for the Dyer Avenue deckover work (Port Authority advisory, Phase 1A): New Jersey-bound
+# traffic goes north on 10th or 11th Ave to Galvin Plaza.
+LTE_GATES = [
+    ('W 30th St / 10th Ave ramp', (-74.00085, 40.75224), ['10th Ave', 'W 30th St'], False),
+    ('W 33rd St ramp', (-73.9985, 40.75345), ['W 33rd St'], False),
+    ('Dyer Ave (34th-36th St, northbound)', (-73.9972, 40.75452), ['Dyer Ave'], False),
+    ('9th Ave southbound ramp (36th St)', (-73.9951, 40.75505), ['9th Ave'], False),
+    ('Galvin Plaza (W 40th St)', (-73.99755, 40.75882), ['W 40th St', 'Galvin Ave'], True),
+]
+def near_junction(pt, r=45):
+    best = None
+    for c in core_j:
+        d = metres(centroid[c], pt)
+        if d < r and (best is None or d < best[0]):
+            best = (d, c)
+    return best
+for pl in places:
+    if pl['name'] == 'the Lincoln Tunnel entrance (to NJ)':
+        defs = []
+        for label, pt, streets, night in LTE_GATES:
+            h = near_junction(pt)
+            if h:
+                defs.append({'node': jre[h[1]], 'streets': streets, 'night': night, 'label': label})
+                place_report.append(f'  gate {label}: junction {jre[h[1]]} ({h[0]:.0f} m from the ramp start)')
+            else:
+                place_report.append(f'  gate {label}: NOT FOUND in this area')
+        if defs:
+            pl['gateDefs'] = defs
 for en in entries_out:
     if en['landsAt'] is None:
         problems.append(f"entry {en['from']} never reaches the streets")
