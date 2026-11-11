@@ -601,6 +601,41 @@ export function initGridGame(ctx, areaId = 'downtown') {
   let LM_ICONS = {}, LM_PICS = {};
   /** A landmark's picture: our silhouette if we drew one, else a small photo from Wikimedia Commons (credited in Settings), else nothing. */
   const lmPic = (n) => (LM_ICONS[n] ? `<svg viewBox="0 0 64 64" fill="currentColor" aria-hidden="true">${LM_ICONS[n]}</svg>` : LM_PICS[n] ? `<img src="${esc(LM_PICS[n].img)}" alt="" />` : '');
+  /** Tap a landmark's name (the callout, or on the result screen) for its photo, name, note and credit; the drive waits meanwhile. */
+  const lmCard = document.createElement('div');
+  lmCard.className = 'gg-lmcard';
+  lmCard.hidden = true;
+  document.body.appendChild(lmCard);
+  let lmCardPaused = null;
+  function closeLmCard() {
+    if (lmCard.hidden) return;
+    lmCard.hidden = true;
+    if (g && lmCardPaused === false && !g.done) {
+      g.paused = false;
+      render();
+    }
+    lmCardPaused = null;
+  }
+  function openLmCard(name) {
+    const pic = LM_PICS[name];
+    const l = (G && G.landmarks || []).find((x) => x.n === name) || { n: name, note: '' };
+    if (!pic) return;
+    clearTimeout(lmTimer);
+    lmTag.hidden = true;
+    if (g && !g.done && lmCardPaused === null) {
+      lmCardPaused = g.paused;
+      g.paused = true; // the car waits while you look
+      render();
+    }
+    const by = pic.author ? `${esc(pic.author)}, ` : '';
+    lmCard.innerHTML = `<div class="gg-lmcard-in"><img src="${esc(pic.img)}" alt="${esc(name)}" /><b>${esc(name)}</b><span>${esc(l.note)}</span><small>Photo: ${by}${esc(pic.license)} · <a href="${esc(pic.page)}" target="_blank" rel="noopener">Wikimedia Commons</a></small><button type="button" class="gg-lmcard-x">Back to the drive</button></div>`;
+    lmCard.hidden = false;
+  }
+  document.addEventListener('click', (ev) => {
+    const el = ev.target.closest && ev.target.closest('[data-lm]');
+    if (el && el.dataset.lm && !lmCard.contains(el)) return openLmCard(el.dataset.lm);
+    if (!lmCard.hidden && (ev.target === lmCard || ev.target.closest('.gg-lmcard-x'))) closeLmCard();
+  });
   // "By the way": a famous building or place within a block of you, named for a few seconds, once per round
   const lmTag = document.createElement('div');
   lmTag.className = 'gg-lmtag';
@@ -630,7 +665,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     g.lmAt = now;
     const side = best.d < 35 ? 'right here' : Math.abs(rel) < 35 ? 'ahead' : rel > 0 ? 'on your right' : 'on your left';
     const pic = lmPic(best.l.n);
-    lmTag.innerHTML = `${pic ? `<i>${pic}</i>` : ''}<div><b>${esc(best.l.n)}</b><span>${side}</span></div>`; // the picture and a name, nothing to read: the note is on the result screen
+    lmTag.dataset.lm = LM_PICS[best.l.n] ? best.l.n : '';
+    lmTag.innerHTML = `${pic ? `<i>${pic}</i>` : ''}<div><b>${esc(best.l.n)}</b><span>${side}${LM_PICS[best.l.n] ? ' · 📷 tap' : ''}</span></div>`; // the picture and a name, nothing to read: the note is on the result screen
     lmTag.classList.toggle('nopic', !pic);
     lmTag.style.top = `${Math.round(ctx.padding().top + 26)}px`;
     lmTag.hidden = false;
@@ -2396,6 +2432,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const brg = (Math.atan2((b[0] - a[0]) * 84400, (b[1] - a[1]) * 111000) * 180) / Math.PI;
     return { p, brg: a === b ? null : brg, k };
   }
+  const lmLink = (l) => (LM_PICS[l.n] ? `<a href="#" class="lmlink" data-lm="${esc(l.n)}" onclick="return false">${esc(l.n)} 📷</a>` : esc(l.n));
   /** The end screen: the famous places you passed, and what's by your destination. */
   function lmResultLines() {
     if (prefs.landmarks === false || !G.landmarks) return '';
@@ -2405,7 +2442,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const norm = (x) => x.toLowerCase().replace(/^the /, '').replace(/ \(.*\)$/, '');
     const isTarget = (l) => !!g.target.name && (norm(g.target.name).includes(norm(l.n)) || norm(l.n).includes(norm(g.target.name)));
     const by = G.landmarks.filter((l) => !names.has(l.n) && metres(tp, l.p) < 170 && !isTarget(l)).slice(0, 3);
-    return `${seen.length ? `<div class="hint">🏛 Passed: ${seen.map((l) => esc(l.n)).join(' · ')}</div>` : ''}${by.length ? `<div class="hint">📍 By your destination: ${by.map((l) => esc(l.n)).join(' · ')}</div>` : ''}`;
+    return `${seen.length ? `<div class="hint">🏛 Passed: ${seen.map(lmLink).join(' · ')}</div>` : ''}${by.length ? `<div class="hint">📍 By your destination: ${by.map(lmLink).join(' · ')}</div>` : ''}`;
   }
   /** The end of a round, after a drive you made in real time: both ways ride out together, fast. */
   function startRace() {

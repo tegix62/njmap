@@ -56,8 +56,7 @@ def batch(titles, **q):
 
 def main():
     lm = json.load(open(os.path.join(ROOT, 'data/landmarks.json')))
-    ip = os.path.join(ROOT, 'data/landmark-icons.json')
-    skip = set(json.load(open(ip)).keys()) if os.path.exists(ip) else set()
+    skip = set()  # silhouettes get a photo too (tap the callout to see it)
     only = set(sys.argv[1:])  # optional: just these landmarks (the rest of data/landmark-credits.json is kept)
     want = {l['n']: TITLES.get(l['n'], l['n']) for l in lm if l['n'] not in skip and (not only or l['n'] in only)}
     # 1. each article's lead image file (one call)
