@@ -580,39 +580,21 @@ export function initGridGame(ctx, areaId = 'downtown') {
   const HOOD_REST = { fill: 0.07, line: 0.6 };
   const HOOD_PULSE = { fill: 0.2, line: 1 };
   let hoodTimer = 0;
-  // "Where am I?": a small magnifier that pulls the map back to all of Manhattan (you, and the red dot) and back again
-  const MANHATTAN = [[-74.03, 40.695], [-73.9, 40.882]];
-  const ovBtn = document.createElement('button');
-  ovBtn.type = 'button';
-  ovBtn.className = 'gg-ov';
-  ovBtn.hidden = true;
-  ovBtn.setAttribute('aria-label', 'Where am I in Manhattan?');
-  ovBtn.setAttribute('aria-pressed', 'false');
-  ovBtn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="6.2" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M7.4 10h5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
-  document.body.appendChild(ovBtn);
-  function placeOv() {
-    const live = !!(g && !g.loading && !g.done && !g.startCard);
-    ovBtn.hidden = !live;
-    if (g && g.done && g.view === 'overview') g.view = 'follow';
-    ovBtn.classList.toggle('on', !!(g && g.view === 'overview'));
-    ovBtn.setAttribute('aria-pressed', String(!!(g && g.view === 'overview')));
-    ovBtn.style.top = `${Math.round(ctx.padding().top + 8)}px`;
-  }
+  // "Where am I?": a magnifier button in the bottom tray that pulls the map back to the neighborhood-sized view and back again
+  const OV_BTN = () => `<button id="ggOv" class="${g.view === 'overview' ? 'on' : ''}" aria-pressed="${g.view === 'overview'}" aria-label="Where am I?"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="6.2" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>`;
+  const OV_ZOOM = 13.1; // ~3 km across: Midtown and the neighborhoods round it, named
   function toggleOverview() {
     if (!g || g.loading || g.done) return;
-    if (g.view === 'overview') {
-      g.view = 'follow';
-      g.camKey = null;
-      carEl.classList.remove('gg-ovcar');
-    } else {
-      g.view = 'overview';
-      carEl.classList.add('gg-ovcar');
-      const pad = ctx.padding();
-      map.fitBounds(MANHATTAN, { padding: { top: pad.top + 6, bottom: pad.bottom + 6, left: 16, right: 56 }, bearing: GRID, duration: ctx.dur(700), essential: true });
-    }
-    placeOv();
+    g.view = g.view === 'overview' ? 'follow' : 'overview';
+    g.camKey = null;
+    carEl.classList.toggle('gg-ovcar', g.view === 'overview');
+    const p = g.pos || g.trail[g.trail.length - 1];
+    const pad = ctx.padding();
+    const H = window.innerHeight;
+    // instant: no animation, then the frame loop keeps it centred on the car
+    map.jumpTo({ center: p, zoom: g.view === 'overview' ? OV_ZOOM : ZOOM, bearing: GRID, offset: [0, pad.top + (H - pad.top - pad.bottom) * 0.62 - H / 2] });
+    render();
   }
-  ovBtn.addEventListener('click', toggleOverview);
   // the name of the outlined neighborhood stays in view, just under the top card, for as long as it's outlined
   const hoodTag = document.createElement('div');
   hoodTag.className = 'gg-hoodtag';
@@ -1204,7 +1186,6 @@ export function initGridGame(ctx, areaId = 'downtown') {
   function stop() {
     clearHood();
     hideLmTag();
-    ovBtn.hidden = true;
     document.body.classList.remove('gg-end');
     carEl.classList.remove('gg-ovcar');
     if (!g) return;
@@ -1507,7 +1488,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     }
     carEl.classList.toggle('sigL', g.queued === 'L');
     carEl.classList.toggle('sigR', g.queued === 'R');
-    if (g.view === 'follow' && !g.done) {
+    if ((g.view === 'follow' || g.view === 'overview') && !g.done) {
+      const ZM = g.view === 'overview' ? OV_ZOOM : ZOOM; // (the wide, neighborhood-sized view follows the car too)
       const pad = ctx.padding();
       const H = window.innerHeight;
       // the car a little below the middle of the open area: more road ahead
@@ -1520,7 +1502,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
           g.camKey = key;
           const far = g.camP ? Math.hypot((p[0] - g.camP[0]) * 84400, (p[1] - g.camP[1]) * 111000) : 0;
           g.camP = p;
-          map.easeTo({ center: p, zoom: ZOOM, bearing: GRID, offset: [0, oy], duration: Math.min(650, 260 + far * 0.25), easing: (t) => 1 - Math.pow(1 - t, 3) });
+          map.easeTo({ center: p, zoom: ZM, bearing: GRID, offset: [0, oy], duration: Math.min(650, 260 + far * 0.25), easing: (t) => 1 - Math.pow(1 - t, 3) });
         }
       } else if (g.plan && g.plan.riding && g.bestRide) {
         // both cars in view: centre between them, zoom out as far as they're apart
@@ -1536,7 +1518,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
         map.easeTo({ center: c, zoom: z, bearing: GRID, offset: [0, pad.top + openH * 0.5 - H / 2], duration: 0 });
       } else {
         g.camKey = null;
-        map.easeTo({ center: p, zoom: ZOOM, bearing: GRID, offset: [0, oy], duration: 0 });
+        map.easeTo({ center: p, zoom: ZM, bearing: GRID, offset: [0, oy], duration: 0 });
       }
     }
     pointToTarget();
@@ -2261,6 +2243,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
           <button id="ggUndo"${p.hist.length ? '' : ' disabled'}>↶ Undo</button>
           <button id="ggHint">💡 Hint</button>
           <button id="ggMark" aria-label="Mark this spot">⚑</button>
+          ${OV_BTN()}
           <button id="ggMore" aria-expanded="${!!g.more}" aria-label="More">${g.more ? '✕' : '⋯'}</button>
         </div>
       </div>`;
@@ -2632,7 +2615,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   function render() {
     if (!g) return;
     requestAnimationFrame(placeHoodTag);
-    placeOv();
+    if (g.done && g.view === 'overview') g.view = 'follow';
     document.body.classList.toggle('gg-end', !!g.done);
     if (g.loading) {
       ctx.hud(`<div class="qkind">🚕 ${AREA.title}</div><div class="q">Loading the street map…</div>`);
@@ -2724,6 +2707,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
           ${g.done || g.startCard || g.plan ? '' : `<button id="ggPause" aria-label="${g.paused ? 'Resume' : 'Pause'}">${g.paused ? '▶ Go' : '⏸ Pause'}</button>`}
           ${!g.done && !g.startCard && !g.report && !g.plan ? `<button id="ggFast" aria-label="Hold to go faster">⏩ Hold</button>` : ''}
           ${!g.done && !g.startCard && !g.report && !(g.plan && !g.plan.riding) ? `<button id="ggMark" aria-label="Mark this spot">⚑</button>` : ''}
+          ${!g.done && !g.startCard && !g.report ? OV_BTN() : ''}
           ${!g.done && !g.startCard && prefs.guide === 'off' ? `<button id="ggPeek">👁 Peek</button>` : ''}
           ${hintReady() && !g.plan ? `<button id="ggHint">💡 Hint</button>` : ''}
           ${g.plan && !g.plan.riding && !g.done ? '' : `<button id="ggMore" aria-expanded="${!!g.more}" aria-label="More">${g.more ? '✕' : '⋯'}</button>`}
@@ -2763,6 +2747,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     for (const b of document.querySelectorAll('.ggturn')) onTap(b, () => press(b.dataset.side));
     for (const b of document.querySelectorAll('.ggpick:not(.ggname)')) onTap(b, () => pickLink(+b.dataset.link));
     document.getElementById('ggPause')?.addEventListener('click', togglePause);
+    { const ov = document.getElementById('ggOv'); if (ov) onTap(ov, toggleOverview); }
     document.getElementById('ggPeek')?.addEventListener('click', peek);
     document.getElementById('ggHint')?.addEventListener('click', showHint);
     document.getElementById('ggUndo')?.addEventListener('click', planUndo);
