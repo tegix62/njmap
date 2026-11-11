@@ -77,6 +77,11 @@ def main():
         'quotes': quote,
     }
     path = os.path.join(ROOT, 'data/lincoln-scenarios.json')
+    if os.path.exists(path):
+        prev = json.load(open(path))
+        if {k: v for k, v in prev.items() if k not in ('built', 'through')} == {k: v for k, v in out.items() if k not in ('built', 'through')}:
+            print('no change in the scenario tables')
+            return  # nothing new: leave the file (and the repo) alone
     with open(path, 'w') as f:
         json.dump(out, f, separators=(',', ':'))
     print(f'{os.path.getsize(path)} bytes; {len(exp)} expressway-closed hours, {len(nt)} north-tube-closed hours over {weeks:.0f} weeks')
