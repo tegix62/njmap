@@ -406,6 +406,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       }
     }
     if (map.getSource('gg-trail')) return;
+    map.setGlobalStateProperty('sq', 0);
     map.addSource('gg-bldg', { type: 'geojson', data: EMPTY });
     map.addSource('gg-streets', { type: 'geojson', data: streetsFC || EMPTY });
     const roadCol = map.getLayer('road-mid') && map.getPaintProperty('road-mid', 'line-color');
@@ -428,8 +429,10 @@ export function initGridGame(ctx, areaId = 'downtown') {
         paint: {
           // a plain stand-in for the city: stone gray, darker the taller it is; the building a landmark sits in is amber
           'fill-extrusion-color': ['case', ['has', 'c'], ['get', 'c'], ['==', ['get', 'lm'], 1], '#d9962b', ['interpolate', ['linear'], ['get', 'h'], 6, '#e9e3d6', 60, '#d6cdbb', 200, '#bdb29d', 300, '#a99d88']],
-          'fill-extrusion-height': ['get', 'h'],
-          'fill-extrusion-base': ['coalesce', ['get', 'b'], 0],
+          // at the driving angle the tall towers are squashed (everything above 60 m at 40%) so they fit the screen and read as
+          // buildings; the global 'sq' goes to 0 when the view is flat or zoomed out, and they stand at their true height again
+          'fill-extrusion-height': squash(['get', 'h']),
+          'fill-extrusion-base': squash(['coalesce', ['get', 'b'], 0]),
           'fill-extrusion-opacity': 0.94,
           'fill-extrusion-vertical-gradient': true,
         },
@@ -641,6 +644,16 @@ export function initGridGame(ctx, areaId = 'downtown') {
   const OV_BTN = () => `<button id="ggOv" class="${g.view === 'overview' ? 'on' : ''}" aria-pressed="${g.view === 'overview'}" aria-label="Where am I?"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="6.2" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>`;
   // ---- 3D: the camera tilts to a driver's angle and the buildings stand up (Midtown; heights from NYC's building footprints) ----
   const TILT_DEG = 55;
+  const SQUASH_FROM = 60, SQUASH_TO = 0.4;
+  const squash = (e) => ['case', ['<=', e, SQUASH_FROM], e, ['+', SQUASH_FROM, ['*', ['-', e, SQUASH_FROM], ['-', 1, ['*', 1 - SQUASH_TO, ['global-state', 'sq']]]]]];
+  let lastSq = -1;
+  /** Squash the towers while the camera is tilted in the close-up view; true heights otherwise. */
+  function syncSquash() {
+    const v = camPitch() ? 1 : 0;
+    if (v === lastSq) return;
+    lastSq = v;
+    map.setGlobalStateProperty('sq', v);
+  }
   const tiltOn = () => !!prefs.tilt && areaId === 'midtown';
   /** The camera's tilt now: tilted only in the close-up follow view (the wide "where am I" view and the end screens stay flat). */
   const camPitch = () => (tiltOn() && g && !g.done && (g.view === 'follow' || g.view === 'peek') ? TILT_DEG : 0);
@@ -727,6 +740,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   }
   function applyTilt() {
     if (!map.getLayer('gg-bldg')) return;
+    syncSquash();
     map.setLayoutProperty('gg-bldg', 'visibility', tiltOn() && g && !g.done ? 'visible' : 'none');
     if (tiltOn()) loadBuildings();
   }
@@ -735,6 +749,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     prefs.tilt = !prefs.tilt;
     savePrefs();
     applyTilt();
+    syncSquash();
     const p = g.pos || g.trail[g.trail.length - 1];
     const pad = ctx.padding();
     const H = window.innerHeight;
@@ -751,6 +766,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const pad = ctx.padding();
     const H = window.innerHeight;
     // instant: no animation, then the frame loop keeps it centred on the car
+    syncSquash();
     map.jumpTo({ center: p, zoom: g.view === 'overview' ? OV_ZOOM : driveZoom(), bearing: GRID, pitch: camPitch(), offset: [0, pad.top + (H - pad.top - pad.bottom) * 0.62 - H / 2] });
     render();
   }
@@ -1970,7 +1986,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     carEl.classList.toggle('sigR', g.queued === 'R');
     if ((g.view === 'follow' || g.view === 'overview') && !g.done && !(g.camHold > performance.now())) {
       const ZM = g.view === 'overview' ? OV_ZOOM : driveZoom();
-      const PT = camPitch(); // (the wide, neighborhood-sized view follows the car too)
+      const PT = camPitch();
+      syncSquash(); // (the wide, neighborhood-sized view follows the car too)
       const pad = ctx.padding();
       const H = window.innerHeight;
       // the car a little below the middle of the open area: more road ahead
