@@ -395,8 +395,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
         // purpose, and drawing all of ours there (offset a little from its own) is a fuzzy mesh
         paint: {
           'line-color': typeof roadCol === 'string' ? roadCol : '#d8d1c3',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 14.5, 2, 15.3, 5, 16, 8, 17, 12],
-          'line-opacity': ['interpolate', ['linear'], ['zoom'], 14.4, 0, 15, 1],
+          'line-width': ['interpolate', ['linear'], ['zoom'], 12.5, 0.8, 14.5, 2, 15.3, 5, 16, 8, 17, 12],
+          'line-opacity': ['interpolate', ['linear'], ['zoom'], 12.3, 0, 13.3, 1],
         },
       },
       map.getLayer('road-minor') ? 'road-minor' : undefined // under the background map's roads: where its tiles load, they draw on top
@@ -487,7 +487,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     // driving: the game's own streets and names; the end-of-round overview and the rest of
     // the app: the background map's own
     const inGame = !!(g && !g.loading && !g.done);
-    vis('gg-streets', inGame);
+    vis('gg-streets', !!(g && !g.loading)); // (the end map keeps them too: the base map's own are faint there)
     vis('gg-elev-case', inGame);
     vis('gg-elev', inGame);
     vis('gg-street-names', inGame && on);
@@ -1205,6 +1205,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     clearHood();
     hideLmTag();
     ovBtn.hidden = true;
+    document.body.classList.remove('gg-end');
     carEl.classList.remove('gg-ovcar');
     if (!g) return;
     keepLog();
@@ -2474,29 +2475,30 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const cover = coverage();
     const starStr = (n) => '★'.repeat(n) + '☆'.repeat(3 - n);
     const saved = mem.get('trips', []).some((t) => routeKey(t) === key);
-    g.result = `<div class="ggstars" title="★ there · ★★ the shortest way · ★★★ and no hints${prefs.style === 'plan' ? '' : ' or peeks, start guess right'}">${starStr(stars)}${
-      before ? ` <span class="muted">best ${starStr(Math.max(before, stars))}</span>` : ''
-    }</div>
-      <div class="fb ${ok ? 'ok' : 'no'}">${mi(g.driven)} mi${ratio <= 1.03 ? ' · the shortest' : ` · shortest ${mi(g.best.cost)}`}${
+    // a short result: one summary row, the famous places you passed, then buttons; the rest is folded into Details
+    const through = g.passed && g.passed.length > 1 ? g.passed.map(esc).join(' → ') : '';
+    g.result = `<div class="ggsum"><span class="ggstars" title="★ there · ★★ the shortest way · ★★★ and no hints${prefs.style === 'plan' ? '' : ' or peeks, start guess right'}">${starStr(stars)}</span>
+      <span class="fb ${ok ? 'ok' : 'no'}">${mi(g.driven)} mi${ratio <= 1.03 ? ' · the shortest' : ` · shortest ${mi(g.best.cost)}`}${
       g.wrong ? ` · ${g.wrong} wrong-way` : ''
     }${g.checks ? ` · check-ins ${g.checksRight}/${g.checks}` : ''}${
-      g.guess ? ` · start guess ${g.guess.ok ? '✓' : '✗'}` : ''
-    }${g.peeks ? ` · ${g.peeks} peek${g.peeks === 1 ? '' : 's'}` : ''}${g.hints ? ` · ${g.hints} hint${g.hints === 1 ? '' : 's'}` : ''}</div>
+      g.guess ? ` · guess ${g.guess.ok ? '✓' : '✗'}` : ''
+    }${g.peeks ? ` · ${g.peeks} peek${g.peeks === 1 ? '' : 's'}` : ''}${g.hints ? ` · ${g.hints} hint${g.hints === 1 ? '' : 's'}` : ''}</span>
+      <span class="ggkeys"><i class="gg-key you"></i>you <i class="gg-key best"></i>best</span></div>
       ${fixed ? `<div class="hint">✓ ${esc(g.mistake.corner)}: got it this time</div>` : ''}
       ${missed ? `<div class="hint">↺ ${esc(missed)} (it'll come back)</div>` : ''}
-      ${g.passed && g.passed.length > 1 ? `<div class="hint">🏘 Through: ${g.passed.map(esc).join(' → ')}</div>` : ''}
       ${lmResultLines()}
-      <div class="hint"><span class="gg-key you"></span> you <span class="gg-key best"></span> shortest</div>
       <details class="ggdet"><summary>Details</summary>
+        ${before ? `<div class="hint">Best so far: ${starStr(Math.max(before, stars))}</div>` : ''}
+        ${through ? `<div class="hint">🏘 Through: ${through}</div>` : ''}
         <div class="hint">Shortest: ${esc(describe(g.best.path))}</div>
         <div class="hint">Driven: ${Math.round(cover * 100)}% of ${AREA.of} blocks${g.newBlocks ? ` (+${g.newBlocks} new${cover - prevCover >= 0.005 ? `, +${Math.round((cover - prevCover) * 100)}%` : ''})` : ''}</div>
       </details>
       <div class="ggend">
         <button class="primary" id="ggAgain">Another route</button>
-        <button id="ggRace">▶ Replay</button>
-        <button id="ggSame">↻ Same</button>
-        <button id="ggSave"${saved ? ' disabled' : ''}>${saved ? '★ Saved' : '☆ Save'}</button>
-        <button id="ggLog">📋 Log</button>
+        <button id="ggRace" aria-label="Replay">▶<small>Replay</small></button>
+        <button id="ggSame" aria-label="Same route again">↻<small>Same</small></button>
+        <button id="ggSave" aria-label="Save"${saved ? ' disabled' : ''}>${saved ? '★' : '☆'}<small>${saved ? 'Saved' : 'Save'}</small></button>
+        <button id="ggLog" aria-label="Round log">📋<small>Log</small></button>
         ${g.flags ? `<button id="ggFlagSend" class="flagged">⚑ Send the ${g.flags} spot${g.flags === 1 ? '' : 's'} you marked</button>` : ''}
       </div>`;
     render();
@@ -2539,7 +2541,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const norm = (x) => x.toLowerCase().replace(/^the /, '').replace(/ \(.*\)$/, '');
     const isTarget = (l) => !!g.target.name && (norm(g.target.name).includes(norm(l.n)) || norm(l.n).includes(norm(g.target.name)));
     const by = G.landmarks.filter((l) => !names.has(l.n) && metres(tp, l.p) < 170 && !isTarget(l)).slice(0, 3);
-    return `${seen.length ? `<div class="hint">🏛 Passed: ${seen.map(lmLink).join(' · ')}</div>` : ''}${by.length ? `<div class="hint">📍 By your destination: ${by.map(lmLink).join(' · ')}</div>` : ''}`;
+    return `${seen.length ? `<div class="hint gg-lm1">🏛 ${seen.map(lmLink).join(' · ')}</div>` : ''}${by.length ? `<div class="hint gg-lm1">📍 Near the end: ${by.map(lmLink).join(' · ')}</div>` : ''}`;
   }
   /** The end of a round, after a drive you made in real time: both ways ride out together, fast. */
   function startRace() {
@@ -2631,6 +2633,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     if (!g) return;
     requestAnimationFrame(placeHoodTag);
     placeOv();
+    document.body.classList.toggle('gg-end', !!g.done);
     if (g.loading) {
       ctx.hud(`<div class="qkind">🚕 ${AREA.title}</div><div class="q">Loading the street map…</div>`);
       ctx.sheet(`${g.opts.header()}`);
