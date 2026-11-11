@@ -46,12 +46,12 @@ const DESC = {
 };
 // How the kinds group in the picker (anything not listed lands in Quizzes)
 const GROUPS = [
-  ['A short daily set', ['today']],
+  ['Timed', ['rapid']],
   ['Driving practice', ['gridgame', 'gridclassic', 'frames']],
 ];
 // The modes that get a tile at the top of Practice (the rest are under "More")
 const TILE_LABEL = {
-  rapid: ['⚡ Rapid', '2 min'],
+  today: ['☀ Today', '2 min'],
   mix: ['∞ Mixed', 'endless'],
   gridmid: ['🚕 Drive', 'Midtown'],
 };
@@ -68,10 +68,10 @@ export function initPractice(ctx) {
   const R = ctx.region;
   L = ctx.theme.label;
   const CFG_KEY = R.id === 'nj' ? 'practice' : `practice.${R.id}`;
-  const cfg = { type: R.gridAngle ? 'gridmid' : 'rapid', area: R.wellKnown ? 'known' : 'all', ...store.get(CFG_KEY, {}) };
+  const cfg = { type: R.gridAngle ? 'gridmid' : 'today', area: R.wellKnown ? 'known' : 'all', ...store.get(CFG_KEY, {}) };
   const SC = R.gridAngle ? 0.12 : 1; // Manhattan distances are short
   const allowed = ['today', 'mix', 'rapid', ...(R.gridAngle ? ['gridmid', 'gridgame', 'gridclassic'] : []), 'frames', ...R.quizTypes, 'trip'];
-  if (cfg.type === 'dropin') cfg.type = 'rapid'; // (the county puzzle is gone)
+  if (cfg.type === 'dropin') cfg.type = 'today'; // (the county puzzle is gone)
   if (!allowed.includes(cfg.type)) cfg.type = 'mix';
   // the whole-island game isn't reliable yet: anyone on it moves to the classic once
   if (cfg.type === 'gridgame' && !store.get('classicBack', false)) {
@@ -826,7 +826,7 @@ export function initPractice(ctx) {
 
   /** The main modes as tiles (New York: Drive Midtown first), and a "More" button for everything else. */
   function typeBtn() {
-    const tiles = (R.gridAngle ? ['gridmid', 'rapid', 'mix'] : ['rapid', 'mix']).filter((k) => allowed.includes(k));
+    const tiles = (R.gridAngle ? ['gridmid', 'today', 'mix'] : ['today', 'mix']).filter((k) => allowed.includes(k));
     const other = !tiles.includes(cfg.type);
     return `<div class="ptiles">${tiles
       .map((k) => `<button class="ptile${cfg.type === k ? ' on' : ''}" data-type="${k}" aria-pressed="${cfg.type === k}"><b>${esc(TILE_LABEL[k][0])}</b><small>${esc(TILE_LABEL[k][1])}</small></button>`)
@@ -851,7 +851,7 @@ export function initPractice(ctx) {
     }
     const card = (k) =>
       `<button class="pcard${k === cfg.type ? ' on' : ''}" data-type="${k}"><span class="pt">${esc(TYPES[k])}</span>${DESC[k] ? `<span class="pd">${esc(DESC[k])}</span>` : ''}</button>`;
-    const used = new Set([...GROUPS.flatMap(([, ks]) => ks), 'rapid', 'mix', 'gridmid']);
+    const used = new Set([...GROUPS.flatMap(([, ks]) => ks), 'today', 'mix', 'gridmid']);
     const groups = GROUPS.map(([name, ks]) => [name, ks.filter((k) => allowed.includes(k))]);
     groups.push(['Quizzes', allowed.filter((k) => !used.has(k))]);
     const quizChip = (k) => `<button class="pchip${k === cfg.type ? ' on' : ''}" data-type="${k}">${esc(TYPES[k])}</button>`;
