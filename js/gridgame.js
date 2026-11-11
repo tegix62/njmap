@@ -661,7 +661,59 @@ export function initGridGame(ctx, areaId = 'downtown') {
   }
   const isCore = (n) => G.coreJ.has(n);
   /** Shortest legal route (moves the buttons can make, no U-turns) from edge e0, s metres along it, to node t. */
-  function shortest(e0, t, s = 0) {
+  // ---- the curb: every destination is one corner of an intersection (NE, SE, SW or NW on the grid) ----
+  // You finish by arriving with that corner on your right, as a driver would pull up to the curb.
+  // On a one-way street the left curb counts too (you can stop on either side there).
+  const QB = { NE: 45, SE: 135, SW: 225, NW: 315 }; // bearing of each corner, clockwise from uptown
+  const QNAME = { NE: 'northeast', SE: 'southeast', SW: 'southwest', NW: 'northwest' };
+  const angd = (a, b) => Math.abs(((a - b + 540) % 360) - 180);
+  /**
+   * 'right' / 'left' when edge e arrives along a street that borders corner `quad` (the corner is just
+   * behind the intersection, beside you, or just ahead of it); null when the street doesn't touch it.
+   */
+  function arrivalSide(e, quad) {
+    const qb = GRID + QB[quad];
+    if (angd(e.b1 + 180, qb) > 62 && angd(e.b1, qb) > 62) return null;
+    return ((qb - e.b1 + 540) % 360) - 180 > 0 ? 'right' : 'left';
+  }
+  const twoWay = (e) => G.out[e.to].some((o) => short(o.name) === short(e.name) && angd(o.b0, e.b1 + 180) < 30);
+  function arrivalOK(e, quad) {
+    if (!quad) return true;
+    const side = arrivalSide(e, quad);
+    return side === 'right' || (side === 'left' && !twoWay(e));
+  }
+  const atTarget = (e, node) => node === g.target.node && arrivalOK(e, g.target.quad);
+  // The corner each landmark really occupies, relative to the intersection the game sends you to
+  // (from the street map; places with no single corner, like neighborhoods and tunnels, aren't listed
+  // and get any corner you can pull up to).
+  const PLACE_QUAD = {
+    'union square': ['NE'], 'grand central': ['NE'], 'empire state building': ['NW'], 'madison square garden': ['SE'],
+    'port authority': ['NW', 'SW'], 'radio city': ['NW'], moma: ['SE'], 'carnegie hall': ['SE'], 'flatiron building': ['NW'],
+    'javits center': ['NW', 'SW'], "macy's": ['SW'], "bloomingdale's": ['NE'], 'washington square park': ['SW'], 'katz’s deli': ['NW'],
+  };
+  const placeKey = (name) => (name || '').replace(/ \(.*\)$/, '').replace(/^the /i, '').toLowerCase();
+  /** A corner of `node` you can pull up to: the landmark's own corner when known, else any from the right. */
+  function chooseQuad(node, name) {
+    const side = (q, e) => arrivalSide(e, q);
+    const right = Object.keys(QB).filter((q) => G.inn[node].some((e) => e.core && side(q, e) === 'right'));
+    const known = (PLACE_QUAD[placeKey(name)] || []).filter((q) => G.inn[node].some((e) => e.core && arrivalOK(e, q)));
+    if (known.length) return rand(known);
+    return right.length ? rand(right) : null;
+  }
+  /** The destination's pin, on its corner rather than the middle of the intersection. */
+  function targetPoint() {
+    const n = G.nodes[g.target.node], q = g.target.quad;
+    if (!q) return n;
+    const b = ((GRID + QB[q]) * Math.PI) / 180;
+    return [n[0] + (Math.sin(b) * 22) / 84400, n[1] + (Math.cos(b) * 22) / 111000];
+  }
+  const wrongSide = (e) => {
+    const t = g.target, side = arrivalSide(e, t.quad);
+    const where = `the ${QNAME[t.quad]} corner`;
+    return side === 'left' ? `🏁 ${where} is on your left here. Go around and come in with it on your right.` : `🏁 Not this way in. Arrive with ${where} on your right: go around the block.`;
+  };
+  function shortest(e0, t, s = 0, quad) {
+    const qd = quad !== undefined ? quad : g && g.target && g.target.node === t ? g.target.quad : null;
     const c0 = e0.len - s;
     const dist = new Map([[e0.id, c0]]);
     const prev = new Map();
@@ -670,7 +722,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     while (heap.size) {
       const { e, c } = heap.pop();
       if (c > dist.get(e.id)) continue;
-      if (e.to === t) {
+      if (e.to === t && arrivalOK(e, qd)) {
         const path = [e];
         let k = e.id;
         while (prev.has(k)) {
@@ -739,13 +791,15 @@ export function initGridGame(ctx, areaId = 'downtown') {
   function roundFrom(rt) {
     const e0 = G.edges[rt.e0];
     if (!e0 || !G.nodes[rt.target.node]) return null;
-    const best = shortest(e0, rt.target.node, rt.s0 || 0);
+    const quad = rt.target.quad || chooseQuad(rt.target.node, rt.target.name);
+    if (!quad) return null;
+    const best = shortest(e0, rt.target.node, rt.s0 || 0, quad);
     if (!best) return null;
     const entry = rt.entry != null ? G.entries.find((en) => en.link === rt.entry && en.from === rt.entryFrom) || null : null;
-    return { e0, s0: rt.s0 || 0, target: { ...rt.target, label: G.label(rt.target.node) }, best, entry };
+    return { e0, s0: rt.s0 || 0, target: { ...rt.target, quad, label: G.label(rt.target.node) }, best, entry };
   }
-  const routeOf = (r) => ({ e0: r.e0.id, s0: r.s0, target: { name: r.target.name, node: r.target.node }, entry: r.entry ? r.entry.link : null, entryFrom: r.entry ? r.entry.from : null });
-  const routeKey = (rt) => `${rt.e0}:${Math.round(rt.s0 || 0)}>${rt.target.node}`;
+  const routeOf = (r) => ({ e0: r.e0.id, s0: r.s0, target: { name: r.target.name, node: r.target.node, quad: r.target.quad }, entry: r.entry ? r.entry.link : null, entryFrom: r.entry ? r.entry.from : null });
+  const routeKey = (rt) => `${rt.e0}:${Math.round(rt.s0 || 0)}>${rt.target.node}${rt.target.quad || ''}`;
   function pickRound(forced) {
     if (forced) return roundFrom(forced);
     // now and then, a trip you saved, or back to a corner you got wrong
@@ -773,10 +827,12 @@ export function initGridGame(ctx, areaId = 'downtown') {
     for (let tries = 0; tries < 200; tries++) {
       const target = places.length && Math.random() < 0.7 ? { ...rand(places) } : { name: null, node: rand(coreNodes) };
       target.label = G.label(target.node);
+      target.quad = chooseQuad(target.node, target.name);
+      if (!target.quad) continue;
       const dm = metres(G.nodes[e0.from], G.nodes[target.node]);
       if (dm < 400 || dm > 2800) continue;
       if (straightTo(e0, target.node)) continue;
-      const best = shortest(e0, target.node, s0);
+      const best = shortest(e0, target.node, s0, target.quad);
       if (!best || best.path.length < 4) continue;
       return { e0, s0, target, best, entry };
     }
@@ -791,6 +847,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     for (let tries = 0; tries < 300; tries++) {
       const target = places.length && Math.random() < 0.7 ? { ...rand(places) } : { name: null, node: rand(coreNodes) };
       target.label = G.label(target.node);
+      target.quad = chooseQuad(target.node, target.name);
+      if (!target.quad) continue;
       let e0, s0 = 0, entry = null;
       if (useEntry) {
         entry = rand(entries);
@@ -804,7 +862,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       const dm = metres(G.nodes[e0.from], G.nodes[target.node]);
       if (dm < 400 || dm > (entry ? 4000 : 2800)) continue;
       if (straightTo(e0, target.node)) continue; // already on the right road
-      const best = shortest(e0, target.node, s0);
+      const best = shortest(e0, target.node, s0, target.quad);
       if (!best || best.path.length < 4) continue;
       return { e0, s0, target, best, entry };
     }
@@ -940,7 +998,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     let m = 0;
     for (const { node, via } of aheadChain(e, 120, 8000)) {
       if (via !== e) m += via.len;
-      if (node === g.target.node) {
+      if (atTarget(via, node)) {
         const r = shortest(e, g.target.node, 0);
         return !!r && e.len + m <= r.cost + 1;
       }
@@ -1011,7 +1069,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const cs = cornersAhead(8);
     if (cs.length < 2 || g.check) return '';
     return `<div class="ggchips"><span class="lbl">Go to</span>${cs
-      .map((c, i) => `<button class="ggchip${c.node === g.goTo ? ' on' : ''}" data-node="${c.node}">${c.node === g.target.node ? '🏁 ' : ''}${esc(prefs.labels ? short(c.name) : `+${i + 1}`)}</button>`)
+      .map((c, i) => `<button class="ggchip${c.node === g.goTo ? ' on' : ''}" data-node="${c.node}">${atTarget(c.via, c.node) ? '🏁 ' : ''}${esc(prefs.labels ? short(c.name) : `+${i + 1}`)}</button>`)
       .join('')}</div>`;
   }
   /** Hard mode check-in: "What street are you on?" */
@@ -1037,6 +1095,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     return null;
   }
   /** The briefing: where you're going. */
+  const cornerTag = (t) => (t.quad ? ` <span class="muted">· ${t.quad} corner</span>` : '');
   function briefTo() {
     const t = g.target;
     const why =
@@ -1047,7 +1106,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
           : g.kind === 'replay'
             ? '<br><span class="muted">↻ Same route</span>'
             : '';
-    return `${placeText(t.name, t.label)}${why}`;
+    return `${placeText(t.name, t.label)}${cornerTag(t)}${why}`;
   }
 
   // ---- check-ins: "You're heading downtown. Which side is the Hudson?" ----------------------
@@ -1226,7 +1285,10 @@ export function initGridGame(ctx, areaId = 'downtown') {
     noteHood(e.pts[e.pts.length - 1], true); // (a fast ride can cross a small one between frames)
     setData('gg-trail', line(g.trail));
     if (g.msg && performance.now() - g.msgAt > 3500) g.msg = '';
-    if (n === g.target.node) return finish();
+    if (n === g.target.node) {
+      if (atTarget(e, n)) return finish();
+      say(wrongSide(e)); // the right corner, the wrong way in: carry on round the block
+    }
     const c = choices(e);
     if (g.goTo === n) {
       if (!c.decision && c.only) {
@@ -1526,7 +1588,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     g.resumeAt = 0;
     g.goAt = performance.now();
     const tp = G.nodes[g.target.node];
-    setData('gg-target', point(tp, { name: g.target.name || g.target.label }));
+    setData('gg-target', point(targetPoint(), { name: g.target.name || g.target.label }));
     if (prefs.mapFirst && ctx.dur(1)) {
       g.view = 'intro';
       ctx.fit([g.pos || g.trail[0], tp], 15, { bearing: GRID, duration: 700 });
@@ -1738,9 +1800,9 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const out = [];
     for (const { node, via } of aheadChain(cur, 70, 7000)) {
       const c = choices(via);
-      const eventful = c.decision || (c.only && Math.abs(turnOf(via, c.only)) > 50) || node === g.target.node;
+      const eventful = c.decision || (c.only && Math.abs(turnOf(via, c.only)) > 50) || atTarget(via, node);
       if (G.real(node) && eventful) out.push({ node, via, name: crossAt(via) || G.label(node) });
-      if (node === g.target.node || out.length >= max) break;
+      if (atTarget(via, node) || out.length >= max) break;
     }
     return out;
   }
@@ -1823,8 +1885,9 @@ export function initGridGame(ctx, areaId = 'downtown') {
     p.cur = chain[k].via;
     p.pos = p.cur.pts[p.cur.pts.length - 1];
     p.curS = p.cur.len;
-    p.phase = node === g.target.node ? 'done' : 'turn';
+    p.phase = atTarget(p.cur, node) ? 'done' : 'turn';
     g.msg = '';
+    if (node === g.target.node && p.phase === 'turn') say(wrongSide(p.cur));
     logEv('plan', 'corner', node);
     drawPlan();
     render();
@@ -1901,7 +1964,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       const cs = planChips();
       const lab = (c) => (prefs.labels ? short(c.name) : `+${c.idx + 1}`);
       return ctl(`<div class="bq">${p.route.length === 1 ? 'Where do you turn?' : 'Next, where do you turn?'}</div>
-        <div class="ggchips plan">${cs.map((c, i) => `<button class="ggchip" data-node="${c.node}">${c.node === g.target.node ? '🏁 ' : ''}${esc(lab(c))}</button>`).join('') || '<span class="muted">No turns ahead on this road.</span>'}</div>`);
+        <div class="ggchips plan">${cs.map((c, i) => `<button class="ggchip" data-node="${c.node}">${atTarget(c.via, c.node) ? '🏁 ' : ''}${esc(lab(c))}</button>`).join('') || '<span class="muted">No turns ahead on this road.</span>'}</div>`);
     }
     const c = choices(p.cur);
     const at = prefs.labels ? G.label(p.cur.to) : 'this corner';
@@ -1965,7 +2028,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const out = [];
     for (const { node, via } of chain) {
       // only corners where you could turn (some meet only one-way streets coming in)
-      if (!G.real(node) || (!choices(via).decision && node !== g.target.node)) continue;
+      if (!G.real(node) || (!choices(via).decision && !atTarget(via, node))) continue;
       out.push({ node, via, name: crossAt(via) || G.label(node) });
       if (out.length >= max) break;
     }
@@ -2256,7 +2319,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       return;
     }
     const t = g.target;
-    const tgt = placeText(t.name, t.label);
+    const tgt = placeText(t.name, t.label) + cornerTag(t);
     const nx = !g.done && g.e.core ? nextCross(g.e) : null;
     const hb = g.bnow ?? g.e.b0;
     void nx;
@@ -2487,7 +2550,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     // for tests
     _state: () => g,
     _graph: () => G,
-    _model: { choices, moves, shortest, straightTo, aheadChain, load, rule, describe },
+    _plan: { planCorner: (n) => planCorner(n), render: () => render() },
+    _model: { choices, moves, shortest, straightTo, aheadChain, load, rule, describe, atTarget, arrivalSide, arrivalOK, chooseQuad, twoWay },
     _speed: () => (g && !g.loading && g.e ? speedNow() : 0),
     _mem: () => mem,
     _countWords: (a, b) => countWords(a, b),
