@@ -3160,3 +3160,9 @@ body[data-mode='explore'][data-region='manhattan'] .fab3d { display: grid; }
 
 /* plan: "All ▸" shows every corner on the road ahead, not just the sample */
 .ggchips.plan .ggchipmore { flex: none; border: 1px dashed currentColor; background: transparent; color: inherit; opacity: 0.75; border-radius: 999px; padding: 6px 12px; font: inherit; cursor: pointer; }
+
+/* entering another area (3D): a small tag in that area's color */
+#ggZone { position: fixed; left: 50%; top: calc(var(--safe-t, 0px) + 112px); transform: translate(-50%, -6px); z-index: 6; padding: 6px 14px; border-radius: 999px; background: rgba(16, 24, 40, 0.86); color: #fff; font-weight: 700; font-size: 14px; letter-spacing: 0.02em; border: 2px solid var(--zc, #ffd27a); box-shadow: 0 0 18px var(--zc, #ffd27a); opacity: 0; pointer-events: none; }
+#ggZone.show { animation: ggzone 2.2s ease-out forwards; }
+@keyframes ggzone { 0% { opacity: 0; transform: translate(-50%, -10px) scale(0.9); } 12% { opacity: 1; transform: translate(-50%, 0) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { #ggZone.show { animation-duration: 0.01s; } }

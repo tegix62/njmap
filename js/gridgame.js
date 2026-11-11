@@ -415,6 +415,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     }
     if (map.getSource('gg-trail')) return;
     map.setGlobalStateProperty('sq', 0);
+    for (let k = 0; k < 3; k++) map.setGlobalStateProperty('r' + k, 1);
     map.addSource('gg-bldg', { type: 'geojson', data: EMPTY });
     map.addSource('gg-streets', { type: 'geojson', data: streetsFC || EMPTY });
     const roadCol = map.getLayer('road-mid') && map.getPaintProperty('road-mid', 'line-color');
@@ -447,6 +448,40 @@ export function initGridGame(ctx, areaId = 'downtown') {
       },
       'gg-streets'
     );
+    // The other areas stand about as ghosts: tinted by area, low and faint until the car nears them, which raises them (see
+    // updateRise); the famous towers stay solid in them as beacons. Opacity is per layer, so one layer per area.
+    for (let k = 0; k < 3; k++) {
+      map.addLayer(
+        {
+          id: 'gg-ghost' + k, type: 'fill-extrusion', source: 'gg-bldg', minzoom: 13.5, layout: { visibility: 'none' },
+          filter: ['all', ['==', ['get', 'z'], k], ['!', ['has', 'c']], ['>=', ['get', 'h'], 15]],
+          paint: {
+            'fill-extrusion-color': ZONE_COLORS[k],
+            'fill-extrusion-height': ['*', squash(['get', 'h']), ['+', 0.2, ['*', 0.8, ['global-state', 'r' + k]]]],
+            'fill-extrusion-base': 0,
+            'fill-extrusion-opacity': ['+', 0.16, ['*', 0.42, ['global-state', 'r' + k]]],
+            'fill-extrusion-vertical-gradient': false,
+          },
+        },
+        'gg-streets'
+      );
+    }
+    map.addLayer(
+      {
+        id: 'gg-beacon', type: 'fill-extrusion', source: 'gg-bldg', minzoom: 13, layout: { visibility: 'none' },
+        filter: ['all', ['has', 'c'], ['!=', ['get', 'z'], -1]],
+        paint: {
+          'fill-extrusion-color': ['get', 'c'],
+          'fill-extrusion-height': squash(['get', 'h']),
+          'fill-extrusion-base': squash(['coalesce', ['get', 'b'], 0]),
+          'fill-extrusion-opacity': 0.8,
+        },
+      },
+      'gg-streets'
+    );
+    map.addSource('gg-zline', { type: 'geojson', data: EMPTY });
+    map.addLayer({ id: 'gg-zline-glow', type: 'line', source: 'gg-zline', layout: { visibility: 'none' }, paint: { 'line-color': '#ffd27a', 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 6, 16, 18], 'line-blur': 8, 'line-opacity': 0.28 } }, 'gg-streets');
+    map.addLayer({ id: 'gg-zline', type: 'line', source: 'gg-zline', layout: { visibility: 'none' }, paint: { 'line-color': '#ffd27a', 'line-width': 1.6, 'line-dasharray': [3, 2], 'line-opacity': 0.8 } });
     map.addSource('gg-trail', { type: 'geojson', data: EMPTY });
     map.addSource('gg-best', { type: 'geojson', data: EMPTY });
     map.addSource('gg-arrows', { type: 'geojson', data: arrowsFC || EMPTY });
@@ -652,6 +687,9 @@ export function initGridGame(ctx, areaId = 'downtown') {
   const OV_BTN = () => `<button id="ggOv" class="${g.view === 'overview' ? 'on' : ''}" aria-pressed="${g.view === 'overview'}" aria-label="Where am I?"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="6.2" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>`;
   // ---- 3D: the camera tilts to a driver's angle and the buildings stand up (Midtown and Uptown; heights from NYC's building footprints) ----
   const TILT_DEG = 55;
+  const ZONE_COLORS = ['#6fb7b0', '#d9a441', '#9a86d6']; // downtown teal, midtown amber, uptown violet
+  const ZONE_NAMES = ['Downtown', 'Midtown', 'Uptown'];
+  const OWN_ZONE = { downtown: 0, midtown: 1, uptown: 2 }[areaId];
   const SQUASH_FROM = 60, SQUASH_TO = 0.4;
   const squash = (e) => ['case', ['<=', e, SQUASH_FROM], e, ['+', SQUASH_FROM, ['*', ['-', e, SQUASH_FROM], ['-', 1, ['*', 1 - SQUASH_TO, ['global-state', 'sq']]]]]];
   let lastSq = -1;
@@ -662,38 +700,103 @@ export function initGridGame(ctx, areaId = 'downtown') {
     lastSq = v;
     map.setGlobalStateProperty('sq', v);
   }
-  const tiltOn = () => !!prefs.tilt && (areaId === 'midtown' || areaId === 'uptown');
+  const tiltOn = () => !!prefs.tilt;
   /** The camera's tilt now: tilted only in the close-up follow view (the wide "where am I" view and the end screens stay flat). */
   const camPitch = () => (tiltOn() && g && !g.done && (g.view === 'follow' || g.view === 'peek') ? TILT_DEG : 0);
   const driveZoom = () => (ZOOM + (camPitch() ? 0.5 : 0));
-  const TILT_BTN = () => (areaId === 'midtown' || areaId === 'uptown' ? `<button id="ggTilt" class="${tiltOn() ? 'on' : ''}" aria-pressed="${tiltOn()}" aria-label="3D view"><b>3D</b></button>` : '');
+  const TILT_BTN = () => (true ? `<button id="ggTilt" class="${tiltOn() ? 'on' : ''}" aria-pressed="${tiltOn()}" aria-label="3D view"><b>3D</b></button>` : '');
   /**
    * The famous towers get their own stepped shapes (stacked, scaled copies of the building's own outline). A tier is
    * { h: top as a fraction of the roof height, s: scale (or [sx, sy]), c: [x, y] where its centre sits in the outline's
    * box (default the middle), b: base as a fraction (default the tier below), color }. `mast` is a thin spire on top, in metres.
    * Stylized from what the buildings look like, not surveyed.
    */
-  // The building files this game stands up: Midtown's own, and for Uptown the Midtown one too (the Uptown file leaves out
-  // that box). The map layer is shared by the games, so it remembers which game's buildings it holds.
-  const BLDG_FILES = areaId === 'uptown' ? ['midtown', 'uptown'] : ['midtown'];
+  // All three areas' buildings, tagged with the area they stand in (z: 0 downtown, 1 midtown, 2 uptown, by where the
+  // building is along the grid). The map source is shared by the games; each game then shows its own area solid and
+  // the other two as ghosts (applyTilt sets the filters).
+  const BLDG_FILES = ['downtown', 'midtown', 'uptown'];
+  const zoneOfY = (y) => (y < G.areas['14'] ? 0 : y < G.areas['59'] ? 1 : 2);
   let bldgBusy = false;
   async function loadBuildings() {
-    if (bldgBusy || map.__ggBldgArea === areaId || (areaId !== 'midtown' && areaId !== 'uptown')) return;
+    if (bldgBusy || map.__ggBldgReady || !G) return;
     bldgBusy = true;
     try {
+      const files = await Promise.all(BLDG_FILES.map((f) => fetch(`data/buildings-${f}.json`).then((r) => r.json())));
       const feats = [];
-      for (const f of BLDG_FILES) feats.push(...buildingFeatures(await fetch(`data/buildings-${f}.json`).then((r) => r.json())));
+      for (const d of files) for (const f of buildingFeatures(d)) {
+        f.properties.z = zoneOfY(gridXY(f.geometry.coordinates[0][0])[1]);
+        feats.push(f);
+      }
       setData('gg-bldg', { type: 'FeatureCollection', features: feats });
-      map.__ggBldgArea = areaId;
+      map.__ggBldgReady = true;
     } catch {
       /* try again next time */
     }
     bldgBusy = false;
   }
+  /** A point on the grid's line `y` (metres) at `x`, back as lon/lat. */
+  function fromGrid(x, y) {
+    const a = rad(GRID);
+    const ex = x * Math.cos(a) + y * Math.sin(a), ny = -x * Math.sin(a) + y * Math.cos(a);
+    return [ex / (111320 * Math.cos(rad(40.78))) - 73.97, ny / 110540 + 40.78];
+  }
+  /** The edge lines of this game's own part, drawn on the ground as a faint glow. */
+  function zoneLines() {
+    const A = G.areas, ys = areaId === 'downtown' ? [A['14']] : areaId === 'midtown' ? [A['14'], A['59']] : [A['59']];
+    return { type: 'FeatureCollection', features: ys.map((y) => ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [-6000, -3000, 0, 3000, 6000].map((x) => fromGrid(x, y)) } })) };
+  }
+  let lastRise = '', lastZone = -1, zoneTagTimer = 0;
+  const RISE_FROM = 700; // metres: a neighbouring area starts to stand up when the car is this near it
+  /**
+   * The neighbours rise as the car nears them (heights ease from low to full over the last 700 m), and a small tag
+   * announces crossing into another area.
+   */
+  function updateRise(p) {
+    if (!G || !p || !tiltOn()) return;
+    const y = gridXY(p)[1], A = G.areas;
+    const lo = [-1e9, A['14'], A['59']], hi = [A['14'], A['59'], 1e9];
+    const r = [0, 1, 2].map((k) => {
+      if (k === OWN_ZONE) return 1;
+      const d = Math.max(0, lo[k] - y, y - hi[k]);
+      return Math.round(Math.max(0, Math.min(1, 1 - d / RISE_FROM)) * 20) / 20;
+    });
+    const key = r.join();
+    if (key !== lastRise) {
+      lastRise = key;
+      r.forEach((v, k) => map.setGlobalStateProperty('r' + k, v));
+    }
+    const z = zoneOfY(y);
+    if (z !== lastZone) {
+      if (lastZone !== -1 && g && !g.startCard) showZoneTag(z);
+      lastZone = z;
+    }
+  }
+  function showZoneTag(z) {
+    let el = document.getElementById('ggZone');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'ggZone';
+      document.body.appendChild(el);
+    }
+    el.textContent = z === OWN_ZONE ? `Back in ${ZONE_NAMES[z]}` : `Entering ${ZONE_NAMES[z]}`;
+    el.style.setProperty('--zc', ZONE_COLORS[z]);
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    clearTimeout(zoneTagTimer);
+    zoneTagTimer = setTimeout(() => el.classList.remove('show'), 2200);
+  }
   function applyTilt() {
     if (!map.getLayer('gg-bldg')) return;
     syncSquash();
-    map.setLayoutProperty('gg-bldg', 'visibility', tiltOn() && g && !g.done ? 'visible' : 'none');
+    const vis = tiltOn() && g && !g.done ? 'visible' : 'none';
+    map.setLayoutProperty('gg-bldg', 'visibility', vis);
+    map.setFilter('gg-bldg', ['==', ['get', 'z'], OWN_ZONE]);
+    for (let k = 0; k < 3; k++) map.setLayoutProperty('gg-ghost' + k, 'visibility', k === OWN_ZONE ? 'none' : vis);
+    map.setFilter('gg-beacon', ['all', ['has', 'c'], ['!=', ['get', 'z'], OWN_ZONE]]);
+    map.setLayoutProperty('gg-beacon', 'visibility', vis);
+    if (G) setData('gg-zline', zoneLines());
+    for (const id of ['gg-zline', 'gg-zline-glow']) map.setLayoutProperty(id, 'visibility', vis);
     if (tiltOn()) loadBuildings();
   }
   function toggleTilt() {
@@ -2063,6 +2166,10 @@ export function initGridGame(ctx, areaId = 'downtown') {
       noteHood(p, false, planning() ? null : b);
       noteLandmarks(p, b, now);
       updateRuler(p);
+    }
+    if (tiltOn() && now - (g.riseAt || 0) > 90) {
+      g.riseAt = now;
+      updateRise(p);
     }
     const hc = `${gridDir(b)}${onGrid(g.e.name, b) ? '' : compassWord(b)}${choices(g.e).named ? 'n' : ''}`;
     if (hc !== g.lastHC) {
