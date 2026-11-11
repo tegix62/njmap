@@ -680,6 +680,21 @@ export function initGridGame(ctx, areaId = 'downtown') {
       if (lmTag.contains(el)) return g && g.peek === el.dataset.lm ? openLmCard(el.dataset.lm) : startPeek(el.dataset.lm); // first tap: where it was; second: its photo
       if (el.dataset.gg === areaId) return openLmCard(el.dataset.lm);
     }
+    const pk = ev.target.closest && ev.target.closest('[data-lmpeek]');
+    if (pk && lmCard.contains(pk)) {
+      const name = pk.dataset.lmpeek;
+      const o = lmOver.find((x) => x.l.n === name);
+      lmCard.hidden = true; // close the list and slide to the one picked (the drive stays paused while you look)
+      if (g && lmCardPaused !== null) g.paused = lmCardPaused;
+      lmCardPaused = null;
+      if (o) {
+        lmOver.splice(lmOver.indexOf(o), 1);
+        syncMore();
+        addLmItem(o.l, o.side, o.l.p, true);
+      }
+      return startPeek(name);
+    }
+    if (ev.target.closest && ev.target.closest('.gg-lmmore') === lmMore && !lmMore.hidden) return openLmList();
     if (!lmCard.hidden && lmCard.contains(ev.target) && !ev.target.closest('a')) closeLmCard(); // a tap anywhere on the card (or round it) closes it; the photo-credit link still opens
   });
   // "By the way": famous places within a block of you, as small chips in a stack at a quiet edge spot (a few at once when you
@@ -689,63 +704,79 @@ export function initGridGame(ctx, areaId = 'downtown') {
   lmTag.className = 'gg-lmtag';
   lmTag.hidden = true;
   document.body.appendChild(lmTag);
-  const lmItems = []; // { l, el, timer }
-  const LM_MAX = 3;
-  const LM_SHOW_MS = 6500;
+  const lmItems = []; // the chips on screen: { l, el, timer }
+  const lmOver = []; // landmarks that came up while two chips were already showing: { l, side }
+  const LM_MAX = 2;
+  const LM_SHOW_MS = 4200;
+  const lmMore = document.createElement('div'); // "+3 more": tap for the list
+  lmMore.className = 'gg-lmmore';
+  lmMore.hidden = true;
+  lmTag.appendChild(lmMore);
+  let lmMoreTimer = 0;
+  let lmSpot = null; // where the stack rests: { x, y }
   /**
-   * Where the stack goes: one of a few resting spots round the edges of the free map area (never the middle),
-   * whichever is least busy right now (few streets and dots, clear of the car and the destination), leaning
-   * to the side the landmark is on. Chosen when the stack appears, so it just fades in and stays put.
+   * Where the stack goes: one of a few resting spots near the top of the free map area (under the top card and the
+   * neighborhood tag, never the middle and never near the bottom panel), whichever is least busy right now (few streets
+   * and dots, clear of the car and the destination), leaning to the side the landmark is on. Chosen when the stack
+   * appears; it just fades in and stays put (nudged only if the panel below grows into it).
    */
-  function placeLmTag(lp) {
+  function freeBand() {
     const pad = ctx.padding();
+    return { T: pad.top + 30, B: window.innerHeight - pad.bottom - 6, R: Math.max(12, pad.right - 8) };
+  }
+  function placeLmTag(lp) {
     const cr = map.getContainer().getBoundingClientRect();
-    const W = window.innerWidth, w = 200, h = 50 * LM_MAX;
-    const L = 12, R = Math.max(12, pad.right - 8), T = pad.top + 6, B = window.innerHeight - pad.bottom - 6;
-    const midY = T + (B - T - h) * 0.42;
-    const spots = [
-      { x: L, y: T, top: true }, { x: W - R - w, y: T, top: true },
-      { x: L, y: midY, top: true }, { x: W - R - w, y: midY, top: true },
-      { x: L, y: B - h, top: false }, { x: W - R - w, y: B - h, top: false },
-    ].filter((s) => s.y >= T - 1 && s.y + h <= B + 1);
+    const { T, B, R } = freeBand();
+    const W = window.innerWidth, w = 190, h = 100;
+    const spots = [{ x: 12, y: T }, { x: W - R - w, y: T }, { x: 12, y: T + 110 }, { x: W - R - w, y: T + 110 }].filter((q) => q.y + h <= B);
     const avoid = [carEl].filter(Boolean).map((el) => el.getBoundingClientRect());
     const tp = map.project(lp);
     const layers = ['gg-streets', 'gg-poi-dot', 'gg-trail', 'gg-best', 'gg-target', 'gg-goto'].filter((id) => map.getLayer(id));
     let best = null;
-    for (const s of spots) {
-      const box = [[s.x - cr.left, s.y - cr.top], [s.x + w - cr.left, s.y + h - cr.top]];
+    for (const q of spots) {
+      const box = [[q.x - cr.left, q.y - cr.top], [q.x + w - cr.left, q.y + h - cr.top]];
       let sc = layers.length ? map.queryRenderedFeatures(box, { layers }).length : 0;
       if (map.getLayer('gg-target')) sc += 100 * map.queryRenderedFeatures(box, { layers: ['gg-target'] }).length; // the destination dot stays clear
-      for (const a of avoid) if (a.right > s.x - 10 && a.left < s.x + w + 10 && a.bottom > s.y - 10 && a.top < s.y + h + 10) sc += 200;
-      const dx = tp.x + cr.left - (s.x + w / 2);
-      sc += Math.hypot(dx, tp.y + cr.top - (s.y + h / 2)) / 90; // near its landmark, a little
-      if (!best || sc < best.sc) best = { s, sc };
+      for (const a of avoid) if (a.right > q.x - 10 && a.left < q.x + w + 10 && a.bottom > q.y - 10 && a.top < q.y + h + 10) sc += 200;
+      sc += Math.hypot(tp.x + cr.left - (q.x + w / 2), tp.y + cr.top - (q.y + h / 2)) / 90; // near its landmark, a little
+      if (!best || sc < best.sc) best = { q, sc };
     }
-    const s = best ? best.s : { x: L, y: T, top: true };
-    // the stack grows away from the edge it's anchored to (down from a top spot, up from a bottom one)
-    lmTag.style.left = `${Math.round(s.x)}px`;
-    lmTag.style.right = 'auto';
-    lmTag.style.flexDirection = s.top ? 'column' : 'column-reverse';
-    if (s.top) {
-      lmTag.style.top = `${Math.round(s.y)}px`;
-      lmTag.style.bottom = 'auto';
-    } else {
-      lmTag.style.bottom = `${Math.round(window.innerHeight - (s.y + h))}px`;
-      lmTag.style.top = 'auto';
-    }
+    lmSpot = best ? { x: best.q.x, y: best.q.y } : { x: 12, y: T };
+    layoutLmTag();
+  }
+  /** Keep the stack inside the free band (the panel below changes height as you drive); with no room, it waits. */
+  function layoutLmTag() {
+    if (!lmSpot) return;
+    const { T, B } = freeBand();
+    const h = lmTag.offsetHeight;
+    const y = Math.max(T, Math.min(lmSpot.y, B - h));
+    lmTag.style.left = `${Math.round(lmSpot.x)}px`;
+    lmTag.style.top = `${Math.round(y)}px`;
+    lmTag.style.visibility = B - T < h ? 'hidden' : 'visible';
+    updateLead();
+  }
+  function syncMore() {
+    clearTimeout(lmMoreTimer);
+    lmMore.hidden = !lmOver.length;
+    lmMore.textContent = `+${lmOver.length} more`;
+    if (lmOver.length) lmMoreTimer = setTimeout(() => { lmOver.length = 0; syncMore(); updateTagVisible(); }, LM_SHOW_MS + 2500);
+  }
+  function updateTagVisible() {
+    lmTag.hidden = !lmItems.length && !lmOver.length;
+    layoutLmTag();
   }
   function dropLmItem(it) {
     clearTimeout(it.timer);
     it.el.remove();
     const i = lmItems.indexOf(it);
     if (i >= 0) lmItems.splice(i, 1);
-    if (!lmItems.length) lmTag.hidden = true;
-    updateLead();
+    updateTagVisible();
   }
   function hideLmTag() {
     for (const it of [...lmItems]) dropLmItem(it);
-    lmTag.hidden = true;
-    updateLead();
+    lmOver.length = 0;
+    syncMore();
+    updateTagVisible();
   }
   /** The passed landmarks as dots on the map (and, on the end screen, the ones by the destination too). */
   function syncLmSeen() {
@@ -765,7 +796,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   lmLead.style.display = 'none';
   document.body.appendChild(lmLead);
   function updateLead() {
-    if (!lmItems.length || lmTag.hidden) {
+    if (!lmItems.length || lmTag.hidden || lmTag.style.visibility === 'hidden') {
       lmLead.style.display = 'none';
       return;
     }
@@ -789,22 +820,43 @@ export function initGridGame(ctx, areaId = 'downtown') {
     lmLead.style.display = 'block';
   }
   map.on('move', updateLead);
-  function addLmItem(l, side, p) {
+  function addLmItem(l, side, p, force) {
     if (lmItems.some((it) => it.l.n === l.n)) return;
-    while (lmItems.length >= LM_MAX) dropLmItem(lmItems[0]);
+    if (lmItems.length >= LM_MAX) {
+      if (!force) {
+        // two are already up: this one waits behind a "+N more" chip (the dots on the map still show it)
+        if (!lmOver.some((o) => o.l.n === l.n)) lmOver.push({ l, side });
+        syncMore();
+        updateTagVisible();
+        return;
+      }
+      dropLmItem(lmItems[0]);
+    }
     const pic = lmPic(l.n);
     const el = document.createElement('div');
     el.className = `gg-lmitem${pic ? '' : ' nopic'}`;
     el.dataset.lm = l.n;
     el.innerHTML = `${pic ? `<i>${pic}</i>` : ''}<div><b>${esc(l.n)}</b><span>${side}</span></div>`; // a picture and a name, nothing to read: the note is on the card
-    const fresh = !lmItems.length;
-    lmTag.appendChild(el);
+    const fresh = !lmItems.length && !lmOver.length;
+    lmTag.insertBefore(el, lmMore);
     lmTag.hidden = false;
-    if (fresh) placeLmTag(l.p);
     const it = { l, el, timer: 0 };
     lmItems.push(it);
+    if (fresh || !lmSpot) placeLmTag(l.p);
+    else layoutLmTag();
     if (!(g && g.peek)) it.timer = setTimeout(() => dropLmItem(it), LM_SHOW_MS);
-    updateLead();
+  }
+  // "+N more": a short list of the landmarks that came up in a cluster; tap one to see where it was
+  function openLmList() {
+    if (!lmOver.length) return;
+    const rows = [...lmItems.map((it) => ({ l: it.l })), ...lmOver].map((o) => `<button type="button" class="gg-lmrow" data-lmpeek="${esc(o.l.n)}">${lmPic(o.l.n) ? `<i>${lmPic(o.l.n)}</i>` : ''}<b>${esc(o.l.n)}</b></button>`).join('');
+    lmCard.innerHTML = `<div class="gg-lmcard-in"><b>Just passed</b>${rows}<button type="button" class="gg-lmcard-x">Back to the drive</button></div>`;
+    lmCard.hidden = false;
+    if (g && !g.done && lmCardPaused === null) {
+      lmCardPaused = g.paused;
+      g.paused = true;
+      render();
+    }
   }
   /** Name the close landmarks that are still ahead of you or beside you, and which side they're on. */
   function noteLandmarks(p, heading, now) {
@@ -1525,10 +1577,28 @@ export function initGridGame(ctx, areaId = 'downtown') {
     return best ? best.name.replace(/^the /, '').replace(/ \(.*\)$/, '') : null;
   }
   /** "Name · Street & Street", or just the streets when it has no name (or the streets already say it). */
-  function placeText(name, label) {
-    if (!name) return `<b>${esc(label)}</b>`;
+  /** The logged landmark a place is: by name, else the closest one within 75 m of the point. */
+  function lmHit(name, pt) {
+    let l = name ? lmFind(name) : null;
+    if (!l && pt) {
+      let d = 75;
+      for (const x of LM_ALL) {
+        const m = metres(pt, x.p);
+        if (m < d) {
+          d = m;
+          l = x;
+        }
+      }
+    }
+    return l;
+  }
+  /** A place in the top card or the start line. If it's a famous spot we have logged, tapping it opens the photo card (quietly: no button). */
+  function placeText(name, label, pt) {
+    const l = lmHit(name, pt);
+    const wrap = (h) => (l ? `<span class="lmsoft" data-lm="${esc(l.n)}" data-gg="${areaId}">${h}</span>` : h);
+    if (!name) return wrap(`<b>${esc(label)}</b>`);
     const bare = name.replace(/^the /i, '').toLowerCase();
-    return label.toLowerCase().includes(bare) ? `<b>${esc(label)}</b>` : `<b>${esc(name)}</b> <span class="muted">· ${esc(label)}</span>`;
+    return wrap(label.toLowerCase().includes(bare) ? `<b>${esc(label)}</b>` : `<b>${esc(name)}</b> <span class="muted">· ${esc(label)}</span>`);
   }
   /** Where you are: a famous spot if there is one, then the street you're on and the next one. */
   function briefYou() {
@@ -1536,7 +1606,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const nx = nextCross(g.e);
     const name = g.entry ? g.entry.from.replace(/^the /, '') : placeNear(p);
     const streets = nx ? `${short(g.e.name)} & ${nx}` : short(g.e.name);
-    return `${placeText(name, streets)} <span class="muted">· facing ${headWord(g.e.name, g.e.b0)}</span>`;
+    return `${placeText(name, streets, p)} <span class="muted">· facing ${headWord(g.e.name, g.e.b0)}</span>`;
   }
   /** Act on touch-down (and on a keyboard "click", which has no pointer). */
   function onTap(el, fn) {
@@ -1596,7 +1666,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
           : g.kind === 'replay'
             ? '<br><span class="muted">↻ Same route</span>'
             : '';
-    return `${placeText(t.name, t.label)}${cornerTag(t)}${why}`;
+    return `${placeText(t.name, t.label, targetPoint())}${cornerTag(t)}${why}`;
   }
 
   // ---- check-ins: "You're heading downtown. Which side is the Hudson?" ----------------------
@@ -2858,6 +2928,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   function render() {
     if (!g) return;
     requestAnimationFrame(placeHoodTag);
+    requestAnimationFrame(layoutLmTag);
     if (g.done && g.view === 'overview') g.view = 'follow';
     document.body.classList.toggle('gg-end', !!g.done);
     if (g.loading) {
@@ -2867,7 +2938,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       return;
     }
     const t = g.target;
-    const tgt = placeText(t.name, t.label) + cornerTag(t);
+    const tgt = placeText(t.name, t.label, targetPoint()) + cornerTag(t);
     const nx = !g.done && g.e.core ? nextCross(g.e) : null;
     const hb = g.bnow ?? g.e.b0;
     void nx;

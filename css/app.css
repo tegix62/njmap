@@ -2541,11 +2541,11 @@ body.ink .prow .typebtn {
   left: 12px;
   top: 0;
   z-index: 4;
-  width: 200px;
-  max-width: 58vw;
+  max-width: min(200px, 56vw);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 5px;
   pointer-events: none;
 }
 .gg-lmtag[hidden] {
@@ -2554,20 +2554,20 @@ body.ink .prow .typebtn {
 .gg-lmitem {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 12px 4px 4px;
-  border-radius: 14px;
+  gap: 7px;
+  max-width: 100%;
+  padding: 3px 10px 3px 3px;
+  border-radius: 12px;
   background: #3b2f1e;
   color: #fff;
   pointer-events: auto;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  animation: gg-lmin 0.25s ease-out;
-  transition: background 0.15s, outline-color 0.15s;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.3);
+  animation: gg-lmin 0.2s ease-out;
   outline: 2px solid transparent;
 }
 .gg-lmitem.nopic {
-  padding: 6px 12px;
+  padding: 5px 10px;
 }
 .gg-lmitem.on {
   background: #5a4630;
@@ -2575,9 +2575,9 @@ body.ink .prow .typebtn {
 }
 .gg-lmitem i {
   flex: none;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
   background: #fff;
   color: #3b2f1e;
   display: grid;
@@ -2585,8 +2585,8 @@ body.ink .prow .typebtn {
   overflow: hidden;
 }
 .gg-lmitem i svg {
-  width: 34px;
-  height: 34px;
+  width: 25px;
+  height: 25px;
 }
 .gg-lmitem i img {
   width: 100%;
@@ -2600,11 +2600,63 @@ body.ink .prow .typebtn {
   min-width: 0;
 }
 .gg-lmitem b {
-  font: 800 14px/1.15 system-ui, sans-serif;
+  font: 800 13px/1.15 system-ui, sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .gg-lmitem span {
-  font: 500 11.5px/1.25 system-ui, sans-serif;
+  font: 500 10.5px/1.2 system-ui, sans-serif;
   opacity: 0.8;
+}
+.gg-lmmore {
+  pointer-events: auto;
+  cursor: pointer;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: rgba(59, 47, 30, 0.88);
+  color: #fff;
+  font: 700 12px system-ui, sans-serif;
+}
+.gg-lmmore[hidden] {
+  display: none;
+}
+.gg-lmrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(59, 47, 30, 0.08);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.gg-lmrow i {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: #3b2f1e;
+}
+.gg-lmrow i svg {
+  width: 30px;
+  height: 30px;
+}
+.gg-lmrow i img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.lmsoft {
+  cursor: pointer;
+  text-decoration: underline dotted rgba(0, 0, 0, 0.3);
+  text-underline-offset: 3px;
 }
 .gg-lmring {
   width: 34px;
@@ -2772,4 +2824,54 @@ body.ink .prow .typebtn {
 }
 body.gg-end .gg-how {
   display: none;
+}
+
+/* the control panel keeps one size: choices are compact, with room for two rows whatever the corner offers */
+.ggctl,
+.ggctl.named {
+  min-height: 112px;
+  grid-auto-rows: minmax(52px, 1fr);
+  align-content: stretch;
+}
+.ggctl.named {
+  grid-template-columns: repeat(3, 1fr);
+}
+.ggpick {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 2px 6px;
+  min-height: 0;
+  padding: 4px 6px;
+  line-height: 1.1;
+}
+.ggpick .gg-arr {
+  width: 22px;
+  height: 22px;
+}
+.ggpick .gg-arr svg {
+  width: 13px;
+  height: 13px;
+}
+.ggpick .nm {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  min-width: 0;
+}
+.ggpick .nm small {
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.ggplan .gp-route {
+  min-height: 2.7em;
+  max-height: 2.7em;
+  overflow: hidden;
+}
+.ggplan {
+  min-height: 238px;
+  align-content: start;
 }
