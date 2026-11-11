@@ -10,7 +10,9 @@ no U-turns), find the shortest route for each, and count, per street, in how man
 that appears in many routes is one you'll actually be on; a street named after someone that serves four blocks is not.
 The keys are the street names as the game shows them (E 4th St and W 4th St are both "4th St").
 
-Usage: python3 -I tools/build_tiers.py data/downtown-streets.json [--report docs/street-tiers-downtown.md]
+Usage: python3 -I tools/build_tiers.py data/downtown-streets.json [--report docs/street-tiers-downtown.md] [--focus-below 14]
+--focus-below N: only trips that start and end below the grid line of N-th St are sampled (the map reaches past it so routes can
+wander out, but the tiers are about the streets you train on); routes may still use anything in the map.
 It rewrites the data file (adding/replacing the "tiers" key) and writes the report.
 """
 import collections, heapq, json, random, re, sys
@@ -54,10 +56,23 @@ def main():
     core = [i for i in range(len(links)) if i not in feeders and not RAMP.search(names[links[i][2]])]
     coreset = set(core)
     key = [short(names[l[2]]) for l in links]
+    if '--focus-below' in sys.argv:
+        import math
+        line = d['areas'][sys.argv[sys.argv.index('--focus-below') + 1]]
+        ox, oy = d['origin']
+        ang = math.radians(d['gridAngle'])
+        J = d['junctions']
+        def gy(j):
+            x, y = (ox + J[2 * j] / sc + 73.97) * 111320 * math.cos(math.radians(40.78)), (oy + J[2 * j + 1] / sc - 40.78) * 110540
+            return x * math.sin(ang) + y * math.cos(ang)
+        focus = [i for i in core if gy(links[i][0]) <= line]
+        print(f'{len(focus)} of {len(core)} street links are in the focus part')
+    else:
+        focus = core
     random.seed(7)
     uses = collections.Counter()
     trips = 0
-    for s in random.sample(core, min(SOURCES, len(core))):
+    for s in random.sample(focus, min(SOURCES, len(focus))):
         dist = {s: length[s]}
         prev = {}
         h = [(length[s], s)]
@@ -73,7 +88,7 @@ def main():
                     dist[v] = nc
                     prev[v] = u
                     heapq.heappush(h, (nc, v))
-        for t in random.sample(core, min(TARGETS, len(core))):
+        for t in random.sample(focus, min(TARGETS, len(focus))):
             if t == s or t not in dist or dist[t] < MIN_M:
                 continue
             trips += 1

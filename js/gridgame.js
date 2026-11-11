@@ -254,7 +254,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     G.streetLines = [...sy].map(([n, v]) => ({ n, y: med(v) })).sort((p, q) => p.y - q.y);
     // each block once (a two-way block's two links share a shape), for coverage
     G.shapeLen = new Map();
-    for (const e of edges) if (e.core) G.shapeLen.set(e.shape, e.len);
+    for (const e of edges) if (e.core && inFocus(gy[e.from])) G.shapeLen.set(e.shape, e.len); // (coverage counts the part you train on)
     G.totalLen = [...G.shapeLen.values()].reduce((a, b) => a + b, 0);
     buildArrows();
     return G;
@@ -1246,11 +1246,21 @@ export function initGridGame(ctx, areaId = 'downtown') {
     }
   }
 
+  /**
+   * The part of the map this game trains on. The map reaches a little past it (a soft edge: routes can wander into the
+   * next area), but starts, places and destinations are only picked inside it.
+   */
+  function inFocus(y) {
+    const A = G.areas;
+    if (areaId === 'downtown') return y <= A['14'] + 150;
+    if (areaId === 'uptown') return y >= A['59'] - 150 && y <= (A['125'] || A['110']) + 150;
+    return y >= A['14'] - 150 && y <= A['59'] + 150;
+  }
   // ---- picking a round -----------------------------------------------------------------------
   function inArea(n) {
     const a = prefs.area;
-    if (a === 'all') return true;
     const y = G.gy[n], A = G.areas;
+    if (a === 'all') return inFocus(y);
     if (a === 'downtown') return y < A['14'];
     if (a === 'midtown') return y >= A['14'] - 150 && y <= A['59'] + 150;
     if (a === 'uptown') return y >= A['59'] - 150 && y <= (A['125'] || A['110']) + 150;

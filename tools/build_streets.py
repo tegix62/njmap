@@ -591,7 +591,11 @@ if DOWNTOWN:
     NOT_STREET = re.compile(r'FDR|ROOSEVELT|TUNNEL|TUNL|UNDERPASS|\bBRG\b|BRIDGE (?!ST$)|BRIDGE$|\bEN\b|\bET\b|\bEX\b|ENTRANCE|EXIT|\bRP\b|RAMP|EXPWY|EXPY|\bEP\b')  # (the Park Ave Viaduct round Grand Central is an ordinary two-way street, level 17: it stays; the FDR's viaduct is caught by FDR)
     # the area's edge streets themselves are in (14th St for both; 59th St for Midtown)
     # (Midtown takes in 60th St: the Queensboro Bridge lets you out there)
-    Y_LO, Y_HI = ((-1e9, areas['14'] + 40) if AREA == 'downtown' else (areas['59'] - 250, areas['125'] + 110) if AREA == 'uptown' else (areas['14'] - 40, areas['59'] + 110))
+    # Each map reaches a little past the part it trains you on (the game picks starts, places and destinations only inside
+    # its own part, see inArea in js/gridgame.js), so a route can wander into the next area: a soft edge, not a wall.
+    # The grid south of 14th is the Village's, so Midtown reaches less far that way.
+    SOFT_N, SOFT_S = 800, 300  # metres past the area's lines
+    Y_LO, Y_HI = ((-1e9, areas['14'] + SOFT_N) if AREA == 'downtown' else (areas['59'] - SOFT_N, areas['125'] + 110) if AREA == 'uptown' else (areas['14'] - SOFT_S, areas['59'] + SOFT_N))
     def below14(c):  # in the area
         return Y_LO <= grid_xy(*centroid[c])[1] <= Y_HI
     street_l = {li for li, L in enumerate(links)
