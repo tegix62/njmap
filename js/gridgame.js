@@ -379,6 +379,18 @@ export function initGridGame(ctx, areaId = 'downtown') {
     x.stroke();
     return { img: x.getImageData(0, 0, w * r, h * r), opts: { pixelRatio: r } };
   }
+  let hoodsAllFC = null;
+  /** Every neighborhood's outline, once, as lines (the dashed borders you cross). */
+  function hoodBordersFC() {
+    if (hoodsAllFC) return hoodsAllFC;
+    const feats = [];
+    for (const m of ctx.munis || []) {
+      if (!m.geom) continue;
+      const polys = m.geom.type === 'Polygon' ? [m.geom.coordinates] : m.geom.coordinates;
+      for (const poly of polys) for (const ring of poly) feats.push({ type: 'Feature', properties: { n: m.n }, geometry: { type: 'LineString', coordinates: ring } });
+    }
+    return (hoodsAllFC = { type: 'FeatureCollection', features: feats });
+  }
   function ensureLayers() {
     for (const [id, col] of [['gg-chev', '#1f1b16'], ['gg-chev-exc', '#c47a00'], ['gg-chev-hl', '#9a5b00']]) {
       if (!map.hasImage(id)) {
@@ -414,6 +426,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const elevW = ['interpolate', ['linear'], ['zoom'], 14.5, 3, 16, 9, 17, 14];
     map.addLayer({ id: 'gg-elev-case', type: 'line', source: 'gg-elev', layout: { 'line-cap': 'butt', 'line-join': 'round', visibility: 'none' }, paint: { 'line-color': '#7c4a14', 'line-width': ['interpolate', ['linear'], ['zoom'], 14.5, 4.5, 16, 12, 17, 18], 'line-opacity': ['interpolate', ['linear'], ['zoom'], 14.4, 0, 15, 0.9] } });
     map.addLayer({ id: 'gg-elev', type: 'line', source: 'gg-elev', layout: { 'line-cap': 'butt', 'line-join': 'round', visibility: 'none' }, paint: { 'line-color': '#f2d9a8', 'line-width': elevW, 'line-opacity': ['interpolate', ['linear'], ['zoom'], 14.4, 0, 15, 1] } });
+    map.addSource('gg-hoods-all', { type: 'geojson', data: hoodBordersFC() });
+    map.addLayer({ id: 'gg-hoods-border', type: 'line', source: 'gg-hoods-all', minzoom: 12, layout: { 'line-cap': 'butt', 'line-join': 'round', visibility: 'none' }, paint: { 'line-color': '#0b7a68', 'line-opacity': 0.42, 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 0.7, 14, 1.2, 16, 2], 'line-dasharray': [3, 2] } });
     map.addSource('gg-hood', { type: 'geojson', data: EMPTY });
     map.addLayer({ id: 'gg-hood-fill', type: 'fill', source: 'gg-hood', filter: ['==', ['get', 'k'], 'f'], paint: { 'fill-color': '#0b7a68', 'fill-opacity': 0, 'fill-opacity-transition': { duration: 500 } } });
     map.addLayer({ id: 'gg-hood-line', type: 'line', source: 'gg-hood', filter: ['==', ['get', 'k'], 'l'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#0b7a68', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.8, 14, 1.4, 16, 2.4, 17.5, 3.4], 'line-opacity': 0, 'line-opacity-transition': { duration: 500 } } });
@@ -505,6 +519,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     // the app: the background map's own
     const inGame = !!(g && !g.loading && !g.done);
     vis('gg-streets', !!(g && !g.loading)); // (the end map keeps them too: the base map's own are faint there)
+    vis('gg-hoods-border', !!(g && !g.loading));
     vis('gg-elev-case', inGame);
     vis('gg-elev', inGame);
     vis('gg-street-names', inGame && on);
@@ -594,8 +609,10 @@ export function initGridGame(ctx, areaId = 'downtown') {
   document.body.appendChild(offEl);
   // neighborhoods in passing: the one you're in is outlined softly on the map and the outline
   // pulses when you cross into another. The name is in the top card.
-  const HOOD_REST = { fill: 0.07, line: 0.6 };
-  const HOOD_PULSE = { fill: 0.2, line: 1 };
+  // (no standing tint: it wore on you. The borders of every neighborhood are dashed hairlines, the one you're in is outlined solid,
+  // and when you cross a border the new one flashes and the tag shows "from › to"; it warns you of the next one as you near it)
+  const HOOD_REST = { fill: 0, line: 0.8 };
+  const HOOD_PULSE = { fill: 0.16, line: 1 };
   let hoodTimer = 0;
   // "Where am I?": a magnifier button in the bottom tray that pulls the map back to the neighborhood-sized view and back again
   const OV_BTN = () => `<button id="ggOv" class="${g.view === 'overview' ? 'on' : ''}" aria-pressed="${g.view === 'overview'}" aria-label="Where am I?"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="6.2" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>`;
@@ -621,8 +638,10 @@ export function initGridGame(ctx, areaId = 'downtown') {
     if (hoodTag.hidden) return;
     hoodTag.style.top = `${Math.round(ctx.padding().top - 6)}px`;
   }
-  function setHoodTag(name, pulse) {
-    hoodTag.textContent = name || '';
+  function setHoodTag(name, pulse, from, next) {
+    hoodTag.innerHTML = name
+      ? `${from ? `<span class="hf">${esc(from)} ›</span> ` : ''}${esc(name)}${next && !from ? ` <span class="hn">→ ${esc(next)}</span>` : ''}`
+      : '';
     hoodTag.hidden = !name;
     placeHoodTag();
     if (pulse) {
@@ -925,7 +944,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     map.easeTo({ center: p, zoom: g.view === 'overview' ? OV_ZOOM : ZOOM, bearing: GRID, offset: [0, camOffsetY()], duration: ctx.dur(520), easing: (t) => 1 - Math.pow(1 - t, 3) });
     render();
   }
-  function highlightHood(m, pulse) {
+  function highlightHood(m, pulse, from) {
     if (!m || !m.geom || !map.getSource('gg-hood')) return;
     const polys = m.geom.type === 'Polygon' ? [m.geom.coordinates] : m.geom.coordinates;
     const feats = [{ type: 'Feature', properties: { k: 'f' }, geometry: m.geom }];
@@ -935,10 +954,10 @@ export function initGridGame(ctx, areaId = 'downtown') {
       map.setPaintProperty('gg-hood-fill', 'fill-opacity', v.fill);
       map.setPaintProperty('gg-hood-line', 'line-opacity', v.line);
     };
-    setHoodTag(m.n, pulse);
+    setHoodTag(m.n, pulse, from, g && g.hoodAhead);
     clearTimeout(hoodTimer);
     lvl(pulse ? HOOD_PULSE : HOOD_REST);
-    if (pulse) hoodTimer = setTimeout(() => map.getLayer('gg-hood-fill') && lvl(HOOD_REST), 1500);
+    if (pulse) hoodTimer = setTimeout(() => { if (map.getLayer('gg-hood-fill')) lvl(HOOD_REST); if (g && g.hoodNow === m.n) setHoodTag(m.n, false, null, g.hoodAhead); }, 2600);
   }
   function clearHood() {
     clearTimeout(hoodTimer);
@@ -957,15 +976,26 @@ export function initGridGame(ctx, areaId = 'downtown') {
     highlightHood(m, !first);
   }
   /** Note where we are: keep the neighborhoods driven through, and outline the current one. */
-  function noteHood(p, quiet = false) {
+  function noteHood(p, quiet = false, heading = null) {
     if (!g || !p) return;
     const m = ctx.locate(p);
     const name = m ? m.n : null;
+    // the next neighborhood, when a border is under 170 m ahead
+    if (heading != null && name) {
+      const r = (heading * Math.PI) / 180;
+      const am = ctx.locate([p[0] + (Math.sin(r) * 170) / 84400, p[1] + (Math.cos(r) * 170) / 111000]);
+      const an = am && am.n !== name ? am.n : null;
+      if (an !== (g.hoodAhead || null)) {
+        g.hoodAhead = an;
+        if (name === g.hoodNow && !g.done && !planning()) setHoodTag(name, false, null, an);
+      }
+    }
     if (!name || name === g.hoodNow) return;
     const first = g.hoodNow == null;
+    const from = g.hoodNow;
     g.hoodNow = name;
     if (!planning() && !g.done && g.passed[g.passed.length - 1] !== name) g.passed.push(name); // the plan's ghost jumps around: only real driving counts
-    highlightHood(m, !first && !quiet);
+    highlightHood(m, !first && !quiet, !first && !quiet ? from : null);
     if (first || quiet) return;
     logEv('hood', name);
     if (!planning() && !g.report && !g.startCard && !g.check && !g.done) render(); // the top card names it
@@ -1769,7 +1799,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     g.bnow = b;
     if (!g.startCard && !g.done && now - (g.hoodAt || 0) > 250) {
       g.hoodAt = now;
-      noteHood(p);
+      noteHood(p, false, planning() ? null : b);
       noteLandmarks(p, b, now);
     }
     const hc = `${gridDir(b)}${onGrid(g.e.name, b) ? '' : compassWord(b)}${choices(g.e).named ? 'n' : ''}`;
@@ -3187,6 +3217,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     _graph: () => G,
     _reportText: () => (g && g.report ? reportText(g.report.kind, g.report.log, g.report.snap, g.report.note) : null),
     _plan: { planCorner: (n) => planCorner(n), planTurn: (sd) => planTurn(sd), planPick: (id) => planPick(id), planStep: (id) => planStep(G.edges[id]), planUndo: () => planUndo(), startRide: () => startRide(), render: () => render() },
+    _hood: (p, h) => noteHood(p, false, h),
     _lm: { note: (p, h) => { g.lmShown = new Set(); g.lmPlan = new Set(); noteLandmarks(p, h, performance.now()); }, open: (n) => openLmCard(n), tap: (x, y) => tapLandmark(x, y), peek: (n) => startPeek(n), end: () => endPeek(), items: () => lmItems.map((i) => i.l.n) },
     _model: { pickEntry, entryStart, choices, moves, shortest, straightTo, aheadChain, load, rule, describe, atTarget, arrivalSide, arrivalOK, chooseQuad, twoWay },
     _speed: () => (g && !g.loading && g.e ? speedNow() : 0),

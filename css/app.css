@@ -2927,3 +2927,13 @@ body.gridding #hud .gg-go {
 .ggplan .gp-bar button {
   padding: 5px 10px;
 }
+
+/* the neighborhood tag: "from › to" right after a crossing, "→ next" when a border is near */
+.gg-hoodtag .hf {
+  opacity: 0.75;
+  font-weight: 600;
+}
+.gg-hoodtag .hn {
+  opacity: 0.8;
+  font-weight: 600;
+}
