@@ -347,7 +347,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       seen.add(e.shape);
       // the Park Ave Viaduct and the ramp up to it: raised roadway, tinted so it reads as passing over the cross streets
       const raised = /Viaduct/.test(e.name) || (e.name === 'Park Ave' && (/Viaduct/.test(G.label(e.to)) || /Viaduct/.test(G.label(e.from))));
-      streets.push({ type: 'Feature', properties: { name: short(e.name), el: raised ? 1 : 0 }, geometry: { type: 'LineString', coordinates: e.pts } });
+      streets.push({ type: 'Feature', properties: { name: short(e.name), el: raised ? 1 : 0, tier: tierOf(e.name) }, geometry: { type: 'LineString', coordinates: e.pts } });
       if (raised) elevFC.features.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: e.pts } });
     }
     for (const pts of G.xingGeo.values()) streets.push({ type: 'Feature', properties: { name: '' }, geometry: { type: 'LineString', coordinates: pts } });
@@ -448,7 +448,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
         // (minzoom below: names only at driving zoom too)
         'text-size': ['interpolate', ['linear'], ['zoom'], 14, 10.5, 16, 13.5], 'symbol-spacing': 280, 'text-max-angle': 30,
       },
-      paint: { 'text-color': '#4f483e', 'text-halo-color': '#ffffff', 'text-halo-width': 1.8 },
+      paint: { 'text-color': ['match', ['get', 'tier'], 3, '#9a9182', '#4f483e'], 'text-halo-color': '#ffffff', 'text-halo-width': 1.8 }, // (local named streets in a lighter gray: not the ones to learn first)
     });
     // famous and need-to-know spots, in passing: a small dot and an italic name that gives way to street names
     map.addSource('gg-poi', { type: 'geojson', data: EMPTY });
@@ -1329,6 +1329,25 @@ export function initGridGame(ctx, areaId = 'downtown') {
   const routeOf = (r) => ({ e0: r.e0.id, s0: r.s0, target: { name: r.target.name, node: r.target.node, quad: r.target.quad }, entry: r.entry ? r.entry.link : null, entryFrom: r.entry ? r.entry.from : null, scn });
   const routeKey = (rt) => `${rt.e0}:${Math.round(rt.s0 || 0)}>${rt.target.node}${rt.target.quad || ''}`;
   let lastTargetNode = null; // a new round never goes to the same place as the one before
+  // ---- street tiers (Downtown: from tools/build_tiers.py): 1 = the spine, 2 = connectors, 3 = local named streets; 0 = no tier data ----
+  const tierOf = (name) => (G.d.tiers ? G.d.tiers[short(name)] || 3 : 0);
+  /** A random corner, leaning to the ones on the streets worth knowing (two spine streets ~4x, two local streets ~1/8th). */
+  function pickCorner(list) {
+    if (!G.d.tiers || prefs.backbone === 'all') return rand(list);
+    const W = G.cornerW || (G.cornerW = new Map());
+    const w = (n) => {
+      if (!W.has(n)) {
+        // by the two best streets that meet there: spine + spine ~4, spine + local ~0.7, local + local ~0.12
+        const ts = [...new Set([...G.out[n], ...G.inn[n]].filter((e) => !G.RAMP.test(e.name)).map((e) => short(e.name)))].map(tierOf).sort((a, b) => a - b).slice(0, 2);
+        const f = (t) => (t === 1 ? 2 : t === 2 ? 1.2 : 0.35);
+        W.set(n, ts.reduce((a, t) => a * f(t), 1));
+      }
+      return W.get(n);
+    };
+    let r = Math.random() * list.reduce((a, n) => a + w(n), 0);
+    for (const n of list) if ((r -= w(n)) < 0) return n;
+    return list[list.length - 1];
+  }
   function pickRound(forced) {
     if (forced) return roundFrom(forced);
     // now and then, a trip you saved, or back to a corner you got wrong
@@ -1354,7 +1373,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     for (let n = 0; n < G.nodes.length; n++) if (isCore(n) && G.real(n) && G.plain(n) && G.streetsAt(n) >= 2 && inArea(n)) coreNodes.push(n);
     const places = G.places.filter((p) => inArea(p.node));
     for (let tries = 0; tries < 200; tries++) {
-      const target = places.length && Math.random() < 0.7 ? { ...rand(places) } : { name: null, node: rand(coreNodes) };
+      const target = places.length && Math.random() < 0.7 ? { ...rand(places) } : { name: null, node: pickCorner(coreNodes) };
       target.label = G.label(target.node);
       if (target.node === lastTargetNode) continue;
       target.quad = target.gates ? null : chooseQuad(target.node, target.name);
@@ -1385,7 +1404,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const useEntry = entries.length && (prefs.from === 'entries' || (prefs.from === 'both' && Math.random() < 0.5));
     const wantBack = Math.random() < 0.05;
     for (let tries = 0; tries < 300; tries++) {
-      const target = places.length && Math.random() < 0.7 ? { ...rand(places) } : { name: null, node: rand(coreNodes) };
+      const target = places.length && Math.random() < 0.7 ? { ...rand(places) } : { name: null, node: pickCorner(coreNodes) };
       target.label = G.label(target.node);
       if (target.node === lastTargetNode) continue;
       target.quad = target.gates ? null : chooseQuad(target.node, target.name);
@@ -1575,6 +1594,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     return m ? `${m.n}${m.c && m.c !== m.n ? ` (${m.c})` : ''}` : null;
   }
   /** What a way out is called on its button: the ramp up to the Park Ave Viaduct is "Park Ave" in the city's data, but it's the viaduct. */
+  /** A small gold star after a spine street's name (the ones worth learning first). */
+  const spineMark = (name) => (tierOf(name) === 1 ? ' <span class="spine" title="a street worth knowing">★</span>' : '');
   const optName = (o) => (o.name === 'Park Ave' && /Viaduct/.test(G.label(o.to)) ? 'Park Ave Viaduct' : short(o.name));
   /** The cross street at the end of edge e (the next corner), if it's a real intersection. */
   function crossAt(e) {
@@ -2600,7 +2621,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       const picks = c.options
         .map((o) => ({ o, d: turnOf(p.cur, o) }))
         .sort((a, b) => a.d - b.d)
-        .map(({ o }) => `<button class="ggpick" data-link="${o.id}"><span class="gg-arr" style="transform:rotate(${(o.b0 - GRID).toFixed(0)}deg)">${DIR_SVG}</span><span class="nm">${esc(optName(o))} <small>${esc(leadsTo(o))}</small></span></button>`)
+        .map(({ o }) => `<button class="ggpick" data-link="${o.id}"><span class="gg-arr" style="transform:rotate(${(o.b0 - GRID).toFixed(0)}deg)">${DIR_SVG}</span><span class="nm">${esc(optName(o))}${spineMark(o.name)} <small>${esc(leadsTo(o))}</small></span></button>`)
         .join('');
       return ctl(`<div class="bq">At <b>${esc(at)}</b>: which way?</div><div class="ggctl named">${picks}</div>`);
     }
@@ -2816,6 +2837,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
         ${before ? `<div class="hint">Best so far: ${starStr(Math.max(before, stars))}</div>` : ''}
         ${through ? `<div class="hint">🏘 Through: ${through}</div>` : ''}
         ${g.target.gates && scn ? `<div class="hint">🕒 ${esc(scn.label)}: ${esc(scn.say)}${scn.kind !== 'usual' && SCN_DATA && SCN_DATA.quotes ? `. A real alert: “${esc(SCN_DATA.quotes[scn.kind === 'expressway' ? 'expressway' : 'northTube'] || '')}”` : ''}</div>` : ''}
+        ${streetTierLine()}
         <div class="hint">Shortest: ${esc(describe(g.best.path))}</div>
         <div class="hint">Driven: ${Math.round(cover * 100)}% of ${AREA.of} blocks${g.newBlocks ? ` (+${g.newBlocks} new${cover - prevCover >= 0.005 ? `, +${Math.round((cover - prevCover) * 100)}%` : ''})` : ''}</div>
       </details>
@@ -2858,6 +2880,20 @@ export function initGridGame(ctx, areaId = 'downtown') {
     return { p, brg: a === b ? null : brg, k };
   }
   const lmLink = (l) => `<a href="#" class="lmlink" data-lm="${esc(l.n)}" data-gg="${areaId}" onclick="return false">${esc(l.n)}${LM_PICS[l.n] ? ' 📷' : ''}</a>`;
+  /** On the end screen: which streets of the route are the spine (worth knowing) and how many were local ones. */
+  function streetTierLine() {
+    if (!G.d.tiers || !g.path || !g.path.length) return '';
+    const seen = new Map();
+    for (const id of g.path) {
+      const e = G.edges[id];
+      if (!e || G.RAMP.test(e.name)) continue;
+      seen.set(short(e.name), tierOf(e.name));
+    }
+    const spine = [...seen].filter(([, t]) => t === 1).map(([n]) => n);
+    const mid = [...seen].filter(([, t]) => t === 2).length;
+    const local = [...seen].filter(([, t]) => t === 3).length;
+    return `<div class="hint">★ Spine streets on your route: ${spine.length ? spine.map(esc).join(', ') : 'none'}${mid || local ? ` · ${mid} connector${mid === 1 ? '' : 's'}, ${local} local` : ''}</div>`;
+  }
   /** The end screen: the famous places you passed, and what's by your destination. */
   function lmResultLines() {
     if (prefs.landmarks === false || !G.landmarks) return '';
@@ -3032,7 +3068,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
         .sort((a, b) => a.d - b.d)
         .map(
           ({ o }) =>
-            `<button class="ggpick${g.pick === o ? ' on' : ''}" data-link="${o.id}"><span class="gg-arr" style="transform:rotate(${(o.b0 - GRID).toFixed(0)}deg)">${DIR_SVG}</span><span class="nm">${esc(optName(o))} <small>${esc(leadsTo(o))}</small></span></button>`
+            `<button class="ggpick${g.pick === o ? ' on' : ''}" data-link="${o.id}"><span class="gg-arr" style="transform:rotate(${(o.b0 - GRID).toFixed(0)}deg)">${DIR_SVG}</span><span class="nm">${esc(optName(o))}${spineMark(o.name)} <small>${esc(leadsTo(o))}</small></span></button>`
         )
         .join('');
     ctx.sheet(
@@ -3068,6 +3104,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
         }
         <div class="ggopts"${g.more && prefs.optsOpen ? '' : ' hidden'}>
           <select id="ggArea" aria-label="Area"${Object.keys(AREAS).length < 2 ? ' hidden' : ''}>${Object.entries(AREAS).map(([k, v]) => `<option value="${k}"${prefs.area === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
+          ${G.d && G.d.tiers ? `<select id="ggBackbone" aria-label="Which corners">${[['first', 'Corners: spine streets first'], ['all', 'Corners: every street equally']].map(([k, v]) => `<option value="${k}"${(prefs.backbone || 'first') === k ? ' selected' : ''}>${v}</option>`).join('')}</select>` : ''}
           <select id="ggFrom" aria-label="Start">${[['both', 'Start: mixed'], ['entries', 'Start: tunnels & bridges'], ['anywhere', 'Start: anywhere']].map(([k, v]) => `<option value="${k}"${prefs.from === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggStyle" aria-label="Play style">${[['plan', 'Play: plan, then ride'], ['drive', 'Play: free drive']].map(([k, v]) => `<option value="${k}"${prefs.style === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
           <select id="ggGuide" aria-label="Guide">${Object.entries(GUIDES).map(([k, v]) => `<option value="${k}"${prefs.guide === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
@@ -3182,6 +3219,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       });
     restartOn('ggArea', 'area');
     restartOn('ggFrom', 'from');
+    if (document.getElementById('ggBackbone')) restartOn('ggBackbone', 'backbone');
     restartOn('ggStyle', 'style');
     document.getElementById('ggDetour').addEventListener('change', (e) => {
       prefs.lteDetour = e.target.value;

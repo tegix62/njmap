@@ -2937,3 +2937,8 @@ body.gridding #hud .gg-go {
   opacity: 0.8;
   font-weight: 600;
 }
+
+.spine {
+  color: #d99a00;
+  font-size: 0.85em;
+}
