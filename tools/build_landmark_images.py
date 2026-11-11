@@ -21,6 +21,10 @@ TITLES = {
     "Macy's Herald Square": "Macy's Herald Square", 'Columbus Circle': 'Columbus Circle', 'Battery Park': 'Battery Park',
     'Rockefeller Center': '30 Rockefeller Plaza', 'Tudor City': 'Tudor City', 'Madison Square Garden': 'Madison Square Garden', 'Staten Island Ferry': 'Staten Island Ferry',
     "Katz's Delicatessen": "Katz's Delicatessen", "Bloomingdale's": "Bloomingdale's",
+    'Lincoln Center': 'Lincoln Center', 'Strawberry Fields': 'Strawberry Fields', 'The Dakota': 'The Dakota',
+    'Natural History Museum': 'American Museum of Natural History', "Zabar's": "Zabar's", 'Frick Collection': 'Frick Collection',
+    'The Met': 'Metropolitan Museum of Art', 'Guggenheim': 'Solomon R. Guggenheim Museum', 'Mount Sinai Hospital': 'Mount Sinai Hospital (Manhattan)',
+    'Queensboro Bridge': 'Queensboro Bridge', 'Roosevelt Island Tram': 'Roosevelt Island Tramway',
 }
 
 # where the article's lead image is a logo or drawing, a chosen Commons file instead

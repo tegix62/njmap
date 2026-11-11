@@ -306,5 +306,68 @@
   "author": "Jean-Christophe BENOIST",
   "license": "CC BY 3.0",
   "page": "https://commons.wikimedia.org/wiki/File:NYC_-_Trinity_Church_-_Watts_statue.JPG"
+ },
+ "Lincoln Center": {
+  "img": "img/landmarks/lincoln-center.jpg",
+  "file": "Lincoln_Center_Overview_(48047495362).jpg",
+  "author": "Ajay Suresh from New York, NY, USA",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Lincoln_Center_Overview_(48047495362).jpg"
+ },
+ "Natural History Museum": {
+  "img": "img/landmarks/natural-history-museum.jpg",
+  "file": "USA-NYC-American_Museum_of_Natural_History.JPG",
+  "author": "Ingfbruno",
+  "license": "CC BY-SA 3.0",
+  "page": "https://commons.wikimedia.org/wiki/File:USA-NYC-American_Museum_of_Natural_History.JPG"
+ },
+ "Zabar's": {
+  "img": "img/landmarks/zabar-s.jpg",
+  "file": "Zabars-2016-front-wide.jpg",
+  "author": "Fuzheado",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Zabars-2016-front-wide.jpg"
+ },
+ "Frick Collection": {
+  "img": "img/landmarks/frick-collection.jpg",
+  "file": "Frick_Collection_New_York_cour.jpg",
+  "author": "CVB",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Frick_Collection_New_York_cour.jpg"
+ },
+ "The Met": {
+  "img": "img/landmarks/the-met.jpg",
+  "file": "Metropolitan_Museum_of_Art_(The_Met)_-_Central_Park,_NYC.jpg",
+  "author": "Hugo Schneider",
+  "license": "CC BY-SA 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Metropolitan_Museum_of_Art_(The_Met)_-_Central_Park,_NYC.jpg"
+ },
+ "Guggenheim": {
+  "img": "img/landmarks/guggenheim.jpg",
+  "file": "Solomon_R._Guggenheim_Museum_(48059131351).jpg",
+  "author": "Ajay Suresh from New York, NY, USA",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Solomon_R._Guggenheim_Museum_(48059131351).jpg"
+ },
+ "Mount Sinai Hospital": {
+  "img": "img/landmarks/mount-sinai-hospital.png",
+  "file": "The_Mount_Sinai_Hospital.png",
+  "author": "Mount Sinai Health System",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:The_Mount_Sinai_Hospital.png"
+ },
+ "Queensboro Bridge": {
+  "img": "img/landmarks/queensboro-bridge.jpg",
+  "file": "Queensboro_Bridge_October_2024_006.jpg",
+  "author": "Kidfly182",
+  "license": "CC BY 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Queensboro_Bridge_October_2024_006.jpg"
+ },
+ "Roosevelt Island Tram": {
+  "img": "img/landmarks/roosevelt-island-tram.jpg",
+  "file": "Roosevelt_Island_tramcar_2010.jpg",
+  "author": "Autopilot",
+  "license": "CC BY-SA 3.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Roosevelt_Island_tramcar_2010.jpg"
  }
 }

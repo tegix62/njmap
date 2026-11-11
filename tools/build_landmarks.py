@@ -61,12 +61,25 @@ L = [
     ('Cooper Union', 'COOPER UNION', 'Cooper Sq, 3rd Ave & 7th St', (-73.99125, 40.72928)),
     ("Katz's Delicatessen", "KATZ'S DELICATESSEN", 'E Houston St & Ludlow St', (-73.98743, 40.72228)),
     ('Whitney Museum', 'WHITNEY MUSEUM OF AMERICAN ART', 'Gansevoort St, the south end of the High Line', (-74.00916, 40.73955)),
+    # Uptown (fallback points; approximate building centres)
+    ('Lincoln Center', 'LINCOLN CENTER', 'Columbus Ave & 64th St, the fountain plaza and the Met Opera', (-73.9835, 40.7725)),
+    ('Strawberry Fields', 'STRAWBERRY FIELDS', 'Central Park West & 72nd St, the Imagine mosaic', (-73.9751, 40.7756)),
+    ('The Dakota', 'THE DAKOTA', 'Central Park West & 72nd St, the gabled apartment house', (-73.9763, 40.7766)),
+    ('Natural History Museum', 'AMERICAN MUSEUM OF NATURAL HISTORY', 'Central Park West, 77th to 81st St', (-73.9740, 40.7813)),
+    ("Zabar's", "ZABAR'S", 'Broadway & 80th St', (-73.9798, 40.7871)),
+    ('Frick Collection', 'FRICK COLLECTION', '5th Ave & 70th St', (-73.9672, 40.7712)),
+    ('The Met', 'METROPOLITAN MUSEUM OF ART', '5th Ave & 82nd St, the big steps', (-73.9632, 40.7794)),
+    ('Guggenheim', 'SOLOMON R GUGGENHEIM MUSEUM', '5th Ave & 89th St, the white spiral', (-73.9590, 40.7830)),
+    ('Mount Sinai Hospital', 'MOUNT SINAI HOSPITAL', 'Madison Ave & 99th St', (-73.9524, 40.7900)),
+    ('Queensboro Bridge', 'QUEENSBORO BRIDGE', 'Manhattan end at 59th St & 2nd Ave', (-73.9610, 40.7585)),
+    ('Roosevelt Island Tram', 'ROOSEVELT ISLAND TRAMWAY', '2nd Ave & 60th St, the cable car to the island', (-73.9648, 40.7612)),
 ]
-# Not in the POI dataset under these names, or better as the fallback point
 FORCE_FALLBACK = {'Penn Station', 'Federal Hall', 'Charging Bull', 'Oculus', "Katz's Delicatessen", 'Washington Square Arch',
                   'Staten Island Ferry', 'Brooklyn Bridge', 'Trinity Church', 'Morgan Library', 'Waldorf Astoria', 'Trump Tower',
                   'Tudor City', 'Bryant Park', 'New York Public Library', "St. Patrick's Cathedral", 'Times Square', '9/11 Memorial',
-                  'Plaza Hotel', 'Woolworth Building', 'Cooper Union', 'Battery Park'}
+                  'Plaza Hotel', 'Woolworth Building', 'Cooper Union', 'Battery Park',
+                  'Lincoln Center', 'Strawberry Fields', 'The Dakota', 'Natural History Museum', "Zabar's", 'Frick Collection', 'The Met',
+                  'Guggenheim', 'Mount Sinai Hospital', 'Queensboro Bridge', 'Roosevelt Island Tram'}
 
 
 def poi(q):
@@ -80,7 +93,10 @@ def poi(q):
 
 def main():
     out, rep = [], []
+    old = {l['n']: l for l in json.load(open(os.path.join(ROOT, 'data/landmarks.json')))}
     for name, q, note, fb in L:
+        if name in old:
+            out.append(old[name]); continue
         pt, src = fb, 'fallback'
         if name not in FORCE_FALLBACK:
             rows = poi(q)
