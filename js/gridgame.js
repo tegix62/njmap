@@ -825,6 +825,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   }
   const routeOf = (r) => ({ e0: r.e0.id, s0: r.s0, target: { name: r.target.name, node: r.target.node, quad: r.target.quad }, entry: r.entry ? r.entry.link : null, entryFrom: r.entry ? r.entry.from : null });
   const routeKey = (rt) => `${rt.e0}:${Math.round(rt.s0 || 0)}>${rt.target.node}${rt.target.quad || ''}`;
+  let lastTargetNode = null; // a new round never goes to the same place as the one before
   function pickRound(forced) {
     if (forced) return roundFrom(forced);
     // now and then, a trip you saved, or back to a corner you got wrong
@@ -852,6 +853,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     for (let tries = 0; tries < 200; tries++) {
       const target = places.length && Math.random() < 0.7 ? { ...rand(places) } : { name: null, node: rand(coreNodes) };
       target.label = G.label(target.node);
+      if (target.node === lastTargetNode) continue;
       target.quad = target.gates ? null : chooseQuad(target.node, target.name);
       if (!target.gates && !target.quad) continue;
       const dm = metres(G.nodes[e0.from], G.nodes[target.node]);
@@ -881,6 +883,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     for (let tries = 0; tries < 300; tries++) {
       const target = places.length && Math.random() < 0.7 ? { ...rand(places) } : { name: null, node: rand(coreNodes) };
       target.label = G.label(target.node);
+      if (target.node === lastTargetNode) continue;
       target.quad = target.gates ? null : chooseQuad(target.node, target.name);
       if (!target.gates && !target.quad) continue;
       let e0, s0 = 0, entry = null;
@@ -926,6 +929,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     }
     if (g !== token) return;
     const r = pickRound(forced);
+    if (r) lastTargetNode = r.target.node;
     if (!r) {
       ctx.hud(`<div class="qkind">🚕 ${AREA.title}</div><div class="q">No route found here; try another area.</div>`);
       return;
@@ -1059,8 +1063,11 @@ export function initGridGame(ctx, areaId = 'downtown') {
   function crossAt(e) {
     const names = [];
     for (const o of [...G.out[e.to], ...G.inn[e.to]]) if (o.name !== e.name && !names.includes(o.name)) names.push(o.name);
-    const nm = names.find((x) => !G.RAMP.test(x)) || names[0]; // a street, not a ramp, if there is one
-    return nm ? short(nm) : null;
+    // streets, not ramps; where two cross at one corner (5th Ave and Broadway at 23rd St) name both,
+    // so a chip never says "5th Ave" for a corner you'd reach by Broadway
+    const streets = [...new Set(names.filter((x) => !G.RAMP.test(x)).map(short))];
+    if (streets.length) return streets.slice(0, 2).join(' / ');
+    return names[0] ? short(names[0]) : null;
   }
   /** The next real intersection ahead on this road, and its cross street. */
   function nextCross(e) {

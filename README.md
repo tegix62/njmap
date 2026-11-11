@@ -81,6 +81,9 @@ The screen is built in two layers. The first is what you can take in at a glance
 
 **Tunnel destinations are the real entrance ramps** (not a corner you pull up to): the city's street data says which streets carry straight on into a tunnel's entrance ramp, so a round to the **Lincoln Tunnel entrance** ends when you drive off the end of **W 30th St** onto the 10th Ave ramp or up **Dyer Ave** onto the W 35th St ramp, and a round to the **Holland Tunnel entrance** ends at the end of **Watts St**. The top card says how to get in (*"· in via W 30th St or Dyer Ave"*). What the map can't show: the approaches to both tunnels are often police-directed for many blocks, with turns closed and lanes changed through the day, and the data has only the signed ramps, not every street that actually feeds them.
 
+
+**Fewer repeats and clearer corners:** a new round never goes to the same place as the round before it. Where two streets cross at one corner (5th Ave and Broadway at 23rd St), the chip and the top card name both (*"5th Ave / Broadway"*), so a chip never names one street for a corner you'd reach by the other.
+
 **Button feel:** every button presses in to 94% and springs back (`js/motion.js`, spring stiffness 1019, damping 42: the feel lab's "snappy" spring made 40% faster). It uses the `scale` property so it can't clash with a button's own transform, a quick tap still shows its press (70 ms minimum), and it's skipped under reduced-motion. Further feedback (wrong-turn shake, star landings, panel curves) is still being chosen.
 
 ## Getting around the app
