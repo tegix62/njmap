@@ -1571,11 +1571,24 @@ export function initGridGame(ctx, areaId = 'downtown') {
     }
     return pickRandom();
   }
+  // About one round in ten has its destination just past the game's own part (inside the soft edge of the map): the
+  // shortest way there crosses into the next area, so those corners get met as destinations too, not only on the way.
+  const EDGE_SHARE = 0.1;
+  /** The corners and places a destination can be picked from this round: the own part, or (now and then) the soft edge. */
+  function destinationPool(ownOnly = false) {
+    const edge = !ownOnly && prefs.area === 'all' && Math.random() < EDGE_SHARE;
+    const ok = (n) => (edge ? !inFocus(G.gy[n]) : inArea(n));
+    const corners = [];
+    for (let n = 0; n < G.nodes.length; n++) if (isCore(n) && G.real(n) && G.plain(n) && G.streetsAt(n) >= 2 && ok(n)) corners.push(n);
+    const places = G.places.filter((p) => ok(p.node));
+    // (an edge round with nothing to pick from falls back to the usual pool)
+    if (edge && !(corners.length && places.length)) return destinationPool(true);
+    return { corners, places, edge };
+  }
   /** A destination for a round that starts on link e0. */
   function pickTarget(e0, s0, entry) {
-    const coreNodes = [];
-    for (let n = 0; n < G.nodes.length; n++) if (isCore(n) && G.real(n) && G.plain(n) && G.streetsAt(n) >= 2 && inArea(n)) coreNodes.push(n);
-    const places = G.places.filter((p) => inArea(p.node));
+    const pool = destinationPool();
+    const coreNodes = pool.corners, places = pool.places;
     for (let tries = 0; tries < 200; tries++) {
       const target = places.length && Math.random() < 0.7 ? { ...rand(places) } : { name: null, node: pickCorner(coreNodes) };
       target.label = G.label(target.node);
@@ -1602,14 +1615,17 @@ export function initGridGame(ctx, areaId = 'downtown') {
     return list[list.length - 1];
   }
   function pickRandom() {
-    const coreNodes = [];
-    for (let n = 0; n < G.nodes.length; n++) if (isCore(n) && G.real(n) && G.plain(n) && G.streetsAt(n) >= 2 && inArea(n)) coreNodes.push(n);
-    const places = G.places.filter((p) => inArea(p.node));
+    const dest = destinationPool();
+    const own = { corners: [], places: [] };  // (starts "anywhere" stay in the game's own part)
+    for (let n = 0; n < G.nodes.length; n++) if (isCore(n) && G.real(n) && G.plain(n) && G.streetsAt(n) >= 2 && inArea(n)) own.corners.push(n);
+    const coreNodes = own.corners; // where a start "anywhere" is picked
+    const places = dest.edge ? dest.places : G.places.filter((p) => inArea(p.node));
+    const destCorners = dest.edge ? dest.corners : own.corners;
     const entries = G.entries.filter((en) => inArea(en.landsAt));
     const useEntry = entries.length && (prefs.from === 'entries' || (prefs.from === 'both' && Math.random() < 0.5));
     const wantBack = Math.random() < 0.05;
     for (let tries = 0; tries < 300; tries++) {
-      const target = places.length && Math.random() < 0.7 ? { ...rand(places) } : { name: null, node: pickCorner(coreNodes) };
+      const target = places.length && Math.random() < 0.7 ? { ...rand(places) } : { name: null, node: pickCorner(destCorners) };
       target.label = G.label(target.node);
       if (target.node === lastTargetNode) continue;
       target.quad = target.gates ? null : chooseQuad(target.node, target.name);
