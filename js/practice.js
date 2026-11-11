@@ -16,6 +16,7 @@ const TYPES = {
   north: 'Which is farther north/east?',
   point: 'Point to it',
   avedir: 'Which way does the avenue run?',
+  addr: 'Addresses: which avenues, which side?',
   crossing: 'Which crossing lands closest?',
   uptown: 'Point uptown',
   roadto: 'Which road gets you there?',
@@ -58,8 +59,8 @@ const TILE_LABEL = {
 // How long the map takes to turn and move to the next question
 const QUESTION_MOVE_MS = 1200;
 // One-tap kinds that work against a clock
-const RAPID_TYPES = ['leftright', 'borders', 'north', 'find', 'name', 'avedir', 'crossing', 'hwyfact', 'dir', 'findpt'];
-const WEIGHT = { find: 2, dir: 2, borders: 2, north: 2, point: 2, roadto: 3, leftright: 3, bigpoint: 2 };
+const RAPID_TYPES = ['leftright', 'borders', 'north', 'find', 'name', 'avedir', 'addr', 'crossing', 'hwyfact', 'dir', 'findpt'];
+const WEIGHT = { addr: 2, find: 2, dir: 2, borders: 2, north: 2, point: 2, roadto: 3, leftright: 3, bigpoint: 2 };
 const DIR8 = ['NW', 'N', 'NE', 'W', '', 'E', 'SW', 'S', 'SE'];
 const DIR_DEG = { N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315 };
 
@@ -335,6 +336,27 @@ export function initPractice(ctx) {
     return { kind: 'avedir', m: { key: `ave:${name}` }, name, dir };
   }
 
+  const ordn = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th'}`;
+  /**
+   * Manhattan addresses on the west side of Fifth Avenue (the zero point): the hundreds digit + 5 is the nearer avenue
+   * (225 W 37th is between 7th and 8th), and on a crosstown street odd numbers are on the north side, even on the south.
+   * (Checked against Macy's 151 W 34th, MoMA 11 W 53rd and the Javits Center, 655 W 34th.)
+   */
+  function makeAddr() {
+    const st = 14 + Math.floor(Math.random() * 46); // 14th to 59th
+    const hundreds = Math.floor(Math.random() * 7); // 0..6 -> 5th&6th ... 11th&12th
+    const n = hundreds * 100 + 1 + Math.floor(Math.random() * 98);
+    const addr = `${n} W ${ordn(st)} St`;
+    if (Math.random() < 0.7) {
+      const pairs = [5, 6, 7, 8, 9, 10, 11].map((a) => a);
+      const right = hundreds + 5;
+      const others = shuffle(pairs.filter((a) => a !== right && Math.abs(a - right) <= 2)).slice(0, 3);
+      const choices = shuffle([right, ...others]).map((a) => ({ a, label: `${ordn(a)} & ${ordn(a + 1)} Ave` }));
+      return { kind: 'addr', mode: 'ave', m: { key: 'addr:ave' }, addr, n, st, hundreds, right, choices };
+    }
+    return { kind: 'addr', mode: 'side', m: { key: 'addr:side' }, addr, n, st, hundreds, right: n % 2 ? 'north' : 'south' };
+  }
+
   /** Manhattan: "Which crossing lands closest to SoHo?" (only when one clearly does) */
   function makeCrossing(p) {
     for (let tries = 0; tries < 200; tries++) {
@@ -593,6 +615,7 @@ export function initPractice(ctx) {
     point: makePoint,
     trip: makeTrip,
     avedir: makeAveDir,
+    addr: makeAddr,
     crossing: makeCrossing,
     uptown: makeUptown,
     roadto: makeRoadTo,
@@ -1014,6 +1037,11 @@ export function initPractice(ctx) {
       body = `<div class="choices three">${['uptown', 'downtown', 'two-way']
         .map((v) => `<button class="choice" data-v="${v}">${v === 'two-way' ? 'Both ways' : v[0].toUpperCase() + v.slice(1)}</button>`)
         .join('')}</div>`;
+    } else if (q.kind === 'addr') {
+      ctx.hud(`<div class="qkind">Addresses</div><div class="q">${q.mode === 'ave' ? `<b>${esc(q.addr)}</b>: between which avenues?` : `Which side of the street is <b>${esc(q.addr)}</b> on?`}</div>`);
+      body = q.mode === 'ave'
+        ? `<div class="choices">${q.choices.map((c) => `<button class="choice" data-v="${c.a}">${esc(c.label)}</button>`).join('')}</div>`
+        : `<div class="choices"><button class="choice" data-v="north">North side</button><button class="choice" data-v="south">South side</button></div>`;
     } else if (q.kind === 'crossing') {
       ctx.highlight(m.id, 'q');
       ctx.reveal([{ m, color: L.q }]);
@@ -1118,7 +1146,7 @@ export function initPractice(ctx) {
       else if (q.kind === 'north') frame(q.choices, 15);
       else if (q.kind === 'roadto' && !q.pending) frame([m, q.target], 12.5);
       else if (q.kind === 'crossing') frame([m, ...R.crossings.map((c) => c.pt)], 14);
-      else if (q.kind === 'avedir' || q.kind === 'uptown') frame([{ bbox: [R.bounds[0][0], R.bounds[0][1], R.bounds[1][0], R.bounds[1][1]] }], 13);
+      else if (q.kind === 'avedir' || q.kind === 'uptown' || q.kind === 'addr') frame([{ bbox: [R.bounds[0][0], R.bounds[0][1], R.bounds[1][0], R.bounds[1][1]] }], 13);
       else if (q.kind === 'point' && q.big) frame([aroundBox(q.from.pt, 8 * SC)], 12);
       else if (q.kind === 'point') frame([aroundBox(q.from.pt, distanceMi(q.from.pt, m.pt) * 1.3)], 13);
       else if (q.kind === 'leftright') frame([aroundBox(q.from.pt, distanceMi(q.from.pt, m.pt) * 1.2)], 13);
@@ -1300,6 +1328,15 @@ export function initPractice(ctx) {
       ctx.reveal([{ m, color: L.q }, ...toward.map((t) => ({ m: t.m, color: t.m === q.target ? L.good : L.neutral }))]);
       feedback(ok, html);
       ctx.fit([m, q.target], 12.5);
+    } else if (q.kind === 'addr') {
+      const ok = btn.dataset.v === String(q.right);
+      record(m, ok);
+      btn.classList.add(ok ? 'right' : 'wrong');
+      document.querySelector(`#qbody .choice[data-v="${q.right}"]`).classList.add('right');
+      const how = q.mode === 'ave'
+        ? `<b>${esc(q.addr)}</b> is between <b>${ordn(q.right)} and ${ordn(q.right + 1)} Ave</b>. The trick: Fifth Ave is the zero point on the west side, so the hundreds digit (${q.hundreds}${q.hundreds === 0 ? ', as it has only two digits' : ''}) + 5 = ${q.right}: the nearer avenue is ${ordn(q.right)}.`
+        : `<b>${esc(q.addr)}</b> is on the <b>${q.right} side</b>: odd numbers are on the north side of a crosstown street, even numbers on the south.`;
+      feedback(ok, `${ok ? '✓' : '✗'} ${how}`);
     } else if (q.kind === 'avedir') {
       const ok = btn.dataset.v === q.dir;
       record(m, ok);
