@@ -705,20 +705,13 @@ export function initGridGame(ctx, areaId = 'downtown') {
     return side === 'right' || (side === 'left' && !twoWay(e));
   }
   const atTarget = (e, node) => (g.target.gates ? g.target.gates.includes(e.id) : node === g.target.node && arrivalOK(e, g.target.quad));
-  // The corner each landmark really occupies, relative to the intersection the game sends you to
-  // (from the street map; places with no single corner, like neighborhoods and tunnels, aren't listed
-  // and get any corner you can pull up to).
-  const PLACE_QUAD = {
-    'union square': ['NE'], 'grand central': ['NE'], 'empire state building': ['NW'], 'madison square garden': ['SE'],
-    'port authority': ['NW', 'SW'], 'radio city': ['NW'], moma: ['SE'], 'carnegie hall': ['SE'], 'flatiron building': ['NW'],
-    'javits center': ['NW', 'SW'], "macy's": ['SW'], "bloomingdale's": ['NE'], 'washington square park': ['SW'], 'katz’s deli': ['NW'],
-  };
-  const placeKey = (name) => (name || '').replace(/ \(.*\)$/, '').replace(/^the /i, '').toLowerCase();
   /** A corner of `node` you can pull up to: the landmark's own corner when known, else any from the right. */
   function chooseQuad(node, name) {
     const side = (q, e) => arrivalSide(e, q);
     const right = Object.keys(QB).filter((q) => G.inn[node].some((e) => e.core && side(q, e) === 'right'));
-    const known = (PLACE_QUAD[placeKey(name)] || []).filter((q) => G.inn[node].some((e) => e.core && arrivalOK(e, q)));
+    // the corner(s) a landmark really occupies come with the street data (CORNERS in tools/build_streets.py)
+    const pl = G.places.find((p) => p.node === node && p.name === name);
+    const known = ((pl && pl.quads) || []).filter((q) => G.inn[node].some((e) => e.core && arrivalOK(e, q)));
     if (known.length) return rand(known);
     return right.length ? rand(right) : null;
   }

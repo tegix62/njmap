@@ -788,8 +788,48 @@ def snap(pt):
         if best is None or d < best[0]:
             best = (d, c)
     return best
+# Where each landmark really is: the corner you pull up at (two streets), and which corner(s) of that
+# intersection it occupies, as seen from the grid (NE = north-east, uptown and east of the crossing).
+# A landmark not listed here (a neighborhood, a tunnel, a ferry) gets whichever corner you can reach.
+CORNERS = {
+    'the UN': (('1st Ave', 'E 46th St'), ['NE', 'SE']),            # visitors' entrance; the UN is east of 1st Ave
+    'MoMA': (('5th Ave', 'W 53rd St'), ['NW']),                      # 11 W 53rd St, just west of 5th Ave
+    'Chelsea Market': (('9th Ave', 'W 16th St'), ['SW']),           # 75 9th Ave, 15th-16th, west of 9th Ave
+    'Hudson Yards': (('10th Ave', 'W 33rd St'), ['SW']),
+    'One World Trade Center': (('Vesey St', 'Greenwich St'), ['SW']),
+    'the Stock Exchange (Wall St)': (('Broad St', 'Wall St'), ['SW']),   # 11 Wall St, south of Wall, west of Broad
+    'Union Square': (None, ['NE', 'SE']),
+    'Grand Central': (None, ['NE']),
+    'the Empire State Building': (None, ['NW']),
+    'Madison Square Garden': (None, ['SE']),
+    'Port Authority': (None, ['NW', 'SW']),
+    'Radio City': (None, ['NW']),
+    'Carnegie Hall': (None, ['SE']),
+    'the Flatiron Building': (None, ['NW']),
+    'the Javits Center': (None, ['NW', 'SW']),
+    "Macy's (Herald Square)": (None, ['SW']),
+    "Bloomingdale's": (None, ['NE']),
+    'Washington Square Park': (None, ['SW']),
+    'Katz’s Deli': (None, ['NW']),
+}
+# not a place you can drive to: entering the bridge isn't arriving at a corner
+DROP = {'the Brooklyn Bridge (Manhattan end)'}
+def streets_at(c):
+    return {names[edges[i][2]] for i in ext[c]}
 places, place_report = [], []
 for nm, pt, ramp in PLACES:
+    if nm in DROP:
+        place_report.append(f'DROPPED {nm}')
+        continue
+    if nm in CORNERS and CORNERS[nm][0]:
+        a, b = CORNERS[nm][0]
+        hit_c = [c for c in core_j if a in streets_at(c) and b in streets_at(c)]
+        if not hit_c:
+            place_report.append(f'NOT IN THIS AREA {nm} ({a} & {b})')
+            continue
+        places.append({'name': nm, 'node': jre[hit_c[0]], **({'quads': CORNERS[nm][1]} if CORNERS[nm][1] else {})})
+        place_report.append(f'{nm}: {a} & {b} {CORNERS[nm][1]}')
+        continue
     if ramp:
         cand2 = [e for e in edges if e[6] == ramp]
         if not cand2:
@@ -799,9 +839,12 @@ for nm, pt, ramp in PLACES:
         hit = snap(nodes[e[0] if e[3] >= 0 else e[1]])
     else:
         hit = snap(pt)
-    if hit and hit[0] < 150:
-        places.append({'name': nm, 'node': jre[hit[1]]})
-        place_report.append(f'{nm}: {hit[0]:.0f} m from the point')
+    if hit and hit[0] < 150 and len(streets_at(hit[1])) >= 2:
+        q = CORNERS.get(nm, (None, None))[1]
+        places.append({'name': nm, 'node': jre[hit[1]], **({'quads': q} if q else {})})
+        place_report.append(f'{nm}: {hit[0]:.0f} m from the point' + (f' {q}' if q else ''))
+    elif hit and hit[0] < 150:
+        place_report.append(f'SKIPPED {nm}: nearest corner has only one street')
     else:
         place_report.append(f'SKIPPED {nm}: nearest intersection {hit[0]:.0f} m away' if hit else f'SKIPPED {nm}')
 for en in entries_out:
