@@ -443,6 +443,14 @@ export function initGridGame(ctx, areaId = 'downtown') {
       },
       paint: { 'text-color': typeof lmInk === 'string' ? lmInk : '#4f483e', 'text-halo-color': '#ffffff', 'text-halo-width': 1.8 },
     });
+    // the famous places you've passed this round: stay on the map (and the wide and end views) so you can see where they were
+    map.addSource('gg-lmseen', { type: 'geojson', data: EMPTY });
+    map.addLayer({ id: 'gg-lmseen-dot', type: 'circle', source: 'gg-lmseen', minzoom: 11.5, paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 5, 15, 7], 'circle-color': '#3b2f1e', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2 } });
+    map.addLayer({
+      id: 'gg-lmseen-label', type: 'symbol', source: 'gg-lmseen', minzoom: 11.5,
+      layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Medium'], 'text-size': 12.5, 'text-anchor': 'top', 'text-offset': [0, 0.8], 'text-max-width': 8, 'text-optional': true },
+      paint: { 'text-color': '#3b2f1e', 'text-halo-color': '#ffffff', 'text-halo-width': 2 },
+    });
     map.addLayer({
       id: 'gg-arrows', type: 'symbol', source: 'gg-arrows',
       layout: {
@@ -644,8 +652,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     if (l) name = l.n;
     const pic = LM_PICS[name];
     if (!l && !pic) return false;
-    clearTimeout(lmTimer);
-    lmTag.hidden = true;
+    hideLmTag();
     if (g && !g.done && lmCardPaused === null) {
       lmCardPaused = g.paused;
       g.paused = true; // the car waits while you look
@@ -705,7 +712,62 @@ export function initGridGame(ctx, areaId = 'downtown') {
   function hideLmTag() {
     clearTimeout(lmTimer);
     lmTag.hidden = true;
+    lmLead.style.display = 'none';
+    lmLeadTo = null;
   }
+  /** The passed landmarks as dots on the map (and, on the end screen, the ones by the destination too). */
+  function syncLmSeen() {
+    if (!g || !map.getSource('gg-lmseen')) return;
+    const list = [...new Map((g.lmSeen || []).map((l) => [l.n, l])).values()];
+    if (g.done && G.landmarks) {
+      const tp = targetPoint();
+      const norm = (x) => x.toLowerCase().replace(/^the /, '').replace(/ \(.*\)$/, '');
+      const isTarget = (l) => !!g.target.name && (norm(g.target.name).includes(norm(l.n)) || norm(l.n).includes(norm(g.target.name)));
+      for (const l of G.landmarks) if (!list.some((x) => x.n === l.n) && metres(tp, l.p) < 170 && !isTarget(l)) list.push(l);
+    }
+    setData('gg-lmseen', { type: 'FeatureCollection', features: list.map((l) => ({ type: 'Feature', properties: { name: l.n }, geometry: { type: 'Point', coordinates: l.p } })) });
+  }
+  // a line from the callout to where the landmark is, kept on it as the map moves, so you can tell where it was
+  const lmLead = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  lmLead.setAttribute('class', 'gg-lmlead');
+  lmLead.style.display = 'none';
+  lmLead.innerHTML = '<line class="u" /><line class="l" /><circle class="u" r="7" /><circle class="d" r="5" />';
+  document.body.appendChild(lmLead);
+  let lmLeadTo = null;
+  function updateLead() {
+    if (!lmLeadTo || lmTag.hidden) {
+      lmLead.style.display = 'none';
+      return;
+    }
+    const cr = map.getContainer().getBoundingClientRect();
+    const tp = map.project(lmLeadTo);
+    const pad = ctx.padding();
+    const W = window.innerWidth;
+    let x = tp.x + cr.left, y = tp.y + cr.top;
+    const clamped = x < 14 || x > W - 14 || y < pad.top || y > window.innerHeight - pad.bottom;
+    x = Math.max(14, Math.min(W - 14, x));
+    y = Math.max(pad.top, Math.min(window.innerHeight - pad.bottom, y));
+    const r = lmTag.getBoundingClientRect();
+    // leave the pill from the point on its edge nearest the landmark
+    const sx = Math.max(r.left, Math.min(r.right, x)), sy = Math.max(r.top, Math.min(r.bottom, y));
+    if (Math.hypot(x - sx, y - sy) < 6) {
+      lmLead.style.display = 'none'; // it's right under the pill
+      return;
+    }
+    for (const el of lmLead.querySelectorAll('line')) {
+      el.setAttribute('x1', sx);
+      el.setAttribute('y1', sy);
+      el.setAttribute('x2', x);
+      el.setAttribute('y2', y);
+    }
+    for (const el of lmLead.querySelectorAll('circle')) {
+      el.setAttribute('cx', x);
+      el.setAttribute('cy', y);
+    }
+    lmLead.classList.toggle('far', clamped);
+    lmLead.style.display = 'block';
+  }
+  map.on('move', updateLead);
   /** Name a landmark that's close, and which side it's on; at most one at a time, a few seconds apart. */
   function noteLandmarks(p, heading, now) {
     if (!g || prefs.landmarks === false || !G.landmarks || now - (g.lmAt || 0) < 5500) return;
@@ -730,9 +792,14 @@ export function initGridGame(ctx, areaId = 'downtown') {
     lmTag.classList.toggle('nopic', !pic);
     lmTag.hidden = false;
     placeLmTag(best.l.p);
+    lmLeadTo = best.l.p;
+    updateLead();
     clearTimeout(lmTimer);
     lmTimer = setTimeout(hideLmTag, 5000);
-    if (!planning()) (g.lmSeen || (g.lmSeen = [])).push(best.l); // only real driving counts for the result
+    if (!planning()) {
+      (g.lmSeen || (g.lmSeen = [])).push(best.l); // only real driving counts for the result
+      syncLmSeen();
+    }
     logEv('lm', best.l.n, side);
   }
   function highlightHood(m, pulse) {
@@ -1155,6 +1222,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     setData('gg-target', EMPTY); // shown once you've driven off (it would give the briefing's guess away)
     setData('gg-trail', EMPTY);
     setData('gg-best', EMPTY);
+    setData('gg-lmseen', EMPTY);
     setData('gg-goto', EMPTY);
     setData('gg-streets', streetsFC || EMPTY);
     setData('gg-elev', elevFC);
@@ -2035,7 +2103,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   function tapLandmark(sx, sy) {
     const r = cont.getBoundingClientRect();
     const x = sx - r.left, y = sy - r.top;
-    const layers = ['gg-target', 'gg-poi-dot'].filter((id) => map.getLayer(id));
+    const layers = ['gg-target', 'gg-lmseen-dot', 'gg-poi-dot'].filter((id) => map.getLayer(id));
     if (!layers.length) return false;
     const hits = map.queryRenderedFeatures([[x - 20, y - 20], [x + 20, y + 20]], { layers });
     for (const f of hits) {
@@ -2391,6 +2459,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     g.waiting = true;
     offEl.hidden = true;
     showLabels(prefs.labels);
+    syncLmSeen();
     keepLog();
     const bestCoords = [];
     g.best.path.forEach((e) => bestCoords.push(...e.pts));

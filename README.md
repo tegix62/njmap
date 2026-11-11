@@ -234,3 +234,5 @@ Location only works over HTTPS (or on `localhost`). To try it on a computer, run
 - [MapLibre GL JS](https://maplibre.org/) (BSD-3), [topojson-client](https://github.com/topojson/topojson-client) (ISC), Noto Sans (SIL OFL). Their licenses are in `lib/` and `fonts/`.
 
 **Where am I?** A magnifier button in the bottom tray, next to the other small buttons (Drive Midtown and Drive Downtown). It jumps straight to a neighborhood-sized view, about 3 km across, centred on you, with neighborhood names and the red destination dot when it's in range; tap again to return. The round carries on while you look, the view keeps following the car, and map taps are ignored in the wide view.
+
+**Where was that landmark?** A landmark callout now has a line running from the pill to the landmark's spot on the map (it follows the map as you drive; dotted when the landmark is off the edge of the screen). Every landmark you pass stays on the map as a dark dot with its name, in the driving view, the magnifier's wide view and the end screen, where the ones by your destination are marked too. Tap a dot for its photo card.
