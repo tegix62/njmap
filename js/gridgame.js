@@ -2542,11 +2542,11 @@ export function initGridGame(ctx, areaId = 'downtown') {
   function planHTML() {
     const p = g.plan;
     const runs = planCrumbs();
-    const crumbs = runs.length ? runs.slice(-4).map((r) => `<b>${esc(short(r.name))}</b> <span class="muted">${r.dir}</span>`).join(' <span class="muted">→</span> ') : '';
+    const crumbs = runs.length ? runs.slice(-2).map((r) => `<b>${esc(short(r.name))}</b> <span class="muted">${r.dir}</span>`).join(' <span class="muted">→</span> ') : '';
     const first = p.route.length === 1;
     const ctl = (html) => `<div class="ggplan">
         ${first && p.phase === 'corner' ? `<div class="gp-here"><span class="bic">📍</span> ${briefYou()}</div>` : ''}
-        <div class="gp-route">${!first && crumbs ? `🧭 ${runs.length > 4 ? '… → ' : ''}${crumbs}` : ''}</div>
+        <div class="gp-route">${!first && crumbs ? `🧭 ${runs.length > 2 ? '… → ' : ''}${crumbs}` : ''}</div>
         ${html}
         <div class="ggmsg${g.msg ? '' : ' muted'}">${g.msg ? esc(g.msg) : ''}</div>
         <div class="gp-bar">
@@ -2925,6 +2925,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
   }
 
   // ---- words on screen -------------------------------------------------------------------
+  /** The game picker chip takes a row of the panel: only on the briefing, the end screen and under "⋯", not while you drive. */
+  const showHeader = () => !!(g.done || g.startCard || g.more || g.report);
   function render() {
     if (!g) return;
     requestAnimationFrame(placeHoodTag);
@@ -2974,7 +2976,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
            ? ''
            : `${showGuide() || showWords() ? `<div class="hint gg-go">${showGuide() ? `<span class="gg-dir" title="Which way the destination is">${DIR_SVG}</span><b class="gg-dist"></b>` : ''}${
                showWords() && !showGuide() ? `<span class="gg-words"></span>` : ''
-             }</div>` : ''}${pl && pl.route.length === 1 ? '' : `<div class="hint gg-where">${where}</div>`}`
+             }</div>` : ''}${pl ? '' : `<div class="hint gg-where">${where}</div>`}`
        }`
     );
     if (!g.done && g.pos && showGuide()) updateDir(aim());
@@ -3004,7 +3006,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
         )
         .join('');
     ctx.sheet(
-      `${g.opts.header()}<div id="qbody">
+      `${showHeader() ? g.opts.header() : ''}<div id="qbody">
         ${g.report ? reportHTML() : g.done ? g.result : g.startCard ? briefingHTML({ you: briefYou(), to: briefTo(), guess: g.guess }) : g.plan ? (g.plan.riding ? '<div class="ggmsg"><b>🚕 Riding your route…</b></div>' : planHTML()) : g.check && g.check.kind === 'name' ? `<div class="ggctl named">${g.check.options.map((n) => `<button class="ggpick ggname" data-name="${esc(n)}"><span class="nm">${esc(short(n))}</span></button>`).join('')}</div>` : `${chipsRow()}${named ? `<div class="ggctl named">${pickBtns()}</div>` : `<div class="ggctl${canStraight ? ' three' : ''}">${btn('L', '◀ Left')}${canStraight ? btn('S', '▲ Straight') : ''}${btn('R', 'Right ▶')}</div>`}
         <div class="ggmsg${g.msg || g.check ? '' : ' muted'}">${
           g.check
@@ -3055,7 +3057,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
         </div>
       </div>`
     );
-    g.opts.bindHeader();
+    if (showHeader()) g.opts.bindHeader();
     // driving controls act on touch-down: the panel redraws at every corner, and a tap whose
     // button is replaced between finger-down and finger-up would otherwise be lost
     for (const b of document.querySelectorAll('.ggturn')) onTap(b, () => press(b.dataset.side));
