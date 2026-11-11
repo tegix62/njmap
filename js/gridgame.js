@@ -859,6 +859,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const places = G.places.filter((p) => inArea(p.node));
     const entries = G.entries.filter((en) => inArea(en.landsAt));
     const useEntry = entries.length && (prefs.from === 'entries' || (prefs.from === 'both' && Math.random() < 0.5));
+    const wantBack = Math.random() < 0.05;
     for (let tries = 0; tries < 300; tries++) {
       const target = places.length && Math.random() < 0.7 ? { ...rand(places) } : { name: null, node: rand(coreNodes) };
       target.label = G.label(target.node);
@@ -867,9 +868,15 @@ export function initGridGame(ctx, areaId = 'downtown') {
       let e0, s0 = 0, entry = null;
       if (useEntry) {
         entry = pickEntry(entries);
-        // not a trip that ends where it began (out of the Lincoln Tunnel, to the Lincoln Tunnel)
+        // A trip that ends where it began (out of the Lincoln Tunnel, back to it) is rare on purpose:
+        // about 1 in 20 of the rounds that start at a crossing the map has a destination for.
         const crossing = (t) => ((t || '').toLowerCase().match(/lincoln|holland|queensboro|queens-midtown|brooklyn bridge|brooklyn-battery|manhattan bridge|williamsburg/) || [])[0];
-        if (target.name && crossing(entry.from) && crossing(entry.from) === crossing(target.name)) continue;
+        const same = crossing(entry.from);
+        const back = same && places.find((p) => crossing(p.name) === same);
+        if (back && wantBack) {
+          Object.assign(target, back, { label: G.label(back.node), quad: chooseQuad(back.node, back.name) });
+          if (!target.quad) continue;
+        } else if (target.name && same && same === crossing(target.name)) continue;
         ({ e: e0, s: s0 } = entryStart(entry));
       } else {
         const n = rand(coreNodes);
