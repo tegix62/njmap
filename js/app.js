@@ -745,5 +745,5 @@ async function main() {
 main().catch((err) => {
   console.error(err);
   document.getElementById('hud').hidden = false;
-  document.getElementById('hud').innerHTML = `<div class="town">Couldn't load the map</div><div class="meta">${String(err.message || err)}</div>`;
+  document.getElementById('hud').innerHTML = `<div class="town">Couldn't load the map</div><div class="meta">${String(err.message || err)}</div><div class="meta" style="font:11px/1.35 ui-monospace,monospace;white-space:pre-wrap;word-break:break-all">${String((err.stack || '').split('\n').slice(0, 4).join('\n')).replace(/[<>&]/g, '')}</div>`;
 });
