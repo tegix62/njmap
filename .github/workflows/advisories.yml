@@ -1,10 +1,10 @@
 name: Port Authority alert log
 
-# Every few hours: read the Port Authority's bridge & tunnel alerts and add the Lincoln Tunnel, Holland Tunnel
+# Once a day: read the Port Authority's bridge & tunnel alerts and add the Lincoln Tunnel, Holland Tunnel
 # and George Washington Bridge ones to data/advisories-log.json (see tools/fetch_advisories.py).
 on:
   schedule:
-    - cron: '17 */3 * * *'
+    - cron: '17 9 * * *'
   workflow_dispatch: {}
 
 permissions:

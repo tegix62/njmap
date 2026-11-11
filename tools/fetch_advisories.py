@@ -5,7 +5,7 @@ The Port Authority's own site loads its "Bridge & Tunnel alerts" from a JSON end
 (www.panynj.gov/bin/portauthority/crossingtimesalertapi.json?start_date=YYYY-MM-DD). This script reads it,
 keeps the alerts about our three crossings, tags them (which tube, which direction, what kind of event),
 and merges them into data/advisories-log.json (deduplicated by message id, oldest first), so the log keeps
-growing as the script is run (the scheduled GitHub Action runs it every few hours).
+growing as the script is run (the scheduled GitHub Action runs it once a day).
 
 Usage: python3 -I tools/fetch_advisories.py [--since YYYY-MM-DD]     (default: the last 4 days)
 """

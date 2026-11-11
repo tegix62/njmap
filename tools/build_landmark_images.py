@@ -27,7 +27,7 @@ TITLES = {
 FILES = {
     'Cooper Union': 'The Cooper Union Foundation Building 002.jpg',
     'Chrysler Building': 'Chrysler Building by David Shankbone Retouched.jpg',
-    'Trinity Church': 'NYC Trinity Church.jpg',
+    'Trinity Church': 'NYC - Trinity Church - Watts statue.JPG',
     'One World Trade Center': 'One World Trade Center Building (2021).jpg',
     'Woolworth Building': 'Woolworth Building 9495.JPG',
     'United Nations': 'UN Headquarters 2.jpg',
