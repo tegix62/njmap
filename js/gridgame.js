@@ -941,7 +941,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
   // Starts at the ways you actually come in (the GWB, the Lincoln and Holland Tunnels) come up far more often.
   const MAIN_ENTRY = /George Washington|GWB|Lincoln Tunnel|Holland Tunnel/;
   function pickEntry(list) {
-    const w = list.map((en) => (/FDR/.test(en.from) ? 3 : MAIN_ENTRY.test(en.from) ? 5 : 1)); // the GWB by the east side is the less usual way down
+    // the GWB by the east side (Google's own route to the UN: I-87, I-278, then the FDR to exit 8) is the less usual way down
+    const w = list.map((en) => (/exit 8/.test(en.from) ? 2 : /FDR/.test(en.from) ? 1 : /GWB.*West Side/.test(en.from) ? 4 : MAIN_ENTRY.test(en.from) ? 5 : 1));
     let r = Math.random() * w.reduce((a, b) => a + b, 0);
     for (let i = 0; i < list.length; i++) if ((r -= w[i]) < 0) return list[i];
     return list[list.length - 1];

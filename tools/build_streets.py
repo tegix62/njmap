@@ -870,6 +870,18 @@ def near_junction(pt, r=45):
 # end at 53rd St and Sutton Pl S) puts you on E 53rd St heading west. The 49th and 34th St exits land on
 # spur streets this map leaves out, and 42nd St has no southbound exit.
 FDR_STARTS = [('the GWB (down the FDR, E 53rd St exit)', (-73.96255, 40.75482), 'E 53rd St')]
+# Google Maps from the GWB to the UN (I-87, I-278 over the Triborough, the FDR south): "Take exit 8 toward
+# I-495/Midtown Tun/E 34 St", merge onto the FDR service road, "Turn right onto E 38th St", "Turn right
+# onto 1st Ave", then up 1st Ave to the UN. That short stretch of E 38th St runs west into 1st Ave and
+# isn't part of the connected network (nothing drives into it from the grid), so it is the lane in.
+if AREA == 'midtown':
+    cand = [li for li in kl if names[links[li]['name']] == 'E 38th St' and {'1st Ave', 'E 38th St'} <= streets_at(links[li]['to']) and abs(links[li]['b0'] - 300) < 30 and li not in core_l]
+    if cand:
+        li = cand[0]
+        entries_out.append({'from': 'the GWB (I-87, I-278, FDR exit 8)', 'via': 'E 38th St', 'link': lre[li], 'landsAt': jre[links[li]['to']]})
+        place_report.append(f'  start the GWB (I-87, I-278, FDR exit 8): link {lre[li]} on E 38th St')
+    else:
+        place_report.append('  start the GWB (I-87, I-278, FDR exit 8): NOT FOUND')
 if AREA == 'midtown':
     for label, pt, street in FDR_STARTS:
         h = near_junction(pt, 30)
