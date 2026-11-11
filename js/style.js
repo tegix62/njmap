@@ -16,6 +16,7 @@ let HWYS = []; // the region's highways with their colors; set by buildStyle()
 
 const isClass = (list) => ['match', ['get', 'class'], list, true, false];
 const notTunnel = ['!=', ['get', 'brunnel'], 'tunnel'];
+const RAMP_K = ['case', ['==', ['get', 'ramp'], 1], 0.5, 1]; // ramps and slip roads: half the width of the road they leave
 const roadWidth = (a, b, c) => ['interpolate', ['exponential', 1.5], ['zoom'], 8, a, 12, b, 16, c];
 // Practice quiets the street network so the question's places stand out.
 const QUIET = ['case', ['boolean', ['global-state', 'quiet'], false], 0.35, 1];
@@ -72,10 +73,11 @@ const baseLayers = (Z) => [
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
         'line-color': ['match', ['get', 'class'], 'motorway', T.road.motorway, T.road.major],
+        // slimmer than before: at region zoom, doubled roadbeds, bridges and ramp tangles read as blobs; ramps get half
         'line-width': ['interpolate', ['exponential', 1.5], ['zoom'],
-          8, ['match', ['get', 'class'], 'motorway', 1, 0.6],
-          12, ['match', ['get', 'class'], 'motorway', 3, 2.2],
-          16, ['match', ['get', 'class'], 'motorway', 14, 12]],
+          8, ['*', RAMP_K, ['match', ['get', 'class'], 'motorway', 0.7, 0.5]],
+          12, ['*', RAMP_K, ['match', ['get', 'class'], 'motorway', 1.9, 1.6]],
+          16, ['*', RAMP_K, ['match', ['get', 'class'], 'motorway', 10, 8]]],
         // State level: interstates/Turnpike/Parkway only; the rest fade in at region level.
         'line-opacity': ['interpolate', ['linear'], ['zoom'], Z.region - 0.6, ['*', ['match', ['get', 'class'], 'motorway', 1, 0], QUIET], Z.region, QUIET],
       },
@@ -98,7 +100,7 @@ const baseLayers = (Z) => [
         'line-color': HWYS.length
           ? ['match', LABEL_EXPR, ...HWYS.flatMap((h) => [h.label, h.color]), T.road.motorway]
           : T.road.motorway,
-        'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], 6, 1.4, 9, 2.4, 12, 3.6, 16, 14],
+        'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], 6, 0.9, 9, 1.5, 12, 2.4, 16, 10],
       },
     },
     'streets light',

@@ -85,8 +85,8 @@ export const INK = {
   water: '#ddd8cd',
   waterInk: '#6b6257',
   road: {
-    motorway: '#3a332b',
-    major: '#8a8172',
+    motorway: '#5a5145',
+    major: '#9a9182',
     mid: '#d8d1c3',
     minor: '#e4ded1',
     ref: '#3a332b',
