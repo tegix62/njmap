@@ -184,6 +184,13 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const gy = nodes.map((p) => gridXY(p)[1]);
     G = { d, nodes, edges, out, inn, coreJ, cuts, real, streetsAt, xingGeo, label, plain, gy, RAMP, places: d.places, entries: d.entries, areas: d.areas };
     G.dataKey = `${d.source}|${edges.length}|${nodes.length}`;
+    // The George Washington Bridge is far uptown, off this map: a trip from it comes down the West
+    // Side Highway, so it starts on the northernmost southbound stretch of 12th Ave.
+    if (areaId === 'midtown' && !G.entries.some((en) => /George Washington/.test(en.from))) {
+      const south = edges.filter((e) => e.core && /^12th Ave/.test(e.name) && Math.abs(((e.b0 - (GRID + 180) + 540) % 360) - 180) < 45);
+      south.sort((a, b) => nodes[b.from][1] - nodes[a.from][1]);
+      if (south[0]) G.entries = [...G.entries, { from: 'the GWB (down the West Side Highway)', via: south[0].name, link: south[0].id, landsAt: south[0].to }];
+    }
     // The grid's own coordinates: across (x) of each avenue, up (y) of each numbered street, so a
     // point can be put into "streets and avenues". Avenues keep one column north of 59th under
     // their uptown names (9th Ave is Columbus Ave, 10th is Amsterdam, 11th is West End).
@@ -838,6 +845,14 @@ export function initGridGame(ctx, areaId = 'downtown') {
     }
     return null;
   }
+  // Starts at the ways you actually come in (the GWB, the Lincoln and Holland Tunnels) come up far more often.
+  const MAIN_ENTRY = /George Washington|GWB|Lincoln Tunnel|Holland Tunnel/;
+  function pickEntry(list) {
+    const w = list.map((en) => (MAIN_ENTRY.test(en.from) ? 5 : 1));
+    let r = Math.random() * w.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < list.length; i++) if ((r -= w[i]) < 0) return list[i];
+    return list[list.length - 1];
+  }
   function pickRandom() {
     const coreNodes = [];
     for (let n = 0; n < G.nodes.length; n++) if (isCore(n) && G.real(n) && G.plain(n) && G.streetsAt(n) >= 2 && inArea(n)) coreNodes.push(n);
@@ -851,7 +866,10 @@ export function initGridGame(ctx, areaId = 'downtown') {
       if (!target.quad) continue;
       let e0, s0 = 0, entry = null;
       if (useEntry) {
-        entry = rand(entries);
+        entry = pickEntry(entries);
+        // not a trip that ends where it began (out of the Lincoln Tunnel, to the Lincoln Tunnel)
+        const crossing = (t) => ((t || '').toLowerCase().match(/lincoln|holland|queensboro|queens-midtown|brooklyn bridge|brooklyn-battery|manhattan bridge|williamsburg/) || [])[0];
+        if (target.name && crossing(entry.from) && crossing(entry.from) === crossing(target.name)) continue;
         ({ e: e0, s: s0 } = entryStart(entry));
       } else {
         const n = rand(coreNodes);
@@ -2551,7 +2569,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     _state: () => g,
     _graph: () => G,
     _plan: { planCorner: (n) => planCorner(n), render: () => render() },
-    _model: { choices, moves, shortest, straightTo, aheadChain, load, rule, describe, atTarget, arrivalSide, arrivalOK, chooseQuad, twoWay },
+    _model: { pickEntry, entryStart, choices, moves, shortest, straightTo, aheadChain, load, rule, describe, atTarget, arrivalSide, arrivalOK, chooseQuad, twoWay },
     _speed: () => (g && !g.loading && g.e ? speedNow() : 0),
     _mem: () => mem,
     _countWords: (a, b) => countWords(a, b),
