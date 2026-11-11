@@ -2610,7 +2610,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
             <summary>More options</summary>
             <label><input type="checkbox" id="ggArrows"${prefs.arrows ? ' checked' : ''}/> One-way arrows</label>
             <label><input type="checkbox" id="ggLabels"${prefs.labels ? ' checked' : ''}/> Street names (off: hard mode)</label>
-            <label><input type="checkbox" id="ggLandmarks"${prefs.landmarks === false ? '' : ' checked'}/> Landmark callouts ("by the way, that's the Chrysler Building")</label>
+            <label><input type="checkbox" id="ggLandmarks"${prefs.landmarks === false ? '' : ' checked'}/> Landmark callouts ("by the way, that's the Chrysler Building") · <a href="credits.html" target="_blank" rel="noopener">photo credits</a></label>
             <label><input type="checkbox" id="ggCover"${prefs.cover ? ' checked' : ''}/> Show streets I've driven</label>
             <label><input type="checkbox" id="ggTrips"${prefs.trips ? ' checked' : ''}/> Mix in my saved trips</label>
             <label><input type="checkbox" id="ggMapFirst"${prefs.mapFirst ? ' checked' : ''}/> Map first</label>

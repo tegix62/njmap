@@ -1,0 +1,233 @@
+{
+ "Grand Central Terminal": {
+  "img": "img/landmarks/grand-central-terminal.jpg",
+  "file": "Image-Grand_central_Station_Outside_Night_2.jpg",
+  "author": "Fcb981 ; Eric Baetscher (attribution required)",
+  "license": "CC BY-SA 3.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Image-Grand_central_Station_Outside_Night_2.jpg"
+ },
+ "New York Public Library": {
+  "img": "img/landmarks/new-york-public-library.jpg",
+  "file": "New_York_Public_Library_-_Main_Branch_(51396225599).jpg",
+  "author": "ajay_suresh",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:New_York_Public_Library_-_Main_Branch_(51396225599).jpg"
+ },
+ "Bryant Park": {
+  "img": "img/landmarks/bryant-park.jpg",
+  "file": "New-York_-_Bryant_Park.jpg",
+  "author": "Jean-Christophe BENOIST",
+  "license": "CC BY 3.0",
+  "page": "https://commons.wikimedia.org/wiki/File:New-York_-_Bryant_Park.jpg"
+ },
+ "Rockefeller Center": {
+  "img": "img/landmarks/rockefeller-center.jpg",
+  "file": "Rockefeller_Center_logo.svg",
+  "author": "Rockefeller Group/Mitsubishi Estate",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Rockefeller_Center_logo.svg"
+ },
+ "Radio City Music Hall": {
+  "img": "img/landmarks/radio-city-music-hall.jpg",
+  "file": "Radio_City_Music_Hall_(51395756913).jpg",
+  "author": "ajay_suresh",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Radio_City_Music_Hall_(51395756913).jpg"
+ },
+ "St. Patrick's Cathedral": {
+  "img": "img/landmarks/st-patrick-s-cathedral.jpg",
+  "file": "St._Patrick's_Cathedral_-_2026_(55284018525).jpg",
+  "author": "Ajay Suresh",
+  "license": "CC BY 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:St._Patrick%27s_Cathedral_-_2026_(55284018525).jpg"
+ },
+ "Times Square": {
+  "img": "img/landmarks/times-square.jpg",
+  "file": "New_york_times_square-terabass.jpg",
+  "author": "Terabass",
+  "license": "CC BY-SA 3.0",
+  "page": "https://commons.wikimedia.org/wiki/File:New_york_times_square-terabass.jpg"
+ },
+ "Port Authority Bus Terminal": {
+  "img": "img/landmarks/port-authority-bus-terminal.jpg",
+  "file": "Port_Authority_Bus_Terminal_(48295955196).jpg",
+  "author": "ajay_suresh",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Port_Authority_Bus_Terminal_(48295955196).jpg"
+ },
+ "Madison Square Garden": {
+  "img": "img/landmarks/madison-square-garden.jpg",
+  "file": "Madison_Square_Garden_(MSG)_-_Full_(48124330357).jpg",
+  "author": "Ajay Suresh from New York, NY, USA",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Madison_Square_Garden_(MSG)_-_Full_(48124330357).jpg"
+ },
+ "Penn Station": {
+  "img": "img/landmarks/penn-station.jpg",
+  "file": "Moynihan_Train_Hall_interior,_Dec_27_2022.jpg",
+  "author": "D. Benjamin Miller",
+  "license": "CC0",
+  "page": "https://commons.wikimedia.org/wiki/File:Moynihan_Train_Hall_interior,_Dec_27_2022.jpg"
+ },
+ "Macy's Herald Square": {
+  "img": "img/landmarks/macy-s-herald-square.jpg",
+  "file": "NYC-manhattan-macys.jpg",
+  "author": "Balou46",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:NYC-manhattan-macys.jpg"
+ },
+ "Madison Square Park": {
+  "img": "img/landmarks/madison-square-park.jpg",
+  "file": "Madison_Square_Park_from_Above_at_Night_New_York_City.jpg",
+  "author": "alq666",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Madison_Square_Park_from_Above_at_Night_New_York_City.jpg"
+ },
+ "Union Square": {
+  "img": "img/landmarks/union-square.jpg",
+  "file": "1_new_york_city_union_square_2010.JPG",
+  "author": "chensiyuan",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:1_new_york_city_union_square_2010.JPG"
+ },
+ "Carnegie Hall": {
+  "img": "img/landmarks/carnegie-hall.jpg",
+  "file": "Carnegie_Hall_-_Full_(48155558466).jpg",
+  "author": "Ajay Suresh from New York, NY, USA",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Carnegie_Hall_-_Full_(48155558466).jpg"
+ },
+ "MoMA": {
+  "img": "img/landmarks/moma.jpg",
+  "file": "MoMa_NY_USA_1.jpg",
+  "author": "hibino",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:MoMa_NY_USA_1.jpg"
+ },
+ "Plaza Hotel": {
+  "img": "img/landmarks/plaza-hotel.jpg",
+  "file": "New_York_-_Manhattan_-_Plaza_Hotel.jpg",
+  "author": "Yarl",
+  "license": "CC BY-SA 3.0",
+  "page": "https://commons.wikimedia.org/wiki/File:New_York_-_Manhattan_-_Plaza_Hotel.jpg"
+ },
+ "Bloomingdale's": {
+  "img": "img/landmarks/bloomingdale-s.jpg",
+  "file": "Bloomingdale's_(48064045898).jpg",
+  "author": "Ajay Suresh from New York, NY, USA",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Bloomingdale%27s_(48064045898).jpg"
+ },
+ "Columbus Circle": {
+  "img": "img/landmarks/columbus-circle.jpg",
+  "file": "Columbus_Circle_in_New_York_City.jpg",
+  "author": "TarHeel4793",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Columbus_Circle_in_New_York_City.jpg"
+ },
+ "Javits Center": {
+  "img": "img/landmarks/javits-center.jpg",
+  "file": "Javits_Center_-_Full_Front_(49052081016).jpg",
+  "author": "Ajay Suresh from New York, NY, USA",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Javits_Center_-_Full_Front_(49052081016).jpg"
+ },
+ "Chelsea Market": {
+  "img": "img/landmarks/chelsea-market.jpg",
+  "file": "Chelsea_Market_(49052085186).jpg",
+  "author": "Ajay Suresh from New York, NY, USA",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Chelsea_Market_(49052085186).jpg"
+ },
+ "Morgan Library": {
+  "img": "img/landmarks/morgan-library.jpg",
+  "file": "Morgan_Library_&_Museum,_New_York_2017_02.jpg",
+  "author": "Photograph by Mike Peel (www.mikepeel.net).",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Morgan_Library_%26_Museum,_New_York_2017_02.jpg"
+ },
+ "Waldorf Astoria": {
+  "img": "img/landmarks/waldorf-astoria.jpg",
+  "file": "Waldorf_Astoria_New_York_(55272623437).jpg",
+  "author": "ajay_suresh",
+  "license": "CC BY 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Waldorf_Astoria_New_York_(55272623437).jpg"
+ },
+ "Trump Tower": {
+  "img": "img/landmarks/trump-tower.jpg",
+  "file": "Trump_Tower_(55283844524).jpg",
+  "author": "ajay_suresh",
+  "license": "CC BY 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Trump_Tower_(55283844524).jpg"
+ },
+ "Tudor City": {
+  "img": "img/landmarks/tudor-city.jpg",
+  "file": "Tudor_City_jeh.JPG",
+  "author": "Jim.henderson",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Tudor_City_jeh.JPG"
+ },
+ "9/11 Memorial": {
+  "img": "img/landmarks/9-11-memorial.jpg",
+  "file": "9-11_Memorial_and_Museum_(28815276064).jpg",
+  "author": "Paul Sableman",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:9-11_Memorial_and_Museum_(28815276064).jpg"
+ },
+ "Oculus": {
+  "img": "img/landmarks/oculus.jpg",
+  "file": "Oculus_World_Trade_Center_-_August_18_2016.jpg",
+  "author": "Anthony Quintano",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Oculus_World_Trade_Center_-_August_18_2016.jpg"
+ },
+ "Stock Exchange": {
+  "img": "img/landmarks/stock-exchange.jpg",
+  "file": "New_York_Stock_Exchange_Facade_2015.jpg",
+  "author": "Jeffrey Zeldman from Manhattan, USA",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:New_York_Stock_Exchange_Facade_2015.jpg"
+ },
+ "Federal Hall": {
+  "img": "img/landmarks/federal-hall.jpg",
+  "file": "Federal_Hall_(48126566178).jpg",
+  "author": "Ajay Suresh from New York, NY, USA",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Federal_Hall_(48126566178).jpg"
+ },
+ "Battery Park": {
+  "img": "img/landmarks/battery-park.jpg",
+  "file": "Battery_Park.JPG",
+  "author": "Gryffindor",
+  "license": "CC BY-SA 3.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Battery_Park.JPG"
+ },
+ "Staten Island Ferry": {
+  "img": "img/landmarks/staten-island-ferry.jpg",
+  "file": "Spirit_of_America_-_Staten_Island_Ferry.jpg",
+  "author": "InSapphoWeTrust",
+  "license": "CC BY-SA 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Spirit_of_America_-_Staten_Island_Ferry.jpg"
+ },
+ "Cooper Union": {
+  "img": "img/landmarks/cooper-union.jpg",
+  "file": "Cooper_Union.svg",
+  "author": "Doyle Partners",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Cooper_Union.svg"
+ },
+ "Katz's Delicatessen": {
+  "img": "img/landmarks/katz-s-delicatessen.jpg",
+  "file": "Katz's_Delicatessen_(51623899326).jpg",
+  "author": "ajay_suresh",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Katz%27s_Delicatessen_(51623899326).jpg"
+ },
+ "Whitney Museum": {
+  "img": "img/landmarks/whitney-museum.jpg",
+  "file": "Whitney_Museum_of_American_Art_(49051573133).jpg",
+  "author": "Ajay Suresh from New York, NY, USA",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Whitney_Museum_of_American_Art_(49051573133).jpg"
+ }
+}

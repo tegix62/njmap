@@ -2,7 +2,7 @@
 // cached, so "which town am I in" keeps working with no signal. Online, the
 // app's own files come from the network first (the latest version every time). Background map
 // tiles are only cached opportunistically.
-const VERSION = 'njtf-v89';
+const VERSION = 'njtf-v90';
 const SHELL = [
   './',
   'index.html',
@@ -42,7 +42,7 @@ const SHELL = [
   'data/manhattan.topo.json',
   'data/downtown-streets.json',
   'data/midtown-streets.json',
-  'data/landmarks.json', 'data/landmark-icons.json',
+  'data/landmarks.json', 'data/landmark-icons.json', 'data/landmark-credits.json', 'credits.html',
   'fonts/Noto Sans Medium/0-255.pbf',
   'fonts/Noto Sans Italic/0-255.pbf',
   'manifest.webmanifest',
