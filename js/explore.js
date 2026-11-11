@@ -1,7 +1,7 @@
 import { bearing, compass8, ARROWS } from './geo.js';
 import { roadsInTown, roadsFrom, draftNote, countyNum } from './roads.js';
 import { editNote } from './notes.js';
-import { buildingFeatures, applySurveyTowers, loadSurveyTowers } from './city3d.js';
+import { buildingFeatures, applySurveyTowers, loadSurveyTowers, groundFeatures, GROUND_PAINT } from './city3d.js';
 
 let L; // label colors of the active theme (set in initExplore)
 
@@ -67,6 +67,11 @@ export function initExplore(ctx) {
         const id = 'x3d-' + name;
         map.addSource(id, { type: 'geojson', data: { type: 'FeatureCollection', features: applySurveyTowers(buildingFeatures(d), towers) } });
         const first = map.getStyle().layers.find((l) => l.type === 'symbol');
+        const ground = await fetch(`data/ground-${name}.json`).then((r) => r.json()).catch(() => null);
+        if (ground) {
+          map.addSource('x3dg-' + name, { type: 'geojson', data: { type: 'FeatureCollection', features: groundFeatures(ground) } });
+          for (const k of ['walk', 'road', 'park']) map.addLayer({ id: `x3dg-${k}-${name}`, type: 'fill', source: 'x3dg-' + name, minzoom: 14, filter: ['==', ['get', 'k'], k], paint: GROUND_PAINT[k] }, first && first.id);
+        }
         map.addLayer(
           {
             id, type: 'fill-extrusion', source: id, minzoom: 13.5,

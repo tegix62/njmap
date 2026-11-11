@@ -98,15 +98,25 @@ export function applySurveyTowers(feats, towers) {
     info.forEach((o, i) => {
       if (drop.has(i)) return;
       const d = mDist(o.c, [lon, lat]);
-      if (d < bd && !o.model && H >= o.h * 0.75 && H <= o.h * 1.4) { bd = d; best = i; }
+      if (d < bd && !o.model && H >= o.h * 0.75 && H <= o.h * 1.55) { bd = d; best = i; }
     });
     // (a model's pieces: any piece of one within 45 m, tallest piece at about the height)
     const pieces = [];
     info.forEach((o, i) => { if (o.model && !drop.has(i) && mDist(o.c, [lon, lat]) < 45) pieces.push(i); });
-    if (best < 0 && !pieces.length) continue;
+    if (best < 0 && !pieces.length) {
+      // nothing like it in the footprint data: add the surveyed tower only where the data has no tall building at all
+      // (the MetLife Building is missing from it; a block of 40 m would be)
+      let nearMax = 0, covered = false;
+      info.forEach((o) => {
+        const d = mDist(o.c, [lon, lat]);
+        if (d < 150) covered = true; // (this file covers the spot at all: each file only adds towers that stand in it)
+        if (d < 45) nearMax = Math.max(nearMax, o.h);
+      });
+      if (!covered || nearMax >= H * 0.5) continue;
+    }
     if (pieces.length) {
       const top = Math.max(...pieces.map((i) => info[i].h));
-      if (!(H >= top * 0.75 && H <= top * 1.4)) continue;
+      if (!(H >= top * 0.75 && H <= top * 1.55)) continue;
     }
     const color = pieces.length ? info[pieces[0]].color : null;
     if (best >= 0) drop.add(best);
@@ -122,3 +132,27 @@ export function applySurveyTowers(feats, towers) {
   }
   return feats.filter((_, i) => !drop.has(i)).concat(add);
 }
+
+/** The street surfaces, sidewalks and parks of a data/ground-*.json (tools/extract_ground.py) as polygon features with k = road | walk | park. */
+export function groundFeatures(d) {
+  const feats = [];
+  for (const k of ['walk', 'road', 'park']) {
+    for (const flat of d[k] || []) {
+      let x = d.o[0], y = d.o[1];
+      const ring = [];
+      for (let i = 0; i < flat.length; i += 2) {
+        x += flat[i];
+        y += flat[i + 1];
+        ring.push([x / 1e6, y / 1e6]);
+      }
+      ring.push(ring[0]);
+      feats.push({ type: 'Feature', properties: { k }, geometry: { type: 'Polygon', coordinates: [ring] } });
+    }
+  }
+  return feats;
+}
+export const GROUND_PAINT = {
+  walk: { 'fill-color': '#ffffff', 'fill-opacity': 0.38 },
+  road: { 'fill-color': '#5a4e3a', 'fill-opacity': 0.17 },
+  park: { 'fill-color': '#6fa65a', 'fill-opacity': 0.34 },
+};

@@ -26,7 +26,7 @@
 
 import { framesStats } from './frames.js';
 import { GUIDES, PEEK_MS, okSides, sideWords, guessRecord, briefingHTML, bindBriefing } from './briefing.js';
-import { buildingFeatures, applySurveyTowers, loadSurveyTowers } from './city3d.js';
+import { buildingFeatures, applySurveyTowers, loadSurveyTowers, groundFeatures, GROUND_PAINT } from './city3d.js';
 
 const CHECK_EVERY_MS = 35000; // a check-in at most this often
 const GRID = 29; // the grid is turned ~29° clockwise from north
@@ -416,6 +416,11 @@ export function initGridGame(ctx, areaId = 'downtown') {
     if (map.getSource('gg-trail')) return;
     map.setGlobalStateProperty('sq', 0);
     for (let k = 0; k < 3; k++) map.setGlobalStateProperty('r' + k, 1);
+    // the street surfaces, sidewalks and parks of NYC Planning's 3D model, as faint flat shapes under the buildings (3D only)
+    map.addSource('gg-ground', { type: 'geojson', data: EMPTY });
+    for (const k of ['walk', 'road', 'park']) {
+      map.addLayer({ id: 'gg-' + k, type: 'fill', source: 'gg-ground', minzoom: 14, layout: { visibility: 'none' }, filter: ['==', ['get', 'k'], k], paint: GROUND_PAINT[k] });
+    }
     map.addSource('gg-bldg', { type: 'geojson', data: EMPTY });
     map.addSource('gg-streets', { type: 'geojson', data: streetsFC || EMPTY });
     const roadCol = map.getLayer('road-mid') && map.getPaintProperty('road-mid', 'line-color');
@@ -721,6 +726,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
     if (bldgBusy || map.__ggBldgReady || !G) return;
     bldgBusy = true;
     try {
+      const grounds = await Promise.all(BLDG_FILES.map((f) => fetch(`data/ground-${f}.json`).then((r) => r.json()).catch(() => null)));
+      setData('gg-ground', { type: 'FeatureCollection', features: grounds.filter(Boolean).flatMap(groundFeatures) });
       const [towers, ...files] = await Promise.all([loadSurveyTowers(), ...BLDG_FILES.map((f) => fetch(`data/buildings-${f}.json`).then((r) => r.json()))]);
       const feats = [];
       for (const f of applySurveyTowers(files.flatMap((d) => buildingFeatures(d)), towers)) {
@@ -791,6 +798,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     syncSquash();
     const vis = tiltOn() && g && !g.done ? 'visible' : 'none';
     map.setLayoutProperty('gg-bldg', 'visibility', vis);
+    for (const k of ['walk', 'road', 'park']) map.setLayoutProperty('gg-' + k, 'visibility', vis);
     map.setFilter('gg-bldg', ['==', ['get', 'z'], OWN_ZONE]);
     for (let k = 0; k < 3; k++) map.setLayoutProperty('gg-ghost' + k, 'visibility', k === OWN_ZONE ? 'none' : vis);
     map.setFilter('gg-beacon', ['all', ['has', 'c'], ['!=', ['get', 'z'], OWN_ZONE]]);
