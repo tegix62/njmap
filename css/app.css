@@ -2618,6 +2618,7 @@ body.ink .prow .typebtn {
   display: none;
 }
 .gg-lmcard-in {
+  cursor: pointer;
   width: min(420px, 100%);
   max-height: 100%;
   overflow: auto;

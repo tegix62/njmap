@@ -646,7 +646,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     const el = ev.target.closest && ev.target.closest('[data-lm]');
     // (Drive Midtown and Drive Downtown each have their own callout and result lines: act only on this game's)
     if (el && el.dataset.lm && !lmCard.contains(el) && (el === lmTag || el.dataset.gg === areaId)) return openLmCard(el.dataset.lm);
-    if (!lmCard.hidden && (ev.target === lmCard || ev.target.closest('.gg-lmcard-x'))) closeLmCard();
+    if (!lmCard.hidden && lmCard.contains(ev.target) && !ev.target.closest('a')) closeLmCard(); // a tap anywhere on the card (or round it) closes it; the photo-credit link still opens
   });
   // "By the way": a famous building or place within a block of you, named for a few seconds, once per round
   const lmTag = document.createElement('div');
