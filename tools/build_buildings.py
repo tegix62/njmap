@@ -16,6 +16,25 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BOX = (40.7400, -74.0150, 40.7720, -73.9600)  # Midtown: lat1, lon1, lat2, lon2
 URL = 'https://data.cityofnewyork.us/resource/5zhs-2jue.json'
 S = 100000
+TOWERS = [
+    ('Empire State Building', -73.98566, 40.74844, 381),
+    ('Chrysler Building', -73.97534, 40.75166, 319),
+    ('GE Building (30 Rock)', -73.97931, 40.75874, 259),
+    ('Bank of America Tower', -73.98458, 40.75537, 288),
+    ('MetLife Building', -73.97665, 40.75339, 246),
+    ('Citigroup Center', -73.97063, 40.75868, 279),
+    ('Trump Tower', -73.97394, 40.76240, 202),
+    ('432 Park Avenue', -73.97194, 40.76166, 426),
+    ('Hearst Tower', -73.98300, 40.76726, 182),
+    ('New York Times Building', -73.99032, 40.75570, 228),
+    ('One Vanderbilt', -73.97839, 40.75263, 427),
+    ('Central Park Tower', -73.98065, 40.76595, 472),
+    ('Lipstick Building', -73.96890, 40.75960, 138),
+    ('Waldorf Astoria', -73.97394, 40.75613, 191),
+    ('Time Warner Center', -73.98287, 40.76846, 229),
+    ('Metropolitan Life Tower', -73.98720, 40.74146, 213),
+    ('Seagram Building', -73.97200, 40.75800, 157),
+]
 MIN_H_M = 6.0      # drop anything lower than this (sheds, garages)
 MIN_AREA_M2 = 40.0  # and anything smaller than this
 TOL_M = 1.2        # outline simplification
@@ -87,6 +106,7 @@ def main():
     lpts = [(l['n'], l['p']) for l in lm]
     origin = (BOX[1], BOX[0])
     out, flagged = [], {}
+    cand = []  # (centroid lon, lat, height, index in out)
     for r in rows:
         try:
             h = float(r['height_roof']) * 0.3048
@@ -114,9 +134,27 @@ def main():
                 flat += [x - px, y - py]
                 px, py = x, y
             out.append([round(h), flag] + flat)
+            cand.append((sum(p[0] for p in ring) / len(ring), sum(p[1] for p in ring) / len(ring), h, len(out) - 1))
+    # the towers with their own models: the nearest building of about the right height within 70 m
+    models, used = [], set()
+    for name, lon, lat, eh in TOWERS:
+        best = None
+        for clon, clat, h, i in cand:
+            if i in used or abs(h - eh) / eh > 0.2:
+                continue
+            d = metres((lon, lat), (clon, clat))
+            if d < 70 and (best is None or d < best[0]):
+                best = (d, i, h)
+        if best:
+            used.add(best[1])
+            models.append(name)
+            out[best[1]][1] = len(models) + 1  # flag 2.. = the model's number + 1
+            print(f'  model {name}: footprint {best[0]:.0f} m from the point, roof {best[2]:.0f} m (expected {eh})')
+        else:
+            print(f'  NO footprint for {name} near ({lon}, {lat}) at about {eh} m')
     path = os.path.join(ROOT, 'data/buildings-midtown.json')
     with open(path, 'w') as f:
-        json.dump({'o': list(origin), 's': S, 'b': out}, f, separators=(',', ':'))
+        json.dump({'o': list(origin), 's': S, 'm': models, 'b': out}, f, separators=(',', ':'))
     print(f'{len(rows)} footprints -> {len(out)} buildings, {os.path.getsize(path) // 1024} KB; landmarks found inside a footprint: {len(flagged)} of {len(lpts)}')
     print('not found:', [n for n, _ in lpts if n not in flagged][:40])
 
