@@ -53,7 +53,7 @@ export function initExplore(ctx) {
   const PARTS = {
     midtown: [40.74, -74.015, 40.772, -73.96],
     downtown: [40.699, -74.026, 40.741, -73.968],
-    uptown: [40.771, -74.005, 40.88, -73.9],
+    uptown: [40.758, -74.005, 40.88, -73.9], // (everything outside the Midtown box, which has its own file)
   };
   const part = {}; // name -> 0 loading / 1 in the map
   const near = (c, [la1, lo1, la2, lo2], pad = 0.012) => c.lat > la1 - pad && c.lat < la2 + pad && c.lng > lo1 - pad && c.lng < lo2 + pad;

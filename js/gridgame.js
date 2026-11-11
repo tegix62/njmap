@@ -650,7 +650,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   let hoodTimer = 0;
   // "Where am I?": a magnifier button in the bottom tray that pulls the map back to the neighborhood-sized view and back again
   const OV_BTN = () => `<button id="ggOv" class="${g.view === 'overview' ? 'on' : ''}" aria-pressed="${g.view === 'overview'}" aria-label="Where am I?"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="6.2" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>`;
-  // ---- 3D: the camera tilts to a driver's angle and the buildings stand up (Midtown; heights from NYC's building footprints) ----
+  // ---- 3D: the camera tilts to a driver's angle and the buildings stand up (Midtown and Uptown; heights from NYC's building footprints) ----
   const TILT_DEG = 55;
   const SQUASH_FROM = 60, SQUASH_TO = 0.4;
   const squash = (e) => ['case', ['<=', e, SQUASH_FROM], e, ['+', SQUASH_FROM, ['*', ['-', e, SQUASH_FROM], ['-', 1, ['*', 1 - SQUASH_TO, ['global-state', 'sq']]]]]];
@@ -662,29 +662,33 @@ export function initGridGame(ctx, areaId = 'downtown') {
     lastSq = v;
     map.setGlobalStateProperty('sq', v);
   }
-  const tiltOn = () => !!prefs.tilt && areaId === 'midtown';
+  const tiltOn = () => !!prefs.tilt && (areaId === 'midtown' || areaId === 'uptown');
   /** The camera's tilt now: tilted only in the close-up follow view (the wide "where am I" view and the end screens stay flat). */
   const camPitch = () => (tiltOn() && g && !g.done && (g.view === 'follow' || g.view === 'peek') ? TILT_DEG : 0);
   const driveZoom = () => (ZOOM + (camPitch() ? 0.5 : 0));
-  const TILT_BTN = () => (areaId === 'midtown' ? `<button id="ggTilt" class="${tiltOn() ? 'on' : ''}" aria-pressed="${tiltOn()}" aria-label="3D view"><b>3D</b></button>` : '');
+  const TILT_BTN = () => (areaId === 'midtown' || areaId === 'uptown' ? `<button id="ggTilt" class="${tiltOn() ? 'on' : ''}" aria-pressed="${tiltOn()}" aria-label="3D view"><b>3D</b></button>` : '');
   /**
    * The famous towers get their own stepped shapes (stacked, scaled copies of the building's own outline). A tier is
    * { h: top as a fraction of the roof height, s: scale (or [sx, sy]), c: [x, y] where its centre sits in the outline's
    * box (default the middle), b: base as a fraction (default the tier below), color }. `mast` is a thin spire on top, in metres.
    * Stylized from what the buildings look like, not surveyed.
    */
-  let bldgState = 0; // 0 not loaded, 1 loading, 2 loaded
+  // The building files this game stands up: Midtown's own, and for Uptown the Midtown one too (the Uptown file leaves out
+  // that box). The map layer is shared by the games, so it remembers which game's buildings it holds.
+  const BLDG_FILES = areaId === 'uptown' ? ['midtown', 'uptown'] : ['midtown'];
+  let bldgBusy = false;
   async function loadBuildings() {
-    if (bldgState || areaId !== 'midtown') return;
-    bldgState = 1;
+    if (bldgBusy || map.__ggBldgArea === areaId || (areaId !== 'midtown' && areaId !== 'uptown')) return;
+    bldgBusy = true;
     try {
-      const d = await fetch('data/buildings-midtown.json').then((r) => r.json());
-      const feats = buildingFeatures(d);
+      const feats = [];
+      for (const f of BLDG_FILES) feats.push(...buildingFeatures(await fetch(`data/buildings-${f}.json`).then((r) => r.json())));
       setData('gg-bldg', { type: 'FeatureCollection', features: feats });
-      bldgState = 2;
+      map.__ggBldgArea = areaId;
     } catch {
-      bldgState = 0;
+      /* try again next time */
     }
+    bldgBusy = false;
   }
   function applyTilt() {
     if (!map.getLayer('gg-bldg')) return;

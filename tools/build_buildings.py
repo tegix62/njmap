@@ -17,7 +17,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AREAS = {
     'midtown': (40.7400, -74.0150, 40.7720, -73.9600),
     'downtown': (40.6990, -74.0260, 40.7410, -73.9680),
-    'uptown': (40.7710, -74.0050, 40.8800, -73.9000),
+    'uptown': (40.7580, -74.0050, 40.8800, -73.9000),
 }
 BOX = AREAS['midtown']
 URL = 'https://data.cityofnewyork.us/resource/5zhs-2jue.json'
@@ -48,6 +48,8 @@ TOWERS = [
 ]
 MIN_H_M = 6.0      # drop anything lower than this (sheds, garages)
 MIN_AREA_M2 = 40.0  # and anything smaller than this
+# anything whose centre is inside the Midtown box belongs to the Midtown file (which has the tower models), not these
+EXCLUDE = {'downtown': 'midtown', 'uptown': 'midtown'}
 THIN = {'uptown': (9.0, 90.0)}  # Uptown is mostly low rows of houses: fewer, bigger, to keep the file small
 TOL_M = 1.2        # outline simplification
 
@@ -145,6 +147,11 @@ def main():
                 ring = ring[:-1]
             if len(ring) < 3 or area_m2(ring) < MIN_AREA_M2:
                 continue
+            if area in EXCLUDE:
+                ex = AREAS[EXCLUDE[area]]
+                cx, cy = sum(p[0] for p in ring) / len(ring), sum(p[1] for p in ring) / len(ring)
+                if ex[0] <= cy <= ex[2] and ex[1] <= cx <= ex[3]:
+                    continue
             flag = 0
             for name, p in lpts:
                 if inside(p, ring):
