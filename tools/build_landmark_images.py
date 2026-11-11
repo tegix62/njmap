@@ -26,6 +26,11 @@ TITLES = {
 # where the article's lead image is a logo or drawing, a chosen Commons file instead
 FILES = {
     'Cooper Union': 'The Cooper Union Foundation Building 002.jpg',
+    'Chrysler Building': 'Chrysler Building by David Shankbone Retouched.jpg',
+    'Trinity Church': 'NYC Trinity Church.jpg',
+    'One World Trade Center': 'One World Trade Center Building (2021).jpg',
+    'Woolworth Building': 'Woolworth Building 9495.JPG',
+    'United Nations': 'UN Headquarters 2.jpg',
     'Charging Bull': 'Bowling Green td (2018-12-13) 06 - 26 Broadway, Charging Bull.jpg',
 }
 
