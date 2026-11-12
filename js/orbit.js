@@ -81,6 +81,40 @@ export function initOrbit(ctx) {
   let hiddenSymbols = [];
   // The township flash: during the wide orienting view of a long swing, the town the target is in is outlined and named for a moment
   // (the same outline and label layers the Manhattan game uses for the neighbourhood), then cleared as the camera drops in.
+  // The shapes of the natural places (rivers as lines, lakes and parks as polygons) as map features, to outline what a question is about.
+  const GEOM_COLOR = { target: '#0b9a82', wrong: '#d9622b' };
+  const ptsOf = (g) => {
+    const out = [];
+    const walk = (c) => { if (typeof c[0] === 'number') out.push(c); else c.forEach(walk); };
+    walk(g.coordinates);
+    return out;
+  };
+  /** [west, south, east, north] of a shape; for a long river only the part within `km` of `near`. */
+  function boundsOf(g, near, km) {
+    let pts = ptsOf(g);
+    if (near && km) {
+      const close = pts.filter((p) => mDist(p, near) < km * 1000);
+      if (close.length > 1) pts = close;
+    }
+    return pts.reduce((b, p) => [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])], [180, 90, -180, -90]);
+  }
+  function setGeom(items) {                       // items: [{ name, role }]
+    const feats = [], walls = [], labs = [];
+    for (const { name, role } of items) {
+      const place = city.list.find((x) => x.n === name);
+      const g = city.geoms && city.geoms[name];
+      if (g) {
+        feats.push({ type: 'Feature', properties: { role, name }, geometry: g });
+        if (g.type === 'Polygon' || g.type === 'MultiPolygon') for (const w of wallFeatures(g, 3)) walls.push({ ...w, properties: { role, h: place && place.kind === 'lake' ? 70 : 160 } });
+        const b = boundsOf(g, place && place.kind === 'river' ? place.p : null, place && place.kind === 'river' ? 22 : 0);
+        labs.push({ type: 'Feature', properties: { role, name }, geometry: { type: 'Point', coordinates: place && place.kind === 'river' ? place.p : [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2] } });
+      } else if (place) {
+        labs.push({ type: 'Feature', properties: { role, name }, geometry: { type: 'Point', coordinates: place.p } });   // (a ridge or a peak has no outline: its name at its point)
+      }
+    }
+    const fc = (f) => ({ type: 'FeatureCollection', features: f });
+    for (const [s, f] of [['orb-geom', feats], ['orb-geom-wall', walls], ['orb-geom-lab', labs]]) if (map.getSource(s)) map.getSource(s).setData(fc(f));
+  }
   let flashed = false;
   function flashTown(t, on) {
     const src = map.getSource('orb-hood');
@@ -105,10 +139,11 @@ export function initOrbit(ctx) {
     if (loading) return loading;
     loading = (async () => {
       if (cfg) {                                             // the region's own landmarks: one file of buildings, parts and street names
-        const [list, pics, d] = await Promise.all([
+        const [list, pics, d, geoms] = await Promise.all([
           fetch(cfg.list).then((r) => r.json()),
           fetch(cfg.credits).then((r) => r.json()).catch(() => ({})),
           fetch(cfg.city).then((r) => r.json()),
+          fetch(cfg.geoms || 'data/nj-geoms.json').then((r) => r.json()).catch(() => ({})),   // (the outlines of the rivers, lakes and parks)
         ]);
         const feats = applyParts(buildingFeatures(d, { o: d.o, s: d.s, g: d.g }));
         const cx = feats.map((f) => {
@@ -124,7 +159,7 @@ export function initOrbit(ctx) {
           return { name: d.names[nid], mid: pts[Math.floor(pts.length / 2)], pts };
         }).filter((s) => s.pts.length > 1);
         const lms = (ctx.region.landmarks || []).map((l) => ({ n: l.name, p: l.pt }));
-        city = { feats, cx, list, pics, lms, segs, grounds: [] };
+        city = { feats, cx, list, pics, lms, segs, grounds: [], geoms };
         return city;
       }
       const [list, pics, lms, towers, ...rest] = await Promise.all([
@@ -165,6 +200,19 @@ export function initOrbit(ctx) {
     if (cfg && !map.getSource('orb-dem')) {                      // real relief: AWS terrain tiles (public elevation data), shaded
       map.addSource('orb-dem', { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 11, attribution: 'Terrain: AWS Terrain Tiles (USGS 3DEP, SRTM and others)' });
       map.addLayer({ id: 'orb-relief', type: 'hillshade', source: 'orb-dem', layout: { visibility: 'none' }, paint: { 'hillshade-exaggeration': 0.55, 'hillshade-shadow-color': '#4d5a52', 'hillshade-highlight-color': '#ffffff', 'hillshade-accent-color': '#6e7d70' } }, first && first.id);
+    }
+    if (cfg) {                                                    // the outline of the river, lake or park in question (and of the one you picked, after a miss)
+      const col = ['match', ['get', 'role'], 'wrong', GEOM_COLOR.wrong, GEOM_COLOR.target];
+      const none = { type: 'FeatureCollection', features: [] };
+      map.addSource('orb-geom', { type: 'geojson', data: none });
+      map.addSource('orb-geom-wall', { type: 'geojson', data: none });
+      map.addSource('orb-geom-lab', { type: 'geojson', data: none });
+      map.addLayer({ id: 'orb-geom-fill', type: 'fill', source: 'orb-geom', filter: ['==', ['geometry-type'], 'Polygon'], layout: { visibility: 'none' }, paint: { 'fill-color': col, 'fill-opacity': 0.3 } }, before);
+      map.addLayer({ id: 'orb-geom-fill2', type: 'fill', source: 'orb-geom', filter: ['==', ['geometry-type'], 'MultiPolygon'], layout: { visibility: 'none' }, paint: { 'fill-color': col, 'fill-opacity': 0.3 } }, before);
+      map.addLayer({ id: 'orb-geom-casing', type: 'line', source: 'orb-geom', layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 6, 12, 11], 'line-opacity': 0.9 } }, before);
+      map.addLayer({ id: 'orb-geom-line', type: 'line', source: 'orb-geom', layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': col, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 3, 12, 6] } }, before);
+      map.addLayer({ id: 'orb-geom-wall', type: 'fill-extrusion', source: 'orb-geom-wall', layout: { visibility: 'none' }, paint: { 'fill-extrusion-color': col, 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': 0.4, 'fill-extrusion-vertical-gradient': true } }, before);
+      map.addLayer({ id: 'orb-geom-name', type: 'symbol', source: 'orb-geom-lab', layout: { visibility: 'none', 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Medium'], 'text-size': 13, 'text-pitch-alignment': 'viewport', 'text-rotation-alignment': 'viewport', 'text-allow-overlap': true }, paint: { 'text-color': col, 'text-halo-color': '#ffffff', 'text-halo-width': 2 } });
     }
     map.addSource('orb-target', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     const col = ['case', ['has', 'c'], ['get', 'c'], ['interpolate', ['linear'], ['get', 'h'], 6, '#e9e3d6', 60, '#d6cdbb', 200, '#bdb29d', 300, '#a99d88']];
@@ -227,8 +275,9 @@ export function initOrbit(ctx) {
     if (cfg && map.getLayer('orb-relief')) map.setLayoutProperty('orb-relief', 'visibility', on ? 'visible' : 'none');
     if (cfg && map.getSource('orb-dem')) {
       map.stop();                                                // (terrain switched on or off in the middle of an ease makes MapLibre throw)
-      map.setTerrain(on ? { source: 'orb-dem', exaggeration: 1.7 } : null);
+      map.setTerrain(on ? { source: 'orb-dem', exaggeration: 2.1 } : null);
     }
+    for (const id of ['orb-geom-fill', 'orb-geom-fill2', 'orb-geom-casing', 'orb-geom-line', 'orb-geom-wall', 'orb-geom-name']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
     for (const id of ['orb-walk', 'orb-road', 'orb-park', 'orb-ghost', 'orb-others', 'orb-hood-fill', 'orb-hood-line', 'orb-hood-wall', 'orb-lab', 'orb-lm', 'orb-hood-name', 'orb-target']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
     if (on) {
       // no names on the map while this runs
@@ -358,6 +407,7 @@ export function initOrbit(ctx) {
       const none = { type: 'FeatureCollection', features: [] };
       for (const s of ['orb-target', 'orb-lab', 'orb-lm', 'orb-hood', 'orb-wall']) if (map.getSource(s)) map.getSource(s).setData(none);
       q.hood = null;
+      setGeom([{ name: t.n, role: 'target' }]);
       return;
     }
     const p = t.p;
@@ -436,18 +486,26 @@ export function initOrbit(ctx) {
     let bearing = spin0;
     let last = performance.now();
     let lastOcc = 0;
+    let center = t.p;
     if (t.k === 'nat') {                                  // a mountain, lake, river or park: high and steep over the terrain, centred in the free area
       zoom = t.z; top = pad.top;
       if (t.bearing != null) bearing = t.bearing;         // (a river: looking along it)
+      const g = city.geoms && city.geoms[t.n];
+      if (g) {                                            // fit its outline (a long river: the 22 km of it round the point)
+        const b = boundsOf(g, t.kind === 'river' ? t.p : null, t.kind === 'river' ? 22 : 0);
+        const ext = Math.max((b[2] - b[0]) * 84200, (b[3] - b[1]) * 111000, 1500);
+        zoom = Math.max(9.4, Math.min(13, Math.log2((0.6 * (map.getContainer().clientWidth || 400) * mpp0) / ext)));
+        if (t.kind !== 'river') center = [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
+      }
     }
-    const cam = { center: t.p, zoom, pitch: t.k === 'nat' ? t.pitch : PITCH, bearing, padding: { top, bottom: pad.bottom, left: 0, right: 0 } };
+    const cam = { center, zoom, pitch: t.k === 'nat' ? t.pitch : PITCH, bearing, padding: { top, bottom: pad.bottom, left: 0, right: 0 } };
     const tick = (now) => {
       if (!run || q.t !== t) return;
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
       if (!document.hidden) {
         bearing = map.getBearing();
-        if (spinOn && !drag) {
+        if (spinOn && !drag && !(cfg && q.done && q.t.k === 'nat')) {
           bearing = (bearing + SPIN * dt * (ctx.reduceMotion ? 0.3 : 1)) % 360;
           map.setBearing(bearing);
         }
@@ -633,6 +691,28 @@ export function initOrbit(ctx) {
     st[t.n] = s;
     ctx.store.set(KEY, st);
     render();
+    if (cfg && t.k === 'nat') setTimeout(() => compare(name), 60);
+  }
+
+  /** After an answer: outline the right place (and, after a miss, the one you picked, in orange) and pull back to see both, so the difference is clear. */
+  function compare(name) {
+    if (!run || !q || !q.done) return;
+    const t = q.t;
+    const picked = !q.ok ? city.list.find((o) => o.n === name) : null;
+    setGeom([{ name: t.n, role: 'target' }, ...(picked ? [{ name: picked.n, role: 'wrong' }] : [])]);
+    const all = [];
+    for (const p of [t, picked].filter(Boolean)) {
+      const g = city.geoms && city.geoms[p.n];
+      if (g) { const b = boundsOf(g); all.push([b[0], b[1]], [b[2], b[3]]); } else all.push(p.p);
+    }
+    const bb = all.reduce((b, p) => [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])], [180, 90, -180, -90]);
+    const boxH = map.getContainer().clientHeight || window.innerHeight;
+    const hudEl = document.getElementById('hud'), sheetEl = document.getElementById('sheet');
+    const mapTop = map.getContainer().getBoundingClientRect().top;
+    const top = (hudEl && !hudEl.hidden ? hudEl.getBoundingClientRect().bottom - mapTop : 0) + 24;
+    const bottom = (sheetEl && !sheetEl.hidden ? boxH - (sheetEl.getBoundingClientRect().top - mapTop) : 0) + 24;
+    map.stop();
+    map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], { padding: { top, bottom, left: 36, right: 36 }, pitch: 48, maxZoom: 12.4, duration: ctx.dur ? ctx.dur(1100) : 1100, essential: true });
   }
 
   function reveal() {
@@ -640,7 +720,7 @@ export function initOrbit(ctx) {
     const pic = city.pics[t.n] || city.pics[ALIAS[t.n]];
     return `<div class="fb ${q.ok ? 'ok' : 'no'} orb-reveal">
       ${pic ? `<img class="orb-thumb" src="${esc(pic.img)}" alt="Photo of ${esc(t.n)}: tap to enlarge" data-n="${esc(t.n)}" tabindex="0" />` : ''}
-      <div><b>${q.ok ? '✓' : '✗'} ${esc(t.n)}</b> <span class="muted">${q.ok ? `+${q.pts}` : ''}</span><br>
+      <div><b>${q.ok ? '✓' : '✗'} ${esc(t.n)}</b> <span class="muted">${q.ok ? `+${q.pts}` : ''}</span>${cfg && t.k === 'nat' && !q.ok && q.picked ? `<div class="orb-legend"><span style="display:inline-block;width:.8em;height:.8em;border-radius:2px;background:${GEOM_COLOR.target};margin-right:.35em"></span>${esc(t.n)}<br><span style="display:inline-block;width:.8em;height:.8em;border-radius:2px;background:${GEOM_COLOR.wrong};margin-right:.35em"></span>${esc(q.picked)} <span class="muted">(your pick)</span></div>` : ''}<br>
       ${esc(t.line)}.<br><span class="muted">${t.k === 'nat' ? `${t.elev ? `${t.elev.toLocaleString()} ft · ` : ''}${esc(t.at)}, ${esc(t.c)} County` : `${t.k === 'lm' ? '' : `${t.h} m (${ft(t.h)} ft) · `}${t.y} · ${esc(t.at)}`}</span></div>
     </div>`;
   }
