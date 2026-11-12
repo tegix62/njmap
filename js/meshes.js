@@ -56,10 +56,10 @@ void main() {
       if (v_pos.z > 55.0 && band < 10.0) c = mix(c, vec3(0.12, 0.13, 0.15) * l, 0.92); // the open floors, a dark gap through the tower
     } else if (k == 6) {                                          // glass with a space-frame lattice: diagonals on the walls, a grid on the roof (Javits)
       if (roof6) {
-        vec2 g = fract(v_pos.xy / u_pat.y);
+        vec2 g = fract(v_pos.xy / (u_pat.y * 2.5));
         float d = min(min(g.x, 1.0 - g.x), min(g.y, 1.0 - g.y));
-        float w = 0.04 + 0.5 * fwidth(v_pos.x / u_pat.y);
-        c = mix(c, vec3(0.90, 0.94, 0.96) * l, 0.55 * (1.0 - smoothstep(w, w + 0.04, d)));
+        float aa = 1.0 - smoothstep(0.15, 0.4, fwidth(v_pos.x / (u_pat.y * 2.5)));
+        c = mix(c, vec3(0.90, 0.94, 0.96) * l, 0.32 * aa * (1.0 - smoothstep(0.02, 0.06, d)));
       } else {
         float u = s / u_pat.y, v = v_pos.z / u_pat.z;
         float d = min(0.5 - abs(fract(u + v) - 0.5), 0.5 - abs(fract(u - v) - 0.5));
