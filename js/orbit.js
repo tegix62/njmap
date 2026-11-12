@@ -306,7 +306,8 @@ export function initOrbit(ctx) {
     const ids = [], mine = [];
     // the building itself: the nearest one of about the right height (not its neighbours, even tall ones)
     let main = -1, bd = 110;
-    city.feats.forEach((f, i) => {
+    const meshed = meshes.ok && meshes.has(t.n); // drawn as a real mesh: no slab is the target
+    if (!meshed) city.feats.forEach((f, i) => {
       const d = mDist(city.cx[i], p);
       if (d < bd && f.properties.h >= 0.5 * t.h) { bd = d; main = i; }
     });
