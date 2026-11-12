@@ -115,6 +115,82 @@ export function initOrbit(ctx) {
     const fc = (f) => ({ type: 'FeatureCollection', features: f });
     for (const [s, f] of [['orb-geom', feats], ['orb-geom-wall', walls], ['orb-geom-lab', labs]]) if (map.getSource(s)) map.getSource(s).setData(fc(f));
   }
+  // The place flash: on arrival, a quick pulse that shows what the place IS. A river: a bright comet runs downstream along it (the way the
+  // water goes) from one end of the stretch on screen to the other, with its two ends marked; a range: the same along its crest; a lake
+  // or reservoir: its outline and tint pulse twice. About a second and a half, then it is gone.
+  let placeRaf = 0;
+  const FLASH_MS = 1500;
+  const easeIO = (x) => x * x * (3 - 2 * x);
+  /** The line to run a comet along for a river or a range: the stretch of the chain nearest the point, within 22 km of it (so a long river does not blow out the view). */
+  function flowOf(t) {
+    const g = city.geoms && city.geoms[t.n];
+    if (!g || t.n === 'Delaware and Raritan Canal') return null;
+    if (g.type === 'Polygon' || g.type === 'MultiPolygon') return { kind: 'poly' };
+    const chains = g.type === 'MultiLineString' ? g.coordinates : g.type === 'LineString' ? [g.coordinates] : null;
+    if (!chains) return null;
+    let best = null;
+    chains.forEach((c, ci) => c.forEach((p, i) => { const d = mDist(p, t.p); if (!best || d < best.d) best = { d, ci, i }; }));
+    const c = chains[best.ci];
+    let a = best.i, b = best.i;
+    while (a > 0 && mDist(c[a - 1], t.p) < 22000) a--;
+    while (b < c.length - 1 && mDist(c[b + 1], t.p) < 22000) b++;
+    const coords = c.slice(a, b + 1);
+    if (coords.length < 2) return null;
+    const cum = [0];
+    for (let i = 1; i < coords.length; i++) cum.push(cum[i - 1] + mDist(coords[i - 1], coords[i]));
+    return { kind: 'line', coords, cum, total: cum[cum.length - 1], ridge: !!g.ridge };
+  }
+  const pointAt = (f, d) => {
+    let i = 1;
+    while (i < f.cum.length - 1 && f.cum[i] < d) i++;
+    const k = (d - f.cum[i - 1]) / Math.max(1e-6, f.cum[i] - f.cum[i - 1]);
+    return [f.coords[i - 1][0] + (f.coords[i][0] - f.coords[i - 1][0]) * k, f.coords[i - 1][1] + (f.coords[i][1] - f.coords[i - 1][1]) * k];
+  };
+  /** One frame of the flash, u from 0 to 1 (a little past 1 keeps the ends marked while it fades). */
+  function drawFlash(t, f, u) {
+    const src = map.getSource('orb-flash');
+    if (!src || !f) return;
+    const feats = [];
+    if (f.kind === 'line') {
+      const s = easeIO(Math.min(1, u / 0.82)) * f.total;
+      const tail = Math.max(0, s - f.total * 0.28);
+      const sub = [pointAt(f, tail)];
+      for (let i = 0; i < f.coords.length; i++) if (f.cum[i] > tail && f.cum[i] < s) sub.push(f.coords[i]);
+      sub.push(pointAt(f, s));
+      if (u < 1.5 && sub.length > 1) feats.push({ type: 'Feature', properties: { k: 'comet', a: u > 1 ? Math.max(0, 1.5 - u) * 2 : 1 }, geometry: { type: 'LineString', coordinates: sub } });
+      const first = f.coords[0], last = f.coords[f.coords.length - 1];
+      feats.push({ type: 'Feature', properties: { k: f.ridge ? 'ridge-end' : 'start' }, geometry: { type: 'Point', coordinates: first } });
+      if (f.ridge || s > f.total * 0.85) feats.push({ type: 'Feature', properties: { k: f.ridge ? 'ridge-end' : 'end' }, geometry: { type: 'Point', coordinates: last } });
+    } else if (f.kind === 'poly') {                          // pulse the tint and the edge twice
+      const pulse = u >= 1 ? 0 : (1 - Math.cos(4 * Math.PI * u)) / 2;
+      for (const id of ['orb-geom-fill', 'orb-geom-fill2']) if (map.getLayer(id)) map.setPaintProperty(id, 'fill-opacity', 0.3 + 0.38 * pulse);
+      if (map.getLayer('orb-geom-line')) map.setPaintProperty('orb-geom-line', 'line-width', ['interpolate', ['linear'], ['zoom'], 8, 3 + 4 * pulse, 12, 6 + 6 * pulse]);
+    }
+    src.setData({ type: 'FeatureCollection', features: feats });
+  }
+  function endFlash() {
+    cancelAnimationFrame(placeRaf);
+    const src = map.getSource('orb-flash');
+    if (src) src.setData({ type: 'FeatureCollection', features: [] });
+    for (const id of ['orb-geom-fill', 'orb-geom-fill2']) if (map.getLayer(id)) map.setPaintProperty(id, 'fill-opacity', 0.3);
+    if (map.getLayer('orb-geom-line')) map.setPaintProperty('orb-geom-line', 'line-width', ['interpolate', ['linear'], ['zoom'], 8, 3, 12, 6]);
+  }
+  function flashPlace(t) {
+    endFlash();
+    if (!cfg || t.k !== 'nat' || !['river', 'lake'].includes(t.kind) && !(t.kind === 'mountain' && city.geoms && city.geoms[t.n] && city.geoms[t.n].ridge)) return;
+    const f = flowOf(t);
+    if (!f) return;
+    const dur = FLASH_MS * (ctx.reduceMotion ? 0.5 : 1);
+    const t0 = performance.now();
+    const step = (now) => {
+      if (!run || !q || q.t !== t || q.done) return endFlash();
+      const u = (now - t0) / dur;
+      drawFlash(t, f, u);
+      if (u < 1.5) placeRaf = requestAnimationFrame(step);
+      else endFlash();
+    };
+    placeRaf = requestAnimationFrame(step);
+  }
   let flashed = false;
   function flashTown(t, on) {
     const src = map.getSource('orb-hood');
@@ -213,6 +289,10 @@ export function initOrbit(ctx) {
       map.addLayer({ id: 'orb-geom-casing', type: 'line', source: 'orb-geom', layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 6, 12, 11], 'line-opacity': 0.9 } }, before);
       map.addLayer({ id: 'orb-geom-line', type: 'line', source: 'orb-geom', layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': col, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 3, 12, 6] } }, before);
       map.addLayer({ id: 'orb-geom-wall', type: 'fill-extrusion', source: 'orb-geom-wall', layout: { visibility: 'none' }, paint: { 'fill-extrusion-color': col, 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': 0.4, 'fill-extrusion-vertical-gradient': true } }, before);
+      map.addSource('orb-flash', { type: 'geojson', data: none });
+      map.addLayer({ id: 'orb-flash-glow', type: 'line', source: 'orb-flash', filter: ['==', ['get', 'k'], 'comet'], layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffd54a', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 12, 12, 22], 'line-blur': 6, 'line-opacity': ['*', 0.6, ['get', 'a']] } }, before);
+      map.addLayer({ id: 'orb-flash-line', type: 'line', source: 'orb-flash', filter: ['==', ['get', 'k'], 'comet'], layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 5, 12, 9], 'line-opacity': ['get', 'a'] } }, before);
+      map.addLayer({ id: 'orb-flash-dot', type: 'circle', source: 'orb-flash', filter: ['!=', ['get', 'k'], 'comet'], layout: { visibility: 'none' }, paint: { 'circle-radius': ['match', ['get', 'k'], 'ridge-end', 5, 8], 'circle-pitch-alignment': 'map', 'circle-color': ['match', ['get', 'k'], 'start', '#ffffff', 'ridge-end', '#ffffff', '#0b9a82'], 'circle-stroke-color': ['match', ['get', 'k'], 'start', '#0b9a82', 'ridge-end', '#0b9a82', '#ffffff'], 'circle-stroke-width': 3 } }, before);
       map.addLayer({ id: 'orb-geom-name', type: 'symbol', source: 'orb-geom-lab', layout: { visibility: 'none', 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Medium'], 'text-size': 13, 'text-pitch-alignment': 'viewport', 'text-rotation-alignment': 'viewport', 'text-allow-overlap': true }, paint: { 'text-color': col, 'text-halo-color': '#ffffff', 'text-halo-width': 2 } });
     }
     map.addSource('orb-target', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
@@ -278,7 +358,7 @@ export function initOrbit(ctx) {
       map.stop();                                                // (terrain switched on or off in the middle of an ease makes MapLibre throw)
       map.setTerrain(on ? { source: 'orb-dem', exaggeration: 2.1 } : null);
     }
-    for (const id of ['orb-geom-fill', 'orb-geom-fill2', 'orb-geom-casing', 'orb-geom-line', 'orb-geom-wall', 'orb-geom-name']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+    for (const id of ['orb-geom-fill', 'orb-geom-fill2', 'orb-geom-casing', 'orb-geom-line', 'orb-geom-wall', 'orb-geom-name', 'orb-flash-glow', 'orb-flash-line', 'orb-flash-dot']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
     for (const id of ['orb-walk', 'orb-road', 'orb-park', 'orb-ghost', 'orb-others', 'orb-hood-fill', 'orb-hood-line', 'orb-hood-wall', 'orb-lab', 'orb-lm', 'orb-hood-name', 'orb-target']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
     if (on) {
       // no names on the map while this runs
@@ -527,6 +607,7 @@ export function initOrbit(ctx) {
       updateOcclusion(bearing);
       render();
       raf = requestAnimationFrame(tick);
+      flashPlace(t);
     };
     // (easeTo, not flyTo: flyTo's long zoom-out makes MapLibre throw from its tile bookkeeping now and then; the towers are
     // only a few km apart, so a plain ease reads as a swing anyway)
@@ -620,6 +701,7 @@ export function initOrbit(ctx) {
   function stop() {
     cancelAnimationFrame(raf);
     cancelAnimationFrame(arcRaf);
+    endFlash();
     if (flashed) flashTown(null, false);
     if (!run) return;
     run = null;
@@ -673,6 +755,7 @@ export function initOrbit(ctx) {
     if (!q || q.done) return;
     const t = q.t;
     q.done = true;
+    endFlash();
     q.picked = name;
     q.ok = name === t.n;
     const pts = q.ok ? Math.max(1, 3 - q.hints) : 0;
@@ -801,5 +884,6 @@ export function initOrbit(ctx) {
       return !!run;
     },
     _state: () => ({ run, q }),
+    _flash: (name, u) => { const t = city.list.find((x) => x.n === name); drawFlash(t, flowOf(t), u); },   // (a single frame, for checking how it looks)
   };
 }

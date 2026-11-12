@@ -99,7 +99,7 @@ def main():
         if peak:                                               # on the summit itself: the highest ground within about a kilometre
             lon, lat, em = elevation(lon, lat, 40, z=12, where=True)
             p = place(lon, lat)
-        e = {'n': nm, 'kind': k, 'k': 'nat', 'p': [round(lon, 5), round(lat, 5)], 'z': 11.8 if peak else zoom_for(r * (1.6 if k == 'mountain' else 1), lat), 'pitch': 64 if k == 'mountain' else 58,
+        e = {'n': nm, 'kind': k, 'k': 'nat', 'p': [round(lon, 5), round(lat, 5)], 'z': 11.8 if peak else zoom_for(r * (1.6 if k == 'mountain' else 1), lat), 'pitch': 64 if k == 'mountain' else 58, 'r': r,
              'line': note.replace("\\'", "'").rstrip('.'), 'at': p['full'] if p else '', 'c': p['c'] if p else ''}
         if peak:
             e['elev'] = int(round(em * 3.28084 / 10) * 10)
