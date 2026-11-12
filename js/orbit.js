@@ -81,8 +81,8 @@ export function initOrbit(ctx) {
   let city = null; // loaded once: { feats, cx, cy, list, pics }
   let loading = null;
   const meshes = createMeshLayer(map); // the towers the survey has as real triangle meshes
-  const holo = createHolo(map);                // the projection-table look (js/holo.js), on while the game runs unless turned off
-  const paper = createPaper(map);              // the printed-road-map look (js/paper.js)
+  const holo = createHolo(map, ctx.region.bounds);                // the projection-table look (js/holo.js), on while the game runs unless turned off
+  const paper = createPaper(map, ctx.region.bounds);              // the printed-road-map look (js/paper.js)
   // the look: 'plain' (the app's own theme), 'paper' (a printed road map) or 'ps1' (projection-table terrain drawn at PlayStation-1 resolution,
   // dithered, with crisp labels). The old 'holo' setting is the PS1 look now.
   const savedLook = ctx.store.get('orbit.look', 'plain');

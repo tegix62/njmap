@@ -364,3 +364,11 @@ The practice picker ("More ways to practice") is sized to the visible screen (`1
 
 The look chip in "Name that place" cycles **Default → Paper → PS1** (remembered). PS1 is the projection-table terrain (`js/holo.js`, now a quiet ground with 40 m steps and no bright rims) drawn at PlayStation-1 resolution with a light dither, distance fog and crisp DOM labels (`js/retro.js`). The PS2 level, the separate Hologram/Retro chips and the + / × scan points were removed after trying them (the scan points read as noise). Paper gained ink spread (a hair of line blur), large soft ink/stock blotches, and sparse pinholes of bare stock (`#paperFx`, `#paperPin`).
 Known limit: the map's own text for landmarks (other towers' names) is still drawn inside the low-resolution canvas under PS1 and gets blocky; town names are crisp.
+
+
+### Texture that belongs to the map (`js/world.js`)
+
+Screen-space overlays (paper fibre, folds, pinholes, the scan lines and sweep of PS1) were removed: they stayed still while the map moved under them and read as a filter. The same ideas are now generated as geographic features over the region's bounds (seeded, so identical every time) and drawn as map layers, so they pan, turn and tilt with the land:
+- **Paper:** fibre as a tiled `fill-pattern` over the whole sheet, soft ink/stock blotches (stacked uneven rings), three fold creases (a dark line with a pale one beside it, draped on the terrain) and pinhole specks. Specks and blotches are faint by design.
+- **PS1:** a latitude/longitude graticule (every 0.05°, every fifth brighter) on the ground, in place of screen lines. The PS1 dither stays screen-space on purpose: on the real hardware it was.
+Not texture-ised yet: the building/landmark extrusions (still plain grey under Paper) and map text under PS1 for other towers' names.

@@ -1,3 +1,5 @@
+import { graticule } from './world.js';
+
 // "Hologram" look for a map: a dark projection table with the land drawn as stacked elevation bands,
 // everything else reduced to thin glowing lines. One module so any game can switch it on.
 //
@@ -52,9 +54,9 @@ function reliefColor() {
 
 const body = () => document.body;
 
-export function createHolo(map) {
+export function createHolo(map, bounds) {
   const saved = new Map();   // `${layer}|${prop}` → original value
-  let on = false, fx = null;
+  let on = false;
 
   const set = (id, prop, val) => {
     if (!map.getLayer(id)) return;
@@ -76,12 +78,12 @@ export function createHolo(map) {
     map.addLayer({ id: 'holo-relief', type: 'color-relief', source: 'orb-dem-hs', layout: { visibility: 'none' }, paint: { 'color-relief-color': reliefColor(), 'color-relief-opacity': 1 } }, before);
   }
 
-  function ensureFx() {
-    if (fx) return;
-    fx = document.createElement('div');
-    fx.id = 'holoFx';
-    fx.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(fx);
+  /** The table's graticule: lines of latitude and longitude on the ground (so it moves with the land, unlike a grid on the screen). */
+  function grid() {
+    if (!bounds || map.getSource('holo-grid')) return;
+    map.addSource('holo-grid', { type: 'geojson', data: graticule(bounds) });
+    const before = map.getLayer('river') ? 'river' : undefined;
+    map.addLayer({ id: 'holo-grid', type: 'line', source: 'holo-grid', layout: { visibility: 'none' }, paint: { 'line-color': '#3cc3e0', 'line-opacity': ['case', ['==', ['get', 'm'], 1], 0.34, 0.13], 'line-width': ['case', ['==', ['get', 'm'], 1], 1.1, 0.7] } }, before);
   }
 
   /** The look of what the game itself draws on top (outlines, bands, flash, names). */
@@ -113,16 +115,15 @@ export function createHolo(map) {
       on = want;
       body().classList.toggle('holo', on);
       if (on) {
-        ensureFx();
         ensureRelief();
+        grid();
         for (const [id, props] of Object.entries(BASE)) for (const [p, v] of Object.entries(props)) set(id, p, v);
         game(true);
-        if (map.getLayer('holo-relief')) map.setLayoutProperty('holo-relief', 'visibility', 'visible');
+        for (const id of ['holo-relief', 'holo-grid']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
       } else {
-        if (map.getLayer('holo-relief')) map.setLayoutProperty('holo-relief', 'visibility', 'none');
+        for (const id of ['holo-relief', 'holo-grid']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
         restore();
       }
-      if (fx) fx.hidden = !on;
     },
     /** The colour of the outline for a role, for things drawn outside the map (legend swatches). */
     color: (role) => (on ? (role === 'wrong' ? HOLO.wrong : HOLO.target) : role === 'wrong' ? '#d9622b' : '#0b9a82'),

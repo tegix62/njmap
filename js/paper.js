@@ -1,3 +1,5 @@
+import { blots, specks, creases, grainImage } from './world.js';
+
 // "Paper" look for a map: a printed road map from the 1960s–70s (cream stock, a few flat spot inks, halftone water,
 // plates that don't quite line up, fold creases). Same shape as js/holo.js:
 //
@@ -52,9 +54,9 @@ function dotsImage(rgb = [63, 120, 173]) {
   return g.getImageData(0, 0, S, S);
 }
 
-export function createPaper(map) {
+export function createPaper(map, bounds) {
   const saved = new Map();
-  let on = false, fx = null, pin = null;
+  let on = false;
 
   const set = (id, prop, val) => {
     if (!map.getLayer(id)) return;
@@ -70,17 +72,28 @@ export function createPaper(map) {
     saved.clear();
   };
 
-  function ensureFx() {
-    if (fx) return;
-    fx = document.createElement('div');
-    fx.id = 'paperFx';
-    fx.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(fx);
-    pin = document.createElement('div');                 // pinholes: specks of bare stock showing through the ink
-    pin.id = 'paperPin';
-    pin.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(pin);
+  /**
+   * The texture of the sheet, as part of the map: paper fibre, ink blotches, fold creases and pinholes are geographic features over the
+   * region, so they pan, turn and tilt with the land. (An overlay on the screen stays still while the map moves under it, and looks like a filter.)
+   */
+  function world() {
+    if (!bounds || map.getSource('orb-paper-blots')) return;
+    const under = map.getLayer('orb-paper-a') ? 'orb-paper-a' : undefined;           // below the coloured masses: it is the stock they were printed on
+    const over = map.getLayer('orb-town-name') ? 'orb-town-name' : undefined;        // above them: pinholes in the ink
+    const hide = { visibility: 'none' };
+    map.addImage('paper-grain', grainImage(), { pixelRatio: 2 });
+    const [[w, s], [e, n]] = bounds;
+    map.addSource('orb-paper-sheet', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[w - 1, s - 1], [e + 1, s - 1], [e + 1, n + 1], [w - 1, n + 1], [w - 1, s - 1]]] } } });
+    map.addSource('orb-paper-blots', { type: 'geojson', data: blots(bounds) });
+    map.addSource('orb-paper-creases', { type: 'geojson', data: creases(bounds) });
+    map.addSource('orb-paper-specks', { type: 'geojson', data: specks(bounds) });
+    map.addLayer({ id: 'orb-paper-grain', type: 'fill', source: 'orb-paper-sheet', layout: hide, paint: { 'fill-pattern': 'paper-grain', 'fill-opacity': 0.4 } }, under);
+    map.addLayer({ id: 'orb-paper-blots', type: 'fill', source: 'orb-paper-blots', layout: hide, paint: { 'fill-color': ['case', ['==', ['get', 'w'], 1], '#8a6a2c', '#1d2a5b'], 'fill-opacity': 0.04 } }, under);
+    map.addLayer({ id: 'orb-paper-crease-dark', type: 'line', source: 'orb-paper-creases', layout: hide, paint: { 'line-color': '#6e5a28', 'line-opacity': 0.3, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.8, 12, 1.6], 'line-blur': 0.6 } }, under);
+    map.addLayer({ id: 'orb-paper-crease-pale', type: 'line', source: 'orb-paper-creases', layout: hide, paint: { 'line-color': '#fffff0', 'line-opacity': 0.6, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.8, 12, 1.5], 'line-translate': [1.6, 1], 'line-blur': 0.5 } }, under);
+    map.addLayer({ id: 'orb-paper-specks', type: 'circle', source: 'orb-paper-specks', layout: hide, paint: { 'circle-color': PAPER.halo, 'circle-opacity': 0.9, 'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, ['*', 0.7, ['+', 0.6, ['get', 's']]], 13, ['*', 1.8, ['+', 0.6, ['get', 's']]]], 'circle-pitch-alignment': 'map' } }, over);
   }
+  const WORLD = ['orb-paper-grain', 'orb-paper-blots', 'orb-paper-crease-dark', 'orb-paper-crease-pale', 'orb-paper-specks'];
 
   /** The two plates that print slightly off behind each coloured mass (mountain bands, lake and park fills). */
   function plates() {
@@ -120,22 +133,20 @@ export function createPaper(map) {
     get on() { return on; },
     apply(want) {
       want = !!want;
-      if (want === on) { if (want) { plates(); game(); } return; }
+      if (want === on) { if (want) { plates(); world(); game(); } return; }
       on = want;
       document.body.classList.toggle('paper', on);
       if (on) {
-        ensureFx();
         plates();
+        world();
         for (const [id, props] of Object.entries(BASE)) for (const [p, v] of Object.entries(props)) set(id, p, v);
         for (const [id, b] of Object.entries(BLEED)) set(id, 'line-blur', b);
         game();
-        for (const id of ['orb-paper-a', 'orb-paper-b']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
+        for (const id of ['orb-paper-a', 'orb-paper-b', ...WORLD]) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
       } else {
-        for (const id of ['orb-paper-a', 'orb-paper-b']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
+        for (const id of ['orb-paper-a', 'orb-paper-b', ...WORLD]) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
         restore();
       }
-      if (fx) fx.hidden = !on;
-      if (pin) pin.hidden = !on;
     },
     color: (role) => (role === 'wrong' ? PAPER.wrong : PAPER.target),
   };
