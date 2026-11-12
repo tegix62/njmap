@@ -28,7 +28,7 @@ PARKS = {
 }
 RIVER_KEYS = {  # our river -> the name in the water layer
     'Delaware River': 'delaware river', 'Passaic River': 'passaic river', 'Hackensack River': 'hackensack river', 'Raritan River': 'raritan river',
-    'Hudson River': 'hudson river', 'Musconetcong River': 'musconetcong river', 'Rockaway River': 'rockaway river', 'Mullica River': 'mullica river',
+'Musconetcong River': 'musconetcong river', 'Rockaway River': 'rockaway river', 'Mullica River': 'mullica river',
     'Toms River': 'toms river', 'Maurice River': 'maurice river', 'Great Egg Harbor River': 'great egg harbor river', 'Wallkill River': 'wallkill river',
     'Ramapo River': 'ramapo river', 'Millstone River': 'millstone river', 'Pequannock River': 'pequannock river', 'Paulins Kill': 'paulins kill',
     'Delaware and Raritan Canal': 'delaware and raritan canal',
@@ -36,7 +36,7 @@ RIVER_KEYS = {  # our river -> the name in the water layer
 LAKES = {'Lake Hopatcong': 'lake hopatcong', 'Greenwood Lake': 'greenwood lake', 'Round Valley Reservoir': 'round valley reservoir', 'Spruce Run Reservoir': 'spruce run reservoir',
          'Monksville Reservoir': 'monksville reservoir', 'Boonton Reservoir': 'boonton reservoir', 'Lake Mohawk': 'lake mohawk', 'Budd Lake': 'budd lake',
          'Swartswood Lake': 'swartswood lake', 'Oradell Reservoir': 'oradell reservoir', 'Manasquan Reservoir': 'manasquan reservoir', 'Union Lake': 'union lake',
-         'Merrill Creek Reservoir': 'merrill creek reservoir', 'Wanaque Reservoir': 'wanaque reservoir'}
+         'Merrill Creek Reservoir': 'merrill creek reservoir', 'Wanaque Reservoir': 'wanaque reservior'}
 
 
 def rnd(c):
@@ -127,7 +127,38 @@ def crest(lon0, lat0, R_km):
         sm = arr.copy()
         sm[1:-1] = np.column_stack([np.convolve(arr[:, i], k, mode='valid') for i in range(2)])
         arr = sm
+    if len(arr) >= 5:                                           # drop only the ends that have drifted down into the valley (more than ~70 m under the median crest height); the middle stays
+        h = np.array([BP.elevation(x, y, 2, z=Z) for x, y in arr])
+        thr = np.median(h) - 70
+        i0, i1 = 0, len(arr)
+        while i0 < i1 - 4 and h[i0] < thr:
+            i0 += 1
+        while i1 > i0 + 4 and h[i1 - 1] < thr:
+            i1 -= 1
+        keep = [k for k in range(i0, i1) if h[k] >= thr]            # (and any stray low point in the middle)
+        arr = arr[keep] if len(keep) >= 4 else arr[i0:i1]
     return [[round(float(a), 5), round(float(b), 5)] for a, b in arr]
+
+
+def join_chains(lines, tol=0.0025):
+    """Join line pieces whose ends are within about 200 m of each other (the data breaks a river into many pieces; a comet needs one run)."""
+    chains = [list(l.coords) for l in lines]
+    while True:
+        best = None
+        for i in range(len(chains)):
+            for j in range(i + 1, len(chains)):
+                for ea, ia in ((chains[i][0], 's'), (chains[i][-1], 'e')):
+                    for eb, jb in ((chains[j][0], 's'), (chains[j][-1], 'e')):
+                        d = math.hypot((ea[0] - eb[0]) * 0.76, ea[1] - eb[1])
+                        if d < tol and (best is None or d < best[0]):
+                            best = (d, i, ia, j, jb)
+        if not best:
+            return [LineString(c) for c in chains]
+        _, i, ia, j, jb = best
+        a = chains[i][::-1] if ia == 's' else chains[i]
+        b = chains[j][::-1] if jb == 'e' else chains[j]
+        chains[i] = a + b
+        del chains[j]
 
 
 def orient_down(line, name):
@@ -194,7 +225,7 @@ def main():
     out = {}
     flow = {}
     water = pickle.load(open('/tmp/nj/water.pkl', 'rb'))
-    lakes = pickle.load(open('/tmp/nj/water_lakes.pkl', 'rb'))
+    lakes = pickle.load(open('/tmp/nj/water_lakes.pkl', 'rb')) + pickle.load(open('/tmp/nj/water_wan.pkl', 'rb'))
     parks = pickle.load(open('/tmp/nj/parks.pkl', 'rb'))
     for name, key in RIVER_KEYS.items():
         gs = [wkb.loads(g) for n, sub, c, g in water if n == key]
@@ -205,7 +236,7 @@ def main():
             continue
         merged = linemerge(unary_union(lines))
         parts = list(merged.geoms) if merged.geom_type == 'MultiLineString' else [merged]
-        parts = [p.simplify(0.0003) for p in parts if p.length > 0.002]
+        parts = [p.simplify(0.0003) for p in join_chains(parts) if p.length > 0.01]
         if not parts:
             continue
         if name in NO_FLOW:
@@ -233,6 +264,21 @@ def main():
             if len(c) >= 3:
                 out[p['n']] = {'type': 'LineString', 'coordinates': c, 'ridge': True}
     out = {k: v for k, v in out.items() if v}
+    kept = []
+    for p in places:
+        if p.get('k') == 'nat':
+            g = out.get(p['n'])
+            if g is None and (p['kind'] in ('river', 'lake', 'park') or (p['kind'] == 'mountain' and 'elev' not in p)):
+                print('   dropped (no shape):', p['n'])
+                continue
+            if g and g['type'] in ('Polygon', 'MultiPolygon'):             # the point a lake or park is placed by: inside it
+                rp = shape(g).buffer(0).representative_point()
+                p['p'] = [round(rp.x, 5), round(rp.y, 5)]
+            elif g and g.get('ridge'):                                    # a range: the middle of its crest
+                c = g['coordinates']
+                p['p'] = c[len(c) // 2]
+        kept.append(p)
+    places = kept
     out['_flow'] = flow
     json.dump(out, open(os.path.join(ROOT, 'data/nj-geoms.json'), 'w'), separators=(',', ':'))
     list_towns(places, out)
