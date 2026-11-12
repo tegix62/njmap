@@ -16,8 +16,9 @@ from laspy import CopcReader, Bounds
 import fsspec
 from pyproj import Transformer
 from scipy import ndimage
+from skimage import measure
 from shapely.geometry import Polygon, MultiPoint, box
-from shapely.ops import unary_union
+from shapely.ops import unary_union, triangulate
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import extract_osm_meshes as X
@@ -25,8 +26,9 @@ import shapely
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASE = 'https://noaa-nos-coastal-lidar-pds.s3.amazonaws.com/laz/geoid18/9306/'
-CELL = 2.5          # metres
-STEP = 2.5          # the surface is rounded to this many metres
+CELL = 1.0          # metres
+STEP = 1.5          # the surface is rounded to this many metres
+SIMPLIFY = 0.9      # the outlines are simplified to this many metres
 MINH = 3.5          # a building is above this
 # name -> (rgb, seed: 'osm' parts from data/landmark-meshes.json's old record outline, or a radius in m round the landmark's position)
 LIDAR = {'Javits Center': {'rgb': (168, 190, 200), 'radius': 190, 'sea': 40}}
@@ -123,7 +125,7 @@ def build(name, cfg):
             lab2, n2 = ndimage.label(L == lv)
             for k in range(1, n2 + 1):
                 m2 = lab2 == k
-                if m2.sum() < 24:
+                if m2.sum() < 70:
                     ring = ndimage.binary_dilation(m2, iterations=1) & ~m2
                     nb = L[ring]
                     if len(nb):
@@ -135,71 +137,58 @@ def build(name, cfg):
     cxm, cym = um * ca - vm * sa, um * sa + vm * ca
     verts, idx, key = [], [], {}
     rgb = cfg['rgb']
-    def vid(x, y, z):
-        u, v = x * CELL - R, y * CELL - R
+    def vid(u, v, z):
         e, nn = u * ca - v * sa, u * sa + v * ca
-        q = (round((e - cxm) * 10), round((nn - cym) * 10), round(z * STEP * 10))
+        q = (round((e - cxm) * 10), round((nn - cym) * 10), round(z * 10))
         if q not in key:
             key[q] = len(verts); verts.append(q)
         return key[q]
-    def quad(a, b, c, d):
-        idx.extend([a, b, c, a, c, d])
-    # tops: runs of equal height merged down the rows
-    open_runs = {}
-    for yy in range(n + 1):
-        row = {}
-        if yy < n:
-            x = 0
-            while x < n:
-                if L[yy, x] > 0:
-                    e = x
-                    while e + 1 < n and L[yy, e + 1] == L[yy, x]:
-                        e += 1
-                    row[(x, e + 1, L[yy, x])] = yy
-                    x = e + 1
-                else:
-                    x += 1
-        for k in list(open_runs):
-            if k not in row:
-                x0, x1, lv = k
-                y0 = open_runs.pop(k)
-                quad(vid(x0, y0, lv), vid(x1, y0, lv), vid(x1, yy, lv), vid(x0, yy, lv))
-        for k in row:
-            if k not in open_runs:
-                open_runs[k] = yy
-    # walls between neighbours: along x (a wall at column edge) and along y; runs of the same (low, high) merge
-    def walls(A, B, axis):
-        # A, B: heights of the two cells either side of an edge, arrays over the edge positions
-        lo, hi = np.minimum(A, B), np.maximum(A, B)
-        diff = lo != hi
-        return lo, hi, diff
-    pad = np.pad(L, 1)
-    for xe in range(n + 1):                                    # vertical edges between column xe-1 and xe
-        A, B = pad[1:-1, xe], pad[1:-1, xe + 1]
-        lo, hi, diff = walls(A, B, 0)
-        y = 0
-        while y < n:
-            if diff[y]:
-                e = y
-                while e + 1 < n and diff[e + 1] and lo[e + 1] == lo[y] and hi[e + 1] == hi[y]:
-                    e += 1
-                quad(vid(xe, y, lo[y]), vid(xe, e + 1, lo[y]), vid(xe, e + 1, hi[y]), vid(xe, y, hi[y]))
-                y = e + 1
-            else:
-                y += 1
-    for ye in range(n + 1):                                    # horizontal edges between row ye-1 and ye
-        A, B = pad[ye, 1:-1], pad[ye + 1, 1:-1]
-        lo, hi, diff = walls(A, B, 1)
-        x = 0
-        while x < n:
-            if diff[x]:
-                e = x
-                while e + 1 < n and diff[e + 1] and lo[e + 1] == lo[x] and hi[e + 1] == hi[x]:
-                    e += 1
-                quad(vid(x, ye, lo[x]), vid(e + 1, ye, lo[x]), vid(e + 1, ye, hi[x]), vid(x, ye, hi[x]))
-                x = e + 1
-            else:
-                x += 1
+    def layer(M):
+        """The outline of a mask as a polygon (with holes), from smooth contours: diagonals stay diagonals, no pixel stairs."""
+        cs = measure.find_contours(np.pad(M.astype(float), 1), 0.5)
+        out = None
+        for c in cs:
+            if len(c) < 4:
+                continue
+            p = Polygon([((x - 1 + 0.5) * CELL - R, (y - 1 + 0.5) * CELL - R) for y, x in c]).buffer(0)
+            out = p if out is None else out.symmetric_difference(p)
+        return out
+    levels = sorted(int(v) for v in np.unique(L[L > 0]))
+    prev_h = 0.0
+    prev_poly = None
+    for k, lv in enumerate(levels):
+        top = lv * STEP
+        poly = layer(L >= lv)
+        if poly is None or poly.is_empty:
+            continue
+        poly = poly.simplify(SIMPLIFY, preserve_topology=True)
+        nxt = layer(L >= levels[k + 1]) if k + 1 < len(levels) else None
+        # the roof that shows: this layer less the next one up
+        exposed = poly if nxt is None or nxt.is_empty else poly.difference(nxt.simplify(SIMPLIFY, preserve_topology=True))
+        for g in (exposed.geoms if exposed.geom_type in ('MultiPolygon', 'GeometryCollection') else [exposed]):
+            if g.geom_type != 'Polygon' or g.area < 6:
+                continue
+            gd = shapely.segmentize(g, 4.0)
+            pts = [c for ring in [gd.exterior, *gd.interiors] for c in ring.coords[:-1]]
+            if len(pts) < 3:
+                continue
+            for t in triangulate(MultiPoint(pts)):
+                if g.contains(t.representative_point()):
+                    tri = [vid(x, y, top) for x, y in list(t.exterior.coords)[:3]]
+                    if len(set(tri)) == 3:
+                        idx.extend(tri)
+        # the walls of this layer, from the level below up to its top
+        for g in (poly.geoms if poly.geom_type == 'MultiPolygon' else [poly]):
+            if g.geom_type != 'Polygon':
+                continue
+            for ring in [g.exterior, *g.interiors]:
+                cs_ = list(ring.coords)
+                for (x0, y0), (x1, y1) in zip(cs_, cs_[1:]):
+                    if math.hypot(x1 - x0, y1 - y0) < 1e-6:
+                        continue
+                    a_, b_, c_, d_ = vid(x0, y0, prev_h), vid(x1, y1, prev_h), vid(x1, y1, top), vid(x0, y0, top)
+                    idx.extend([a_, b_, c_, a_, c_, d_])
+        prev_h = top
     if len(verts) > 65000:
         raise SystemExit(f'too many vertices: {len(verts)}')
     P = np.array(verts, np.int16).reshape(-1)

@@ -63,8 +63,8 @@ void main() {
       } else {
         float u = s / u_pat.y, v = v_pos.z / u_pat.z;
         float d = min(0.5 - abs(fract(u + v) - 0.5), 0.5 - abs(fract(u - v) - 0.5));
-        float w = 0.06 + 0.5 * fwidth(u + v);
-        c = mix(c, vec3(0.90, 0.94, 0.96) * l, 0.5 * (1.0 - smoothstep(w, w + 0.04, d)));
+        float aa = 1.0 - smoothstep(0.2, 0.5, fwidth(u + v));
+        c = mix(c, vec3(0.90, 0.94, 0.96) * l, 0.4 * aa * (1.0 - smoothstep(0.035, 0.075, d)));
       }
     } else if (k == 4) {                                          // mullions and spandrels (Seagram)
       float u = s / u_pat.y, v = v_pos.z / u_pat.z;
@@ -87,7 +87,7 @@ const PATTERN = {
   'Chanin Building': [2, 2.2, 0.2],
   '432 Park Avenue': [3, 4.6, 0],
   'Seagram Building': [4, 1.7, 4.1],
-  'Javits Center': [6, 4.5, 4.5],
+  'Javits Center': [6, 9, 9],
 };
 const NOPAT = [0, 1, 1];
 const b64 = (s) => {
