@@ -90,11 +90,19 @@ const mDist = (a, b) => Math.hypot((a[0] - b[0]) * 84200, (a[1] - b[1]) * 111000
  * replaced by the survey's stack of slabs; a tower with no such building is left out (it was demolished, or built since
  * and still a block here), and a stylized model standing there is replaced too, keeping its colour.
  */
-export function applySurveyTowers(feats, towers) {
+export function applySurveyTowers(feats, towers, meshes = []) {
   if (!towers || !towers.t || !towers.t.length) return feats;
   const info = feats.map((f) => ({ c: ringCentre(f.geometry.coordinates[0]), h: f.properties.h, model: f.properties.c !== undefined, color: f.properties.c }));
   const drop = new Set(), add = [];
+  // a tower that has a real mesh (js/meshes.js) is drawn by that, so its footprint building, its model pieces and its survey slabs
+  // all go: whatever stands within 48 m and is part of it
+  for (const m of meshes) {
+    info.forEach((o, i) => {
+      if (mDist(o.c, [m.lon, m.lat]) < 48 && (o.model || o.h >= 0.5 * m.h)) drop.add(i);
+    });
+  }
   for (const [lon, lat, H, slabs] of towers.t) {
+    if (meshes.some((m) => mDist([lon, lat], [m.lon, m.lat]) < 40)) continue;
     let best = -1, bd = 45;
     info.forEach((o, i) => {
       if (drop.has(i)) return;

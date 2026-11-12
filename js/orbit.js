@@ -4,6 +4,7 @@
 // stands on). The towers you miss come round more often. The shapes are the same ones Explore and the drive games stand up
 // (NYC's footprints and the surveyed towers); the base map's labels are hidden so nothing gives the name away.
 import { buildingFeatures, applySurveyTowers, loadSurveyTowers, groundFeatures, GROUND_PAINT } from './city3d.js';
+import { createMeshLayer } from './meshes.js';
 
 const KEY = 'orbit';
 const ROUND = 10;
@@ -71,6 +72,8 @@ export function initOrbit(ctx) {
   let raf = 0;
   let city = null; // loaded once: { feats, cx, cy, list, pics }
   let loading = null;
+  const meshes = createMeshLayer(map); // the towers the survey has as real triangle meshes
+  const canMesh = (() => { try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; } })();
   let hiddenSymbols = [];
   let spinOn = ctx.store.get('orbit.spin', true); // the camera circles by itself (off: it holds still and you turn it)
   let drag = null; // a finger or mouse turning the view
@@ -96,7 +99,9 @@ export function initOrbit(ctx) {
         ...AREAS.map((a) => fetch(`data/${a}-streets.json`).then((r) => r.json()).catch(() => null)),
       ]);
       const files = rest.slice(0, 3), grounds = rest.slice(3, 6), streetFiles = rest.slice(6);
-      const feats = applySurveyTowers(files.flatMap((d) => buildingFeatures(d)), towers);
+      const md = canMesh ? await meshes.data() : null;
+      const meshList = md ? md.t.map(({ n, lon, lat, h }) => ({ n, lon, lat, h })) : [];
+      const feats = applySurveyTowers(files.flatMap((d) => buildingFeatures(d)), towers, meshList);
       const cx = feats.map((f) => {
         const r = f.geometry.coordinates[0];
         let x = 0, y = 0;
@@ -174,6 +179,7 @@ export function initOrbit(ctx) {
     );
   }
   const show = (on) => {
+    meshes.show(on);
     for (const id of ['orb-walk', 'orb-road', 'orb-park', 'orb-ghost', 'orb-others', 'orb-hood-fill', 'orb-hood-line', 'orb-hood-wall', 'orb-lab', 'orb-lm', 'orb-hood-name', 'orb-target']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
     if (on) {
       // no names on the map while this runs
@@ -317,6 +323,11 @@ export function initOrbit(ctx) {
       });
     }
     map.getSource('orb-target').setData({ type: 'FeatureCollection', features: mine });
+    // the surveyed meshes: this one solid, the others see-through and greyed
+    if (meshes.ok) {
+      meshes.all({ alpha: 0.5, mute: 0.55 });
+      meshes.state(t.n, { alpha: 1, mute: 0 });
+    }
     const not = ['!', ['in', ['id'], ['literal', ids.length ? ids : [-1]]]];
     // tall neighbours right beside the tower would stand in front of it: those within 90 m are kept low like the rest
     const nearIds = [];
@@ -417,6 +428,8 @@ export function initOrbit(ctx) {
     if (!run) return;
     run.loading = false;
     layers();
+    if (canMesh) await meshes.load(map.getStyle().layers.find((l) => l.type === 'symbol')?.id);
+    if (!run) return;
     map.setMaxPitch(70);
     show(true);
     dragOn();
