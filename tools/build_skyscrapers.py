@@ -22,7 +22,7 @@ S = [
     ('Woolworth Building', (-74.00797, 40.71264), 241, 1913, 'Gothic "Cathedral of Commerce", the world\'s tallest until 1930', 'Broadway & Park Place', 'Tribeca'),
     ('MetLife Building', (-73.97665, 40.75339), 246, 1963, 'the wide octagonal slab that sits on Grand Central, built as Pan Am', 'Park Ave & 45th St', 'Midtown East'),
     ('Citigroup Center', (-73.97000, 40.75840), 279, 1977, 'a slanted roof, standing on four stilts above a church', 'Lexington Ave & 53rd St', 'Midtown East'),
-    ('Hearst Tower', (-73.98300, 40.76726), 182, 2006, 'a diamond-lattice glass tower on top of a 1928 base', '8th Ave & 57th St', 'Midtown West'),
+    ('Hearst Tower', (-73.98361, 40.76656), 182, 2006, 'a diamond-lattice glass tower on top of a 1928 base', '8th Ave & 57th St', 'Midtown West'),
     ('New York Times Building', (-73.99032, 40.75570), 319, 2007, 'Renzo Piano\'s tower with a ceramic-rod screen and a mast', '8th Ave & 41st St', 'Midtown West'),
     ('One Vanderbilt', (-73.97839, 40.75263), 427, 2020, 'a tapering glass tower beside Grand Central, with an observation deck', 'Vanderbilt Ave & 42nd St', 'Midtown East'),
     ('Central Park Tower', (-73.98065, 40.76595), 472, 2020, 'among the tallest residential towers in the world, on Billionaires\' Row', 'W 57th St, 7th Ave to 8th Ave', 'Midtown'),

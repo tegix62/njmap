@@ -16,7 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # looks like): the Chrysler Building's survey has the right place and height (328 m) but a bare 5 m needle where its crown is.
 NOT_THE_SHAPE = []
 CHRYSLER = (-73.97535, 40.75166)  # built by hand from the survey (see chrysler() below)
-HEARST = (-73.98301, 40.76711)  # the NW corner of 8th Ave and 57th St (see hearst() below)
+HEARST = (-73.98361, 40.76656)  # the SW corner of 8th Ave and 57th St: 300 W 57th is an even number, the south side (see hearst() below)
 
 
 def chrysler(b):
@@ -110,23 +110,42 @@ def chrysler(b):
 
 
 def hearst(b):
-    """Hearst Tower. The survey has its place and height (about 191 m with the roof gear; the tower is 182 m) and the 1928
-    stone base (a 41 x 40 m block, 24 m high) and the lower shaft right, but steps the shaft in at 93 m and again near the
-    top, which the real tower doesn't do (a flat-topped glass prism with notched corners, the same width all the way up). So:
-    the base in stone, the survey's shaft outline carried straight up to the roof in glass, and a small roof stage."""
-    base = next(s for s in b['slabs'] if s[0] == 0 and len(s[2]) >= 3)
-    shaft = max((s for s in b['slabs'] if 20 < s[0] < 30 and len(s[2]) >= 12), key=lambda s: len(s[2]))
-    top = 182.0
-    def scaled(ring, k):
-        cx = sum(p[0] for p in ring) / len(ring); cy = sum(p[1] for p in ring) / len(ring)
-        return [[round(cx + (x - cx) * k, 1), round(cy + (y - cy) * k, 1)] for x, y in ring]
+    """Hearst Tower: the 1928 stone base (a six-storey block, 80 x 80 m and 29 m high) with Foster's glass tower set on it
+    (a 62 x 58 m rectangle, to the 181 m roof, then a small roof stage). The survey has all of that but as a plain box; the
+    real tower's edges are a diagrid, a zigzag of triangles four storeys (16 m) tall, so each corner is cut away more and
+    less, over and over, up the tower, and the glass is lighter at the nodes of the grid."""
+    from shapely.geometry import Polygon
+    sl = [(s[0], s[1], Polygon(s[2])) for s in b['slabs'] if len(s[2]) >= 3]
+    base = next(s for s in sl if s[0] > 10 and s[1] < 31 and len(s[2].exterior.coords) > 10)   # the 24-point outline of the base
+    shaft = max((s for s in sl if s[0] >= 25 and s[1] > 150), key=lambda s: s[2].area)         # the 62 x 58 m rectangle
+    rest = [s for s in sl if s[0] >= 180 and s[2].area > 150]                                  # the roof stages
+    top0 = shaft[0]
+    mrr = shaft[2].minimum_rotated_rectangle
+    P = list(mrr.exterior.coords)[:4]
+    e1 = (P[1][0] - P[0][0], P[1][1] - P[0][1]); e2 = (P[2][0] - P[1][0], P[2][1] - P[1][1])
+    L1, L2 = math.hypot(*e1), math.hypot(*e2)
+    uu = (e1[0] / L1, e1[1] / L1); vv = (e2[0] / L2, e2[1] / L2)
+    hu, hv = L1 / 2, L2 / 2
+    cx, cy = mrr.centroid.coords[0]
+    def octagon(c):
+        pts = []
+        for su, sv, (du, dv) in ((-1, -1, (c, 0)), (-1, -1, (0, c)), (1, -1, (-c, 0)), (1, -1, (0, c)), (1, 1, (-c, 0)), (1, 1, (0, -c)), (-1, 1, (c, 0)), (-1, 1, (0, -c))):
+            a_, b_ = su * hu + du, sv * hv + dv
+            pts.append([round(cx + uu[0] * a_ + vv[0] * b_, 1), round(cy + uu[1] * a_ + vv[1] * b_, 1)])
+        return pts
+    ring = lambda g: [[round(x, 1), round(y, 1)] for x, y in list(g.exterior.coords)[:-1]]
+    slabs = [[0.0, round(shaft[0], 1), ring(base[2]), '#cdbfa5']]
+    z = top0
+    while z < shaft[1] - 0.01:
+        z2 = min(z + 4.0, shaft[1])
+        ph = (((z + z2) / 2 - top0) / 16.0) % 1.0
+        tri = abs(ph * 2 - 1)                       # 1 at a node of the grid, 0 half way between
+        slabs.append([round(z, 1), round(z2, 1), octagon(1.2 + 6.0 * (1 - tri)), '#a6b8c7' if tri > 0.75 else '#7d93a5'])
+        z = z2
+    for lo, hi, g in rest:
+        slabs.append([round(lo, 1), round(hi, 1), ring(g), '#aab4bd'])
     rec = dict(b)
-    rec['h'] = 186.0
-    rec['slabs'] = [
-        [0.0, round(base[1], 1), base[2], '#cdbfa5'],
-        [round(base[1], 1), top, shaft[2], '#7f95a6'],
-        [top, 186.0, scaled(shaft[2], 0.55), '#aab4bd'],
-    ]
+    rec['slabs'] = slabs
     return rec
 
 
