@@ -348,10 +348,6 @@ Not possible without a vertex stage in MapLibre: PS1 vertex wobble and affine te
 
 At PS1/PS2 strength the map's own text would be blocky, so town names are drawn as DOM text above the map instead (`createLabels` in `js/retro.js`, placed with `map.project`, no overlapping): small caps, monospace, hard stepped shadow like a PS1 menu. The same hard-shadow monospace style is applied to the heading and question; the compare-view pins take it too. Answer buttons, hints and the result text stay plain on purpose. Which pieces get the retro text treatment is a handful of selectors at the end of `css/app.css`.
 
-### Scan points (hologram look, `createScan` in `js/holo.js`)
-
-Small + and × strokes are pinned to the terrain round the place being asked about, like a camera tracker's feature points or a Death Stranding scan. They are seeded on a jittered grid covering about what is on screen and kept where the terrain model is steepest (so they outline the relief), plus a few on flat ground. While the question is open a ring sweeps outward from the place every 7 s and lights them as it passes; after you answer they sit still. They are drawn as short line strokes (draped on the ground), not text, because MapLibre drops text and icons whose terrain tile has not loaded. Under the retro pass the strokes are thickened (×1.6 PS2, ×3.2 PS1) so they survive the low resolution and dither. They follow the Hologram chip.
-
 ### Paper look (prototype, `js/paper.js`)
 
 The look chip in "Name that place" now cycles **Hologram → Paper → Plain map** (remembered; the older on/off setting still counts). Paper is after a printed road map of Washington, D.C.: cream stock, thin dark linework, orange arterials, halftone blue dots on water (a `fill-pattern`), a flat orange mass for what is asked about (mountain bands as three ink strengths) with two off-register plates behind it (yellow and blue, offset 3–4 px on screen) and a hard offset ink shadow under outlines. Relief is cut to a faint warm tone. Over the map: fibre speckle, three fold creases and aged edges (`#paperFx`, static, multiply). Panels are cream cards with a double rule, hard shadows, serif question text and small-caps labels. The retro pass sits on top of any look (its fog takes the stock colour in Paper). A Newport News palette (red roads, blue linework) is the planned alternative.
@@ -362,3 +358,9 @@ Not seen on a device: halftone water and the base-map recolour (the test browser
 While a game runs, the practice header is one line ("Name that place · change ▾", `gameBar()` in `js/practice.js`) instead of the row of quick-switch tiles; the tiles stay on the other practice screens. In "Name that place" the points moved into the heading line, the three look chips (Orbit/Drag, Plain/Paper/Holo, Retro Off/PS2/PS1) sit on one row, and the heading's town list shows four short names plus "+N more" (the full list is in the result card). The Next button sits on a solid sticky bar, so result text no longer shows through it.
 
 The practice picker ("More ways to practice") is sized to the visible screen (`100dvh` minus the safe areas, not the browser's tallest layout), scrolls inside, and keeps Close pinned at the bottom, so it no longer runs under the status bar or Safari's toolbar.
+
+
+### Three looks (current)
+
+The look chip in "Name that place" cycles **Default → Paper → PS1** (remembered). PS1 is the projection-table terrain (`js/holo.js`, now a quiet ground with 40 m steps and no bright rims) drawn at PlayStation-1 resolution with a light dither, distance fog and crisp DOM labels (`js/retro.js`). The PS2 level, the separate Hologram/Retro chips and the + / × scan points were removed after trying them (the scan points read as noise). Paper gained ink spread (a hair of line blur), large soft ink/stock blotches, and sparse pinholes of bare stock (`#paperFx`, `#paperPin`).
+Known limit: the map's own text for landmarks (other towers' names) is still drawn inside the low-resolution canvas under PS1 and gets blocky; town names are crisp.

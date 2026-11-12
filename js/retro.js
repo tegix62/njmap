@@ -16,8 +16,8 @@
 
 const LEVELS = [
   null,
-  { name: 'PS2', ratio: 0.8, smooth: true, levels: 0, dither: 0.0, grain: 0.07, fog: 0.35, tone: 'contrast(1.08) saturate(1.12)' },
-  { name: 'PS1', ratio: 0.38, smooth: false, levels: 7, dither: 0.3, grain: 0, fog: 0.75, tone: 'contrast(1.12) saturate(1.05)' },
+  null,   // (a softer PS2 level was tried and dropped)
+  { name: 'PS1', ratio: 0.38, smooth: false, levels: 7, dither: 0.16, grain: 0, fog: 0.75, tone: 'contrast(1.12) saturate(1.05)' },
 ];
 
 const SVG_NS = 'http://www.w3.org/2000/svg';

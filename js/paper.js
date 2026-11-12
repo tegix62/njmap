@@ -39,6 +39,8 @@ const BASE = {
   'muni-line': { 'line-color': '#9a9a7a', 'line-opacity': 0.55 },
   'county-line': { 'line-color': PAPER.ink, 'line-opacity': 0.6 },
 };
+// ink spreads a little into the stock: a hair of blur on printed lines
+const BLEED = { river: 0.5, 'road-minor': 0.45, 'road-mid': 0.45, 'road-major': 0.55, 'hwy-color': 0.6, 'muni-line': 0.5, 'county-line': 0.6 };
 
 /** A tile of blue halftone dots (transparent between), for the water. */
 function dotsImage(rgb = [63, 120, 173]) {
@@ -52,7 +54,7 @@ function dotsImage(rgb = [63, 120, 173]) {
 
 export function createPaper(map) {
   const saved = new Map();
-  let on = false, fx = null;
+  let on = false, fx = null, pin = null;
 
   const set = (id, prop, val) => {
     if (!map.getLayer(id)) return;
@@ -74,6 +76,10 @@ export function createPaper(map) {
     fx.id = 'paperFx';
     fx.setAttribute('aria-hidden', 'true');
     document.body.appendChild(fx);
+    pin = document.createElement('div');                 // pinholes: specks of bare stock showing through the ink
+    pin.id = 'paperPin';
+    pin.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(pin);
   }
 
   /** The two plates that print slightly off behind each coloured mass (mountain bands, lake and park fills). */
@@ -94,6 +100,8 @@ export function createPaper(map) {
     set('orb-geom-casing', 'line-color', PAPER.ink);               // a hard offset ink shadow, like the state borders
     set('orb-geom-casing', 'line-opacity', 0.85);
     set('orb-geom-casing', 'line-translate', [2, 2]);
+    set('orb-geom-casing', 'line-blur', 0.8);
+    set('orb-geom-line', 'line-blur', 0.6);
     set('orb-geom-casing', 'line-width', ['interpolate', ['linear'], ['zoom'], 8, 4.5, 12, 8]);
     set('orb-flash-glow', 'line-color', '#f2d63c');
     set('orb-town-name', 'text-color', PAPER.text);
@@ -119,6 +127,7 @@ export function createPaper(map) {
         ensureFx();
         plates();
         for (const [id, props] of Object.entries(BASE)) for (const [p, v] of Object.entries(props)) set(id, p, v);
+        for (const [id, b] of Object.entries(BLEED)) set(id, 'line-blur', b);
         game();
         for (const id of ['orb-paper-a', 'orb-paper-b']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
       } else {
@@ -126,6 +135,7 @@ export function createPaper(map) {
         restore();
       }
       if (fx) fx.hidden = !on;
+      if (pin) pin.hidden = !on;
     },
     color: (role) => (role === 'wrong' ? PAPER.wrong : PAPER.target),
   };
