@@ -8,7 +8,7 @@ import { buildingFeatures, applySurveyTowers, loadSurveyTowers, groundFeatures, 
 const KEY = 'orbit';
 const ROUND = 10;
 const SPIN = 7; // degrees a second: a full turn in under a minute
-const PITCH = 64;
+const PITCH = 52; // tilted down more than the drive games' view, so the top of the tower shows and it can be framed closer
 const TALL = 150; // metres: buildings at least this tall stand up in full round the tower
 const GHOST_CAP = 26; // metres: the city around the tower is kept low so nothing stands in front of it
 const AREAS = ['downtown', 'midtown', 'uptown'];
@@ -254,9 +254,15 @@ export function initOrbit(ctx) {
     }
     map.getSource('orb-target').setData({ type: 'FeatureCollection', features: mine });
     const not = ['!', ['in', ['id'], ['literal', ids.length ? ids : [-1]]]];
+    // tall neighbours right beside the tower would stand in front of it: those within 90 m are kept low like the rest
+    const nearIds = [];
+    city.feats.forEach((f, i) => {
+      if (!ids.includes(i) && (f.properties.c !== undefined || f.properties.h >= TALL) && mDist(city.cx[i], p) < 90) nearIds.push(i);
+    });
+    const near = ['in', ['id'], ['literal', nearIds.length ? nearIds : [-1]]];
     // the low ghost: everything that is neither the tower nor one of the tall ones kept standing round it
-    map.setFilter('orb-ghost', ['all', ['!', ['has', 'c']], ['<', ['get', 'h'], TALL], not]);
-    map.setFilter('orb-others', ['all', ['any', ['has', 'c'], ['>=', ['get', 'h'], TALL]], not]);
+    map.setFilter('orb-ghost', ['all', not, ['any', ['all', ['!', ['has', 'c']], ['<', ['get', 'h'], TALL]], near]]);
+    map.setFilter('orb-others', ['all', ['any', ['has', 'c'], ['>=', ['get', 'h'], TALL]], not, ['!', near]]);
     around(t);
   }
 
@@ -265,12 +271,19 @@ export function initOrbit(ctx) {
     // The tower is centred in the free area (the space between the top card and the answers): about 78% of that height, its
     // middle at the middle. A tower this many metres high shows about 1.15 x sin(pitch) x height / (metres per pixel) pixels
     // tall; its foot goes half of that below the middle, and the camera padding is worked out to put the foot there.
-    const pad = ctx.padding();
-    const winH = window.innerHeight;
+    // The free area is measured off the real top card and answer panel (not guessed): the panel must already be drawn.
+    const boxH = map.getContainer().clientHeight || window.innerHeight;
+    const hudEl = document.getElementById('hud');
+    const sheetEl = document.getElementById('sheet');
+    const mapTop = map.getContainer().getBoundingClientRect().top;
+    const padTop = hudEl && !hudEl.hidden ? hudEl.getBoundingClientRect().bottom - mapTop + 30 : ctx.padding().top;
+    const padBottom = sheetEl && !sheetEl.hidden ? boxH - (sheetEl.getBoundingClientRect().top - mapTop) + 8 : ctx.padding().bottom;
+    const pad = { top: padTop, bottom: padBottom };
+    const winH = boxH;
     const free = Math.max(120, winH - pad.top - pad.bottom);
     const mpp0 = 78271.5 * Math.cos((t.p[1] * Math.PI) / 180);
     const sinP = Math.sin((PITCH * Math.PI) / 180);
-    const zoom = Math.max(14.4, Math.min(17, Math.log2((mpp0 * 0.78 * free) / (1.15 * sinP * t.h))));
+    const zoom = Math.max(14.4, Math.min(16.9, Math.log2((mpp0 * 0.86 * free) / (1.15 * sinP * t.h))));
     const pxTall = (1.15 * sinP * t.h * Math.pow(2, zoom)) / mpp0;
     const baseY = pad.top + free / 2 + pxTall / 2;
     const top = Math.max(pad.top, 2 * baseY - (winH - pad.bottom));
@@ -360,8 +373,8 @@ export function initOrbit(ctx) {
         render();
       }, wait);
     }
-    camera(t, Math.random() * 360, first);
     render();
+    camera(t, Math.random() * 360, first);
   }
   const HINTS = [
     (t) => `<b>${t.h} m</b> (${ft(t.h)} ft), finished in <b>${t.y}</b>.`,
