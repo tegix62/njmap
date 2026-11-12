@@ -72,6 +72,8 @@ export function initOrbit(ctx) {
   let city = null; // loaded once: { feats, cx, cy, list, pics }
   let loading = null;
   let hiddenSymbols = [];
+  let spinOn = ctx.store.get('orbit.spin', true); // the camera circles by itself (off: it holds still and you turn it)
+  let drag = null; // a finger or mouse turning the view
   let occl = []; // the tall towers round the one being asked about, for lowering the ones in front
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const rand = (a) => a[Math.floor(Math.random() * a.length)];
@@ -205,6 +207,43 @@ export function initOrbit(ctx) {
     return shuffle([t, ...out]);
   }
 
+  // One finger (or the mouse) turns the view round the tower: sideways turns it, up and down tilts it. The map's own panning is
+  // off while this runs, so the tower stays where it is; two fingers still zoom.
+  function dragStart(e) {
+    if (!run || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (e.target.closest && e.target.closest('.maplibregl-ctrl')) return;
+    drag = { x: e.clientX, y: e.clientY, id: e.pointerId };
+  }
+  function dragMove(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    drag.x = e.clientX;
+    drag.y = e.clientY;
+    map.setBearing(map.getBearing() - dx * 0.45);
+    map.setPitch(Math.max(20, Math.min(70, map.getPitch() - dy * 0.25)));
+  }
+  function dragEnd(e) {
+    if (drag && (!e || e.pointerId === drag.id)) drag = null;
+  }
+  const canvasBox = () => map.getCanvasContainer();
+  function dragOn() {
+    map.dragPan.disable();
+    const el = canvasBox();
+    el.addEventListener('pointerdown', dragStart);
+    window.addEventListener('pointermove', dragMove);
+    window.addEventListener('pointerup', dragEnd);
+    window.addEventListener('pointercancel', dragEnd);
+  }
+  function dragOff() {
+    map.dragPan.enable();
+    const el = canvasBox();
+    el.removeEventListener('pointerdown', dragStart);
+    window.removeEventListener('pointermove', dragMove);
+    window.removeEventListener('pointerup', dragEnd);
+    window.removeEventListener('pointercancel', dragEnd);
+    drag = null;
+  }
+
   /** Lower the tall towers that stand between the camera and the tower (the camera looks along `bearing` degrees), raise the rest. */
   function updateOcclusion(bearing) {
     const r = (bearing * Math.PI) / 180;
@@ -330,8 +369,11 @@ export function initOrbit(ctx) {
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
       if (!document.hidden) {
-        bearing = (bearing + SPIN * dt * (ctx.reduceMotion ? 0.3 : 1)) % 360;
-        map.setBearing(bearing);
+        bearing = map.getBearing();
+        if (spinOn && !drag) {
+          bearing = (bearing + SPIN * dt * (ctx.reduceMotion ? 0.3 : 1)) % 360;
+          map.setBearing(bearing);
+        }
         if (now - lastOcc > 90) {
           lastOcc = now;
           updateOcclusion(bearing);
@@ -377,6 +419,7 @@ export function initOrbit(ctx) {
     layers();
     map.setMaxPitch(70);
     show(true);
+    dragOn();
     next();
   }
   function stop() {
@@ -389,6 +432,7 @@ export function initOrbit(ctx) {
     if (pb) pb.hidden = true;
     for (const o of occl) if (o.low) map.setFeatureState({ source: 'orb-city', id: o.id }, { low: false });
     occl = [];
+    dragOff();
     show(false);
     map.easeTo({ pitch: 0, duration: ctx.dur ? ctx.dur(400) : 400 });
   }
@@ -508,13 +552,18 @@ export function initOrbit(ctx) {
       return `<button class="orb-choice${cls}" data-n="${esc(c.n)}"${q.done || q.flying ? ' disabled' : ''}>${esc(c.n)}</button>`;
     };
     ctx.sheet(`${run.opts.header()}<div id="qbody">
-      <div class="score">${run.pts} points${run.streak >= 3 ? ` · 🔥 ${run.streak}` : ''}</div>
+      <div class="score"><button type="button" id="orbSpin" class="orb-mini" aria-pressed="${spinOn}">${spinOn ? '↻ Orbiting' : '✋ Drag to turn'}</button> ${run.pts} points${run.streak >= 3 ? ` · 🔥 ${run.streak}` : ''}</div>
       <div class="orb-choices">${q.choices.map(btn).join('')}</div>
       ${q.done ? `${reveal()}<button class="primary" id="orbNext">${run.n >= ROUND ? 'Finish' : 'Next tower'}</button>` : `<button id="orbHint"${q.hints >= HINTS.length || q.flying ? ' disabled' : ''}>💡 Hint (−1 point)</button>`}
     </div>`);
     run.opts.bindHeader();
     for (const b of document.querySelectorAll('.orb-choice')) b.addEventListener('click', () => answer(b.dataset.n));
     document.getElementById('orbNext')?.addEventListener('click', next);
+    document.getElementById('orbSpin')?.addEventListener('click', () => {
+      spinOn = !spinOn;
+      ctx.store.set('orbit.spin', spinOn);
+      render();
+    });
     document.querySelector('.orb-thumb')?.addEventListener('click', () => openPhoto(q.t));
     document.getElementById('orbHint')?.addEventListener('click', hint);
   }
