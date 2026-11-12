@@ -7,11 +7,13 @@ import io, json, math, os, pickle, sys, urllib.request
 import numpy as np
 from PIL import Image
 from shapely import wkb
-from shapely.geometry import mapping, LineString, MultiLineString
+from shapely.geometry import mapping, shape, LineString, MultiLineString
+from shapely.strtree import STRtree
 from shapely.ops import unary_union, linemerge
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_nj_places as BP
+import build_nj_landmark_list as BL
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # park (our name) -> the Overture names (prefixes) that make it up
@@ -138,6 +140,56 @@ def orient_down(line, name):
     return co if e0 >= e1 else co[::-1]
 
 
+def list_towns(places, out):
+    """The towns each place is in, from its shape against the town boundaries: a river or range in order along it (a river downstream), a lake or park
+    biggest share first. Written back into data/nj-places.json as `towns` and `counties`."""
+    polys, props = BL.towns()
+    tree = STRtree(polys)
+    for p in places:
+        if p.get('k') != 'nat':
+            continue
+        g = out.get(p['n'])
+        towns = []
+        if g and g['type'] in ('LineString', 'MultiLineString'):
+            gg = shape(g)
+            chains = list(gg.geoms) if gg.geom_type == 'MultiLineString' else [gg]
+            main = max(chains, key=lambda c: c.length)
+            buf = unary_union([c.buffer(0.004 if g.get('ridge') else 0.0007) for c in chains])
+            hits = []
+            for i in tree.query(buf):
+                inter = polys[i].intersection(buf)
+                if inter.is_empty or inter.area < 1e-8:
+                    continue
+                pos = main.project(inter.representative_point()) if main.distance(inter) < 0.003 else 99
+                hits.append((pos, props[i]['full'], props[i]['c']))
+            towns = [(n, c) for pos, n, c in sorted(hits)]
+        elif g and g['type'] in ('Polygon', 'MultiPolygon'):
+            gg = shape(g)
+            hits = []
+            for i in tree.query(gg):
+                inter = polys[i].intersection(gg)
+                if inter.is_empty:
+                    continue
+                share = inter.area / gg.area
+                if share >= 0.04 or inter.area * 84200 * 111000 > 150000:
+                    hits.append((-inter.area, props[i]['full'], props[i]['c']))
+            towns = [(n, c) for a, n, c in sorted(hits)]
+        seen, uniq = set(), []
+        for n, c in towns:
+            if n not in seen:
+                seen.add(n); uniq.append((n, c))
+        if uniq:
+            p['towns'] = [n for n, c in uniq]
+            p['counties'] = list(dict.fromkeys(c for n, c in uniq))
+        elif p.get('at'):
+            p['towns'] = [p['at']]
+            p['counties'] = [p['c']] if p.get('c') else []
+    json.dump(places, open(os.path.join(ROOT, 'data/nj-places.json'), 'w'), ensure_ascii=False, separators=(',', ':'))
+    for p in places:
+        if p.get('k') == 'nat' and p.get('kind') in ('river', 'mountain', 'lake') and len(p.get('towns', [])) > 1:
+            print(f"   {p['n']:30s} {len(p['towns']):3d} towns, {len(p['counties'])} counties: {', '.join(p['towns'][:5])}{'...' if len(p['towns']) > 5 else ''}")
+
+
 def main():
     out = {}
     flow = {}
@@ -183,6 +235,7 @@ def main():
     out = {k: v for k, v in out.items() if v}
     out['_flow'] = flow
     json.dump(out, open(os.path.join(ROOT, 'data/nj-geoms.json'), 'w'), separators=(',', ':'))
+    list_towns(places, out)
     print(len(out) - 1, 'shapes,', os.path.getsize(os.path.join(ROOT, 'data/nj-geoms.json')) // 1024, 'KB')
     missing = [n for n in list(RIVER_KEYS) + list(LAKES) + list(PARKS) + list(RIDGE_KM) if n not in out]
     print('no shape for:', missing)

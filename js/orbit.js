@@ -168,6 +168,12 @@ export function initOrbit(ctx) {
     }
     src.setData({ type: 'FeatureCollection', features: feats });
   }
+  function clearFlashVisual() {
+    const src = map.getSource('orb-flash');
+    if (src) src.setData({ type: 'FeatureCollection', features: [] });
+    for (const id of ['orb-geom-fill', 'orb-geom-fill2']) if (map.getLayer(id)) map.setPaintProperty(id, 'fill-opacity', 0.3);
+    if (map.getLayer('orb-geom-line')) map.setPaintProperty('orb-geom-line', 'line-width', ['interpolate', ['linear'], ['zoom'], 8, 3, 12, 6]);
+  }
   function endFlash() {
     cancelAnimationFrame(placeRaf);
     const src = map.getSource('orb-flash');
@@ -181,13 +187,16 @@ export function initOrbit(ctx) {
     const f = flowOf(t);
     if (!f) return;
     const dur = FLASH_MS * (ctx.reduceMotion ? 0.5 : 1);
+    const pause = ctx.reduceMotion ? 2200 : 1100;            // a breath between one pass and the next
+    const period = dur * 1.5 + pause;
     const t0 = performance.now();
+    let resting = false;
     const step = (now) => {
-      if (!run || !q || q.t !== t || q.done) return endFlash();
-      const u = (now - t0) / dur;
-      drawFlash(t, f, u);
-      if (u < 1.5) placeRaf = requestAnimationFrame(step);
-      else endFlash();
+      if (!run || !q || q.t !== t || q.done) return endFlash();   // (it goes on for as long as the question is open)
+      const e = (now - t0) % period;
+      if (e <= dur * 1.5) { drawFlash(t, f, e / dur); resting = false; }
+      else if (!resting) { clearFlashVisual(); resting = true; }
+      placeRaf = requestAnimationFrame(step);
     };
     placeRaf = requestAnimationFrame(step);
   }
@@ -741,9 +750,13 @@ export function initOrbit(ctx) {
     render();
     camera(t, Math.random() * 360, first);
   }
+  /** "A, B, C and 4 more": the first `max` of a list. */
+  const listOf = (a, max) => (a.length <= max ? (a.length > 1 ? `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}` : a[0] || '') : `${a.slice(0, max).join(', ')} and ${a.length - max} more`);
+  const countiesOf = (t) => (t.counties && t.counties.length ? t.counties : [t.c]).filter(Boolean);
+  const townsOf = (t) => (t.towns && t.towns.length ? t.towns : [t.at]).filter(Boolean);
   const HINTS = [
-    (t) => (t.k === 'nat' ? `It's in <b>${esc(t.c)} County</b>.` : t.k === 'lm' ? `Opened in <b>${t.y}</b>.` : `<b>${t.h} m</b> (${ft(t.h)} ft), finished in <b>${t.y}</b>.`),
-    (t) => (t.k === 'nat' ? `Near <b>${esc(t.at)}</b>.` : cfg ? `It's in <b>${esc(t.at)}</b>.` : `You'd find it at <b>${esc(t.at)}</b>.`),
+    (t) => (t.k === 'nat' ? (countiesOf(t).length > 1 ? `It spans <b>${esc(listOf(countiesOf(t), 8))}</b> counties.` : `It's in <b>${esc(countiesOf(t)[0])} County</b>.`) : t.k === 'lm' ? `Opened in <b>${t.y}</b>.` : `<b>${t.h} m</b> (${ft(t.h)} ft), finished in <b>${t.y}</b>.`),
+    (t) => (t.k === 'nat' ? (townsOf(t).length > 1 ? `${t.kind === 'river' ? 'Runs through' : t.kind === 'mountain' ? 'Crosses' : 'Lies in'} <b>${esc(listOf(townsOf(t), 6))}</b>.` : `Near <b>${esc(t.at)}</b>.`) : cfg ? `It's in <b>${esc(t.at)}</b>.` : `You'd find it at <b>${esc(t.at)}</b>.`),
     (t) => (t.k === 'nat' ? `${t.elev ? `<b>${t.elev.toLocaleString()} ft</b>. ` : ''}${esc(t.line)}.` : `${esc(t.line)}.`),
   ];
   function hint() {
@@ -812,7 +825,7 @@ export function initOrbit(ctx) {
     return `<div class="fb ${q.ok ? 'ok' : 'no'} orb-reveal">
       ${pic ? `<img class="orb-thumb" src="${esc(pic.img)}" alt="Photo of ${esc(t.n)}: tap to enlarge" data-n="${esc(t.n)}" tabindex="0" />` : ''}
       <div><b>${q.ok ? '✓' : '✗'} ${esc(t.n)}</b> <span class="muted">${q.ok ? `+${q.pts}` : ''}</span>${cfg && t.k === 'nat' && !q.ok && q.picked ? `<div class="orb-legend"><span style="display:inline-block;width:.8em;height:.8em;border-radius:2px;background:${GEOM_COLOR.target};margin-right:.35em"></span>${esc(t.n)}<br><span style="display:inline-block;width:.8em;height:.8em;border-radius:2px;background:${GEOM_COLOR.wrong};margin-right:.35em"></span>${esc(q.picked)} <span class="muted">(your pick)</span></div>` : ''}<br>
-      ${esc(t.line)}.<br><span class="muted">${t.k === 'nat' ? `${t.elev ? `${t.elev.toLocaleString()} ft · ` : ''}${esc(t.at)}, ${esc(t.c)} County` : `${t.k === 'lm' ? '' : `${t.h} m (${ft(t.h)} ft) · `}${t.y} · ${esc(t.at)}`}</span></div>
+      ${esc(t.line)}.<br><span class="muted">${t.k === 'nat' ? `${t.elev ? `${t.elev.toLocaleString()} ft · ` : ''}${townsOf(t).length > 1 ? `${t.kind === 'river' ? 'Through ' : t.kind === 'mountain' ? 'Across ' : 'In '}${esc(listOf(townsOf(t), 14))} (${townsOf(t).length} towns, ${countiesOf(t).length > 1 ? `${esc(listOf(countiesOf(t), 8))} counties` : `${esc(countiesOf(t)[0])} County`})` : `${esc(t.at)}, ${esc(t.c)} County`}` : `${t.k === 'lm' ? '' : `${t.h} m (${ft(t.h)} ft) · `}${t.y} · ${esc(t.at)}`}</span></div>
     </div>`;
   }
   /** The photo large, over everything, with its credit; a tap anywhere (or Escape) closes it. */
