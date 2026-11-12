@@ -360,3 +360,5 @@ Not seen on a device: halftone water and the base-map recolour (the test browser
 ### Less clutter (shared across games)
 
 While a game runs, the practice header is one line ("Name that place · change ▾", `gameBar()` in `js/practice.js`) instead of the row of quick-switch tiles; the tiles stay on the other practice screens. In "Name that place" the points moved into the heading line, the three look chips (Orbit/Drag, Plain/Paper/Holo, Retro Off/PS2/PS1) sit on one row, and the heading's town list shows four short names plus "+N more" (the full list is in the result card). The Next button sits on a solid sticky bar, so result text no longer shows through it.
+
+The practice picker ("More ways to practice") is sized to the visible screen (`100dvh` minus the safe areas, not the browser's tallest layout), scrolls inside, and keeps Close pinned at the bottom, so it no longer runs under the status bar or Safari's toolbar.

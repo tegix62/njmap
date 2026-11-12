@@ -907,7 +907,7 @@ export function initPractice(ctx) {
     groups.push(['Quizzes', allowed.filter((k) => !used.has(k))]);
     const quizChip = (k) => `<button class="pchip${k === cfg.type ? ' on' : ''}" data-type="${k}">${esc(TYPES[k])}</button>`;
     const recent = store.get('practice.recent', []).filter((k) => allowed.includes(k) && k !== cfg.type).slice(0, 3);
-    dlg.innerHTML = `<h2>More ways to practice</h2>
+    dlg.innerHTML = `<div class="pscroll"><h2>More ways to practice</h2>
       ${recent.length ? `<div class="pgroup"><div class="pname">Recently</div><div class="precent">${recent.map((k) => `<button class="pchip" data-type="${k}">${esc(TYPES[k])}</button>`).join('')}</div></div>` : ''}
       ${groups
         .filter(([, ks]) => ks.length)
@@ -917,7 +917,7 @@ export function initPractice(ctx) {
               ? `<div class="pgroup"><div class="pname">${name}</div><div class="precent quizzes">${ks.map(quizChip).join('')}</div></div>`
               : `<div class="pgroup"><div class="pname">${name}</div><div class="pcards">${ks.map(card).join('')}</div></div>`
         )
-        .join('')}
+        .join('')}</div>
       <button class="primary" id="pickClose">Close</button>`;
     for (const b of dlg.querySelectorAll('[data-type]'))
       b.addEventListener('click', () => {
