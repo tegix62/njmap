@@ -406,7 +406,7 @@ export function initOrbit(ctx) {
     const mpp0 = 78271.5 * Math.cos((t.p[1] * Math.PI) / 180);
     const sinP = Math.sin((PITCH * Math.PI) / 180);
     const hh = t.k === 'lm' ? Math.max(t.h, cfg ? 40 : 85) : t.h; // a landmark is low: frame it as if it stood a little taller
-    let zoom = Math.max(14.4, Math.min(16.9, Math.log2((mpp0 * 0.86 * free) / (1.15 * sinP * hh))));
+    let zoom = Math.max(14.4, Math.min(cfg ? 16.0 : 16.9, Math.log2((mpp0 * 0.86 * free) / (1.15 * sinP * hh))));
     // a wide one (a stadium, a mall) must fit across the screen too: its width, with a margin for the turn
     if (t.w) zoom = Math.min(zoom, Math.max(14.2, Math.log2((0.8 * (map.getContainer().clientWidth || 400) * mpp0) / (t.w * 1.45))));
     const pxTall = (1.15 * sinP * hh * Math.pow(2, zoom)) / mpp0;
@@ -449,30 +449,49 @@ export function initOrbit(ctx) {
     const from = map.getCenter();
     const km = mDist([from.lng, from.lat], cam.center) / 1000;
     if (cfg && km > 2) {
-      // Far apart (New Jersey's landmarks are a state away from each other): climb so the way is visible, look down, then come back
-      // down onto the next one, instead of skimming over rooftops where nothing can be seen.
+      // Far apart (New Jersey's landmarks are a state away from each other). In phases, so you can follow it: RISE straight up (no sideways
+      // travel while still low, turning north-up), CRUISE across at height, drop to a wide ORIENTING view and hold there a beat with the
+      // target in the middle (so you can see where you are), then settle into the orbit.
       cancelAnimationFrame(arcRaf);
       const z0 = map.getZoom(), b0 = map.getBearing(), p0 = map.getPitch(), pd0 = map.getPadding();
       const W = map.getContainer().clientWidth || 400;
       const zFit = Math.log2((0.6 * W * 78271.5 * Math.cos((cam.center[1] * Math.PI) / 180)) / (km * 1000));
-      const zMid = Math.max(7.2, Math.min(zFit, z0, cam.zoom));
-      const dB = ((((cam.bearing - b0) % 360) + 540) % 360) - 180;
-      const ms = (ctx.reduceMotion ? 0.5 : 1) * Math.min(3400, 1500 + km * 45);
+      const zTop = Math.max(7.2, Math.min(zFit, z0 - 1, cam.zoom - 1));             // high enough to see both ends
+      const zOri = Math.min(cam.zoom - 1.8, 12.4);                                   // the orienting view: regional, terrain readable
+      const f = (ctx.reduceMotion ? 0.5 : 1) * Math.max(0.45, Math.min(1, km / 40)); // short hops are quicker
+      const seg = [800 * f, Math.min(1900, 550 + km * 16) * f, 700 * f, 450 * f, 900 * f]; // rise, cruise, drop, hold, settle (about 4.7 s across the state)
+      const total = seg.reduce((x, y) => x + y, 0);
+      const ease = (x) => x * x * (3 - 2 * x);
+      const dB0 = ((((0 - b0) % 360) + 540) % 360) - 180;                          // to north-up
+      const dB1 = ((((cam.bearing - 0) % 360) + 540) % 360) - 180;                 // north-up to the orbit's start
+      const pTop = Math.min(p0, 30), pOri = 45;
+      const lerp = (x, y, e) => x + (y - x) * e;
       const t0 = performance.now();
       const step = (now) => {
         if (!run || q.t !== t) return;
-        const s = Math.min(1, (now - t0) / ms);
-        const e = s * s * (3 - 2 * s);
-        const bump = Math.sin(Math.PI * e);                                  // 0, up to 1 at the top of the arc, 0
-        const zl = z0 + (cam.zoom - z0) * e;
+        let tau = Math.min(total, now - t0);
+        const st = { c: [from.lng, from.lat], z: z0, b: b0, p: p0, pad: 0 };
+        if (tau < seg[0]) {                                                         // rise: up, level, north
+          const e = ease(tau / seg[0]);
+          st.z = lerp(z0, zTop, e); st.b = b0 + dB0 * e; st.p = lerp(p0, pTop, e);
+        } else if ((tau -= seg[0]) < seg[1]) {                                      // cruise: across at height
+          const e = ease(tau / seg[1]);
+          st.c = [lerp(from.lng, cam.center[0], e), lerp(from.lat, cam.center[1], e)]; st.z = zTop; st.b = b0 + dB0; st.p = pTop;
+        } else if ((tau -= seg[1]) < seg[2]) {                                      // drop to the orienting view
+          const e = ease(tau / seg[2]);
+          st.c = cam.center; st.z = lerp(zTop, zOri, e); st.b = b0 + dB0; st.p = lerp(pTop, pOri, e);
+        } else if ((tau -= seg[2]) < seg[3]) {                                      // hold: look
+          st.c = cam.center; st.z = zOri + 0.15 * (tau / seg[3]); st.b = b0 + dB0; st.p = pOri;
+        } else {                                                                    // settle into the orbit
+          tau -= seg[3];
+          const e = ease(Math.min(1, tau / seg[4]));
+          st.c = cam.center; st.z = lerp(zOri + 0.15, cam.zoom, e); st.b = b0 + dB0 + dB1 * e; st.p = lerp(pOri, cam.pitch, e); st.pad = e;
+        }
         map.jumpTo({
-          center: [from.lng + (cam.center[0] - from.lng) * e, from.lat + (cam.center[1] - from.lat) * e],
-          zoom: zl - bump * ((z0 + cam.zoom) / 2 - zMid),
-          pitch: (p0 + (cam.pitch - p0) * e) * (1 - 0.75 * bump),
-          bearing: b0 + dB * e,
-          padding: { top: pd0.top + (cam.padding.top - pd0.top) * e, bottom: pd0.bottom + (cam.padding.bottom - pd0.bottom) * e, left: 0, right: 0 },
+          center: st.c, zoom: st.z, pitch: st.p, bearing: st.b,
+          padding: { top: lerp(pd0.top, cam.padding.top, st.pad), bottom: lerp(pd0.bottom, cam.padding.bottom, st.pad), left: 0, right: 0 },
         });
-        if (s < 1) arcRaf = requestAnimationFrame(step);
+        if (now - t0 < total) arcRaf = requestAnimationFrame(step);
         else go();
       };
       arcRaf = requestAnimationFrame(step);
