@@ -312,7 +312,7 @@ export function initOrbit(ctx) {
     };
     // (easeTo, not flyTo: flyTo's long zoom-out makes MapLibre throw from its tile bookkeeping now and then; the towers are
     // only a few km apart, so a plain ease reads as a swing anyway)
-    map.easeTo({ ...cam, duration: ctx.dur ? ctx.dur(first ? 1100 : 1500) : 1500, easing: (x) => x * x * (3 - 2 * x), essential: true });
+    map.easeTo({ ...cam, duration: ctx.dur ? ctx.dur(first ? 800 : 900) : 900, easing: (x) => x * x * (3 - 2 * x), essential: true });
     // (after easeTo starts: starting it ends any motion already under way, and that motion's own "moveend" must not count)
     if (map.isMoving()) map.once('moveend', go);
     else go();
@@ -366,7 +366,7 @@ export function initOrbit(ctx) {
     // the last tower stays in place until the camera is about halfway there, then the new one stands up where it's going
     if (first) focus(t);
     else {
-      const wait = ctx.dur ? ctx.dur(1500) * 0.45 : 700;
+      const wait = ctx.dur ? ctx.dur(900) * 0.45 : 400;
       setTimeout(() => {
         if (!run || !q || q.t !== t) return;
         focus(t);
