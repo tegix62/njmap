@@ -140,9 +140,9 @@ export function createPaper(map, bounds) {
     set('orb-geom-casing', 'line-width', ['interpolate', ['linear'], ['zoom'], 8, 4.5, 12, 8]);
     set('orb-flash-glow', 'line-color', '#f2d63c');
     set('orb-town-name', 'text-color', PAPER.text);
-    set('orb-town-name', 'text-halo-color', 'rgba(29,42,91,0.5)');
-    set('orb-town-name', 'text-halo-width', 1.6);
-    set('orb-town-name', 'text-halo-blur', 1.4);
+    set('orb-town-name', 'text-halo-color', 'rgba(29,42,91,0.9)');   // a tight, near-solid glow: the ink just spreads a hair
+    set('orb-town-name', 'text-halo-width', 0.7);
+    set('orb-town-name', 'text-halo-blur', 0.3);
     set('orb-relief', 'hillshade-shadow-color', '#7a6a3a');       // relief only as a faint warm tone: printed maps of this kind had none
     set('orb-relief', 'hillshade-highlight-color', '#fffbe0');
     set('orb-relief', 'hillshade-accent-color', '#a89a60');

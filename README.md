@@ -384,3 +384,5 @@ Not texture-ised yet: the building/landmark extrusions (still plain grey under P
 
 Lines are widened and brightened (county borders 2.6 px, highways 3.2 px, outline 4–7 px) because a one-pixel line is half a rendered pixel at this resolution; the map renders at 0.5× (was 0.38×) with 10 colour levels (was 7) and less dither; all remaining map text layers of the game are hidden under PS1 in favour of the crisp labels and the HUD.
 Not done: a world-anchored ink shader (a custom WebGL layer that draws fibre, mottling and pinholes from noise in map coordinates). Risky next to terrain draping; not started.
+
+Paper text glow, tuned: the first version (soft 6 px dark glow) made text hard to read. It is now a tight, near-solid spread (1 px at 0.9 opacity on panel text; a 0.7 px, 0.3-blur halo on map labels) with a faint orange plate (0.22 opacity), so it only thickens the ink a hair.
