@@ -52,6 +52,8 @@ def colour(name, z, height):
         return (185, 192, 198)                      # the mast
     if name == 'Woolworth Building' and z > 200:
         return (143, 179, 160)                      # the green copper roof
+    if name == 'Metropolitan Life Tower' and z > 150:
+        return (214, 178, 96) if z > 196 else (122, 168, 150)   # the green copper roof and the gilded lantern
     if name == 'Municipal Building' and z > 160:
         return (201, 162, 74)                       # the gilded statue
     return base

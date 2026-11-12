@@ -21,7 +21,7 @@ BOXES = [(-73.9860, 40.7480, -73.9690, 40.7690), (-74.0200, 40.7050, -74.0000, 4
 # the towers to build, with the colour of the glass/stone: name -> (rgb, min share of the official height the tallest part must reach)
 TOWERS = {
     'One Vanderbilt': (176, 190, 202), 'Central Park Tower': (178, 192, 200), '111 West 57th Street': (196, 202, 206),
-    '432 Park Avenue': (214, 212, 205), 'Four World Trade Center': (164, 178, 188),
+    '432 Park Avenue': (214, 212, 205), 'Seagram Building': (122, 102, 82), '53 West 53rd': (132, 140, 150), 'Four World Trade Center': (164, 178, 188),
     '53 West 53rd': (190, 197, 203),
 }
 
@@ -30,7 +30,14 @@ TOWERS = {
 # a stone base and a glass shaft: name -> (height of the base, base rgb). Parts above the base start at its roof (the 1928 building's
 # facade is a ring, the tower rises from inside it) and the colour changes at that height with its own vertices (no fade)
 SPLIT = {}  # (none now: the survey's Hearst is better than a base and a plain box)
-TAPER = {'One Vanderbilt': (120, 330, 0.60)}
+TAPER = {'One Vanderbilt': (120, 330, 0.60), '53 West 53rd': (90, 320, 0.72)}
+# towers the parts do not have (or have wrong): extruded from the footprint data's outline to the official height, the shader draws the facade
+HULL = {'Seagram Building'}
+PRISMS = {'Seagram Building': 157.0, '53 West 53rd': 320.0}
+# open steel crowns above the roof: name -> roof height in metres (posts and rails round the roof's outline, 22 m up)
+FRAMES = {'New York Times Building': 240.0}
+# a pitched roof the survey lacks: name -> (official top m, rgb); a pyramid on the tower's top outline
+CAPS = {}  # (the survey's Met Life Tower already has its stepped roof; extract_meshes.py colours it)
 # masts and spires missing from the survey: name -> (top metres, width at the foot in metres, rgb); stood on the tower's roof
 MASTS = {'New York Times Building': (319, 2.6, (150, 158, 166))}
 
@@ -54,6 +61,34 @@ def earclip(pts):
             break
     if len(idx) == 3:
         out.append(tuple(idx))
+    return out
+
+
+def footprint_prisms(sky):
+    """name -> the outline (lon/lat polygon) of the tower's footprint in data/buildings-midtown.json: the biggest one whose middle is within 25 m."""
+    d = json.load(open(os.path.join(ROOT, 'data/buildings-midtown.json')))
+    o, sc = d['o'], d['s']
+    out = {}
+    for name in PRISMS:
+        lon0, lat0 = sky[name]['p']
+        best = None
+        for b in d['b']:
+            x = y = 0
+            ring = []
+            for i in range(2, len(b), 2):
+                x += b[i]; y += b[i + 1]
+                ring.append((o[0] + x / sc, o[1] + y / sc))
+            if len(ring) < 3:
+                continue
+            g = Polygon(ring).buffer(0)
+            c = g.centroid
+            if g.geom_type == 'Polygon' and math.hypot((c.x - lon0) * 84200, (c.y - lat0) * 111000) < 25 and (best is None or g.area > best.area):
+                best = g
+        if best is not None:
+            if name in HULL:
+                best = best.convex_hull        # (the outline has a notch cut into it; the real tower is a plain rectangle)
+            out[name] = best
+            print(f'  {name}: footprint {best.area * 84200 * 111000:.0f} m2')
     return out
 
 
@@ -83,6 +118,7 @@ def main():
     sky = {s['n']: s for s in json.load(open(os.path.join(ROOT, 'data/skyscrapers.json')))}
     parts = fetch_parts()
     print(len(parts), 'parts')
+    prism_poly = footprint_prisms(sky)
     old = json.load(open(dst)) if os.path.exists(dst) else {'v': 2, 't': []}
     byname = {t['n']: t for t in old['t']}
     for name, rgb in TOWERS.items():
@@ -90,6 +126,8 @@ def main():
         lon0, lat0 = s['p']
         kx, ky = 111320 * math.cos(math.radians(lat0)), 110574
         near = [(g, a, b) for g, a, b in parts if math.hypot((g.centroid.x - lon0) * kx, (g.centroid.y - lat0) * ky) < 60 and g.geom_type == 'Polygon']
+        if name in PRISMS:
+            near = [(prism_poly[name], 0.0, PRISMS[name])] if name in prism_poly else []
         tall = [g for g, a, b in near if b >= 0.3 * s['h'] or a > 0]
         if not tall or max(b for g, a, b in near) < 0.8 * s['h']:
             print(' ', name, 'parts do not reach its height: skipped'); continue
@@ -143,6 +181,76 @@ def main():
                'i': base64.b64encode(np.array(idx, np.uint16).tobytes()).decode(), 'src': 'osm'}
         byname[name] = rec
         print(f'  {name}: {len(mine)} parts, {rec["tris"]} triangles, top {h:.0f} m (official {s["h"]})')
+    def decode(t):
+        return (np.frombuffer(base64.b64decode(t['p']), np.int16).reshape(-1, 3).tolist(), np.frombuffer(base64.b64decode(t['c']), np.uint8).reshape(-1, 3).tolist(), np.frombuffer(base64.b64decode(t['i']), np.uint16).tolist())
+    def encode(t, p, c, i):
+        t['p'] = base64.b64encode(np.array(p, np.int16).reshape(-1).tobytes()).decode()
+        t['c'] = base64.b64encode(np.array(c, np.uint8).reshape(-1).tobytes()).decode()
+        t['i'] = base64.b64encode(np.array(i, np.uint16).tobytes()).decode()
+        t['tris'] = len(i) // 3
+    def box(p, c, i, x0, y0, z0, x1, y1, z1, rgb):
+        n0 = len(p)
+        for z in (z0, z1):
+            for x, y in ((x0, y0), (x1, y0), (x1, y1), (x0, y1)):
+                p.append([x, y, z]); c.append(list(rgb))
+        for k in range(4):
+            a, b = n0 + k, n0 + (k + 1) % 4
+            i += [a, b, b + 4, a, b + 4, a + 4]
+        i += [n0 + 4, n0 + 5, n0 + 6, n0 + 4, n0 + 6, n0 + 7]
+    for name, roof in FRAMES.items():
+        t = byname.get(name)
+        if not t or t.get('frame'):
+            continue
+        p, c, i = decode(t)
+        band = [q for q in p if roof * 10 - 150 <= q[2] <= roof * 10]
+        x0, x1 = min(q[0] for q in band), max(q[0] for q in band)
+        y0, y1 = min(q[1] for q in band), max(q[1] for q in band)
+        z0, z1 = round(roof * 10), round(roof * 10 + 220)
+        rgb = (214, 219, 224)
+        step_ = 36
+        xs = list(range(x0, x1 + 1, step_)) + [x1]
+        ys = list(range(y0, y1 + 1, step_)) + [y1]
+        for x in xs:
+            for y in (y0, y1):
+                box(p, c, i, x - 3, y - 3, z0, x + 3, y + 3, z1, rgb)
+        for y in ys[1:-1]:
+            for x in (x0, x1):
+                box(p, c, i, x - 3, y - 3, z0, x + 3, y + 3, z1, rgb)
+        for z in (z0 + 70, z0 + 140, z1 - 4):
+            box(p, c, i, x0 - 2, y0 - 2, z, x1 + 2, y0 + 2, z + 4, rgb)
+            box(p, c, i, x0 - 2, y1 - 2, z, x1 + 2, y1 + 2, z + 4, rgb)
+            box(p, c, i, x0 - 2, y0 - 2, z, x0 + 2, y1 + 2, z + 4, rgb)
+            box(p, c, i, x1 - 2, y0 - 2, z, x1 + 2, y1 + 2, z + 4, rgb)
+        encode(t, p, c, i)
+        t['frame'] = 1
+        print(f'  {name}: steel crown on {(x1 - x0) / 10:.0f} x {(y1 - y0) / 10:.0f} m roof')
+    for name, (top, rgb) in CAPS.items():
+        t = byname.get(name)
+        if not t or t.get('cap'):
+            continue
+        p, c, i = decode(t)
+        zt = max(q[2] for q in p)
+        band = [q for q in p if q[2] >= zt - 60]
+        x0, x1 = min(q[0] for q in band), max(q[0] for q in band)
+        y0, y1 = min(q[1] for q in band), max(q[1] for q in band)
+        cx_, cy_ = (x0 + x1) // 2, (y0 + y1) // 2
+        hx, hy = (x1 - x0) // 2, (y1 - y0) // 2
+        print(f'  {name}: top outline {2 * hx / 10:.0f} x {2 * hy / 10:.0f} m at {zt / 10:.0f} m')
+        n0 = len(p)
+        for x, y in ((cx_ - hx, cy_ - hy), (cx_ + hx, cy_ - hy), (cx_ + hx, cy_ + hy), (cx_ - hx, cy_ + hy)):
+            p.append([x, y, zt]); c.append(list(rgb))
+        # a pyramid, then a small lantern on its tip
+        zl = round(zt + (top * 10 - zt) * 0.72)
+        for x, y in ((cx_ - hx // 4, cy_ - hy // 4), (cx_ + hx // 4, cy_ - hy // 4), (cx_ + hx // 4, cy_ + hy // 4), (cx_ - hx // 4, cy_ + hy // 4)):
+            p.append([x, y, zl]); c.append(list(rgb))
+        for k in range(4):
+            a, b = n0 + k, n0 + (k + 1) % 4
+            i += [a, b, b + 4, a, b + 4, a + 4]
+        gold = (214, 178, 96)
+        box(p, c, i, cx_ - hx // 4, cy_ - hy // 4, zl, cx_ + hx // 4, cy_ + hy // 4, round(top * 10), gold)
+        encode(t, p, c, i)
+        t['h'] = float(top)
+        t['cap'] = 1
     for name, (top, w, rgb) in MASTS.items():
         t = byname.get(name)
         if not t or t.get('mast'):

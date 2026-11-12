@@ -32,19 +32,49 @@ void main() {
   float l = 0.5 + 0.5 * abs(dot(n, normalize(vec3(-0.45, -0.55, 0.7)))); // flat shading, brighter on roofs and the sunny sides
   l *= 0.82 + 0.18 * clamp(v_pos.z / 300.0, 0.0, 1.0);                   // a little lighter towards the top
   vec3 c = v_col * l;
-  if (u_pat.x > 0.5 && abs(n.z) < 0.5 && v_pos.z > 32.0) {       // the diagonal frame of a facade (Hearst Tower), on walls above the base
+  if (u_pat.x > 0.5 && abs(n.z) < 0.5 && v_pos.z > 6.0) {        // facade patterns, on walls only
     vec2 t = normalize(vec2(-n.y, n.x));
-    float u = dot(v_pos.xy, t) / u_pat.y, v = v_pos.z / u_pat.z;
-    float d = min(0.5 - abs(fract(u + v) - 0.5), 0.5 - abs(fract(u - v) - 0.5)); // distance to the nearest diagonal, 0 on it
-    float w = 0.05 + 0.5 * fwidth(u + v);
-    c = mix(c, vec3(0.80, 0.84, 0.88) * l, 0.6 * (1.0 - smoothstep(w, w + 0.04, d)));
+    float s = dot(v_pos.xy, t);
+    int k = int(u_pat.x + 0.5);
+    if ((k == 1 && v_pos.z > 32.0) || k == 5) {                   // a diagonal frame (Hearst Tower; 5 = the bold braces of 53 West 53rd)
+      float u = s / u_pat.y, v = v_pos.z / u_pat.z;
+      float d = min(0.5 - abs(fract(u + v) - 0.5), 0.5 - abs(fract(u - v) - 0.5)); // distance to the nearest diagonal, 0 on it
+      float w = (k == 5 ? 0.12 : 0.05) + 0.5 * fwidth(u + v);
+      c = mix(c, (k == 5 ? vec3(0.86, 0.88, 0.90) : vec3(0.80, 0.84, 0.88)) * l, (k == 5 ? 0.85 : 0.6) * (1.0 - smoothstep(w, w + 0.04, d)));
+    } else if (k == 2) {                                          // vertical piers with darker window strips (30 Rock, Empire State, Chanin)
+      float u = s / u_pat.y;
+      float aa = 1.0 - smoothstep(0.25, 0.6, fwidth(u));
+      c *= 1.0 - u_pat.z * step(0.42, fract(u)) * aa;
+    } else if (k == 3) {                                          // square windows in a concrete grid, open mechanical floors (432 Park)
+      float u = s / u_pat.y, v = v_pos.z / u_pat.y;
+      float aa = 1.0 - smoothstep(0.25, 0.6, fwidth(u));
+      vec2 f = fract(vec2(u, v));
+      float pane = step(0.14, f.x) * step(f.x, 0.86) * step(0.14, f.y) * step(f.y, 0.86);
+      c *= 1.0 - 0.38 * pane * aa;
+      float band = mod(v_pos.z - 55.0, 60.0);
+      if (v_pos.z > 55.0 && band < 10.0) c = mix(c, vec3(0.12, 0.13, 0.15) * l, 0.92); // the open floors, a dark gap through the tower
+    } else if (k == 4) {                                          // mullions and spandrels (Seagram)
+      float u = s / u_pat.y, v = v_pos.z / u_pat.z;
+      float aa = 1.0 - smoothstep(0.25, 0.6, fwidth(u));
+      c *= 1.0 - 0.45 * (1.0 - step(0.14, fract(u))) * aa;          // the bronze I-beam mullions
+      c *= 1.0 - 0.35 * (1.0 - step(0.3, fract(v)));                 // the spandrel band at each floor
+      c *= 1.0 + 0.12 * step(0.3, fract(v)) * step(0.14, fract(u)); // the glass a little lighter
+    }
   }
   c = mix(c, vec3(0.66, 0.71, 0.76) * l, u_mute);
   o = vec4(c, u_alpha);
 }`;
 
 // facades drawn with a pattern in the shader (no geometry for it in the survey): name -> [kind, metres across, metres up]
-const PATTERN = { 'Hearst Tower': [1, 11, 16.5] };
+const PATTERN = {
+  'Hearst Tower': [1, 11, 16.5],
+  '53 West 53rd': [5, 18, 34],
+  '30 Rockefeller Plaza': [2, 2.6, 0.24],
+  'Empire State Building': [2, 2.4, 0.2],
+  'Chanin Building': [2, 2.2, 0.2],
+  '432 Park Avenue': [3, 4.6, 0],
+  'Seagram Building': [4, 1.7, 4.1],
+};
 const NOPAT = [0, 1, 1];
 const b64 = (s) => {
   const bin = atob(s);

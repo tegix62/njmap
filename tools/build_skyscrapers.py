@@ -79,22 +79,29 @@ def footprints():
     return feats
 
 
-def snap(p, h, feats):
-    """The middle of the real building: the nearest footprint within 110 m that is about this tall (the data's roof heights run
-    a good deal under the architectural height, which counts the spire: half to 1.3 times it)."""
-    best = None
-    for lo, la, hh in feats:
-        d = math.hypot((p[0] - lo) * 84200, (p[1] - la) * 111000)
-        if d < 110 and 0.5 * h <= hh <= 1.3 * h and (best is None or d < best[0]):
-            best = (d, (lo, la))
-    return best
+OLD_RULE = {'Four World Trade Center'}  # the footprint data has it under-height (it was still going up): the loose rule finds it
+
+
+def snap(p, h, feats, loose=False):
+    """The middle of the real building: the nearest footprint within 110 m that is about this tall. First those within 0.85 to 1.2 times
+    the height (a tower of that height, not a neighbour that happens to be taller than half of it), then, for towers whose data height
+    runs well under the architectural one (spires, masts), anything from half to 1.3 times it."""
+    for lo_r, hi_r in (((0.5, 1.3),) if loose else ((0.85, 1.2), (0.5, 1.3))):
+        best = None
+        for lo, la, hh in feats:
+            d = math.hypot((p[0] - lo) * 84200, (p[1] - la) * 111000)
+            if d < 110 and lo_r * h <= hh <= hi_r * h and (best is None or d < best[0]):
+                best = (d, (lo, la))
+        if best:
+            return best
+    return None
 
 
 def write():
     feats = footprints()
     moved = []
     for i, (n, p, h, y, line, at, hood) in enumerate(S):
-        b = snap(p, h, feats)
+        b = snap(p, h, feats, n in OLD_RULE)
         if b:
             S[i] = (n, (round(b[1][0], 6), round(b[1][1], 6)), h, y, line, at, hood)
             moved.append(f'{n} {b[0]:.0f} m')
