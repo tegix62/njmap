@@ -77,6 +77,7 @@ export function initOrbit(ctx) {
   const meshes = createMeshLayer(map); // the towers the survey has as real triangle meshes
   const canMesh = (() => { try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; } })();
   let hiddenSymbols = [];
+  let arcRaf = 0;                                                  // the climbing swing between far-apart targets (region games)
   let spinOn = ctx.store.get('orbit.spin', true); // the camera circles by itself (off: it holds still and you turn it)
   let drag = null; // a finger or mouse turning the view
   let occl = []; // the tall towers round the one being asked about, for lowering the ones in front
@@ -149,6 +150,10 @@ export function initOrbit(ctx) {
     for (const k of ['walk', 'road', 'park'])
       map.addLayer({ id: 'orb-' + k, type: 'fill', source: 'orb-ground', filter: ['==', ['get', 'k'], k], layout: { visibility: 'none' }, paint: GROUND_PAINT[k] }, before);
     map.addSource('orb-city', { type: 'geojson', generateId: true, data: { type: 'FeatureCollection', features: city.feats } });
+    if (cfg && !map.getSource('orb-dem')) {                      // real relief: AWS terrain tiles (public elevation data), shaded
+      map.addSource('orb-dem', { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 14, attribution: 'Terrain: AWS Terrain Tiles (USGS 3DEP, SRTM and others)' });
+      map.addLayer({ id: 'orb-relief', type: 'hillshade', source: 'orb-dem', layout: { visibility: 'none' }, paint: { 'hillshade-exaggeration': 0.55, 'hillshade-shadow-color': '#4d5a52', 'hillshade-highlight-color': '#ffffff', 'hillshade-accent-color': '#6e7d70' } }, first && first.id);
+    }
     map.addSource('orb-target', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     const col = ['case', ['has', 'c'], ['get', 'c'], ['interpolate', ['linear'], ['get', 'h'], 6, '#e9e3d6', 60, '#d6cdbb', 200, '#bdb29d', 300, '#a99d88']];
     map.addLayer(
@@ -207,6 +212,11 @@ export function initOrbit(ctx) {
   }
   const show = (on) => {
     meshes.show(on);
+    if (cfg && map.getLayer('orb-relief')) map.setLayoutProperty('orb-relief', 'visibility', on ? 'visible' : 'none');
+    if (cfg && map.getSource('orb-dem')) {
+      map.stop();                                                // (terrain switched on or off in the middle of an ease makes MapLibre throw)
+      map.setTerrain(on ? { source: 'orb-dem', exaggeration: 1.7 } : null);
+    }
     for (const id of ['orb-walk', 'orb-road', 'orb-park', 'orb-ghost', 'orb-others', 'orb-hood-fill', 'orb-hood-line', 'orb-hood-wall', 'orb-lab', 'orb-lm', 'orb-hood-name', 'orb-target']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
     if (on) {
       // no names on the map while this runs
@@ -436,6 +446,38 @@ export function initOrbit(ctx) {
     };
     // (easeTo, not flyTo: flyTo's long zoom-out makes MapLibre throw from its tile bookkeeping now and then; the towers are
     // only a few km apart, so a plain ease reads as a swing anyway)
+    const from = map.getCenter();
+    const km = mDist([from.lng, from.lat], cam.center) / 1000;
+    if (cfg && km > 2) {
+      // Far apart (New Jersey's landmarks are a state away from each other): climb so the way is visible, look down, then come back
+      // down onto the next one, instead of skimming over rooftops where nothing can be seen.
+      cancelAnimationFrame(arcRaf);
+      const z0 = map.getZoom(), b0 = map.getBearing(), p0 = map.getPitch(), pd0 = map.getPadding();
+      const W = map.getContainer().clientWidth || 400;
+      const zFit = Math.log2((0.6 * W * 78271.5 * Math.cos((cam.center[1] * Math.PI) / 180)) / (km * 1000));
+      const zMid = Math.max(7.2, Math.min(zFit, z0, cam.zoom));
+      const dB = ((((cam.bearing - b0) % 360) + 540) % 360) - 180;
+      const ms = (ctx.reduceMotion ? 0.5 : 1) * Math.min(3400, 1500 + km * 45);
+      const t0 = performance.now();
+      const step = (now) => {
+        if (!run || q.t !== t) return;
+        const s = Math.min(1, (now - t0) / ms);
+        const e = s * s * (3 - 2 * s);
+        const bump = Math.sin(Math.PI * e);                                  // 0, up to 1 at the top of the arc, 0
+        const zl = z0 + (cam.zoom - z0) * e;
+        map.jumpTo({
+          center: [from.lng + (cam.center[0] - from.lng) * e, from.lat + (cam.center[1] - from.lat) * e],
+          zoom: zl - bump * ((z0 + cam.zoom) / 2 - zMid),
+          pitch: (p0 + (cam.pitch - p0) * e) * (1 - 0.75 * bump),
+          bearing: b0 + dB * e,
+          padding: { top: pd0.top + (cam.padding.top - pd0.top) * e, bottom: pd0.bottom + (cam.padding.bottom - pd0.bottom) * e, left: 0, right: 0 },
+        });
+        if (s < 1) arcRaf = requestAnimationFrame(step);
+        else go();
+      };
+      arcRaf = requestAnimationFrame(step);
+      return;
+    }
     map.easeTo({ ...cam, duration: ctx.dur ? ctx.dur(first ? 800 : 900) : 900, easing: (x) => x * x * (3 - 2 * x), essential: true });
     // (after easeTo starts: starting it ends any motion already under way, and that motion's own "moveend" must not count)
     if (map.isMoving()) map.once('moveend', go);
@@ -472,6 +514,7 @@ export function initOrbit(ctx) {
   }
   function stop() {
     cancelAnimationFrame(raf);
+    cancelAnimationFrame(arcRaf);
     if (!run) return;
     run = null;
     q = null;
@@ -482,7 +525,7 @@ export function initOrbit(ctx) {
     occl = [];
     dragOff();
     show(false);
-    map.easeTo({ pitch: 0, duration: ctx.dur ? ctx.dur(400) : 400 });
+    map.easeTo({ pitch: 0, center: map.getCenter(), duration: ctx.dur ? ctx.dur(400) : 400 });
   }
   function next() {
     if (!run) return;
