@@ -98,7 +98,7 @@ export function initOrbit(ctx) {
     }
     return pts.reduce((b, p) => [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])], [180, 90, -180, -90]);
   }
-  function setGeom(items) {                       // items: [{ name, role }]
+  function setGeom(items, labelled = false) {     // items: [{ name, role }]; the names are drawn only once the question is answered (they would give it away)
     const feats = [], walls = [], labs = [];
     for (const { name, role } of items) {
       const place = city.list.find((x) => x.n === name);
@@ -107,8 +107,8 @@ export function initOrbit(ctx) {
         feats.push({ type: 'Feature', properties: { role, name }, geometry: g });
         if (g.type === 'Polygon' || g.type === 'MultiPolygon') for (const w of wallFeatures(g, 3)) walls.push({ ...w, properties: { role, h: place && place.kind === 'lake' ? 70 : 160 } });
         const b = boundsOf(g, place && place.kind === 'river' ? place.p : null, place && place.kind === 'river' ? 22 : 0);
-        labs.push({ type: 'Feature', properties: { role, name }, geometry: { type: 'Point', coordinates: place && place.kind === 'river' ? place.p : [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2] } });
-      } else if (place) {
+        if (labelled) labs.push({ type: 'Feature', properties: { role, name }, geometry: { type: 'Point', coordinates: place && place.kind === 'river' ? place.p : [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2] } });
+      } else if (place && labelled) {
         labs.push({ type: 'Feature', properties: { role, name }, geometry: { type: 'Point', coordinates: place.p } });   // (a ridge or a peak has no outline: its name at its point)
       }
     }
@@ -199,7 +199,8 @@ export function initOrbit(ctx) {
     map.addSource('orb-city', { type: 'geojson', generateId: true, data: { type: 'FeatureCollection', features: city.feats } });
     if (cfg && !map.getSource('orb-dem')) {                      // real relief: AWS terrain tiles (public elevation data), shaded
       map.addSource('orb-dem', { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 11, attribution: 'Terrain: AWS Terrain Tiles (USGS 3DEP, SRTM and others)' });
-      map.addLayer({ id: 'orb-relief', type: 'hillshade', source: 'orb-dem', layout: { visibility: 'none' }, paint: { 'hillshade-exaggeration': 0.55, 'hillshade-shadow-color': '#4d5a52', 'hillshade-highlight-color': '#ffffff', 'hillshade-accent-color': '#6e7d70' } }, first && first.id);
+      map.addSource('orb-dem-hs', { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 11 });   // (its own source: MapLibre wants the shading and the terrain apart)
+      map.addLayer({ id: 'orb-relief', type: 'hillshade', source: 'orb-dem-hs', layout: { visibility: 'none' }, paint: { 'hillshade-exaggeration': 0.55, 'hillshade-shadow-color': '#4d5a52', 'hillshade-highlight-color': '#ffffff', 'hillshade-accent-color': '#6e7d70' } }, first && first.id);
     }
     if (cfg) {                                                    // the outline of the river, lake or park in question (and of the one you picked, after a miss)
       const col = ['match', ['get', 'role'], 'wrong', GEOM_COLOR.wrong, GEOM_COLOR.target];
@@ -699,7 +700,7 @@ export function initOrbit(ctx) {
     if (!run || !q || !q.done) return;
     const t = q.t;
     const picked = !q.ok ? city.list.find((o) => o.n === name) : null;
-    setGeom([{ name: t.n, role: 'target' }, ...(picked ? [{ name: picked.n, role: 'wrong' }] : [])]);
+    setGeom([{ name: t.n, role: 'target' }, ...(picked ? [{ name: picked.n, role: 'wrong' }] : [])], true);
     const all = [];
     for (const p of [t, picked].filter(Boolean)) {
       const g = city.geoms && city.geoms[p.n];
@@ -712,7 +713,14 @@ export function initOrbit(ctx) {
     const top = (hudEl && !hudEl.hidden ? hudEl.getBoundingClientRect().bottom - mapTop : 0) + 24;
     const bottom = (sheetEl && !sheetEl.hidden ? boxH - (sheetEl.getBoundingClientRect().top - mapTop) : 0) + 24;
     map.stop();
-    map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], { padding: { top, bottom, left: 36, right: 36 }, pitch: 48, maxZoom: 12.4, duration: ctx.dur ? ctx.dur(1100) : 1100, essential: true });
+    // (not fitBounds: it refuses, and does nothing at all, when the two places will not fit with the padding, as with a river in the north and
+    // one in the south; this works out the zoom for the area between the top card and the answers, and centres on the middle of that area)
+    const W = map.getContainer().clientWidth || 400;
+    const availW = Math.max(120, W - 72), availH = Math.max(120, boxH - top - bottom);
+    const dx = Math.max(1, (bb[2] - bb[0]) * 84200), dy = Math.max(1, (bb[3] - bb[1]) * 111000);
+    const mpp0 = 78271.5 * Math.cos((((bb[1] + bb[3]) / 2) * Math.PI) / 180);
+    const z = Math.max(6.2, Math.min(12.4, Math.log2(Math.min((availW * mpp0) / dx, (availH * mpp0) / dy)) - 0.15));
+    map.easeTo({ center: [(bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2], zoom: z, pitch: z < 8.8 ? 0 : 32, bearing: 0, padding: { top, bottom, left: 36, right: 36 }, duration: ctx.dur ? ctx.dur(1100) : 1100, essential: true });
   }
 
   function reveal() {
