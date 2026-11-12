@@ -5,6 +5,7 @@
 // (NYC's footprints and the surveyed towers); the base map's labels are hidden so nothing gives the name away.
 import { buildingFeatures, applySurveyTowers, applyParts, loadParts, loadSurveyTowers, groundFeatures, GROUND_PAINT } from './city3d.js';
 import { createMeshLayer, meshInfo } from './meshes.js';
+import { choicesHtml, hintsHtml, whereHtml } from './ui.js';
 
 const KEY = 'orbit';
 const ROUND = 10;
@@ -944,20 +945,16 @@ export function initOrbit(ctx) {
       document.getElementById('orbAgain')?.addEventListener('click', () => start(run.opts));
       return;
     }
-    const hints = HINTS.slice(0, q.hints).map((h) => `<div class="orb-hint">${h(q.t)}</div>`).join('');
-    const where = q.t.k === 'nat' ? (q.towns && q.towns.shown.length ? `<div class="orb-where">📍 ${esc(q.towns.shown.map((m) => m.full).join(' · '))}${q.towns.more ? ` · +${q.towns.more} more along it` : ''}</div>` : '') : q.hood ? `<div class="orb-where">📍 ${esc(q.hood)}</div>` : '';
+    const hints = hintsHtml(HINTS.slice(0, q.hints).map((h) => h(q.t)));
+    const where = q.t.k === 'nat' ? (q.towns && q.towns.shown.length ? whereHtml(q.towns.shown.map((m) => m.full).join(' · ') + (q.towns.more ? ` · +${q.towns.more} more along it` : '')) : '') : whereHtml(q.hood || '');
     ctx.hud(`<div class="qkind">${ICON} ${TITLE} · ${run.n + (q.done ? 0 : 1)}/${ROUND}</div><div class="q">${q.done ? (q.ok ? 'Yes.' : 'Not quite.') : q.flying ? 'Swinging over…' : (cfg ? `Which ${NOUN[q.t.kind] || 'place'} is this?` : q.t.k === 'lm' ? 'Which landmark is this?' : 'Which tower is this?')}</div>${q.flying ? '' : where}${q.flying ? '' : hints}`);
-    const btn = (c) => {
-      const cls = q.done ? (c.n === q.t.n ? ' right' : c.n === q.picked ? ' wrong' : '') : '';
-      return `<button class="orb-choice${cls}" data-n="${esc(c.n)}"${q.done || q.flying ? ' disabled' : ''}>${esc(c.n)}</button>`;
-    };
     ctx.sheet(`${run.opts.header()}<div id="qbody">
-      <div class="score"><button type="button" id="orbSpin" class="orb-mini" aria-pressed="${spinOn}">${spinOn ? '↻ Orbiting' : '✋ Drag to turn'}</button> ${run.pts} points${run.streak >= 3 ? ` · 🔥 ${run.streak}` : ''}</div>
-      <div class="orb-choices">${q.choices.map(btn).join('')}</div>
-      ${q.done ? `${reveal()}<button class="primary" id="orbNext">${run.n >= ROUND ? 'Finish' : cfg || q.t.k === 'lm' ? 'Next' : 'Next tower'}</button>` : `<button id="orbHint"${q.hints >= HINTS.length || q.flying ? ' disabled' : ''}>💡 Hint (−1 point)</button>`}
+      <div class="score"><button type="button" id="orbSpin" class="chip toggle" aria-pressed="${spinOn}">${spinOn ? '↻ Orbiting' : '✋ Drag to turn'}</button> ${run.pts} points${run.streak >= 3 ? ` · 🔥 ${run.streak}` : ''}</div>
+      ${choicesHtml(q.choices, { attr: 'n', data: (c) => c.n, label: (c) => c.n, off: q.done || q.flying, state: (c) => (q.done ? (c.n === q.t.n ? 'right' : c.n === q.picked ? 'wrong' : '') : '') })}
+      ${q.done ? `${reveal()}<button class="primary" id="orbNext">${run.n >= ROUND ? 'Finish' : cfg || q.t.k === 'lm' ? 'Next' : 'Next tower'}</button>` : `<button id="orbHint" class="chip"${q.hints >= HINTS.length || q.flying ? ' disabled' : ''}>💡 Hint (−1 point)</button>`}
     </div>`);
     run.opts.bindHeader();
-    for (const b of document.querySelectorAll('.orb-choice')) b.addEventListener('click', () => answer(b.dataset.n));
+    for (const b of document.querySelectorAll('#sheet .choice')) b.addEventListener('click', () => answer(b.dataset.n));
     document.getElementById('orbNext')?.addEventListener('click', next);
     document.getElementById('orbSpin')?.addEventListener('click', () => {
       spinOn = !spinOn;

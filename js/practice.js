@@ -1,5 +1,6 @@
 import { bearing, distanceMi, compass8, compass16, angleDiff, dirWord, destination as destinationPt } from './geo.js';
 import { gridY } from './grid.js';
+import { choicesHtml } from './ui.js';
 import { sampleRoads, roadsThrough } from './roads.js';
 
 let L; // label colors of the active theme (set in initPractice)
@@ -978,15 +979,15 @@ export function initPractice(ctx) {
     } else if (q.kind === 'name') {
       ctx.highlight(m.id, 'q');
       ctx.hud(`<div class="qkind">${q.group ? 'Sound-alikes' : 'Name it'}</div><div class="q">Which town is highlighted?</div>`);
-      body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
+      body = choicesHtml(q.choices, { data: (o) => o.id, label: (o) => ctx.name(o) });
     } else if (q.kind === 'borders') {
       ctx.highlight(m.id, 'q');
       ctx.reveal([{ m, color: L.q }]);
       ctx.hud(`<div class="qkind">Borders${q.fallback ? ' <span class="muted">(no road question nearby)</span>' : ''}</div><div class="q">Which of these borders ${prompt(m)}?</div>`);
-      body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
+      body = choicesHtml(q.choices, { data: (o) => o.id, label: (o) => ctx.name(o) });
     } else if (q.kind === 'landmark') {
       ctx.hud(`<div class="qkind">Landmarks</div><div class="q"><b>${esc(q.landmark.name)}</b> is in which ${R.unit}?</div>`);
-      body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
+      body = choicesHtml(q.choices, { data: (o) => o.id, label: (o) => ctx.name(o) });
     } else if (q.kind === 'findpt') {
       ctx.hud(`<div class="qkind">${esc(q.n.kind)}</div><div class="q">Tap <b>${esc(q.n.name)}</b> on the map</div>`);
       body = `<div class="hint muted">Close counts: within about ${q.n.r} mi.</div>`;
@@ -1024,7 +1025,7 @@ export function initPractice(ctx) {
       ctx.hud(
         `<div class="qkind">Highways</div><div class="q">Where do ${ctx.swatch(q.j.a)}<b>${esc(theHwy(q.j.a))}</b> and ${ctx.swatch(q.j.b)}<b>${esc(theHwy(q.j.b))}</b> meet?</div>`
       );
-      body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
+      body = choicesHtml(q.choices, { data: (o) => o.id, label: (o) => ctx.name(o) });
     } else if (q.kind === 'hwyfact') {
       ctx.hud(`<div class="qkind">Highways</div><div class="q">Where does ${ctx.swatch(q.h.label)}<b>${esc(theHwy(q.h.label))}</b> end in the <b>${q.e.side}</b>?</div>`);
       body = `<div class="choices">${q.choices.map((e, i) => `<button class="choice" data-v="${i}">${esc(e.name.replace(/^the /, ''))}</button>`).join('')}</div>`;
@@ -1075,7 +1076,7 @@ export function initPractice(ctx) {
     } else if (q.kind === 'north') {
       const word = q.axis === 'N' ? 'north' : q.axis === 'U' ? 'uptown' : 'east';
       ctx.hud(`<div class="qkind">Farther ${word}?</div><div class="q">Which is farther <b>${word}</b>?</div>`);
-      body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
+      body = choicesHtml(q.choices, { data: (o) => o.id, label: (o) => ctx.name(o) });
     } else if (q.kind === 'point') {
       const from = q.from.you ? 'where you are' : `<b>${esc(q.from.name)}</b>`;
       if (!q.from.you) ctx.reveal([{ m: q.m, pt: q.from.pt, label: q.from.name, color: L.q }]);
@@ -1101,7 +1102,7 @@ export function initPractice(ctx) {
       ctx.highlight(q.from.id, 'q');
       ctx.reveal([{ m: q.from, color: L.q }]);
       ctx.hud(`<div class="qkind">My last drive</div><div class="q">After ${prompt(q.from)}, which town did you enter next?</div>`);
-      body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
+      body = choicesHtml(q.choices, { data: (o) => o.id, label: (o) => ctx.name(o) });
     } else if (q.kind === 'triphead') {
       showTripLine(q.trip);
       ctx.highlight(m.id, 'q');
@@ -1110,7 +1111,7 @@ export function initPractice(ctx) {
       body = `<div class="rose8">${DIR8.map((d) => (d ? `<button class="choice dir" data-dir="${d}">${d}</button>` : '<span></span>')).join('')}</div>`;
     } else if (q.kind === 'sec') {
       ctx.hud(`<div class="qkind">Villages &amp; sections</div><div class="q"><b>${esc(q.section.name)}</b> is part of which town?</div>`);
-      body = `<div class="choices">${q.choices.map((o) => `<button class="choice" data-id="${o.id}">${esc(ctx.name(o))}</button>`).join('')}</div>`;
+      body = choicesHtml(q.choices, { data: (o) => o.id, label: (o) => ctx.name(o) });
     } else if (q.kind === 'dir') {
       ctx.highlight(m.id, 'q');
       ctx.reveal([{ m, color: L.q }]);

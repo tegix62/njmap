@@ -329,3 +329,7 @@ Location only works over HTTPS (or on `localhost`). To try it on a computer, run
 Mountains and ranges are drawn as three nested tinted bands (low slopes → upper slopes → summit zone) rather than a bare line.
 `tools/build_nj_geoms.py` (`mountain_bands`) cuts them from the 57 m terrain model: the region within reach of the crest or summit that rises above 30 %, 55 % and 78 % of the local relief, keeping only the connected mass that holds the crest. They are the `bands` of each ridge/peak in `data/nj-geoms.json`.
 In the game the bands are the `orb-geom-band` layer and pulse twice per flash (ranges also keep the comet along the crest); the camera and compare view fit the whole mass. Band extents are only as good as the terrain model; broad masses (Garret Mountain spans six towns) may overreach the way a hiker would draw them.
+
+### Shared question UI (`js/ui.js`)
+
+Every game builds its answer buttons, hint lines and "where it is" line through the same helpers (`choicesHtml`, `hintsHtml`, `whereHtml`) and the same classes (`.choices/.choice`, `.hint`, `.where`, `.fb`, `.chip`) in `css/app.css`. These follow the active theme (Ink and Classic), so a visual change there reaches Practice, Name that place and the grid games together. "Name that place" used to carry its own hard-coded light buttons (white on white in Classic); it now uses the shared ones. Region-specific games differ in what they ask, not in how a question looks.
