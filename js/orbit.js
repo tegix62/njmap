@@ -72,6 +72,7 @@ export function initOrbit(ctx) {
   let city = null; // loaded once: { feats, cx, cy, list, pics }
   let loading = null;
   let hiddenSymbols = [];
+  let occl = []; // the tall towers round the one being asked about, for lowering the ones in front
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const rand = (a) => a[Math.floor(Math.random() * a.length)];
   const shuffle = (a) => a.map((v) => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map((p) => p[1]);
@@ -128,7 +129,16 @@ export function initOrbit(ctx) {
       {
         id: 'orb-others', type: 'fill-extrusion', source: 'orb-city', layout: { visibility: 'none' },
         filter: ['any', ['has', 'c'], ['>=', ['get', 'h'], TALL]],
-        paint: { 'fill-extrusion-color': '#a9b6c2', 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': ['coalesce', ['get', 'b'], 0], 'fill-extrusion-opacity': 0.55, 'fill-extrusion-vertical-gradient': true },
+        // a tower that stands between the camera and the tower being asked about sinks to the low ghost while it is in the way
+        paint: {
+          'fill-extrusion-color': '#a9b6c2',
+          'fill-extrusion-height': ['case', ['boolean', ['feature-state', 'low'], false], ['min', ['get', 'h'], GHOST_CAP], ['get', 'h']],
+          'fill-extrusion-base': ['case', ['boolean', ['feature-state', 'low'], false], ['min', ['coalesce', ['get', 'b'], 0], GHOST_CAP], ['coalesce', ['get', 'b'], 0]],
+          'fill-extrusion-height-transition': { duration: 350, delay: 0 },
+          'fill-extrusion-base-transition': { duration: 350, delay: 0 },
+          'fill-extrusion-opacity': 0.55,
+          'fill-extrusion-vertical-gradient': true,
+        },
       },
       before
     );
@@ -193,6 +203,21 @@ export function initOrbit(ctx) {
     const out = [];
     for (const o of [...near.slice(0, 2), ...far]) if (out.length < 3 && !out.includes(o)) out.push(o);
     return shuffle([t, ...out]);
+  }
+
+  /** Lower the tall towers that stand between the camera and the tower (the camera looks along `bearing` degrees), raise the rest. */
+  function updateOcclusion(bearing) {
+    const r = (bearing * Math.PI) / 180;
+    const fx = Math.sin(r), fy = Math.cos(r);
+    for (const o of occl) {
+      const along = o.dx * -fx + o.dy * -fy; // how far it is towards the camera from the tower
+      const side = Math.abs(o.dx * fy - o.dy * fx); // how far off the line of sight
+      const inFront = along > 12 && side < 70;
+      if (inFront !== o.low) {
+        o.low = inFront;
+        map.setFeatureState({ source: 'orb-city', id: o.id }, { low: inFront });
+      }
+    }
   }
 
   /** The street names, other landmarks and neighbourhood round a tower, for finding where it stands. */
@@ -260,6 +285,15 @@ export function initOrbit(ctx) {
       if (!ids.includes(i) && (f.properties.c !== undefined || f.properties.h >= TALL) && mDist(city.cx[i], p) < 90) nearIds.push(i);
     });
     const near = ['in', ['id'], ['literal', nearIds.length ? nearIds : [-1]]];
+    // the tall towers within 520 m that could stand in front of it, as metres east and north of it
+    for (const o of occl) map.setFeatureState({ source: 'orb-city', id: o.id }, { low: false });
+    occl = [];
+    const skip = new Set([...ids, ...nearIds]);
+    city.feats.forEach((f, i) => {
+      if (skip.has(i) || !(f.properties.c !== undefined || f.properties.h >= TALL)) return;
+      const dx = (city.cx[i][0] - p[0]) * 84200, dy = (city.cx[i][1] - p[1]) * 111000;
+      if (Math.hypot(dx, dy) < 520) occl.push({ id: i, dx, dy, low: false });
+    });
     // the low ghost: everything that is neither the tower nor one of the tall ones kept standing round it
     map.setFilter('orb-ghost', ['all', not, ['any', ['all', ['!', ['has', 'c']], ['<', ['get', 'h'], TALL]], near]]);
     map.setFilter('orb-others', ['all', ['any', ['has', 'c'], ['>=', ['get', 'h'], TALL]], not, ['!', near]]);
@@ -289,6 +323,7 @@ export function initOrbit(ctx) {
     const top = Math.max(pad.top, 2 * baseY - (winH - pad.bottom));
     let bearing = spin0;
     let last = performance.now();
+    let lastOcc = 0;
     const cam = { center: t.p, zoom, pitch: PITCH, bearing, padding: { top, bottom: pad.bottom, left: 0, right: 0 } };
     const tick = (now) => {
       if (!run || q.t !== t) return;
@@ -297,6 +332,10 @@ export function initOrbit(ctx) {
       if (!document.hidden) {
         bearing = (bearing + SPIN * dt * (ctx.reduceMotion ? 0.3 : 1)) % 360;
         map.setBearing(bearing);
+        if (now - lastOcc > 90) {
+          lastOcc = now;
+          updateOcclusion(bearing);
+        }
       }
       raf = requestAnimationFrame(tick);
     };
@@ -307,6 +346,7 @@ export function initOrbit(ctx) {
       if (!run || q.t !== t || !q.flying) return;
       q.flying = false;
       last = performance.now();
+      updateOcclusion(bearing);
       render();
       raf = requestAnimationFrame(tick);
     };
@@ -347,6 +387,8 @@ export function initOrbit(ctx) {
     document.body.classList.remove('framing');
     const pb = document.getElementById('orbPhoto');
     if (pb) pb.hidden = true;
+    for (const o of occl) if (o.low) map.setFeatureState({ source: 'orb-city', id: o.id }, { low: false });
+    occl = [];
     show(false);
     map.easeTo({ pitch: 0, duration: ctx.dur ? ctx.dur(400) : 400 });
   }
