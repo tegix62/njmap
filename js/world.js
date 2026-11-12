@@ -97,3 +97,61 @@ export function grainImage(size = 128) {
   }
   return g.getImageData(0, 0, size, size);
 }
+
+// value noise in geographic space (smooth, the same everywhere for the same place)
+const hash2 = (x, y) => { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
+function vnoise(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = hash2(xi, yi), b = hash2(xi + 1, yi), c = hash2(xi, yi + 1), d = hash2(xi + 1, yi + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+
+/**
+ * Hand-pulled edges: every line and ring is cut into short pieces and each point pushed sideways by noise that depends only on where it is
+ * on the Earth (so the wobble is part of the land and does not swim as the map moves). amp in metres.
+ */
+export function roughen(geom, amp = 55) {
+  const rough = (coords) => {
+    const out = [];
+    for (let i = 0; i < coords.length; i++) {
+      const p = coords[i];
+      if (i > 0) {
+        const q = coords[i - 1], k = km(p[1]);
+        const dm = Math.hypot((p[0] - q[0]) / k.lng, (p[1] - q[1]) / k.lat) * 1000;
+        const n = Math.min(60, Math.floor(dm / 140));
+        for (let s = 1; s <= n; s++) out.push(shift([q[0] + ((p[0] - q[0]) * s) / (n + 1), q[1] + ((p[1] - q[1]) * s) / (n + 1)]));
+      }
+      out.push(shift(p));
+    }
+    return out;
+  };
+  const shift = (p) => {
+    const k = km(p[1]);
+    const fx = p[0] * 900, fy = p[1] * 900;                              // ~120 m features
+    const a = (vnoise(fx, fy) - 0.5) + 0.5 * (vnoise(fx * 3.1 + 9, fy * 3.1 + 4) - 0.5);
+    const b = (vnoise(fx + 31, fy - 17) - 0.5) + 0.5 * (vnoise(fx * 3.1 - 5, fy * 3.1 + 12) - 0.5);
+    return [p[0] + (a * amp * k.lng) / 1000, p[1] + (b * amp * k.lat) / 1000];
+  };
+  const walk = (c, depth) => (depth === 0 ? rough(c) : c.map((x) => walk(x, depth - 1)));
+  const depth = { Point: -1, LineString: 0, MultiPoint: -1, Polygon: 1, MultiLineString: 1, MultiPolygon: 2 }[geom.type];
+  if (depth === undefined || depth < 0) return geom;
+  const out = { ...geom, coordinates: walk(geom.coordinates, depth) };
+  if (geom.bands) out.bands = geom.bands.map((r) => rough(r));
+  return out;
+}
+
+/** A tile of ink texture for the coloured masses: bare-stock pinholes and darker flecks, so the flat colour looks printed. */
+export function inkImage(size = 128) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+  const r = rng(29);
+  const dot = (x, y, rad, col) => {
+    g.fillStyle = col;
+    for (const [dx, dy] of [[0, 0], [size, 0], [-size, 0], [0, size], [0, -size]]) { g.beginPath(); g.arc(x + dx, y + dy, rad, 0, 6.283); g.fill(); }
+  };
+  for (let i = 0; i < 170; i++) dot(r() * size, r() * size, 0.5 + r() * 1.2, `rgba(246,241,201,${(0.35 + r() * 0.4).toFixed(2)})`);
+  for (let i = 0; i < 70; i++) dot(r() * size, r() * size, 0.6 + r() * 1.4, `rgba(29,42,91,${(0.1 + r() * 0.16).toFixed(2)})`);
+  return g.getImageData(0, 0, size, size);
+}

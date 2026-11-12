@@ -3287,3 +3287,8 @@ body.paper .px-label { font-family: 'Gill Sans', 'Trebuchet MS', system-ui, sans
 
 /* ink spread on the panel text */
 body.paper .q, body.paper .choice, body.paper .qkind { text-shadow: 0 0 1px rgba(29, 42, 91, 0.45); }
+
+/* paper: ink bleed as a dark outer glow, and a plate a pixel off in orange (the same trick as on the map) */
+body.paper .q, body.paper .choice, body.paper .qkind, body.paper .hint, body.paper .where, body.paper .fb, body.paper .gamebar b {
+  text-shadow: 0 0 2px rgba(29, 42, 91, 0.55), 0 0 6px rgba(29, 42, 91, 0.2), 1px 1px 0 rgba(232, 96, 58, 0.32); }
+body.paper .px-label { text-shadow: 0 0 2px rgba(29, 42, 91, 0.5), 1px 1px 0 rgba(232, 96, 58, 0.3); }

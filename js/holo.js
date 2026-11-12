@@ -27,13 +27,14 @@ const BASE = {
   bg: { 'background-color': HOLO.void },
   'muni-fill': { 'fill-color': HOLO.land, 'fill-opacity': 1 },
   water: { 'fill-color': HOLO.water, 'fill-opacity': 0.85 },
-  river: { 'line-color': '#3cc3e0', 'line-opacity': 0.9 },
-  'road-minor': { 'line-color': '#145a6e', 'line-opacity': 0.55 },
-  'road-mid': { 'line-color': '#1a7288', 'line-opacity': 0.65 },
-  'road-major': { 'line-color': '#2aa8c4', 'line-opacity': 0.8 },
-  'hwy-color': { 'line-color': '#6fe6ff', 'line-opacity': 0.9 },
-  'muni-line': { 'line-color': '#1f8ca6', 'line-opacity': 0.4 },
-  'county-line': { 'line-color': '#3cc3e0', 'line-opacity': 0.55 },
+  // lines are widened and brightened: at PS1 resolution a one-pixel line is half a rendered pixel and would vanish
+  river: { 'line-color': '#4fd0ea', 'line-opacity': 1, 'line-width': 2.4 },
+  'road-minor': { 'line-color': '#1b7088', 'line-opacity': 0.7, 'line-width': 1.2 },
+  'road-mid': { 'line-color': '#2290aa', 'line-opacity': 0.85, 'line-width': 1.8 },
+  'road-major': { 'line-color': '#3cc3e0', 'line-opacity': 0.95, 'line-width': 2.4 },
+  'hwy-color': { 'line-color': '#9af0ff', 'line-opacity': 1, 'line-width': 3.2 },
+  'muni-line': { 'line-color': '#2aa8c4', 'line-opacity': 0.8, 'line-width': 1.6 },
+  'county-line': { 'line-color': '#7fe6ff', 'line-opacity': 1, 'line-width': 2.6 },
 };
 
 // the elevation bands: a quiet ground. Every STEP metres the shade steps up a little, with no bright rim, so the relief
@@ -91,6 +92,7 @@ export function createHolo(map, bounds) {
     const col = ['match', ['get', 'role'], 'wrong', onNow ? HOLO.wrong : '#d9622b', onNow ? HOLO.target : '#0b9a82'];
     for (const id of ['orb-geom-band', 'orb-geom-fill', 'orb-geom-fill2']) set(id, 'fill-color', col);
     set('orb-geom-line', 'line-color', col);
+    set('orb-geom-line', 'line-width', ['interpolate', ['linear'], ['zoom'], 8, 4, 12, 7]);
     set('orb-geom-wall', 'fill-extrusion-color', col);
     set('orb-geom-casing', 'line-color', HOLO.halo);
     set('orb-geom-casing', 'line-opacity', 0.75);

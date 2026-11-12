@@ -372,3 +372,15 @@ Screen-space overlays (paper fibre, folds, pinholes, the scan lines and sweep of
 - **Paper:** fibre as a tiled `fill-pattern` over the whole sheet, soft ink/stock blotches (stacked uneven rings), three fold creases (a dark line with a pale one beside it, draped on the terrain) and pinhole specks. Specks and blotches are faint by design.
 - **PS1:** a latitude/longitude graticule (every 0.05°, every fifth brighter) on the ground, in place of screen lines. The PS1 dither stays screen-space on purpose: on the real hardware it was.
 Not texture-ised yet: the building/landmark extrusions (still plain grey under Paper) and map text under PS1 for other towers' names.
+
+### Paper: ink bleed, misregistration, roughness (round 2)
+
+- **Hand-pulled edges** (`roughen` in `js/world.js`): the answer geometry (river, lake, mountain bands) is cut into ~140 m pieces and each point pushed sideways by noise that depends only on where it is on the Earth, so the wobble is part of the land and does not swim as the map moves. (A wobble applied to the whole screen with an SVG displacement filter was considered and rejected: its pattern is fixed to the screen, so lines crawl as you pan.) It applies when a question starts under Paper.
+- **Ink bleed / glow:** under the main base-map lines (rivers, major roads, highways, county and town borders) a soft dark glow layer, cloned from the style's own layers; labels get a dark blurred halo instead of a cream one; panel text gets a dark outer glow.
+- **Missed registration:** a blue copy of rivers, roads and borders a pixel or two off, an orange plate on panel text, and the yellow/blue plates behind coloured masses.
+- **Ink texture:** a tiled `fill-pattern` (pinholes of bare stock, darker flecks) over the coloured masses.
+
+### PS1: clearer borders and text
+
+Lines are widened and brightened (county borders 2.6 px, highways 3.2 px, outline 4–7 px) because a one-pixel line is half a rendered pixel at this resolution; the map renders at 0.5× (was 0.38×) with 10 colour levels (was 7) and less dither; all remaining map text layers of the game are hidden under PS1 in favour of the crisp labels and the HUD.
+Not done: a world-anchored ink shader (a custom WebGL layer that draws fibre, mottling and pinholes from noise in map coordinates). Risky next to terrain draping; not started.

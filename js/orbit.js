@@ -8,6 +8,7 @@ import { createMeshLayer, meshInfo } from './meshes.js';
 import { choicesHtml, hintsHtml, whereHtml } from './ui.js';
 import { createHolo } from './holo.js';
 import { createPaper, PAPER } from './paper.js';
+import { roughen } from './world.js';
 import { createRetro, createLabels } from './retro.js';
 
 const KEY = 'orbit';
@@ -100,6 +101,8 @@ export function initOrbit(ctx) {
     const px = gameOn && look === 'ps1';
     pxLabels.show(px);
     if (map.getLayer('orb-town-name')) map.setLayoutProperty('orb-town-name', 'visibility', gameOn && !px ? 'visible' : 'none');
+    // every other piece of map text would be blocky at low resolution too: under PS1 only the crisp labels and the HUD name things
+    if (px) for (const l of map.getStyle().layers) if (l.type === 'symbol' && l.id.startsWith('orb-')) map.setLayoutProperty(l.id, 'visibility', 'none');
   };
   const canMesh = (() => { try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; } })();
   let hiddenSymbols = [];
@@ -164,6 +167,7 @@ export function initOrbit(ctx) {
       if (labelled && at) addPin(name, role, at);
     }
     const fc = (f) => ({ type: 'FeatureCollection', features: f });
+    if (paper.on) for (const f of feats) if (f.properties.band === undefined || true) f.geometry = roughen(f.geometry);   // hand-pulled edges, in map space
     for (const [s, f] of [['orb-geom', feats], ['orb-geom-wall', walls]]) if (map.getSource(s)) map.getSource(s).setData(fc(f));
   }
   // The place flash: on arrival, a quick pulse that shows what the place IS. A river: a bright comet runs downstream along it (the way the

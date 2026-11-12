@@ -1,4 +1,4 @@
-import { blots, specks, creases, grainImage } from './world.js';
+import { blots, specks, creases, grainImage, inkImage } from './world.js';
 
 // "Paper" look for a map: a printed road map from the 1960s–70s (cream stock, a few flat spot inks, halftone water,
 // plates that don't quite line up, fold creases). Same shape as js/holo.js:
@@ -93,13 +93,35 @@ export function createPaper(map, bounds) {
     map.addLayer({ id: 'orb-paper-crease-pale', type: 'line', source: 'orb-paper-creases', layout: hide, paint: { 'line-color': '#fffff0', 'line-opacity': 0.6, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.8, 12, 1.5], 'line-translate': [1.6, 1], 'line-blur': 0.5 } }, under);
     map.addLayer({ id: 'orb-paper-specks', type: 'circle', source: 'orb-paper-specks', layout: hide, paint: { 'circle-color': PAPER.halo, 'circle-opacity': 0.9, 'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, ['*', 0.7, ['+', 0.6, ['get', 's']]], 13, ['*', 1.8, ['+', 0.6, ['get', 's']]]], 'circle-pitch-alignment': 'map' } }, over);
   }
-  const WORLD = ['orb-paper-grain', 'orb-paper-blots', 'orb-paper-crease-dark', 'orb-paper-crease-pale', 'orb-paper-specks'];
+  const WORLD = ['orb-paper-inktex', 'orb-paper-grain', 'orb-paper-blots', 'orb-paper-crease-dark', 'orb-paper-crease-pale', 'orb-paper-specks'];
+
+  /**
+   * Ink bleed and missed registration for the printed linework: under each main line a soft dark glow (the ink spreading into the stock), and
+   * a blue copy a pixel or two off (a plate that did not line up). Cloned from the base style's own layers.
+   */
+  const GLOW = [];
+  function linework() {
+    if (GLOW.length) return;
+    const specs = map.getStyle().layers;
+    for (const id of ['river', 'road-major', 'hwy-color', 'county-line', 'muni-line']) {
+      const s = specs.find((l) => l.id === id);
+      if (!s || s.type !== 'line') continue;
+      const w = ['interpolate', ['linear'], ['zoom'], 8, id === 'county-line' ? 3.2 : 2.4, 12, id === 'county-line' ? 6 : 4.5];
+      const base = { ...s, layout: { ...(s.layout || {}), visibility: 'none' } };
+      map.addLayer({ ...base, id: id + '-pglow', paint: { 'line-color': PAPER.ink, 'line-opacity': 0.26, 'line-blur': 3, 'line-width': w } }, id);
+      if (id !== 'muni-line') map.addLayer({ ...base, id: id + '-preg', paint: { 'line-color': PAPER.fringeB, 'line-opacity': 0.4, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 12, 2], 'line-translate': [1.6, 1.2], 'line-translate-anchor': 'viewport' } }, id);
+      GLOW.push(id + '-pglow');
+      if (id !== 'muni-line') GLOW.push(id + '-preg');
+    }
+  }
 
   /** The two plates that print slightly off behind each coloured mass (mountain bands, lake and park fills). */
   function plates() {
     if (!map.getSource('orb-geom') || map.getLayer('orb-paper-a')) return;
     const before = 'orb-geom-band';
     const f = ['any', ['has', 'band'], ['==', ['geometry-type'], 'Polygon'], ['==', ['geometry-type'], 'MultiPolygon']];
+    if (!map.hasImage('paper-ink')) map.addImage('paper-ink', inkImage(), { pixelRatio: 2 });
+    map.addLayer({ id: 'orb-paper-inktex', type: 'fill', source: 'orb-geom', filter: f, layout: { visibility: 'none' }, paint: { 'fill-pattern': 'paper-ink', 'fill-opacity': 0.9 } }, map.getLayer('orb-geom-fill') ? 'orb-geom-fill' : undefined);
     for (const [id, col, tr] of [['orb-paper-a', PAPER.fringeA, [4, 3]], ['orb-paper-b', PAPER.fringeB, [-3, -3]]])
       map.addLayer({ id, type: 'fill', source: 'orb-geom', filter: f, layout: { visibility: 'none' }, paint: { 'fill-color': col, 'fill-opacity': 0.55, 'fill-translate': tr, 'fill-translate-anchor': 'viewport' } }, before);
   }
@@ -118,7 +140,9 @@ export function createPaper(map, bounds) {
     set('orb-geom-casing', 'line-width', ['interpolate', ['linear'], ['zoom'], 8, 4.5, 12, 8]);
     set('orb-flash-glow', 'line-color', '#f2d63c');
     set('orb-town-name', 'text-color', PAPER.text);
-    set('orb-town-name', 'text-halo-color', PAPER.halo);
+    set('orb-town-name', 'text-halo-color', 'rgba(29,42,91,0.5)');
+    set('orb-town-name', 'text-halo-width', 1.6);
+    set('orb-town-name', 'text-halo-blur', 1.4);
     set('orb-relief', 'hillshade-shadow-color', '#7a6a3a');       // relief only as a faint warm tone: printed maps of this kind had none
     set('orb-relief', 'hillshade-highlight-color', '#fffbe0');
     set('orb-relief', 'hillshade-accent-color', '#a89a60');
@@ -139,12 +163,13 @@ export function createPaper(map, bounds) {
       if (on) {
         plates();
         world();
+        linework();
         for (const [id, props] of Object.entries(BASE)) for (const [p, v] of Object.entries(props)) set(id, p, v);
         for (const [id, b] of Object.entries(BLEED)) set(id, 'line-blur', b);
         game();
-        for (const id of ['orb-paper-a', 'orb-paper-b', ...WORLD]) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
+        for (const id of ['orb-paper-a', 'orb-paper-b', ...WORLD, ...GLOW]) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
       } else {
-        for (const id of ['orb-paper-a', 'orb-paper-b', ...WORLD]) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
+        for (const id of ['orb-paper-a', 'orb-paper-b', ...WORLD, ...GLOW]) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
         restore();
       }
     },
