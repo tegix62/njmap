@@ -3238,3 +3238,16 @@ body.holo #sheet #orbNext { box-shadow: 0 -8px 12px rgba(2, 18, 28, 0.9); }
 /* ---- Retro pass (js/retro.js): ordered dither over the picture ---------------------------------------- */
 #retroDither { position: fixed; inset: 0; z-index: 4; pointer-events: none; mix-blend-mode: overlay; }
 #retroDither[hidden] { display: none; }
+
+/* ---- Crisp text over the retro map ------------------------------------------------------------------- */
+#pxLabels { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
+#pxLabels[hidden] { display: none; }
+.px-label { position: absolute; left: 0; top: 0; white-space: nowrap; will-change: transform;
+  font: 700 12px ui-monospace, 'SF Mono', Menlo, Consolas, 'Courier New', monospace; letter-spacing: 0.12em; text-transform: uppercase;
+  color: #e8fdff; text-shadow: 1px 0 #02101a, -1px 0 #02101a, 0 1px #02101a, 0 -1px #02101a, 2px 2px 0 #02101a; }
+/* which other pieces get the same hard-edged look at retro strength (headings and the question; answers stay plain) */
+body[data-retro='1'] .qkind, body[data-retro='2'] .qkind,
+body[data-retro='1'] .q, body[data-retro='2'] .q {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, 'Courier New', monospace; font-weight: 700; letter-spacing: 0.04em;
+  text-shadow: 2px 2px 0 rgba(2, 16, 26, 0.9); }
+body[data-retro='2'] .orb-pin span:last-child { font-family: ui-monospace, Menlo, Consolas, monospace !important; text-transform: uppercase; letter-spacing: 0.08em; text-shadow: 1px 1px 0 #02101a !important; }

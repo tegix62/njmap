@@ -96,3 +96,47 @@ export function createRetro(map) {
     },
   };
 }
+
+/**
+ * Town names as DOM text above the map, for when the map itself is drawn at PS1 resolution (map text would be
+ * blocky and hard to read). They are placed with map.project, keep a few pixels apart, and take their look from
+ * `.px-label` in css/app.css (hard stepped shadow, small caps, like a PS1 menu).
+ */
+export function createLabels(map) {
+  const box = document.createElement('div');
+  box.id = 'pxLabels';
+  box.setAttribute('aria-hidden', 'true');
+  map.getContainer().appendChild(box);
+  let items = [], shown = false;
+
+  function place() {
+    if (!shown) return;
+    const taken = [];
+    for (const it of items) {
+      const s = map.project(it.pt);
+      const w = it.el.offsetWidth || it.name.length * 8 + 10, h = 16;
+      const r = { x: s.x - w / 2, y: s.y - h / 2, w, h };
+      const clash = taken.some((t) => r.x < t.x + t.w + 4 && r.x + r.w + 4 > t.x && r.y < t.y + t.h + 2 && r.y + r.h + 2 > t.y);
+      it.el.style.visibility = clash ? 'hidden' : 'visible';
+      it.el.style.transform = `translate(${s.x}px, ${s.y}px) translate(-50%, -50%)`;
+      if (!clash) taken.push(r);
+    }
+  }
+  map.on('render', place);
+
+  return {
+    /** list: [{ n: name, pt: [lng, lat] }] */
+    set(list) {
+      box.textContent = '';
+      items = list.map((m) => {
+        const el = document.createElement('div');
+        el.className = 'px-label';
+        el.textContent = m.n;
+        box.appendChild(el);
+        return { el, name: m.n, pt: m.pt };
+      });
+      place();
+    },
+    show(on) { shown = !!on; box.hidden = !on; place(); },
+  };
+}

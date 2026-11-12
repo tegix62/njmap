@@ -343,3 +343,7 @@ Not done yet: PS1/PS2-style rendering (vertex snapping, low-res upscale, dither)
 
 The **🕹 Retro** chip in "Name that place" cycles Off → PS2 → PS1 (remembered). It is a post-process, not a new renderer: a smaller map canvas scaled up (PS2 0.8×, soft; PS1 0.38×, nearest-neighbour so pixels stay square), an SVG filter that snaps channels to 7 levels (PS1), a 4×4 Bayer dither overlay, and distance fog from MapLibre's sky settings. Panels and text stay crisp. It works with or without the hologram look.
 Not possible without a vertex stage in MapLibre: PS1 vertex wobble and affine texture warp. Map labels get blocky at PS1 strength by design; if that costs too much legibility the ratio is one number in `LEVELS`.
+
+#### Crisp text over the retro map
+
+At PS1/PS2 strength the map's own text would be blocky, so town names are drawn as DOM text above the map instead (`createLabels` in `js/retro.js`, placed with `map.project`, no overlapping): small caps, monospace, hard stepped shadow like a PS1 menu. The same hard-shadow monospace style is applied to the heading and question; the compare-view pins take it too. Answer buttons, hints and the result text stay plain on purpose. Which pieces get the retro text treatment is a handful of selectors at the end of `css/app.css`.

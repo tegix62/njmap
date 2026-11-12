@@ -7,7 +7,7 @@ import { buildingFeatures, applySurveyTowers, applyParts, loadParts, loadSurveyT
 import { createMeshLayer, meshInfo } from './meshes.js';
 import { choicesHtml, hintsHtml, whereHtml } from './ui.js';
 import { createHolo } from './holo.js';
-import { createRetro } from './retro.js';
+import { createRetro, createLabels } from './retro.js';
 
 const KEY = 'orbit';
 const ROUND = 10;
@@ -84,6 +84,14 @@ export function initOrbit(ctx) {
   let holoOn = ctx.store.get('orbit.holo', true);
   const retro = createRetro(map);              // PS1/PS2-style rendering (js/retro.js): off, PS2, PS1
   let retroLvl = ctx.store.get('orbit.retro', 0);
+  const pxLabels = createLabels(map);          // town names as crisp text above a low-resolution map
+  let gameOn = false;
+  /** Town names: drawn by the map normally, as DOM text over it while the retro pass is on. */
+  const syncLabels = () => {
+    const px = gameOn && retroLvl > 0;
+    pxLabels.show(px);
+    if (map.getLayer('orb-town-name')) map.setLayoutProperty('orb-town-name', 'visibility', gameOn && !px ? 'visible' : 'none');
+  };
   const canMesh = (() => { try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; } })();
   let hiddenSymbols = [];
   // The township flash: during the wide orienting view of a long swing, the town the target is in is outlined and named for a moment
@@ -163,6 +171,7 @@ export function initOrbit(ctx) {
   function setTowns(list) {
     const src = map.getSource('orb-towns');
     if (src) src.setData({ type: 'FeatureCollection', features: list.map((m) => ({ type: 'Feature', properties: { name: m.n }, geometry: { type: 'Point', coordinates: m.pt } })) });
+    pxLabels.set(list);
   }
   let placeRaf = 0;
   let compareTimer = 0;
@@ -419,6 +428,7 @@ export function initOrbit(ctx) {
   }
   const show = (on) => {
     meshes.show(on);
+    gameOn = on;
     if (cfg) { holo.apply(on && holoOn); retro.apply(on ? retroLvl : 0); }
     if (cfg && map.getLayer('orb-relief')) map.setLayoutProperty('orb-relief', 'visibility', on ? 'visible' : 'none');
     if (cfg && map.getSource('orb-dem')) {
@@ -427,6 +437,7 @@ export function initOrbit(ctx) {
     }
     for (const id of ['orb-geom-band', 'orb-geom-fill', 'orb-geom-fill2', 'orb-geom-casing', 'orb-geom-line', 'orb-geom-wall', 'orb-town-name', 'orb-flash-glow', 'orb-flash-line', 'orb-flash-dot']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
     for (const id of ['orb-walk', 'orb-road', 'orb-park', 'orb-ghost', 'orb-others', 'orb-hood-fill', 'orb-hood-line', 'orb-hood-wall', 'orb-lab', 'orb-lm', 'orb-hood-name', 'orb-target']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+    syncLabels();
     if (on) {
       // no names on the map while this runs
       hiddenSymbols = map.getStyle().layers.filter((l) => !l.id.startsWith('orb-') && (l.type === 'symbol' || l.type === 'circle') && map.getLayoutProperty(l.id, 'visibility') !== 'none').map((l) => l.id);
@@ -967,6 +978,7 @@ export function initOrbit(ctx) {
       retroLvl = (retroLvl + 1) % 3;
       ctx.store.set('orbit.retro', retroLvl);
       retro.apply(retroLvl);
+      syncLabels();
       render();
     });
     document.getElementById('orbHolo')?.addEventListener('click', () => {
@@ -992,7 +1004,7 @@ export function initOrbit(ctx) {
     },
     _state: () => ({ run, q }),
     _holo: (v) => { holoOn = v; holo.apply(v); },
-    _retro: (v) => { retroLvl = v; retro.apply(v); },
+    _retro: (v) => { retroLvl = v; retro.apply(v); syncLabels(); },
     _flash: (name, u) => { const t = city.list.find((x) => x.n === name); drawFlash(t, flowOf(t), u); },   // (a single frame, for checking how it looks)
   };
 }
