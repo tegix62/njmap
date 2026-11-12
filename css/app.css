@@ -3234,3 +3234,7 @@ body.holo .fb.no { color: #ffb4a3; }
 body.holo .fb b, body.holo .q b { color: #fff; }
 body.holo .primary { background: rgba(95, 243, 255, 0.2); color: #fff; border: 1px solid #5ff3ff; border-radius: 2px; text-transform: uppercase; letter-spacing: 0.1em; box-shadow: 0 0 16px rgba(95, 243, 255, 0.3); }
 body.holo #sheet #orbNext { box-shadow: 0 -8px 12px rgba(2, 18, 28, 0.9); }
+
+/* ---- Retro pass (js/retro.js): ordered dither over the picture ---------------------------------------- */
+#retroDither { position: fixed; inset: 0; z-index: 4; pointer-events: none; mix-blend-mode: overlay; }
+#retroDither[hidden] { display: none; }

@@ -338,3 +338,8 @@ Every game builds its answer buttons, hint lines and "where it is" line through 
 
 "Name that place" in New Jersey now draws as a projection table: a dark void, the land as stacked 20 m elevation bands (a MapLibre `color-relief` layer, each band a ramp to a bright rim, so the contour intervals read as lit slabs), water and roads as thin cyan lines, outlines and the flash in glowing teal, plus a faint scan overlay (`#holoFx`) and corner-bracket glass panels with monospace labels (`body.holo` in `css/app.css`). The **◇ Hologram / ▢ Plain map** chip in the sheet switches it; the choice is remembered. Turning it off restores every changed paint property from what was saved first, so Ink and Classic themes come back exactly. `createHolo(map)` is region-neutral: any game can call `apply(true)`.
 Not done yet: PS1/PS2-style rendering (vertex snapping, low-res upscale, dither), the paper-scan theme, and tinting the custom mesh layer (towers) for the hologram.
+
+### Retro pass (prototype, `js/retro.js`)
+
+The **🕹 Retro** chip in "Name that place" cycles Off → PS2 → PS1 (remembered). It is a post-process, not a new renderer: a smaller map canvas scaled up (PS2 0.8×, soft; PS1 0.38×, nearest-neighbour so pixels stay square), an SVG filter that snaps channels to 7 levels (PS1), a 4×4 Bayer dither overlay, and distance fog from MapLibre's sky settings. Panels and text stay crisp. It works with or without the hologram look.
+Not possible without a vertex stage in MapLibre: PS1 vertex wobble and affine texture warp. Map labels get blocky at PS1 strength by design; if that costs too much legibility the ratio is one number in `LEVELS`.

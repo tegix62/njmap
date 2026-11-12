@@ -7,6 +7,7 @@ import { buildingFeatures, applySurveyTowers, applyParts, loadParts, loadSurveyT
 import { createMeshLayer, meshInfo } from './meshes.js';
 import { choicesHtml, hintsHtml, whereHtml } from './ui.js';
 import { createHolo } from './holo.js';
+import { createRetro } from './retro.js';
 
 const KEY = 'orbit';
 const ROUND = 10;
@@ -81,6 +82,8 @@ export function initOrbit(ctx) {
   const meshes = createMeshLayer(map); // the towers the survey has as real triangle meshes
   const holo = createHolo(map);                // the projection-table look (js/holo.js), on while the game runs unless turned off
   let holoOn = ctx.store.get('orbit.holo', true);
+  const retro = createRetro(map);              // PS1/PS2-style rendering (js/retro.js): off, PS2, PS1
+  let retroLvl = ctx.store.get('orbit.retro', 0);
   const canMesh = (() => { try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; } })();
   let hiddenSymbols = [];
   // The township flash: during the wide orienting view of a long swing, the town the target is in is outlined and named for a moment
@@ -416,7 +419,7 @@ export function initOrbit(ctx) {
   }
   const show = (on) => {
     meshes.show(on);
-    if (cfg) holo.apply(on && holoOn);
+    if (cfg) { holo.apply(on && holoOn); retro.apply(on ? retroLvl : 0); }
     if (cfg && map.getLayer('orb-relief')) map.setLayoutProperty('orb-relief', 'visibility', on ? 'visible' : 'none');
     if (cfg && map.getSource('orb-dem')) {
       map.stop();                                                // (terrain switched on or off in the middle of an ease makes MapLibre throw)
@@ -953,13 +956,19 @@ export function initOrbit(ctx) {
     const where = q.t.k === 'nat' ? (q.towns && q.towns.shown.length ? whereHtml(q.towns.shown.map((m) => m.full).join(' · ') + (q.towns.more ? ` · +${q.towns.more} more along it` : '')) : '') : whereHtml(q.hood || '');
     ctx.hud(`<div class="qkind">${ICON} ${TITLE} · ${run.n + (q.done ? 0 : 1)}/${ROUND}</div><div class="q">${q.done ? (q.ok ? 'Yes.' : 'Not quite.') : q.flying ? 'Swinging over…' : (cfg ? `Which ${NOUN[q.t.kind] || 'place'} is this?` : q.t.k === 'lm' ? 'Which landmark is this?' : 'Which tower is this?')}</div>${q.flying ? '' : where}${q.flying ? '' : hints}`);
     ctx.sheet(`${run.opts.header()}<div id="qbody">
-      <div class="score row"><button type="button" id="orbSpin" class="chip toggle" aria-pressed="${spinOn}">${spinOn ? '↻ Orbiting' : '✋ Drag to turn'}</button>${cfg ? `<button type="button" id="orbHolo" class="chip toggle" aria-pressed="${!holoOn}">${holoOn ? '◇ Hologram' : '▢ Plain map'}</button>` : ''} <span class="pts">${run.pts} points${run.streak >= 3 ? ` · 🔥 ${run.streak}` : ''}</span></div>
+      <div class="score row"><button type="button" id="orbSpin" class="chip toggle" aria-pressed="${spinOn}">${spinOn ? '↻ Orbiting' : '✋ Drag to turn'}</button>${cfg ? `<button type="button" id="orbHolo" class="chip toggle" aria-pressed="${!holoOn}">${holoOn ? '◇ Hologram' : '▢ Plain map'}</button><button type="button" id="orbRetro" class="chip toggle" aria-pressed="${retroLvl === 0}">🕹 ${['Retro off', 'PS2', 'PS1'][retroLvl]}</button>` : ''} <span class="pts">${run.pts} points${run.streak >= 3 ? ` · 🔥 ${run.streak}` : ''}</span></div>
       ${choicesHtml(q.choices, { attr: 'n', data: (c) => c.n, label: (c) => c.n, off: q.done || q.flying, state: (c) => (q.done ? (c.n === q.t.n ? 'right' : c.n === q.picked ? 'wrong' : '') : '') })}
       ${q.done ? `${reveal()}<button class="primary" id="orbNext">${run.n >= ROUND ? 'Finish' : cfg || q.t.k === 'lm' ? 'Next' : 'Next tower'}</button>` : `<button id="orbHint" class="chip"${q.hints >= HINTS.length || q.flying ? ' disabled' : ''}>💡 Hint (−1 point)</button>`}
     </div>`);
     run.opts.bindHeader();
     for (const b of document.querySelectorAll('#sheet .choice')) b.addEventListener('click', () => answer(b.dataset.n));
     document.getElementById('orbNext')?.addEventListener('click', next);
+    document.getElementById('orbRetro')?.addEventListener('click', () => {
+      retroLvl = (retroLvl + 1) % 3;
+      ctx.store.set('orbit.retro', retroLvl);
+      retro.apply(retroLvl);
+      render();
+    });
     document.getElementById('orbHolo')?.addEventListener('click', () => {
       holoOn = !holoOn;
       ctx.store.set('orbit.holo', holoOn);
@@ -983,6 +992,7 @@ export function initOrbit(ctx) {
     },
     _state: () => ({ run, q }),
     _holo: (v) => { holoOn = v; holo.apply(v); },
+    _retro: (v) => { retroLvl = v; retro.apply(v); },
     _flash: (name, u) => { const t = city.list.find((x) => x.n === name); drawFlash(t, flowOf(t), u); },   // (a single frame, for checking how it looks)
   };
 }
