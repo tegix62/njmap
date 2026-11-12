@@ -206,8 +206,9 @@ def main():
             tri, roofs = [], []
             for k in ks:
                 tri += brep_triangles(surf[k][0])
-                if surf[k][5]:
-                    roofs += roof_polygons(surf[k][0])
+                # every surface counts for the plan above a height, not only the roofs: some towers' crowns are filed as walls
+                # (the Chrysler's is about 300 tiny facets), and a wall seen from above is just a line, which adds nothing
+                roofs += roof_polygons(surf[k][0])
             if not tri:
                 continue
             tri = np.array(tri)
