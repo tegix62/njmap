@@ -101,7 +101,8 @@ export function initOrbit(ctx) {
       ]);
       const files = rest.slice(0, 3), grounds = rest.slice(3, 6), streetFiles = rest.slice(6, 9), partFiles = rest.slice(9, 12);
       const md = canMesh ? await meshes.data() : null;
-      const meshList = meshInfo(md);
+      const quiz = new Set(list.map((x) => x.n));
+      const meshList = meshInfo(md).filter((m) => quiz.has(m.n)); // (the other landmark and tower meshes are for Explore: here they stay blocks)
       const feats = applyParts(applySurveyTowers(files.flatMap((d, i) => buildingFeatures(d, partFiles[i])), towers, meshList));
       const cx = feats.map((f) => {
         const r = f.geometry.coordinates[0];
@@ -430,7 +431,11 @@ export function initOrbit(ctx) {
     if (!run) return;
     run.loading = false;
     layers();
-    if (canMesh) await meshes.load(map.getStyle().layers.find((l) => l.type === 'symbol')?.id);
+    if (canMesh) {
+      await meshes.load(map.getStyle().layers.find((l) => l.type === 'symbol')?.id);
+      const quiz = new Set(city.list.map((x) => x.n));
+      for (const t of meshes.towers) t.hidden = !quiz.has(t.n);
+    }
     if (!run) return;
     map.setMaxPitch(70);
     show(true);
