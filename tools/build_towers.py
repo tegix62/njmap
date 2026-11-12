@@ -42,21 +42,34 @@ def chrysler(b):
                 out.append((lo, hi, g))
     out.append(shaft)
     top = shaft[1]
-    crown_top = 282.0
-    # seven terraced arches, each a little narrower at its top than at its foot, the next set in from the one below
-    ARCHES, RINGS = 7, 3
+    crown_top = 276.0   # where the arches end and the spire starts (the spire's tip is at the official 319 m)
+    tip = 319.0
+    STONE, SILVER, GLASS, NEEDLE = '#e6e0d3', '#cfd4d9', '#8b939b', '#c5cbd0'
+    coloured = [(lo, hi, g, STONE) for lo, hi, g in out]
+    # The crown, traced from a photograph: about 78% of the shaft's width where it starts, nearly that for the first third,
+    # then closing like an ogive to about 12% at the top: width(u) = 1 - 0.9 u^2.1 of that, u = 0 to 1 up the crown. Seven
+    # terraced arches, each a little narrower at its top (so the outline scallops), each a silver band under a darker band
+    # (the triangular windows).
+    ARCHES, RINGS = 7, 5
     span = (crown_top - top) / ARCHES
     for a in range(ARCHES):
-        u0 = a / ARCHES
-        k0 = max(0.07, 0.84 * (1 - u0 ** 1.6) ** 0.62)
         for r in range(RINGS):
             f = (r + 0.5) / RINGS
-            k = k0 * (1 - 0.17 * f)
+            u = (a + f) / ARCHES
+            k = 0.78 * (1 - 0.9 * u ** 2.1) * (1 - 0.09 * f)
             z0 = top + a * span + r * span / RINGS
-            out.append((z0, z0 + span / RINGS, affinity.scale(sp, k, k, origin=sp.centroid)))
-    out.append((crown_top, b['h'], affinity.scale(sp, 0.05, 0.05, origin=sp.centroid)))
+            coloured.append((z0, z0 + span / RINGS, affinity.scale(sp, k, k, origin=sp.centroid), SILVER if f < 0.6 else GLASS))
+    # the spire: a needle from 12% of the shaft's width at the top of the arches down to 3% at the tip
+    z = crown_top
+    while z < tip - 0.01:
+        z2 = min(z + 6.0, tip)
+        k = 0.12 - 0.09 * ((z + z2) / 2 - crown_top) / (tip - crown_top)
+        coloured.append((z, z2, affinity.scale(sp, k, k, origin=sp.centroid), NEEDLE))
+        z = z2
+    out = coloured
     rec = dict(b)
-    rec['slabs'] = [[round(lo, 1), round(hi, 1), [[round(x, 1), round(y, 1)] for x, y in list(g.exterior.coords)[:-1]]] for lo, hi, g in out]
+    rec['h'] = tip
+    rec['slabs'] = [[round(lo, 1), round(hi, 1), [[round(x, 1), round(y, 1)] for x, y in list(g.exterior.coords)[:-1]], col] for lo, hi, g, col in out]
     return rec
 
 
