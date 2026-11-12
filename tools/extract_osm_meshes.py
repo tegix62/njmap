@@ -17,11 +17,12 @@ from shapely.ops import unary_union
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RELEASE = '2026-10-21.0'
 URL = None  # set below (needs the part file's name: listed from the bucket)
-BOX = (-73.9860, 40.7480, -73.9690, 40.7690)
+BOXES = [(-73.9860, 40.7480, -73.9690, 40.7690), (-74.0200, 40.7050, -74.0000, 40.7160)]  # Midtown, the Financial District
 # the towers to build, with the colour of the glass/stone: name -> (rgb, min share of the official height the tallest part must reach)
 TOWERS = {
     'One Vanderbilt': (176, 190, 202), 'Central Park Tower': (178, 192, 200), '111 West 57th Street': (196, 202, 206),
-    '432 Park Avenue': (214, 212, 205),
+    '432 Park Avenue': (214, 212, 205), 'Four World Trade Center': (164, 178, 188),
+    '53 West 53rd': (190, 197, 203),
 }
 
 
@@ -58,11 +59,11 @@ def fetch_parts():
     for g in range(md.num_row_groups):
         rg = md.row_group(g)
         st = lambda n: (rg.column(ix[n]).statistics.min, rg.column(ix[n]).statistics.max)
-        if st('bbox.xmax')[1] < BOX[0] or st('bbox.xmin')[0] > BOX[2] or st('bbox.ymax')[1] < BOX[1] or st('bbox.ymin')[0] > BOX[3]:
+        if not any(not (st('bbox.xmax')[1] < B[0] or st('bbox.xmin')[0] > B[2] or st('bbox.ymax')[1] < B[1] or st('bbox.ymin')[0] > B[3]) for B in BOXES):
             continue
         for r in pf.read_row_group(g, columns=['height', 'min_height', 'geometry', 'bbox']).to_pylist():
             b = r['bbox']
-            if b['xmin'] > BOX[0] and b['xmax'] < BOX[2] and b['ymin'] > BOX[1] and b['ymax'] < BOX[3] and r['height']:
+            if r['height'] and any(b['xmin'] > B[0] and b['xmax'] < B[2] and b['ymin'] > B[1] and b['ymax'] < B[3] for B in BOXES):
                 out.append((wkb.loads(bytes(r['geometry'])), r['min_height'] or 0.0, r['height']))
     return out
 
