@@ -25,6 +25,12 @@ TOWERS = {
     '53 West 53rd': (190, 197, 203),
 }
 
+# towers whose parts are constant-width columns but whose real shape tapers: (height where the taper starts, height where it ends,
+# share of the width left at the end); the walls are split every 20 m so they slant smoothly
+TAPER = {'One Vanderbilt': (120, 330, 0.60)}
+# masts and spires missing from the survey: name -> (top metres, width at the foot in metres, rgb); stood on the tower's roof
+MASTS = {'New York Times Building': (319, 2.6, (150, 158, 166))}
+
 
 def earclip(pts):
     n = len(pts)
@@ -89,8 +95,12 @@ def main():
         cen = unary_union([g for g, a, b in mine if b >= 0.3 * s['h']]).centroid
         cx, cy = cen.x, cen.y
         verts, cols, idx, key = [], [], [], {}
+        tp = TAPER.get(name)
         def vid(x, y, z):
-            q = (round((x - cx) * kx * 10), round((y - cy) * ky * 10), round(z * 10))
+            f = 1.0
+            if tp:
+                f = 1 - (1 - tp[2]) * min(1, max(0, (z - tp[0]) / (tp[1] - tp[0])))
+            q = (round((x - cx) * kx * 10 * f), round((y - cy) * ky * 10 * f), round(z * 10))
             if q not in key:
                 key[q] = len(verts); verts.append(q)
                 c = np.array(rgb, float)
@@ -102,9 +112,13 @@ def main():
                 continue
             for i in range(len(ring)):
                 (x0, y0), (x1, y1) = ring[i], ring[(i + 1) % len(ring)]
-                a, b, c, d = vid(x0, y0, z0), vid(x1, y1, z0), vid(x1, y1, z1), vid(x0, y0, z1)
-                if len({a, b, c}) == 3: idx += [a, b, c]
-                if len({a, c, d}) == 3: idx += [a, c, d]
+                zs = [z0, z1]
+                if tp:
+                    zs = sorted({z0, z1, *[z for z in range(0, 600, 20) if z0 < z < z1]})
+                for za, zb in zip(zs, zs[1:]):
+                    a, b, c, d = vid(x0, y0, za), vid(x1, y1, za), vid(x1, y1, zb), vid(x0, y0, zb)
+                    if len({a, b, c}) == 3: idx += [a, b, c]
+                    if len({a, c, d}) == 3: idx += [a, c, d]
             for t in earclip([((x - cx) * kx, (y - cy) * ky) for x, y in ring]):
                 tri = [vid(ring[i][0], ring[i][1], z1) for i in t]
                 if len(set(tri)) == 3: idx += tri
@@ -117,6 +131,33 @@ def main():
                'i': base64.b64encode(np.array(idx, np.uint16).tobytes()).decode(), 'src': 'osm'}
         byname[name] = rec
         print(f'  {name}: {len(mine)} parts, {rec["tris"]} triangles, top {h:.0f} m (official {s["h"]})')
+    for name, (top, w, rgb) in MASTS.items():
+        t = byname.get(name)
+        if not t or t.get('mast'):
+            continue
+        p = np.frombuffer(base64.b64decode(t['p']), np.int16).reshape(-1, 3).tolist()
+        c = np.frombuffer(base64.b64decode(t['c']), np.uint8).reshape(-1, 3).tolist()
+        i = np.frombuffer(base64.b64decode(t['i']), np.uint16).tolist()
+        z0, z1 = (t['h'] - 6) * 10, top * 10
+        n0 = len(p)
+        # a four-sided needle, narrowing: rings at the foot, a third up and the tip
+        ring = lambda z, hw: [(-hw, -hw, z), (hw, -hw, z), (hw, hw, z), (-hw, hw, z)]
+        levels = [(z0, w * 5), (z0 + (z1 - z0) * 0.35, w * 3), (z1, w * 0.4)]
+        for z, hw in levels:
+            for q in ring(round(z), round(hw)):
+                p.append(list(q)); c.append(list(rgb))
+        for L in range(2):
+            for k in range(4):
+                a, b = n0 + L * 4 + k, n0 + L * 4 + (k + 1) % 4
+                A, B = a + 4, b + 4
+                i += [a, b, B, a, B, A]
+        t['p'] = base64.b64encode(np.array(p, np.int16).reshape(-1).tobytes()).decode()
+        t['c'] = base64.b64encode(np.array(c, np.uint8).reshape(-1).tobytes()).decode()
+        t['i'] = base64.b64encode(np.array(i, np.uint16).tobytes()).decode()
+        t['tris'] = len(i) // 3
+        t['h'] = float(top)
+        t['mast'] = 1
+        print(f'  {name}: mast to {top} m')
     json.dump({'v': 2, 't': list(byname.values())}, open(dst, 'w'), separators=(',', ':'))
     print(len(byname), 'towers ->', dst, os.path.getsize(dst) // 1024, 'KB')
 
