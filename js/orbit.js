@@ -9,9 +9,60 @@ const KEY = 'orbit';
 const ROUND = 10;
 const SPIN = 7; // degrees a second: a full turn in under a minute
 const PITCH = 64;
+const TALL = 150; // metres: buildings at least this tall stand up in full round the tower
 const GHOST_CAP = 26; // metres: the city around the tower is kept low so nothing stands in front of it
 const AREAS = ['downtown', 'midtown', 'uptown'];
 const ALIAS = { '30 Rockefeller Plaza': 'Rockefeller Center', 'Time Warner Center': 'Columbus Circle' }; // (the landmark photos)
+
+const RAMP = /entrance|exit|\bramp|\bRp\b|Bridge|Tunnel|Expwy|\bEp\b|\bEn\b|\bEt\b|Unnamed|Transverse|Dr$|Drive|Pkwy|Hwy/i;
+const shortName = (n) => n.replace(/^[EW] (\d+\w\w) St$/, '$1 St');
+/** Every named street block of the three street files as { name, mid, pts }: for labelling what stands round a tower. */
+function streetSegments(files) {
+  const seen = new Set(), out = [];
+  for (const d of files) {
+    const [ox, oy] = d.origin;
+    const geo = d.geoms.map((flat) => {
+      const pts = [];
+      let x = 0, y = 0;
+      for (let i = 0; i < flat.length; i += 2) {
+        x += flat[i];
+        y += flat[i + 1];
+        pts.push([ox + x / d.scale, oy + y / d.scale]);
+      }
+      return pts;
+    });
+    for (const [, , nid, gi] of d.links) {
+      const name = d.names[nid];
+      if (!name || RAMP.test(name)) continue;
+      const shape = gi >= 0 ? gi : ~gi;
+      const pts = geo[shape];
+      if (!pts || pts.length < 2) continue;
+      const mid = pts[Math.floor(pts.length / 2)];
+      const key = shortName(name) + '|' + mid[0].toFixed(4) + ',' + mid[1].toFixed(4);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ name: shortName(name), mid, pts });
+    }
+  }
+  return out;
+}
+/** A neighbourhood's outline as thin standing walls (one thin rectangle per edge of each outer ring), in lon/lat. */
+function wallFeatures(geom, halfWidthM = 3.5) {
+  const polys = geom.type === 'MultiPolygon' ? geom.coordinates : [geom.coordinates];
+  const out = [];
+  for (const poly of polys) {
+    const ring = poly[0];
+    for (let i = 0; i + 1 < ring.length; i++) {
+      const a = ring[i], b = ring[i + 1];
+      const dx = (b[0] - a[0]) * 84200, dy = (b[1] - a[1]) * 111000;
+      const len = Math.hypot(dx, dy);
+      if (len < 0.5) continue;
+      const nx = ((-dy / len) * halfWidthM) / 84200, ny = ((dx / len) * halfWidthM) / 111000;
+      out.push({ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[a[0] + nx, a[1] + ny], [b[0] + nx, b[1] + ny], [b[0] - nx, b[1] - ny], [a[0] - nx, a[1] - ny], [a[0] + nx, a[1] + ny]]] } });
+    }
+  }
+  return out;
+}
 
 export function initOrbit(ctx) {
   const { map } = ctx;
@@ -32,14 +83,16 @@ export function initOrbit(ctx) {
     if (city) return city;
     if (loading) return loading;
     loading = (async () => {
-      const [list, pics, towers, ...rest] = await Promise.all([
+      const [list, pics, lms, towers, ...rest] = await Promise.all([
         fetch('data/skyscrapers.json').then((r) => r.json()),
         fetch('data/landmark-credits.json').then((r) => r.json()).catch(() => ({})),
+        fetch('data/landmarks.json').then((r) => r.json()).catch(() => []),
         loadSurveyTowers(),
         ...AREAS.map((a) => fetch(`data/buildings-${a}.json`).then((r) => r.json())),
         ...AREAS.map((a) => fetch(`data/ground-${a}.json`).then((r) => r.json()).catch(() => null)),
+        ...AREAS.map((a) => fetch(`data/${a}-streets.json`).then((r) => r.json()).catch(() => null)),
       ]);
-      const files = rest.slice(0, 3), grounds = rest.slice(3);
+      const files = rest.slice(0, 3), grounds = rest.slice(3, 6), streetFiles = rest.slice(6);
       const feats = applySurveyTowers(files.flatMap((d) => buildingFeatures(d)), towers);
       const cx = feats.map((f) => {
         const r = f.geometry.coordinates[0];
@@ -47,7 +100,7 @@ export function initOrbit(ctx) {
         for (const p of r) { x += p[0]; y += p[1]; }
         return [x / r.length, y / r.length];
       });
-      city = { feats, cx, list, pics, grounds: grounds.filter(Boolean).flatMap(groundFeatures) };
+      city = { feats, cx, list, pics, lms, segs: streetSegments(streetFiles.filter(Boolean)), grounds: grounds.filter(Boolean).flatMap(groundFeatures) };
       return city;
     })();
     return loading;
@@ -70,6 +123,36 @@ export function initOrbit(ctx) {
       },
       before
     );
+    // the other tall towers (the surveyed and modelled ones, and any plain building over 150 m) stand up too, muted
+    map.addLayer(
+      {
+        id: 'orb-others', type: 'fill-extrusion', source: 'orb-city', layout: { visibility: 'none' },
+        filter: ['any', ['has', 'c'], ['>=', ['get', 'h'], TALL]],
+        paint: { 'fill-extrusion-color': '#a9b6c2', 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': ['coalesce', ['get', 'b'], 0], 'fill-extrusion-opacity': 0.55, 'fill-extrusion-vertical-gradient': true },
+      },
+      before
+    );
+    // the neighbourhood the tower stands in: a faint tint on the ground, a dashed edge and a low glass wall round it
+    map.addSource('orb-hood', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addSource('orb-wall', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({ id: 'orb-hood-fill', type: 'fill', source: 'orb-hood', layout: { visibility: 'none' }, filter: ['==', ['geometry-type'], 'Polygon'], paint: { 'fill-color': '#0b7a68', 'fill-opacity': 0.1 } }, before);
+    map.addLayer({ id: 'orb-hood-line', type: 'line', source: 'orb-hood', layout: { visibility: 'none' }, paint: { 'line-color': '#0b7a68', 'line-width': 2.2, 'line-opacity': 0.85, 'line-dasharray': [3, 2] } }, before);
+    map.addLayer({ id: 'orb-hood-wall', type: 'fill-extrusion', source: 'orb-wall', layout: { visibility: 'none' }, paint: { 'fill-extrusion-color': '#0b9a82', 'fill-extrusion-height': 55, 'fill-extrusion-base': 0, 'fill-extrusion-opacity': 0.28, 'fill-extrusion-vertical-gradient': true } }, before);
+    // subtle labels: the streets round it, the other landmarks (not the towers), and the neighbourhood's name
+    map.addSource('orb-lab', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addSource('orb-lm', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({
+      id: 'orb-lab', type: 'symbol', source: 'orb-lab', layout: { visibility: 'none', 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Medium'], 'text-size': 11, 'text-pitch-alignment': 'viewport', 'text-rotation-alignment': 'viewport', 'text-max-width': 8, 'text-optional': true },
+      paint: { 'text-color': '#5d5648', 'text-opacity': 0.8, 'text-halo-color': 'rgba(255,255,255,0.9)', 'text-halo-width': 1.4 },
+    });
+    map.addLayer({
+      id: 'orb-lm', type: 'symbol', source: 'orb-lm', layout: { visibility: 'none', 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Italic'], 'text-size': 11, 'text-pitch-alignment': 'viewport', 'text-rotation-alignment': 'viewport', 'text-max-width': 7, 'text-optional': true, 'text-anchor': 'top', 'text-offset': [0, 0.5] },
+      paint: { 'text-color': '#7a4f1d', 'text-opacity': 0.85, 'text-halo-color': 'rgba(255,255,255,0.9)', 'text-halo-width': 1.4 },
+    });
+    map.addLayer({
+      id: 'orb-hood-name', type: 'symbol', source: 'orb-hood', filter: ['==', ['geometry-type'], 'Point'], layout: { visibility: 'none', 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Medium'], 'text-size': 13, 'text-letter-spacing': 0.18, 'text-transform': 'uppercase', 'text-pitch-alignment': 'viewport', 'text-rotation-alignment': 'viewport' },
+      paint: { 'text-color': '#0b6b5b', 'text-opacity': 0.75, 'text-halo-color': 'rgba(255,255,255,0.85)', 'text-halo-width': 1.6 },
+    });
     map.addLayer(
       {
         id: 'orb-target', type: 'fill-extrusion', source: 'orb-target', layout: { visibility: 'none' },
@@ -79,10 +162,10 @@ export function initOrbit(ctx) {
     );
   }
   const show = (on) => {
-    for (const id of ['orb-walk', 'orb-road', 'orb-park', 'orb-ghost', 'orb-target']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+    for (const id of ['orb-walk', 'orb-road', 'orb-park', 'orb-ghost', 'orb-others', 'orb-hood-fill', 'orb-hood-line', 'orb-hood-wall', 'orb-lab', 'orb-lm', 'orb-hood-name', 'orb-target']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
     if (on) {
       // no names on the map while this runs
-      hiddenSymbols = map.getStyle().layers.filter((l) => (l.type === 'symbol' || l.type === 'circle') && map.getLayoutProperty(l.id, 'visibility') !== 'none').map((l) => l.id);
+      hiddenSymbols = map.getStyle().layers.filter((l) => !l.id.startsWith('orb-') && (l.type === 'symbol' || l.type === 'circle') && map.getLayoutProperty(l.id, 'visibility') !== 'none').map((l) => l.id);
       for (const id of hiddenSymbols) map.setLayoutProperty(id, 'visibility', 'none');
     } else {
       for (const id of hiddenSymbols) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
@@ -112,6 +195,38 @@ export function initOrbit(ctx) {
     return shuffle([t, ...out]);
   }
 
+  /** The street names, other landmarks and neighbourhood round a tower, for finding where it stands. */
+  function around(t) {
+    const p = t.p;
+    // streets: one label for each street within ~420 m, at its block nearest the tower
+    const best = new Map();
+    for (const sg of city.segs) {
+      if (mDist(sg.mid, p) > 520) continue;
+      let d = 1e9;
+      for (const q of sg.pts) d = Math.min(d, mDist(q, p));
+      if (d > 420) continue;
+      const cur = best.get(sg.name);
+      if (!cur || d < cur.d) best.set(sg.name, { d, sg, d0: mDist(sg.mid, p) });
+    }
+    const labels = [...best.values()].sort((a, b) => a.d - b.d).slice(0, 24).map((b) => ({ type: 'Feature', properties: { name: b.sg.name }, geometry: { type: 'Point', coordinates: b.sg.mid } }));
+    map.getSource('orb-lab').setData({ type: 'FeatureCollection', features: labels });
+    // landmarks that are not themselves towers of the quiz (those would give the answers away)
+    const taken = new Set(city.list.map((x) => x.n));
+    for (const [tower, lm] of Object.entries(ALIAS)) if (taken.has(tower)) taken.add(lm);
+    const lm = city.lms.filter((l) => !taken.has(l.n) && mDist(l.p, p) < 700 && mDist(l.p, p) > 25).map((l) => ({ type: 'Feature', properties: { name: l.n }, geometry: { type: 'Point', coordinates: l.p } }));
+    map.getSource('orb-lm').setData({ type: 'FeatureCollection', features: lm });
+    // the neighbourhood
+    const m = ctx.locate ? ctx.locate(p) : null;
+    q.hood = m ? m.n : null;
+    if (m) {
+      map.getSource('orb-hood').setData({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: m.geom }, { type: 'Feature', properties: { name: m.mapLabel || m.n }, geometry: { type: 'Point', coordinates: m.pt } }] });
+      map.getSource('orb-wall').setData({ type: 'FeatureCollection', features: wallFeatures(m.geom) });
+    } else {
+      map.getSource('orb-hood').setData({ type: 'FeatureCollection', features: [] });
+      map.getSource('orb-wall').setData({ type: 'FeatureCollection', features: [] });
+    }
+  }
+
   /** Make this tower the solid one: everything standing within 60 m that is part of it, the rest left as the ghost. */
   function focus(t) {
     const p = t.p;
@@ -135,10 +250,14 @@ export function initOrbit(ctx) {
       });
     }
     map.getSource('orb-target').setData({ type: 'FeatureCollection', features: mine });
-    map.setFilter('orb-ghost', ['!', ['in', ['id'], ['literal', ids.length ? ids : [-1]]]]);
+    const not = ['!', ['in', ['id'], ['literal', ids.length ? ids : [-1]]]];
+    // the low ghost: everything that is neither the tower nor one of the tall ones kept standing round it
+    map.setFilter('orb-ghost', ['all', ['!', ['has', 'c']], ['<', ['get', 'h'], TALL], not]);
+    map.setFilter('orb-others', ['all', ['any', ['has', 'c'], ['>=', ['get', 'h'], TALL]], not]);
+    around(t);
   }
 
-  function camera(t, spin0) {
+  function camera(t, spin0, first) {
     cancelAnimationFrame(raf);
     // The foot of the tower sits low in the free area and the zoom is worked out so its top clears the top card: a tower this
     // many metres high shows about sin(pitch) x height / (metres per pixel) pixels tall on the screen, with some slack for
@@ -152,7 +271,7 @@ export function initOrbit(ctx) {
     const zoom = Math.max(14.4, Math.min(17, Math.log2((mpp0 * avail) / (1.3 * Math.sin((PITCH * Math.PI) / 180) * t.h))));
     let bearing = spin0;
     let last = performance.now();
-    map.jumpTo({ center: t.p, zoom, pitch: PITCH, bearing, padding: { top, bottom: pad.bottom, left: 0, right: 0 } });
+    const cam = { center: t.p, zoom, pitch: PITCH, bearing, padding: { top, bottom: pad.bottom, left: 0, right: 0 } };
     const tick = (now) => {
       if (!run || q.t !== t) return;
       const dt = Math.min(0.1, (now - last) / 1000);
@@ -163,7 +282,22 @@ export function initOrbit(ctx) {
       }
       raf = requestAnimationFrame(tick);
     };
-    raf = requestAnimationFrame(tick);
+    // Swing over from wherever the camera is (the last tower, or the map you came from) to the next one, as the rest of the app
+    // does between questions; the orbit starts when the camera arrives.
+    q.flying = true;
+    const go = () => {
+      if (!run || q.t !== t || !q.flying) return;
+      q.flying = false;
+      last = performance.now();
+      render();
+      raf = requestAnimationFrame(tick);
+    };
+    // (easeTo, not flyTo: flyTo's long zoom-out makes MapLibre throw from its tile bookkeeping now and then; the towers are
+    // only a few km apart, so a plain ease reads as a swing anyway)
+    map.easeTo({ ...cam, duration: ctx.dur ? ctx.dur(first ? 1800 : 2800) : 2800, easing: (x) => x * x * (3 - 2 * x), essential: true });
+    // (after easeTo starts: starting it ends any motion already under way, and that motion's own "moveend" must not count)
+    if (map.isMoving()) map.once('moveend', go);
+    else go();
   }
 
   async function start(opts) {
@@ -193,6 +327,8 @@ export function initOrbit(ctx) {
     run = null;
     q = null;
     document.body.classList.remove('framing');
+    const pb = document.getElementById('orbPhoto');
+    if (pb) pb.hidden = true;
     show(false);
     map.easeTo({ pitch: 0, duration: ctx.dur ? ctx.dur(400) : 400 });
   }
@@ -206,15 +342,26 @@ export function initOrbit(ctx) {
     }
     const t = (run.n === 0 && run.opts.first && city.list.find((x) => x.n === run.opts.first)) || pick();
     run.seen.push(t.n);
-    q = { t, choices: choicesFor(t), hints: 0, picked: null, done: false };
-    focus(t);
-    camera(t, Math.random() * 360);
+    q = { t, choices: choicesFor(t), hints: 0, picked: null, done: false, flying: true };
+    const first = !run.flown;
+    run.flown = true;
+    // the last tower stays in place until the camera is about halfway there, then the new one stands up where it's going
+    if (first) focus(t);
+    else {
+      const wait = ctx.dur ? ctx.dur(3000) * 0.45 : 1350;
+      setTimeout(() => {
+        if (!run || !q || q.t !== t) return;
+        focus(t);
+        render();
+      }, wait);
+    }
+    camera(t, Math.random() * 360, first);
     render();
   }
   const HINTS = [
-    (t) => `It stands in <b>${esc(t.hood)}</b>.`,
     (t) => `<b>${t.h} m</b> (${ft(t.h)} ft), finished in <b>${t.y}</b>.`,
     (t) => `You'd find it at <b>${esc(t.at)}</b>.`,
+    (t) => `${esc(t.line)}.`,
   ];
   function hint() {
     if (!q || q.done || q.hints >= HINTS.length) return;
@@ -250,10 +397,35 @@ export function initOrbit(ctx) {
     const t = q.t;
     const pic = city.pics[t.n] || city.pics[ALIAS[t.n]];
     return `<div class="fb ${q.ok ? 'ok' : 'no'} orb-reveal">
-      ${pic ? `<img src="${esc(pic.img)}" alt="" />` : ''}
+      ${pic ? `<img class="orb-thumb" src="${esc(pic.img)}" alt="Photo of ${esc(t.n)}: tap to enlarge" data-n="${esc(t.n)}" tabindex="0" />` : ''}
       <div><b>${q.ok ? '✓' : '✗'} ${esc(t.n)}</b> <span class="muted">${q.ok ? `+${q.pts}` : ''}</span><br>
       ${esc(t.line)}.<br><span class="muted">${t.h} m (${ft(t.h)} ft) · ${t.y} · ${esc(t.at)}</span></div>
     </div>`;
+  }
+  /** The photo large, over everything, with its credit; a tap anywhere (or Escape) closes it. */
+  function openPhoto(t) {
+    const pic = city.pics[t.n] || city.pics[ALIAS[t.n]];
+    if (!pic) return;
+    let box = document.getElementById('orbPhoto');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'orbPhoto';
+      box.setAttribute('role', 'dialog');
+      box.setAttribute('aria-modal', 'true');
+      document.body.appendChild(box);
+      box.addEventListener('click', (e) => { if (e.target.tagName !== 'A') box.hidden = true; });
+      window.addEventListener('keydown', (e) => { if (e.key === 'Escape') box.hidden = true; });
+    }
+    const credit = [pic.author && `Photo: ${esc(pic.author)}`, pic.license && esc(pic.license)].filter(Boolean).join(', ');
+    box.innerHTML = `<figure><img src="${esc(pic.img)}" alt="${esc(t.n)}"><figcaption><b>${esc(t.n)}</b><br>${credit}${pic.page ? ` · <a href="${esc(pic.page)}" target="_blank" rel="noopener">source</a>` : ''}<br><span class="muted">Tap to close</span></figcaption></figure>`;
+    box.hidden = false;
+    // the saved picture is small: swap in a larger one from Wikimedia Commons when it arrives (and the phone is online)
+    if (pic.file && navigator.onLine !== false) {
+      const big = new Image();
+      big.onload = () => { const cur = box.querySelector('img'); if (cur && !box.hidden && box.dataset.n === t.n) cur.src = big.src; };
+      box.dataset.n = t.n;
+      big.src = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(pic.file)}?width=900`;
+    }
   }
   function render() {
     if (!run || run.loading) return;
@@ -269,19 +441,21 @@ export function initOrbit(ctx) {
       return;
     }
     const hints = HINTS.slice(0, q.hints).map((h) => `<div class="orb-hint">${h(q.t)}</div>`).join('');
-    ctx.hud(`<div class="qkind">🏙 Name that tower · ${run.n + (q.done ? 0 : 1)}/${ROUND}</div><div class="q">${q.done ? (q.ok ? 'Yes.' : 'Not quite.') : 'Which tower is this?'}</div>${hints}`);
+    const where = q.hood ? `<div class="orb-where">📍 ${esc(q.hood)}</div>` : '';
+    ctx.hud(`<div class="qkind">🏙 Name that tower · ${run.n + (q.done ? 0 : 1)}/${ROUND}</div><div class="q">${q.done ? (q.ok ? 'Yes.' : 'Not quite.') : q.flying ? 'Swinging over…' : 'Which tower is this?'}</div>${q.flying ? '' : where}${q.flying ? '' : hints}`);
     const btn = (c) => {
       const cls = q.done ? (c.n === q.t.n ? ' right' : c.n === q.picked ? ' wrong' : '') : '';
-      return `<button class="orb-choice${cls}" data-n="${esc(c.n)}"${q.done ? ' disabled' : ''}>${esc(c.n)}</button>`;
+      return `<button class="orb-choice${cls}" data-n="${esc(c.n)}"${q.done || q.flying ? ' disabled' : ''}>${esc(c.n)}</button>`;
     };
     ctx.sheet(`${run.opts.header()}<div id="qbody">
       <div class="score">${run.pts} points${run.streak >= 3 ? ` · 🔥 ${run.streak}` : ''}</div>
       <div class="orb-choices">${q.choices.map(btn).join('')}</div>
-      ${q.done ? `${reveal()}<button class="primary" id="orbNext">${run.n >= ROUND ? 'Finish' : 'Next tower'}</button>` : `<button id="orbHint"${q.hints >= HINTS.length ? ' disabled' : ''}>💡 Hint (−1 point)</button>`}
+      ${q.done ? `${reveal()}<button class="primary" id="orbNext">${run.n >= ROUND ? 'Finish' : 'Next tower'}</button>` : `<button id="orbHint"${q.hints >= HINTS.length || q.flying ? ' disabled' : ''}>💡 Hint (−1 point)</button>`}
     </div>`);
     run.opts.bindHeader();
     for (const b of document.querySelectorAll('.orb-choice')) b.addEventListener('click', () => answer(b.dataset.n));
     document.getElementById('orbNext')?.addEventListener('click', next);
+    document.querySelector('.orb-thumb')?.addEventListener('click', () => openPhoto(q.t));
     document.getElementById('orbHint')?.addEventListener('click', hint);
   }
 
