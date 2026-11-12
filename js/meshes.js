@@ -32,7 +32,8 @@ void main() {
   float l = 0.5 + 0.5 * abs(dot(n, normalize(vec3(-0.45, -0.55, 0.7)))); // flat shading, brighter on roofs and the sunny sides
   l *= 0.82 + 0.18 * clamp(v_pos.z / 300.0, 0.0, 1.0);                   // a little lighter towards the top
   vec3 c = v_col * l;
-  if (u_pat.x > 0.5 && abs(n.z) < 0.5 && v_pos.z > 6.0) {        // facade patterns, on walls only
+  bool roof6 = u_pat.x > 5.5 && n.z > 0.5;
+  if (u_pat.x > 0.5 && ((abs(n.z) < 0.5 && v_pos.z > (u_pat.x > 5.5 ? 0.5 : 6.0)) || roof6)) {  // facade patterns, on walls (and on roofs for kind 6)
     vec2 t = normalize(vec2(-n.y, n.x));
     float s = dot(v_pos.xy, t);
     int k = int(u_pat.x + 0.5);
@@ -53,6 +54,18 @@ void main() {
       c *= 1.0 - 0.38 * pane * aa;
       float band = mod(v_pos.z - 55.0, 60.0);
       if (v_pos.z > 55.0 && band < 10.0) c = mix(c, vec3(0.12, 0.13, 0.15) * l, 0.92); // the open floors, a dark gap through the tower
+    } else if (k == 6) {                                          // glass with a space-frame lattice: diagonals on the walls, a grid on the roof (Javits)
+      if (roof6) {
+        vec2 g = fract(v_pos.xy / u_pat.y);
+        float d = min(min(g.x, 1.0 - g.x), min(g.y, 1.0 - g.y));
+        float w = 0.04 + 0.5 * fwidth(v_pos.x / u_pat.y);
+        c = mix(c, vec3(0.90, 0.94, 0.96) * l, 0.55 * (1.0 - smoothstep(w, w + 0.04, d)));
+      } else {
+        float u = s / u_pat.y, v = v_pos.z / u_pat.z;
+        float d = min(0.5 - abs(fract(u + v) - 0.5), 0.5 - abs(fract(u - v) - 0.5));
+        float w = 0.06 + 0.5 * fwidth(u + v);
+        c = mix(c, vec3(0.90, 0.94, 0.96) * l, 0.5 * (1.0 - smoothstep(w, w + 0.04, d)));
+      }
     } else if (k == 4) {                                          // mullions and spandrels (Seagram)
       float u = s / u_pat.y, v = v_pos.z / u_pat.z;
       float aa = 1.0 - smoothstep(0.25, 0.6, fwidth(u));
@@ -74,6 +87,7 @@ const PATTERN = {
   'Chanin Building': [2, 2.2, 0.2],
   '432 Park Avenue': [3, 4.6, 0],
   'Seagram Building': [4, 1.7, 4.1],
+  'Javits Center': [6, 4.5, 4.5],
 };
 const NOPAT = [0, 1, 1];
 const b64 = (s) => {

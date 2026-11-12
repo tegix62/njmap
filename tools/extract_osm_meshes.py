@@ -11,13 +11,13 @@ file over HTTP range requests, so only a few MB come down.
 import base64, json, math, os, sys
 import fsspec, numpy as np, pyarrow.parquet as pq
 from shapely import wkb
-from shapely.geometry import Polygon
+from shapely.geometry import MultiPoint, Polygon
 from shapely.ops import unary_union
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RELEASE = '2026-10-21.0'
 URL = None  # set below (needs the part file's name: listed from the bucket)
-BOXES = [(-73.9860, 40.7480, -73.9690, 40.7690), (-74.0200, 40.7050, -74.0000, 40.7160)]  # Midtown, the Financial District
+BOXES = [(-73.9860, 40.7480, -73.9690, 40.7690), (-74.0200, 40.7050, -74.0000, 40.7160), (-74.0080, 40.7530, -73.9990, 40.7610)]  # Midtown, the Financial District, the Javits Center
 # the towers to build, with the colour of the glass/stone: name -> (rgb, min share of the official height the tallest part must reach)
 TOWERS = {
     'One Vanderbilt': (176, 190, 202), 'Central Park Tower': (178, 192, 200), '111 West 57th Street': (196, 202, 206),
@@ -38,7 +38,10 @@ OUTLINE = {'53 West 53rd': [[-73.977804, 40.761918], [-73.977777, 40.761956], [-
 HULL = {'Seagram Building'}
 PRISMS = {'Seagram Building': 157.0, '53 West 53rd': 320.0}
 # open steel crowns above the roof: name -> roof height in metres (posts and rails round the roof's outline, 22 m up)
-FRAMES = {'New York Times Building': 240.0}
+FRAMES = {'New York Times Building': 228.0}
+# landmark buildings built from OpenStreetMap parts (written to data/landmark-meshes.json): name -> (radius m round the landmark's position, tallest
+# part to keep in metres, smallest part in m2, rgb). The survey has Javits as a slab with boxes on top; the parts have its low hall and wing.
+OSM_LANDMARKS = {'Javits Center': (260, 40, 800, (168, 190, 200))}
 # a pitched roof the survey lacks: name -> (official top m, rgb); a pyramid on the tower's top outline
 CAPS = {}  # (the survey's Met Life Tower already has its stepped roof; extract_meshes.py colours it)
 # masts and spires missing from the survey: name -> (top metres, width at the foot in metres, rgb); stood on the tower's roof
@@ -202,33 +205,43 @@ def main():
             a, b = n0 + k, n0 + (k + 1) % 4
             i += [a, b, b + 4, a, b + 4, a + 4]
         i += [n0 + 4, n0 + 5, n0 + 6, n0 + 4, n0 + 6, n0 + 7]
+    def prism(p, c, i, quad, z0, z1, rgb):
+        """A column on a four-cornered outline (cyclic), from z0 to z1."""
+        n0 = len(p)
+        for z in (z0, z1):
+            for x, y in quad:
+                p.append([round(x), round(y), z]); c.append(list(rgb))
+        for k in range(4):
+            a, b = n0 + k, n0 + (k + 1) % 4
+            i += [a, b, b + 4, a, b + 4, a + 4]
+        i += [n0 + 4, n0 + 5, n0 + 6, n0 + 4, n0 + 6, n0 + 7]
+    def beam(p, c, i, A, B, z0, z1, w, rgb):
+        dx, dy = B[0] - A[0], B[1] - A[1]
+        L = math.hypot(dx, dy) or 1
+        nx, ny = -dy / L * w / 2, dx / L * w / 2
+        prism(p, c, i, [(A[0] - nx, A[1] - ny), (B[0] - nx, B[1] - ny), (B[0] + nx, B[1] + ny), (A[0] + nx, A[1] + ny)], z0, z1, rgb)
     for name, roof in FRAMES.items():
         t = byname.get(name)
         if not t or t.get('frame'):
             continue
         p, c, i = decode(t)
-        band = [q for q in p if roof * 10 - 150 <= q[2] <= roof * 10]
-        x0, x1 = min(q[0] for q in band), max(q[0] for q in band)
-        y0, y1 = min(q[1] for q in band), max(q[1] for q in band)
+        # the roof's outline: the vertices at the roof's height, as the smallest rotated rectangle (the building stands on the street grid, not on east-north)
+        band = [(q[0], q[1]) for q in p if abs(q[2] - roof * 10) <= 10]
+        corners = list(MultiPoint(band).minimum_rotated_rectangle.exterior.coords)[:4]
         z0, z1 = round(roof * 10), round(roof * 10 + 220)
         rgb = (214, 219, 224)
-        step_ = 36
-        xs = list(range(x0, x1 + 1, step_)) + [x1]
-        ys = list(range(y0, y1 + 1, step_)) + [y1]
-        for x in xs:
-            for y in (y0, y1):
-                box(p, c, i, x - 3, y - 3, z0, x + 3, y + 3, z1, rgb)
-        for y in ys[1:-1]:
-            for x in (x0, x1):
-                box(p, c, i, x - 3, y - 3, z0, x + 3, y + 3, z1, rgb)
-        for z in (z0 + 70, z0 + 140, z1 - 4):
-            box(p, c, i, x0 - 2, y0 - 2, z, x1 + 2, y0 + 2, z + 4, rgb)
-            box(p, c, i, x0 - 2, y1 - 2, z, x1 + 2, y1 + 2, z + 4, rgb)
-            box(p, c, i, x0 - 2, y0 - 2, z, x0 + 2, y1 + 2, z + 4, rgb)
-            box(p, c, i, x1 - 2, y0 - 2, z, x1 + 2, y1 + 2, z + 4, rgb)
+        for k in range(4):
+            A, B = corners[k], corners[(k + 1) % 4]
+            L = math.hypot(B[0] - A[0], B[1] - A[1])
+            n = max(2, round(L / 36))
+            for m in range(n + 1):                 # the posts, every 3.6 m along each side
+                f = m / n
+                beam(p, c, i, (A[0] + (B[0] - A[0]) * f, A[1] + (B[1] - A[1]) * f), (A[0] + (B[0] - A[0]) * f + 1, A[1] + (B[1] - A[1]) * f), z0, z1, 6, rgb)
+            for z in (z0 + 70, z0 + 140, z1 - 4):   # the rails
+                beam(p, c, i, A, B, z, z + 4, 4, rgb)
         encode(t, p, c, i)
         t['frame'] = 1
-        print(f'  {name}: steel crown on {(x1 - x0) / 10:.0f} x {(y1 - y0) / 10:.0f} m roof')
+        print(f'  {name}: steel crown on the roof at {roof} m')
     for name, (top, rgb) in CAPS.items():
         t = byname.get(name)
         if not t or t.get('cap'):
@@ -284,6 +297,41 @@ def main():
         t['mast'] = 1
         print(f'  {name}: mast to {top} m')
     json.dump({'v': 2, 't': list(byname.values())}, open(dst, 'w'), separators=(',', ':'))
+    lmdst = os.path.join(ROOT, 'data/landmark-meshes.json')
+    lmold = json.load(open(lmdst)) if os.path.exists(lmdst) else {'v': 2, 't': []}
+    lmby = {t['n']: t for t in lmold['t']}
+    for name, (radius, maxtop, minarea, rgb) in OSM_LANDMARKS.items():
+        lon0, lat0 = sky[name]['p']
+        kx, ky = 111320 * math.cos(math.radians(lat0)), 110574
+        items = [(g, a, b) for g, a, b in parts if g.geom_type == 'Polygon' and b <= maxtop and g.area * kx * ky >= minarea
+                 and math.hypot((g.centroid.x - lon0) * kx, (g.centroid.y - lat0) * ky) < radius]
+        if not items:
+            print(' ', name, 'no parts'); continue
+        cen = unary_union([g for g, a, b in items]).centroid
+        cx, cy = cen.x, cen.y
+        verts, cols, idx, key = [], [], [], {}
+        def vid(x, y, z):
+            q = (round((x - cx) * kx * 10), round((y - cy) * ky * 10), round(z * 10))
+            if q not in key:
+                key[q] = len(verts); verts.append(q); cols.append(rgb)
+            return key[q]
+        for g, z0, z1 in items:
+            ring = list(g.exterior.coords)[:-1]
+            for k in range(len(ring)):
+                (x0, y0), (x1, y1) = ring[k], ring[(k + 1) % len(ring)]
+                a, b, c_, d = vid(x0, y0, z0), vid(x1, y1, z0), vid(x1, y1, z1), vid(x0, y0, z1)
+                if len({a, b, c_}) == 3: idx += [a, b, c_]
+                if len({a, c_, d}) == 3: idx += [a, c_, d]
+            for t in earclip([((x - cx) * kx, (y - cy) * ky) for x, y in ring]):
+                tri = [vid(ring[k][0], ring[k][1], z1) for k in t]
+                if len(set(tri)) == 3: idx += tri
+        hull = unary_union([g for g, a, b in items]).convex_hull.simplify(2.0 / kx)
+        fpr = list(hull.exterior.coords)[:-1]
+        lmby[name] = {'fp': [int(round(v)) for q in fpr for v in ((q[0] - cx) * kx * 10, (q[1] - cy) * ky * 10)], 'n': name, 'lon': round(cx, 6), 'lat': round(cy, 6),
+                      'h': round(max(b for g, a, b in items), 1), 'tris': len(idx) // 3, 'p': base64.b64encode(np.array(verts, np.int16).reshape(-1).tobytes()).decode(),
+                      'c': base64.b64encode(np.array(cols, np.uint8).reshape(-1).tobytes()).decode(), 'i': base64.b64encode(np.array(idx, np.uint16).tobytes()).decode(), 'src': 'osm'}
+        print(f'  {name}: {len(items)} parts, {len(idx) // 3} triangles, top {lmby[name]["h"]} m')
+    json.dump({'v': 2, 't': list(lmby.values())}, open(lmdst, 'w'), separators=(',', ':'))
     print(len(byname), 'towers ->', dst, os.path.getsize(dst) // 1024, 'KB')
 
 
