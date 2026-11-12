@@ -16,6 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # looks like): the Chrysler Building's survey has the right place and height (328 m) but a bare 5 m needle where its crown is.
 NOT_THE_SHAPE = []
 CHRYSLER = (-73.97535, 40.75166)  # built by hand from the survey (see chrysler() below)
+HEARST = (-73.98301, 40.76711)  # the NW corner of 8th Ave and 57th St (see hearst() below)
 
 
 def chrysler(b):
@@ -59,6 +60,27 @@ def chrysler(b):
     return rec
 
 
+def hearst(b):
+    """Hearst Tower. The survey has its place and height (about 191 m with the roof gear; the tower is 182 m) and the 1928
+    stone base (a 41 x 40 m block, 24 m high) and the lower shaft right, but steps the shaft in at 93 m and again near the
+    top, which the real tower doesn't do (a flat-topped glass prism with notched corners, the same width all the way up). So:
+    the base in stone, the survey's shaft outline carried straight up to the roof in glass, and a small roof stage."""
+    base = next(s for s in b['slabs'] if s[0] == 0 and len(s[2]) >= 3)
+    shaft = max((s for s in b['slabs'] if 20 < s[0] < 30 and len(s[2]) >= 12), key=lambda s: len(s[2]))
+    top = 182.0
+    def scaled(ring, k):
+        cx = sum(p[0] for p in ring) / len(ring); cy = sum(p[1] for p in ring) / len(ring)
+        return [[round(cx + (x - cx) * k, 1), round(cy + (y - cy) * k, 1)] for x, y in ring]
+    rec = dict(b)
+    rec['h'] = 186.0
+    rec['slabs'] = [
+        [0.0, round(base[1], 1), base[2], '#cdbfa5'],
+        [round(base[1], 1), top, shaft[2], '#7f95a6'],
+        [top, 186.0, scaled(shaft[2], 0.55), '#aab4bd'],
+    ]
+    return rec
+
+
 def covered(slabs, height):
     ok = 0
     for k in range(50):
@@ -75,6 +97,9 @@ def main():
     for f in sorted(glob.glob(os.path.join(src, 'MN*.json'))):
         for b in json.load(open(f)):
             if b['h'] < min_h or len(b['slabs']) < 3:  # (a plain box needs no model: the footprint data draws it)
+                continue
+            if math.hypot((b['lon'] - HEARST[0]) * 84200, (b['lat'] - HEARST[1]) * 111000) < 25:
+                allb.append(hearst(b))
                 continue
             if math.hypot((b['lon'] - CHRYSLER[0]) * 84200, (b['lat'] - CHRYSLER[1]) * 111000) < 40:
                 b = chrysler(b)
@@ -95,7 +120,7 @@ def main():
     keep.sort(key=lambda b: -b['h'])
     t = []
     for b in keep:
-        slabs = [[s[0], s[1], [round(v * 10) for xy in s[2] for v in xy]] for s in b['slabs']]
+        slabs = [[s[0], s[1], [round(v * 10) for xy in s[2] for v in xy]] + (list(s[3:4]) if len(s) > 3 else []) for s in b['slabs']]
         t.append([b['lon'], b['lat'], round(b['h']), slabs])
     path = os.path.join(ROOT, 'data/towers.json')
     json.dump({'v': 1, 't': t}, open(path, 'w'), separators=(',', ':'))

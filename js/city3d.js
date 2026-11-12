@@ -123,12 +123,12 @@ export function applySurveyTowers(feats, towers) {
     if (best >= 0) drop.add(best);
     pieces.forEach((i) => drop.add(i));
     const kx = 1 / 84200, ky = 1 / 111000;
-    for (const [b, t, flat] of slabs) {
+    for (const [b, t, flat, slabColor] of slabs) {
       const ring = [];
       for (let k = 0; k < flat.length; k += 2) ring.push([lon + (flat[k] / 10) * kx, lat + (flat[k + 1] / 10) * ky]);
       ring.push(ring[0]);
       const shade = Math.min(1, t / H);
-      add.push({ type: 'Feature', properties: { h: t, b, c: color || (shade > 0.8 ? '#e6dfce' : '#d8d0be') }, geometry: { type: 'Polygon', coordinates: [ring] } });
+      add.push({ type: 'Feature', properties: { h: t, b, c: slabColor || color || (shade > 0.8 ? '#e6dfce' : '#d8d0be') }, geometry: { type: 'Polygon', coordinates: [ring] } });
     }
   }
   return feats.filter((_, i) => !drop.has(i)).concat(add);
