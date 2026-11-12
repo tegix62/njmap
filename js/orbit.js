@@ -79,6 +79,16 @@ export function initOrbit(ctx) {
   const meshes = createMeshLayer(map); // the towers the survey has as real triangle meshes
   const canMesh = (() => { try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; } })();
   let hiddenSymbols = [];
+  // The township flash: during the wide orienting view of a long swing, the town the target is in is outlined and named for a moment
+  // (the same outline and label layers the Manhattan game uses for the neighbourhood), then cleared as the camera drops in.
+  let flashed = false;
+  function flashTown(t, on) {
+    const src = map.getSource('orb-hood');
+    if (!src) return;
+    const m = on && ctx.locate ? ctx.locate(t.p) : null;
+    src.setData({ type: 'FeatureCollection', features: m ? [{ type: 'Feature', properties: {}, geometry: m.geom }, { type: 'Feature', properties: { name: m.mapLabel || m.full || m.n }, geometry: { type: 'Point', coordinates: m.pt } }] : [] });
+    flashed = !!m;
+  }
   let arcRaf = 0;                                                  // the climbing swing between far-apart targets (region games)
   let spinOn = ctx.store.get('orbit.spin', true); // the camera circles by itself (off: it holds still and you turn it)
   let drag = null; // a finger or mouse turning the view
@@ -495,11 +505,13 @@ export function initOrbit(ctx) {
         } else if ((tau -= seg[1]) < seg[2]) {                                      // drop to the orienting view
           const e = ease(tau / seg[2]);
           st.c = cam.center; st.z = lerp(zTop, zOri, e); st.b = b0 + dB0; st.p = lerp(pTop, pOri, e);
-        } else if ((tau -= seg[2]) < seg[3]) {                                      // hold: look
+        } else if ((tau -= seg[2]) < seg[3]) {                                      // hold: look (and flash the town)
+          if (!flashed) flashTown(t, true);
           st.c = cam.center; st.z = zOri + 0.15 * (tau / seg[3]); st.b = b0 + dB0; st.p = pOri;
         } else {                                                                    // settle into the orbit
           tau -= seg[3];
           const e = ease(Math.min(1, tau / seg[4]));
+          if (flashed && tau > seg[4] * 0.35) flashTown(t, false);                     // (gone a third of the way down)
           st.c = cam.center; st.z = lerp(zOri + 0.15, cam.zoom, e); st.b = b0 + dB0 + dB1 * e; st.p = lerp(pOri, cam.pitch, e); st.pad = e;
         }
         map.jumpTo({
@@ -507,7 +519,7 @@ export function initOrbit(ctx) {
           padding: { top: lerp(pd0.top, cam.padding.top, st.pad), bottom: lerp(pd0.bottom, cam.padding.bottom, st.pad), left: 0, right: 0 },
         });
         if (now - t0 < total) arcRaf = requestAnimationFrame(step);
-        else go();
+        else { if (flashed) flashTown(t, false); go(); }
       };
       arcRaf = requestAnimationFrame(step);
       return;
@@ -549,6 +561,7 @@ export function initOrbit(ctx) {
   function stop() {
     cancelAnimationFrame(raf);
     cancelAnimationFrame(arcRaf);
+    if (flashed) flashTown(null, false);
     if (!run) return;
     run = null;
     q = null;
