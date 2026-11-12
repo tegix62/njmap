@@ -78,7 +78,7 @@ export function initPractice(ctx) {
   const cfg = { type: R.gridAngle ? 'gridmid' : 'today', area: R.wellKnown ? 'known' : 'all', ...store.get(CFG_KEY, {}) };
   const SC = R.gridAngle ? 0.12 : 1; // Manhattan distances are short
   if (R.orbit) {   // a region with its own "Name that ..." game (New Jersey's landmarks)
-    TYPES.orbit = `🏙 ${R.orbit.title} (new)`;
+    TYPES.orbit = `${R.orbit.icon || '🏙'} ${R.orbit.title} (new)`;
     DESC.orbit = R.orbit.desc;
   }
   const allowed = ['today', 'mix', 'rapid', ...(R.gridAngle ? ['gridmid', 'gridup', 'gridgame', 'gridclassic', 'orbit'] : R.orbit ? ['orbit'] : []), 'frames', ...R.quizTypes, 'trip'];

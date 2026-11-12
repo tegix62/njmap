@@ -69,6 +69,8 @@ export function initOrbit(ctx) {
   const { map } = ctx;
   const cfg = ctx.region.orbit || null;                        // a region with its own landmark game (New Jersey), else Manhattan's towers
   const TITLE = cfg ? cfg.title : 'Name that tower';
+  const ICON = cfg && cfg.icon ? cfg.icon : '🏙';
+  const NOUN = { mountain: 'mountain or ridge', lake: 'lake or reservoir', river: 'river', park: 'park or forest', landmark: 'landmark' };
   let run = null; // the session
   let q = null; // the question
   let raf = 0;
@@ -151,7 +153,7 @@ export function initOrbit(ctx) {
       map.addLayer({ id: 'orb-' + k, type: 'fill', source: 'orb-ground', filter: ['==', ['get', 'k'], k], layout: { visibility: 'none' }, paint: GROUND_PAINT[k] }, before);
     map.addSource('orb-city', { type: 'geojson', generateId: true, data: { type: 'FeatureCollection', features: city.feats } });
     if (cfg && !map.getSource('orb-dem')) {                      // real relief: AWS terrain tiles (public elevation data), shaded
-      map.addSource('orb-dem', { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 14, attribution: 'Terrain: AWS Terrain Tiles (USGS 3DEP, SRTM and others)' });
+      map.addSource('orb-dem', { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 11, attribution: 'Terrain: AWS Terrain Tiles (USGS 3DEP, SRTM and others)' });
       map.addLayer({ id: 'orb-relief', type: 'hillshade', source: 'orb-dem', layout: { visibility: 'none' }, paint: { 'hillshade-exaggeration': 0.55, 'hillshade-shadow-color': '#4d5a52', 'hillshade-highlight-color': '#ffffff', 'hillshade-accent-color': '#6e7d70' } }, first && first.id);
     }
     map.addSource('orb-target', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
@@ -235,15 +237,16 @@ export function initOrbit(ctx) {
       if (run.seen.includes(t.n)) return 0;
       const s = st[t.n] || { r: 0, w: 0 };
       const n = s.r + s.w;
-      return n === 0 ? 3 : 1 + 4 * (s.w / n);
+      return (n === 0 ? 3 : 1 + 4 * (s.w / n)) * (t.kind === 'landmark' ? 0.3 : 1);   // (a building landmark comes up now and then)
     });
     let x = Math.random() * w.reduce((a, b) => a + b, 0);
     for (let i = 0; i < w.length; i++) if ((x -= w[i]) <= 0) return city.list[i];
     return city.list.find((t) => !run.seen.includes(t.n)) || rand(city.list);
   }
   function choicesFor(t) {
-    const others = city.list.filter((o) => o.n !== t.n && (o.k || 't') === (t.k || 't')); // (landmarks against landmarks, towers against towers)
-    const near = shuffle(others.filter((o) => Math.abs(o.h - t.h) / t.h < 0.3));
+    const same = (o) => (cfg ? o.kind === t.kind : (o.k || 't') === (t.k || 't'));   // (mountains against mountains, lakes against lakes; landmarks against landmarks, towers against towers)
+    const others = city.list.filter((o) => o.n !== t.n && same(o));
+    const near = shuffle(others.filter((o) => (t.h ? Math.abs(o.h - t.h) / t.h < 0.3 : mDist(o.p, t.p) < 60000)));   // (the near ones: of a similar height, or within 60 km)
     const far = shuffle(others);
     const out = [];
     for (const o of [...near.slice(0, 2), ...far]) if (out.length < 3 && !out.includes(o)) out.push(o);
@@ -339,6 +342,14 @@ export function initOrbit(ctx) {
 
   /** Make this tower the solid one: everything standing within 60 m that is part of it, the rest left as the ghost. */
   function focus(t) {
+    if (t.k === 'nat') {                                  // nothing to stand up: clear what the last landmark left
+      for (const o of occl) map.setFeatureState({ source: 'orb-city', id: o.id }, { low: false });
+      occl = [];
+      const none = { type: 'FeatureCollection', features: [] };
+      for (const s of ['orb-target', 'orb-lab', 'orb-lm', 'orb-hood', 'orb-wall']) if (map.getSource(s)) map.getSource(s).setData(none);
+      q.hood = null;
+      return;
+    }
     const p = t.p;
     const ids = [], mine = [];
     // the building itself: the nearest one of about the right height (not its neighbours, even tall ones)
@@ -411,11 +422,15 @@ export function initOrbit(ctx) {
     if (t.w) zoom = Math.min(zoom, Math.max(14.2, Math.log2((0.8 * (map.getContainer().clientWidth || 400) * mpp0) / (t.w * 1.45))));
     const pxTall = (1.15 * sinP * hh * Math.pow(2, zoom)) / mpp0;
     const baseY = pad.top + free / 2 + pxTall / 2;
-    const top = Math.max(pad.top, 2 * baseY - (winH - pad.bottom));
+    let top = Math.max(pad.top, 2 * baseY - (winH - pad.bottom));
     let bearing = spin0;
     let last = performance.now();
     let lastOcc = 0;
-    const cam = { center: t.p, zoom, pitch: PITCH, bearing, padding: { top, bottom: pad.bottom, left: 0, right: 0 } };
+    if (t.k === 'nat') {                                  // a mountain, lake, river or park: high and steep over the terrain, centred in the free area
+      zoom = t.z; top = pad.top;
+      if (t.bearing != null) bearing = t.bearing;         // (a river: looking along it)
+    }
+    const cam = { center: t.p, zoom, pitch: t.k === 'nat' ? t.pitch : PITCH, bearing, padding: { top, bottom: pad.bottom, left: 0, right: 0 } };
     const tick = (now) => {
       if (!run || q.t !== t) return;
       const dt = Math.min(0.1, (now - last) / 1000);
@@ -458,8 +473,8 @@ export function initOrbit(ctx) {
       const zFit = Math.log2((0.6 * W * 78271.5 * Math.cos((cam.center[1] * Math.PI) / 180)) / (km * 1000));
       const zTop = Math.max(7.2, Math.min(zFit, z0 - 1, cam.zoom - 1));             // high enough to see both ends
       const zOri = Math.min(cam.zoom - 1.8, 12.4);                                   // the orienting view: regional, terrain readable
-      const f = (ctx.reduceMotion ? 0.5 : 1) * Math.max(0.45, Math.min(1, km / 40)); // short hops are quicker
-      const seg = [800 * f, Math.min(1900, 550 + km * 16) * f, 700 * f, 450 * f, 900 * f]; // rise, cruise, drop, hold, settle (about 4.7 s across the state)
+      const f = (ctx.reduceMotion ? 0.5 : 1) * Math.max(0.5, Math.min(1, km / 30)); // short hops are quicker
+      const seg = [500 * f, Math.min(1150, 380 + km * 9) * f, 400 * f, 250 * f, 600 * f]; // rise, cruise, drop, hold, settle (about 2.9 s across the state)
       const total = seg.reduce((x, y) => x + y, 0);
       const ease = (x) => x * x * (3 - 2 * x);
       const dB0 = ((((0 - b0) % 360) + 540) % 360) - 180;                          // to north-up
@@ -510,11 +525,11 @@ export function initOrbit(ctx) {
     ctx.clearHighlights();
     ctx.reveal([]);
     ctx.line(null);
-    ctx.hud(`<div class="qkind">🏙 ${TITLE}</div><div class="q">Loading the ${cfg ? 'map' : 'skyline'}…</div>`);
+    ctx.hud(`<div class="qkind">${ICON} ${TITLE}</div><div class="q">Loading the ${cfg ? 'map' : 'skyline'}…</div>`);
     try {
       await load();
     } catch {
-      if (run) ctx.hud(`<div class="qkind">🏙 ${TITLE}</div><div class="q">Couldn’t load the buildings.</div>`);
+      if (run) ctx.hud(`<div class="qkind">${ICON} ${TITLE}</div><div class="q">Couldn’t load the buildings.</div>`);
       return;
     }
     if (!run) return;
@@ -573,9 +588,9 @@ export function initOrbit(ctx) {
     camera(t, Math.random() * 360, first);
   }
   const HINTS = [
-    (t) => (t.k === 'lm' ? `Opened in <b>${t.y}</b>.` : `<b>${t.h} m</b> (${ft(t.h)} ft), finished in <b>${t.y}</b>.`),
-    (t) => (cfg ? `It's in <b>${esc(t.at)}</b>.` : `You'd find it at <b>${esc(t.at)}</b>.`),
-    (t) => `${esc(t.line)}.`,
+    (t) => (t.k === 'nat' ? `It's in <b>${esc(t.c)} County</b>.` : t.k === 'lm' ? `Opened in <b>${t.y}</b>.` : `<b>${t.h} m</b> (${ft(t.h)} ft), finished in <b>${t.y}</b>.`),
+    (t) => (t.k === 'nat' ? `Near <b>${esc(t.at)}</b>.` : cfg ? `It's in <b>${esc(t.at)}</b>.` : `You'd find it at <b>${esc(t.at)}</b>.`),
+    (t) => (t.k === 'nat' ? `${t.elev ? `<b>${t.elev.toLocaleString()} ft</b>. ` : ''}${esc(t.line)}.` : `${esc(t.line)}.`),
   ];
   function hint() {
     if (!q || q.done || q.hints >= HINTS.length) return;
@@ -613,7 +628,7 @@ export function initOrbit(ctx) {
     return `<div class="fb ${q.ok ? 'ok' : 'no'} orb-reveal">
       ${pic ? `<img class="orb-thumb" src="${esc(pic.img)}" alt="Photo of ${esc(t.n)}: tap to enlarge" data-n="${esc(t.n)}" tabindex="0" />` : ''}
       <div><b>${q.ok ? '✓' : '✗'} ${esc(t.n)}</b> <span class="muted">${q.ok ? `+${q.pts}` : ''}</span><br>
-      ${esc(t.line)}.<br><span class="muted">${t.k === 'lm' ? '' : `${t.h} m (${ft(t.h)} ft) · `}${t.y} · ${esc(t.at)}</span></div>
+      ${esc(t.line)}.<br><span class="muted">${t.k === 'nat' ? `${t.elev ? `${t.elev.toLocaleString()} ft · ` : ''}${esc(t.at)}, ${esc(t.c)} County` : `${t.k === 'lm' ? '' : `${t.h} m (${ft(t.h)} ft) · `}${t.y} · ${esc(t.at)}`}</span></div>
     </div>`;
   }
   /** The photo large, over everything, with its credit; a tap anywhere (or Escape) closes it. */
@@ -645,7 +660,7 @@ export function initOrbit(ctx) {
     if (!run || run.loading) return;
     if (run.done) {
       const best = run.pts + '/' + ROUND * 3;
-      ctx.hud(`<div class="qkind">🏙 ${TITLE}</div><div class="q">Round done: <b>${best}</b></div>`);
+      ctx.hud(`<div class="qkind">${ICON} ${TITLE}</div><div class="q">Round done: <b>${best}</b></div>`);
       ctx.sheet(`${run.opts.header()}<div id="qbody">
         <div class="score">${run.right}/${ROUND} named · ${run.pts} points</div>
         ${run.misses.length ? `<div class="fb no">To look at again: ${run.misses.map(esc).join(', ')}</div>` : '<div class="fb ok">Every one named.</div>'}
@@ -655,8 +670,8 @@ export function initOrbit(ctx) {
       return;
     }
     const hints = HINTS.slice(0, q.hints).map((h) => `<div class="orb-hint">${h(q.t)}</div>`).join('');
-    const where = q.hood ? `<div class="orb-where">📍 ${esc(q.hood)}</div>` : '';
-    ctx.hud(`<div class="qkind">🏙 ${TITLE} · ${run.n + (q.done ? 0 : 1)}/${ROUND}</div><div class="q">${q.done ? (q.ok ? 'Yes.' : 'Not quite.') : q.flying ? 'Swinging over…' : (q.t.k === 'lm' ? 'Which landmark is this?' : 'Which tower is this?')}</div>${q.flying ? '' : where}${q.flying ? '' : hints}`);
+    const where = q.hood && q.t.k !== 'nat' ? `<div class="orb-where">📍 ${esc(q.hood)}</div>` : '';
+    ctx.hud(`<div class="qkind">${ICON} ${TITLE} · ${run.n + (q.done ? 0 : 1)}/${ROUND}</div><div class="q">${q.done ? (q.ok ? 'Yes.' : 'Not quite.') : q.flying ? 'Swinging over…' : (cfg ? `Which ${NOUN[q.t.kind] || 'place'} is this?` : q.t.k === 'lm' ? 'Which landmark is this?' : 'Which tower is this?')}</div>${q.flying ? '' : where}${q.flying ? '' : hints}`);
     const btn = (c) => {
       const cls = q.done ? (c.n === q.t.n ? ' right' : c.n === q.picked ? ' wrong' : '') : '';
       return `<button class="orb-choice${cls}" data-n="${esc(c.n)}"${q.done || q.flying ? ' disabled' : ''}>${esc(c.n)}</button>`;
@@ -664,7 +679,7 @@ export function initOrbit(ctx) {
     ctx.sheet(`${run.opts.header()}<div id="qbody">
       <div class="score"><button type="button" id="orbSpin" class="orb-mini" aria-pressed="${spinOn}">${spinOn ? '↻ Orbiting' : '✋ Drag to turn'}</button> ${run.pts} points${run.streak >= 3 ? ` · 🔥 ${run.streak}` : ''}</div>
       <div class="orb-choices">${q.choices.map(btn).join('')}</div>
-      ${q.done ? `${reveal()}<button class="primary" id="orbNext">${run.n >= ROUND ? 'Finish' : q.t.k === 'lm' ? 'Next' : 'Next tower'}</button>` : `<button id="orbHint"${q.hints >= HINTS.length || q.flying ? ' disabled' : ''}>💡 Hint (−1 point)</button>`}
+      ${q.done ? `${reveal()}<button class="primary" id="orbNext">${run.n >= ROUND ? 'Finish' : cfg || q.t.k === 'lm' ? 'Next' : 'Next tower'}</button>` : `<button id="orbHint"${q.hints >= HINTS.length || q.flying ? ' disabled' : ''}>💡 Hint (−1 point)</button>`}
     </div>`);
     run.opts.bindHeader();
     for (const b of document.querySelectorAll('.orb-choice')) b.addEventListener('click', () => answer(b.dataset.n));
