@@ -25,16 +25,27 @@ in vec3 v_col;
 in vec3 v_pos;
 uniform float u_alpha;
 uniform float u_mute;
+uniform vec3 u_pat; // wall pattern: x kind (0 none, 1 diagrid), y metres across, z metres up
 out vec4 o;
 void main() {
   vec3 n = normalize(cross(dFdx(v_pos), dFdy(v_pos)));
   float l = 0.5 + 0.5 * abs(dot(n, normalize(vec3(-0.45, -0.55, 0.7)))); // flat shading, brighter on roofs and the sunny sides
   l *= 0.82 + 0.18 * clamp(v_pos.z / 300.0, 0.0, 1.0);                   // a little lighter towards the top
   vec3 c = v_col * l;
+  if (u_pat.x > 0.5 && abs(n.z) < 0.5 && v_pos.z > 32.0) {       // the diagonal frame of a facade (Hearst Tower), on walls above the base
+    vec2 t = normalize(vec2(-n.y, n.x));
+    float u = dot(v_pos.xy, t) / u_pat.y, v = v_pos.z / u_pat.z;
+    float d = min(0.5 - abs(fract(u + v) - 0.5), 0.5 - abs(fract(u - v) - 0.5)); // distance to the nearest diagonal, 0 on it
+    float w = 0.05 + 0.5 * fwidth(u + v);
+    c = mix(c, vec3(0.80, 0.84, 0.88) * l, 0.6 * (1.0 - smoothstep(w, w + 0.04, d)));
+  }
   c = mix(c, vec3(0.66, 0.71, 0.76) * l, u_mute);
   o = vec4(c, u_alpha);
 }`;
 
+// facades drawn with a pattern in the shader (no geometry for it in the survey): name -> [kind, metres across, metres up]
+const PATTERN = { 'Hearst Tower': [1, 11, 16.5] };
+const NOPAT = [0, 1, 1];
 const b64 = (s) => {
   const bin = atob(s);
   const a = new Uint8Array(bin.length);
@@ -95,7 +106,7 @@ export function createMeshLayer(map) {
       loc = {
         pos: gl.getAttribLocation(prog, 'a_pos'), col: gl.getAttribLocation(prog, 'a_col'),
         matrix: gl.getUniformLocation(prog, 'u_matrix'), sq: gl.getUniformLocation(prog, 'u_sq'),
-        alpha: gl.getUniformLocation(prog, 'u_alpha'), mute: gl.getUniformLocation(prog, 'u_mute'),
+        pat: gl.getUniformLocation(prog, 'u_pat'), alpha: gl.getUniformLocation(prog, 'u_alpha'), mute: gl.getUniformLocation(prog, 'u_mute'),
       };
       api.ok = true;
       for (const t of api.towers) upload(t);
@@ -117,6 +128,7 @@ export function createMeshLayer(map) {
         const s = mc.s;
         const model = new Float64Array([s, 0, 0, 0, 0, -s, 0, 0, 0, 0, s, 0, mc.x, mc.y, mc.z, 1]);
         gl.uniformMatrix4fv(loc.matrix, false, new Float32Array(mul(main, model)));
+        gl.uniform3fv(loc.pat, PATTERN[t.n] || NOPAT);
         gl.uniform1f(loc.alpha, t.alpha);
         gl.uniform1f(loc.mute, t.mute);
         gl.depthMask(t.alpha >= 1);

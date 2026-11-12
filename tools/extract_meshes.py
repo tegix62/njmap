@@ -161,16 +161,18 @@ def main():
             cx, cy = fp.centroid.coords[0]
             lon, lat = to_ll.transform(cx, cy)
             verts, vcol, idx, key = [], [], [], {}
-            def vid(p):
+            def vid(p, col):
                 q = (round((p[0] - cx) * FT * 10), round((p[1] - cy) * FT * 10), round((p[2] - z0) * FT * 10))
-                if q not in key:
-                    key[q] = len(verts)
+                k = q + col                      # a vertex is shared only by faces of one colour: no fade along a tall wall
+                if k not in key:
+                    key[k] = len(verts)
                     verts.append(q)
-                    vcol.append(colour(t['n'], q[2] / 10, h))
-                return key[q]
+                    vcol.append(col)
+                return key[k]
             for pl in mine:
                 for a, b, c in triangulate(pl):
-                    ia, ib, ic = vid(a), vid(b), vid(c)
+                    col = colour(t['n'], ((a[2] + b[2] + c[2]) / 3 - z0) * FT, h)     # by the face's own height
+                    ia, ib, ic = vid(a, col), vid(b, col), vid(c, col)
                     if len({ia, ib, ic}) == 3:
                         idx += [ia, ib, ic]
             if not idx or len(verts) > 65000:

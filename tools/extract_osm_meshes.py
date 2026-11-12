@@ -27,6 +27,9 @@ TOWERS = {
 
 # towers whose parts are constant-width columns but whose real shape tapers: (height where the taper starts, height where it ends,
 # share of the width left at the end); the walls are split every 20 m so they slant smoothly
+# a stone base and a glass shaft: name -> (height of the base, base rgb). Parts above the base start at its roof (the 1928 building's
+# facade is a ring, the tower rises from inside it) and the colour changes at that height with its own vertices (no fade)
+SPLIT = {}  # (none now: the survey's Hearst is better than a base and a plain box)
 TAPER = {'One Vanderbilt': (120, 330, 0.60)}
 # masts and spires missing from the survey: name -> (top metres, width at the foot in metres, rgb); stood on the tower's roof
 MASTS = {'New York Times Building': (319, 2.6, (150, 158, 166))}
@@ -92,20 +95,28 @@ def main():
             print(' ', name, 'parts do not reach its height: skipped'); continue
         core = unary_union(tall).buffer(2.0 / kx)
         mine = [(g, a, b) for g, a, b in near if g.intersects(core)]
+        if name in SPLIT:                        # only what stands on the base: its largest part
+            base = max(near, key=lambda t: t[0].area)[0].buffer(2.0 / kx)
+            mine = [(g, a, b) for g, a, b in near if base.contains(g.representative_point())]
         cen = unary_union([g for g, a, b in mine if b >= 0.3 * s['h']]).centroid
         cx, cy = cen.x, cen.y
         verts, cols, idx, key = [], [], [], {}
         tp = TAPER.get(name)
-        def vid(x, y, z):
+        sp = SPLIT.get(name)
+        def vid(x, y, z, up=None):
             f = 1.0
             if tp:
                 f = 1 - (1 - tp[2]) * min(1, max(0, (z - tp[0]) / (tp[1] - tp[0])))
             q = (round((x - cx) * kx * 10 * f), round((y - cy) * ky * 10 * f), round(z * 10))
+            stone = bool(sp) and (z < sp[0] if up is None else not up)
+            q = q + (stone,)
             if q not in key:
-                key[q] = len(verts); verts.append(q)
-                c = np.array(rgb, float)
+                key[q] = len(verts); verts.append(q[:3])
+                c = np.array(sp[1] if stone else rgb, float)
                 cols.append(tuple(int(v) for v in np.clip(c * (0.93 + 0.07 * min(1, z / s['h'])), 0, 255)))
             return key[q]
+        if sp:                                   # the shaft stands on the base's roof; the base is only the base
+            mine = [(g, sp[0] if z1 > sp[0] + 20 else z0, z1) for g, z0, z1 in mine]
         for g, z0, z1 in mine:
             ring = list(g.exterior.coords)[:-1]
             if len(ring) < 3:
@@ -116,11 +127,12 @@ def main():
                 if tp:
                     zs = sorted({z0, z1, *[z for z in range(0, 600, 20) if z0 < z < z1]})
                 for za, zb in zip(zs, zs[1:]):
-                    a, b, c, d = vid(x0, y0, za), vid(x1, y1, za), vid(x1, y1, zb), vid(x0, y0, zb)
+                    ub = None if not sp else (zb > sp[0] + 0.01 and za >= sp[0] - 0.01)   # a quad is stone below the base's roof, glass above
+                    a, b, c, d = vid(x0, y0, za, ub), vid(x1, y1, za, ub), vid(x1, y1, zb, ub), vid(x0, y0, zb, ub)
                     if len({a, b, c}) == 3: idx += [a, b, c]
                     if len({a, c, d}) == 3: idx += [a, c, d]
             for t in earclip([((x - cx) * kx, (y - cy) * ky) for x, y in ring]):
-                tri = [vid(ring[i][0], ring[i][1], z1) for i in t]
+                tri = [vid(ring[i][0], ring[i][1], z1, (z1 > sp[0] + 0.01) if sp else None) for i in t]
                 if len(set(tri)) == 3: idx += tri
         if len(verts) > 65000:
             print(' ', name, 'too many vertices'); continue
