@@ -14,7 +14,49 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # or roofs the model lacks) and some lose the part that matters. A tower is kept only when slabs cover at least 92% of 50
 # heights between 2% and 80% of its height, and not if it is on this list (checked by eye against what the building really
 # looks like): the Chrysler Building's survey has the right place and height (328 m) but a bare 5 m needle where its crown is.
-NOT_THE_SHAPE = [('Chrysler Building', -73.97535, 40.75166)]
+NOT_THE_SHAPE = []
+CHRYSLER = (-73.97535, 40.75166)  # built by hand from the survey (see chrysler() below)
+
+
+def chrysler(b):
+    """The Chrysler Building. The survey has its base and its shaft (the 113 m to 205 m slab) right but no crown, only a
+    needle, so the base and shaft are kept (the base clipped to within 12 m of the shaft, which drops the low buildings the
+    survey ran into it) and the crown is generated: seven terraced arches of thin rings, the shaft's own rectangle scaled down along a
+    pointed curve (about 84% of the shaft's width at 205 m to a few percent at 282 m), then the needle to the survey's 328 m."""
+    from shapely.geometry import Polygon
+    from shapely import affinity
+    slabs = [(s[0], s[1], Polygon(s[2])) for s in b['slabs'] if len(s[2]) >= 3]
+    shaft = max((s for s in slabs if s[0] >= 100 and s[1] <= 215 and s[1] - s[0] > 60), key=lambda s: s[1] - s[0])
+    sp = shaft[2]
+    near = sp.buffer(12)
+    out = []
+    for lo, hi, p in slabs:
+        if hi > shaft[0] + 0.5:
+            continue
+        q = p.intersection(near)
+        if q.is_empty:
+            continue
+        for g in (q.geoms if q.geom_type == 'MultiPolygon' else [q]):
+            if g.geom_type == 'Polygon' and g.area > 20:
+                out.append((lo, hi, g))
+    out.append(shaft)
+    top = shaft[1]
+    crown_top = 282.0
+    # seven terraced arches, each a little narrower at its top than at its foot, the next set in from the one below
+    ARCHES, RINGS = 7, 3
+    span = (crown_top - top) / ARCHES
+    for a in range(ARCHES):
+        u0 = a / ARCHES
+        k0 = max(0.07, 0.84 * (1 - u0 ** 1.6) ** 0.62)
+        for r in range(RINGS):
+            f = (r + 0.5) / RINGS
+            k = k0 * (1 - 0.17 * f)
+            z0 = top + a * span + r * span / RINGS
+            out.append((z0, z0 + span / RINGS, affinity.scale(sp, k, k, origin=sp.centroid)))
+    out.append((crown_top, b['h'], affinity.scale(sp, 0.05, 0.05, origin=sp.centroid)))
+    rec = dict(b)
+    rec['slabs'] = [[round(lo, 1), round(hi, 1), [[round(x, 1), round(y, 1)] for x, y in list(g.exterior.coords)[:-1]]] for lo, hi, g in out]
+    return rec
 
 
 def covered(slabs, height):
@@ -33,6 +75,10 @@ def main():
     for f in sorted(glob.glob(os.path.join(src, 'MN*.json'))):
         for b in json.load(open(f)):
             if b['h'] < min_h or len(b['slabs']) < 3:  # (a plain box needs no model: the footprint data draws it)
+                continue
+            if math.hypot((b['lon'] - CHRYSLER[0]) * 84200, (b['lat'] - CHRYSLER[1]) * 111000) < 40:
+                b = chrysler(b)
+                allb.append(b)
                 continue
             if covered(b['slabs'], b['h']) < 0.92:
                 dropped.append((round(b['h']), b['lon'], b['lat'], 'holes'))

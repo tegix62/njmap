@@ -9,6 +9,7 @@ const KEY = 'orbit';
 const ROUND = 10;
 const SPIN = 7; // degrees a second: a full turn in under a minute
 const PITCH = 64;
+const GHOST_CAP = 26; // metres: the city around the tower is kept low so nothing stands in front of it
 const AREAS = ['downtown', 'midtown', 'uptown'];
 const ALIAS = { '30 Rockefeller Plaza': 'Rockefeller Center', 'Time Warner Center': 'Columbus Circle' }; // (the landmark photos)
 
@@ -65,7 +66,7 @@ export function initOrbit(ctx) {
     map.addLayer(
       {
         id: 'orb-ghost', type: 'fill-extrusion', source: 'orb-city', layout: { visibility: 'none' },
-        paint: { 'fill-extrusion-color': '#9fb0c0', 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': ['coalesce', ['get', 'b'], 0], 'fill-extrusion-opacity': 0.24, 'fill-extrusion-vertical-gradient': false },
+        paint: { 'fill-extrusion-color': '#9fb0c0', 'fill-extrusion-height': ['min', ['get', 'h'], GHOST_CAP], 'fill-extrusion-base': ['min', ['coalesce', ['get', 'b'], 0], GHOST_CAP], 'fill-extrusion-opacity': 0.3, 'fill-extrusion-vertical-gradient': false },
       },
       before
     );
@@ -115,14 +116,24 @@ export function initOrbit(ctx) {
   function focus(t) {
     const p = t.p;
     const ids = [], mine = [];
+    // the building itself: the nearest one of about the right height (not its neighbours, even tall ones)
+    let main = -1, bd = 48;
     city.feats.forEach((f, i) => {
-      if (mDist(city.cx[i], p) > 60) return;
-      const tall = f.properties.h >= 0.45 * t.h || f.properties.c !== undefined;
-      if (tall) {
-        ids.push(i);
-        mine.push(f);
-      }
+      const d = mDist(city.cx[i], p);
+      if (d < bd && f.properties.h >= 0.7 * t.h * 0.85) { bd = d; main = i; }
     });
+    if (main >= 0) {
+      const mc = city.cx[main];
+      const modelled = city.feats[main].properties.c !== undefined;
+      city.feats.forEach((f, i) => {
+        const d = mDist(city.cx[i], mc);
+        // a surveyed or modelled tower is many pieces: take every piece standing in its place; a plain one is just itself
+        if (i === main || (modelled && f.properties.c !== undefined && d < 38)) {
+          ids.push(i);
+          mine.push(f);
+        }
+      });
+    }
     map.getSource('orb-target').setData({ type: 'FeatureCollection', features: mine });
     map.setFilter('orb-ghost', ['!', ['in', ['id'], ['literal', ids.length ? ids : [-1]]]]);
   }
@@ -130,7 +141,7 @@ export function initOrbit(ctx) {
   function camera(t, spin0) {
     cancelAnimationFrame(raf);
     // zoomed out far enough to see the whole tower; its foot sits in the lower part of the free area, so it rises into the rest
-    const zoom = Math.max(14.6, Math.min(16.6, 16.95 - t.h * 0.0043));
+    const zoom = Math.max(14.6, Math.min(16.9, 17.3 - t.h * 0.0046));
     const pad = ctx.padding();
     const free = Math.max(120, window.innerHeight - pad.top - pad.bottom);
     const top = pad.top + free * 0.34;
