@@ -855,7 +855,7 @@ export function initPractice(ctx) {
     }
     if (cfg.type === 'gridgame' || cfg.type === 'gridmid' || cfg.type === 'gridup' || cfg.type === 'gridclassic' || cfg.type === 'orbit' || cfg.type === 'frames')
       // these have no use for the neighborhood/town list
-      return `${typeBtn()}<div class="score"></div>`;
+      return `${gameBar()}<div class="score"></div>`;
     if (cfg.type === 'rapid' && !rapid.on)
       return `${typeBtn()}<div class="prow">
         <select id="qArea" aria-label="Area">${area}</select>
@@ -871,6 +871,11 @@ export function initPractice(ctx) {
   }
 
   /** The main modes as tiles (New York: Drive Midtown first), and a "More" button for everything else. */
+  /** While a game is running: one line saying which, with the way to another. (The quick tiles come back on the other screens.) */
+  function gameBar() {
+    const name = TYPES[cfg.type] || (TILE_LABEL[cfg.type] ? TILE_LABEL[cfg.type][0] : cfg.type);
+    return `<button id="qType" class="gamebar" aria-haspopup="dialog" aria-label="Change what you practice"><b>${esc(name)}</b><span>change ▾</span></button>`;
+  }
   function typeBtn() {
     const tiles = (R.gridAngle ? ['gridmid', 'today', 'mix'] : ['today', 'mix']).filter((k) => allowed.includes(k));
     const other = !tiles.includes(cfg.type);

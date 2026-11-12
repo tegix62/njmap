@@ -3178,14 +3178,13 @@ body[data-mode='explore'][data-region='manhattan'] .fab3d { display: grid; }
 #orbPhoto img { max-width: 100%; max-height: 72vh; border-radius: 10px; display: block; margin: 0 auto 10px; }
 #orbPhoto a { color: #9fd3ff; }
 
-#sheet #orbNext { position: sticky; bottom: 0; box-shadow: 0 -8px 12px var(--panel); }
 .orb-reveal { font-size: 13px; line-height: 1.35; }
 .orb-reveal img { width: 56px; height: 56px; }
 
 /* shared: a line saying where the thing is, and a two-state toggle chip */
 .where { font-size: 13px; margin-top: 3px; color: var(--good); font-weight: 600; }
-.score.row { display: flex; align-items: center; gap: 6px; }
-.score.row .pts { margin-left: auto; }
+.score.row { display: flex; align-items: center; justify-content: flex-start; gap: 6px; flex-wrap: nowrap; }
+.score.row .chip { flex: none; white-space: nowrap; text-transform: none; letter-spacing: 0; }
 .chip.toggle { padding: 3px 10px; font-size: 12px; }
 .chip.toggle[aria-pressed='false'] { background: var(--accent); color: #fff; }
 body.ink .where { color: #166534; }
@@ -3233,7 +3232,6 @@ body.holo .fb.ok { color: #9dffd2; }
 body.holo .fb.no { color: #ffb4a3; }
 body.holo .fb b, body.holo .q b { color: #fff; }
 body.holo .primary { background: rgba(95, 243, 255, 0.2); color: #fff; border: 1px solid #5ff3ff; border-radius: 2px; text-transform: uppercase; letter-spacing: 0.1em; box-shadow: 0 0 16px rgba(95, 243, 255, 0.3); }
-body.holo #sheet #orbNext { box-shadow: 0 -8px 12px rgba(2, 18, 28, 0.9); }
 
 /* ---- Retro pass (js/retro.js): ordered dither over the picture ---------------------------------------- */
 #retroDither { position: fixed; inset: 0; z-index: 4; pointer-events: none; mix-blend-mode: overlay; }
@@ -3246,11 +3244,11 @@ body.holo #sheet #orbNext { box-shadow: 0 -8px 12px rgba(2, 18, 28, 0.9); }
   font: 700 12px ui-monospace, 'SF Mono', Menlo, Consolas, 'Courier New', monospace; letter-spacing: 0.12em; text-transform: uppercase;
   color: #e8fdff; text-shadow: 1px 0 #02101a, -1px 0 #02101a, 0 1px #02101a, 0 -1px #02101a, 2px 2px 0 #02101a; }
 /* which other pieces get the same hard-edged look at retro strength (headings and the question; answers stay plain) */
-body[data-retro='1'] .qkind, body[data-retro='2'] .qkind,
-body[data-retro='1'] .q, body[data-retro='2'] .q {
+body[data-retro='1']:not(.paper) .qkind, body[data-retro='2']:not(.paper) .qkind,
+body[data-retro='1']:not(.paper) .q, body[data-retro='2']:not(.paper) .q {
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, 'Courier New', monospace; font-weight: 700; letter-spacing: 0.04em;
   text-shadow: 2px 2px 0 rgba(2, 16, 26, 0.9); }
-body[data-retro='2'] .orb-pin span:last-child { font-family: ui-monospace, Menlo, Consolas, monospace !important; text-transform: uppercase; letter-spacing: 0.08em; text-shadow: 1px 1px 0 #02101a !important; }
+body[data-retro='2']:not(.paper) .orb-pin span:last-child { font-family: ui-monospace, Menlo, Consolas, monospace !important; text-transform: uppercase; letter-spacing: 0.08em; text-shadow: 1px 1px 0 #02101a !important; }
 
 /* ---- Paper look (js/paper.js): a printed road map ------------------------------------------------------ */
 #paperFx { position: fixed; inset: 0; z-index: 4; pointer-events: none; overflow: hidden; mix-blend-mode: multiply;
@@ -3286,4 +3284,15 @@ body.paper .fb.ok { color: #1f6a39; }
 body.paper .fb.no { color: #a82d18; }
 body.paper .fb b, body.paper .q b { color: #1d2a5b; }
 body.paper .primary { background: #e8603a; color: #fff; border: 2px solid #1d2a5b; border-radius: 0; text-transform: uppercase; letter-spacing: 0.1em; box-shadow: 3px 3px 0 rgba(29, 42, 91, 0.4); }
-body.paper #sheet #orbNext { box-shadow: 3px 3px 0 rgba(29, 42, 91, 0.4), 0 -8px 12px #f6f1c9; }
+
+/* ---- Less clutter, for every game ----------------------------------------------------------------------- */
+/* a running game shows one line for 'what am I practising', not the row of quick tiles */
+.gamebar { display: flex; align-items: baseline; justify-content: space-between; width: 100%; border: 0; background: transparent; color: inherit; font: inherit; padding: 0 2px 2px; cursor: pointer; }
+.gamebar b { font-size: 13px; }
+.gamebar span { font-size: 12px; opacity: 0.65; }
+/* the Next button stays at the foot of a scrolling sheet, on a solid bar so text never shows through it */
+.stickybar { position: sticky; bottom: -12px; margin: 8px -12px -12px; padding: 8px 12px 12px; background: var(--panel); }
+body.holo #hud, body.holo #sheet { --panel: #05202c; }
+body.holo .gamebar, body.paper .gamebar { text-transform: uppercase; letter-spacing: 0.08em; }
+body.holo .score.row .chip, body.paper .score.row .chip { text-transform: none; letter-spacing: 0; font-size: 12px; padding: 3px 8px; }
+body.paper .px-label { font-family: 'Gill Sans', 'Trebuchet MS', system-ui, sans-serif; color: #1d2a5b; text-shadow: 1px 0 #f6f1c9, -1px 0 #f6f1c9, 0 1px #f6f1c9, 0 -1px #f6f1c9; }
