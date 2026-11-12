@@ -36,6 +36,11 @@ export default {
   superGroups: REGIONS,
   groupTint: THEME.countyKey,
   landmarks: LANDMARKS,
+  // "Name that landmark": the camera circles a New Jersey landmark in a ghost of the buildings round it (js/orbit.js, tools/build_nj_landmarks.py)
+  orbit: {
+    title: 'Name that landmark', noun: 'landmark', list: 'data/nj-landmarks.json', city: 'data/nj-landmark-city.json', credits: 'data/nj-landmark-credits.json',
+    desc: 'The camera circles a New Jersey landmark, alone in a ghost of the buildings round it: which one is it? Ten a round, hints cost a point.',
+  },
   roadNotes: ROAD_NOTES,
   confusables: GROUPS,
   gridAngle: null,

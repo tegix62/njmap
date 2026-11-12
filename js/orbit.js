@@ -67,6 +67,8 @@ function wallFeatures(geom, halfWidthM = 3.5) {
 
 export function initOrbit(ctx) {
   const { map } = ctx;
+  const cfg = ctx.region.orbit || null;                        // a region with its own landmark game (New Jersey), else Manhattan's towers
+  const TITLE = cfg ? cfg.title : 'Name that tower';
   let run = null; // the session
   let q = null; // the question
   let raf = 0;
@@ -89,6 +91,29 @@ export function initOrbit(ctx) {
     if (city) return city;
     if (loading) return loading;
     loading = (async () => {
+      if (cfg) {                                             // the region's own landmarks: one file of buildings, parts and street names
+        const [list, pics, d] = await Promise.all([
+          fetch(cfg.list).then((r) => r.json()),
+          fetch(cfg.credits).then((r) => r.json()).catch(() => ({})),
+          fetch(cfg.city).then((r) => r.json()),
+        ]);
+        const feats = applyParts(buildingFeatures(d, { o: d.o, s: d.s, g: d.g }));
+        const cx = feats.map((f) => {
+          const r = f.geometry.coordinates[0];
+          let x = 0, y = 0;
+          for (const p of r) { x += p[0]; y += p[1]; }
+          return [x / r.length, y / r.length];
+        });
+        const segs = d.segs.map(([nid, ...flat]) => {
+          const pts = [];
+          let x = 0, y = 0;
+          for (let i = 0; i < flat.length; i += 2) { x += flat[i]; y += flat[i + 1]; pts.push([d.o[0] + x / d.s, d.o[1] + y / d.s]); }
+          return { name: d.names[nid], mid: pts[Math.floor(pts.length / 2)], pts };
+        }).filter((s) => s.pts.length > 1);
+        const lms = (ctx.region.landmarks || []).map((l) => ({ n: l.name, p: l.pt }));
+        city = { feats, cx, list, pics, lms, segs, grounds: [] };
+        return city;
+      }
       const [list, pics, lms, towers, ...rest] = await Promise.all([
         fetch('data/skyscrapers.json').then((r) => r.json()),
         fetch('data/landmark-credits.json').then((r) => r.json()).catch(() => ({})),
@@ -292,8 +317,8 @@ export function initOrbit(ctx) {
     map.getSource('orb-lm').setData({ type: 'FeatureCollection', features: lm });
     // the neighbourhood
     const m = ctx.locate ? ctx.locate(p) : null;
-    q.hood = m ? m.n : null;
-    if (m) {
+    q.hood = m ? (cfg ? m.full || m.n : m.n) : null;
+    if (m && !cfg) {
       map.getSource('orb-hood').setData({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: m.geom }, { type: 'Feature', properties: { name: m.mapLabel || m.n }, geometry: { type: 'Point', coordinates: m.pt } }] });
       map.getSource('orb-wall').setData({ type: 'FeatureCollection', features: wallFeatures(m.geom) });
     } else {
@@ -311,7 +336,7 @@ export function initOrbit(ctx) {
     const meshed = meshes.ok && meshes.has(t.n); // drawn as a real mesh: no slab is the target
     if (!meshed) city.feats.forEach((f, i) => {
       const d = mDist(city.cx[i], p);
-      if (d < bd && f.properties.h >= 0.5 * t.h) { bd = d; main = i; }
+      if (cfg ? f.properties.lm === 1 && d < bd : d < bd && f.properties.h >= 0.5 * t.h) { bd = d; main = i; }   // (a region game flags the landmark's own building)
     });
     if (main >= 0) {
       const mc = city.cx[main];
@@ -370,8 +395,10 @@ export function initOrbit(ctx) {
     const free = Math.max(120, winH - pad.top - pad.bottom);
     const mpp0 = 78271.5 * Math.cos((t.p[1] * Math.PI) / 180);
     const sinP = Math.sin((PITCH * Math.PI) / 180);
-    const hh = t.k === 'lm' ? Math.max(t.h, 85) : t.h; // a landmark is low and wide: frame it as if it stood a little taller
-    const zoom = Math.max(14.4, Math.min(16.9, Math.log2((mpp0 * 0.86 * free) / (1.15 * sinP * hh))));
+    const hh = t.k === 'lm' ? Math.max(t.h, cfg ? 40 : 85) : t.h; // a landmark is low: frame it as if it stood a little taller
+    let zoom = Math.max(14.4, Math.min(16.9, Math.log2((mpp0 * 0.86 * free) / (1.15 * sinP * hh))));
+    // a wide one (a stadium, a mall) must fit across the screen too: its width, with a margin for the turn
+    if (t.w) zoom = Math.min(zoom, Math.max(14.2, Math.log2((0.8 * (map.getContainer().clientWidth || 400) * mpp0) / (t.w * 1.45))));
     const pxTall = (1.15 * sinP * hh * Math.pow(2, zoom)) / mpp0;
     const baseY = pad.top + free / 2 + pxTall / 2;
     const top = Math.max(pad.top, 2 * baseY - (winH - pad.bottom));
@@ -422,17 +449,17 @@ export function initOrbit(ctx) {
     ctx.clearHighlights();
     ctx.reveal([]);
     ctx.line(null);
-    ctx.hud('<div class="qkind">🏙 Name that tower</div><div class="q">Loading the skyline…</div>');
+    ctx.hud(`<div class="qkind">🏙 ${TITLE}</div><div class="q">Loading the ${cfg ? 'map' : 'skyline'}…</div>`);
     try {
       await load();
     } catch {
-      if (run) ctx.hud('<div class="qkind">🏙 Name that tower</div><div class="q">Couldn’t load the buildings.</div>');
+      if (run) ctx.hud(`<div class="qkind">🏙 ${TITLE}</div><div class="q">Couldn’t load the buildings.</div>`);
       return;
     }
     if (!run) return;
     run.loading = false;
     layers();
-    if (canMesh) {
+    if (canMesh && !cfg) {
       await meshes.load(map.getStyle().layers.find((l) => l.type === 'symbol')?.id);
       const quiz = new Set(city.list.map((x) => x.n));
       for (const t of meshes.towers) t.hidden = !quiz.has(t.n);
@@ -485,7 +512,7 @@ export function initOrbit(ctx) {
   }
   const HINTS = [
     (t) => (t.k === 'lm' ? `Opened in <b>${t.y}</b>.` : `<b>${t.h} m</b> (${ft(t.h)} ft), finished in <b>${t.y}</b>.`),
-    (t) => `You'd find it at <b>${esc(t.at)}</b>.`,
+    (t) => (cfg ? `It's in <b>${esc(t.at)}</b>.` : `You'd find it at <b>${esc(t.at)}</b>.`),
     (t) => `${esc(t.line)}.`,
   ];
   function hint() {
@@ -556,7 +583,7 @@ export function initOrbit(ctx) {
     if (!run || run.loading) return;
     if (run.done) {
       const best = run.pts + '/' + ROUND * 3;
-      ctx.hud(`<div class="qkind">🏙 Name that tower</div><div class="q">Round done: <b>${best}</b></div>`);
+      ctx.hud(`<div class="qkind">🏙 ${TITLE}</div><div class="q">Round done: <b>${best}</b></div>`);
       ctx.sheet(`${run.opts.header()}<div id="qbody">
         <div class="score">${run.right}/${ROUND} named · ${run.pts} points</div>
         ${run.misses.length ? `<div class="fb no">To look at again: ${run.misses.map(esc).join(', ')}</div>` : '<div class="fb ok">Every one named.</div>'}
@@ -567,7 +594,7 @@ export function initOrbit(ctx) {
     }
     const hints = HINTS.slice(0, q.hints).map((h) => `<div class="orb-hint">${h(q.t)}</div>`).join('');
     const where = q.hood ? `<div class="orb-where">📍 ${esc(q.hood)}</div>` : '';
-    ctx.hud(`<div class="qkind">🏙 Name that tower · ${run.n + (q.done ? 0 : 1)}/${ROUND}</div><div class="q">${q.done ? (q.ok ? 'Yes.' : 'Not quite.') : q.flying ? 'Swinging over…' : (q.t.k === 'lm' ? 'Which landmark is this?' : 'Which tower is this?')}</div>${q.flying ? '' : where}${q.flying ? '' : hints}`);
+    ctx.hud(`<div class="qkind">🏙 ${TITLE} · ${run.n + (q.done ? 0 : 1)}/${ROUND}</div><div class="q">${q.done ? (q.ok ? 'Yes.' : 'Not quite.') : q.flying ? 'Swinging over…' : (q.t.k === 'lm' ? 'Which landmark is this?' : 'Which tower is this?')}</div>${q.flying ? '' : where}${q.flying ? '' : hints}`);
     const btn = (c) => {
       const cls = q.done ? (c.n === q.t.n ? ' right' : c.n === q.picked ? ' wrong' : '') : '';
       return `<button class="orb-choice${cls}" data-n="${esc(c.n)}"${q.done || q.flying ? ' disabled' : ''}>${esc(c.n)}</button>`;

@@ -77,7 +77,11 @@ export function initPractice(ctx) {
   const CFG_KEY = R.id === 'nj' ? 'practice' : `practice.${R.id}`;
   const cfg = { type: R.gridAngle ? 'gridmid' : 'today', area: R.wellKnown ? 'known' : 'all', ...store.get(CFG_KEY, {}) };
   const SC = R.gridAngle ? 0.12 : 1; // Manhattan distances are short
-  const allowed = ['today', 'mix', 'rapid', ...(R.gridAngle ? ['gridmid', 'gridup', 'gridgame', 'gridclassic', 'orbit'] : []), 'frames', ...R.quizTypes, 'trip'];
+  if (R.orbit) {   // a region with its own "Name that ..." game (New Jersey's landmarks)
+    TYPES.orbit = `🏙 ${R.orbit.title} (new)`;
+    DESC.orbit = R.orbit.desc;
+  }
+  const allowed = ['today', 'mix', 'rapid', ...(R.gridAngle ? ['gridmid', 'gridup', 'gridgame', 'gridclassic', 'orbit'] : R.orbit ? ['orbit'] : []), 'frames', ...R.quizTypes, 'trip'];
   if (cfg.type === 'dropin') cfg.type = 'today'; // (the county puzzle is gone)
   if (!allowed.includes(cfg.type)) cfg.type = 'mix';
   // the whole-island game isn't reliable yet: anyone on it moves to the classic once

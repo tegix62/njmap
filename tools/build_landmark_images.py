@@ -71,10 +71,21 @@ def batch(titles, **q):
     r = api(action='query', titles='|'.join(titles), redirects=1, **q)
     return r['query']
 
+NJ_TITLES = {
+    'American Dream': 'American Dream (shopping mall)', 'Red Bull Arena': 'Red Bull Arena (Harrison)', 'Prudential Center': 'Prudential Center',
+    'Newark Penn Station': 'Newark Penn Station', 'Boardwalk Hall': 'Boardwalk Hall', 'Great Auditorium': 'Great Auditorium (Ocean Grove)',
+    'High Point Monument': 'High Point State Park', 'Garden State Plaza': 'Westfield Garden State Plaza', 'New Jersey State House': 'New Jersey State House',
+    'Old Queens': 'Old Queens', 'Nassau Hall': 'Nassau Hall', 'Barnegat Lighthouse': 'Barnegat Lighthouse', 'Hoboken Terminal': 'Hoboken Terminal',
+}
+
+
 def main():
-    lm = json.load(open(os.path.join(ROOT, 'data/landmarks.json')))
+    nj = os.environ.get('NJ')          # NJ=1: the New Jersey landmarks (data/nj-landmarks.json -> data/nj-landmark-credits.json)
+    TITLES.update(NJ_TITLES if nj else {})
+    lm = json.load(open(os.path.join(ROOT, 'data/nj-landmarks.json' if nj else 'data/landmarks.json')))
     skip = set()  # silhouettes get a photo too (tap the callout to see it)
     only = set(sys.argv[1:])  # optional: just these landmarks (the rest of data/landmark-credits.json is kept)
+    lm = [{'n': l['n']} if 'n' in l else {'n': l['name']} for l in lm]
     want = {l['n']: TITLES.get(l['n'], l['n']) for l in lm if l['n'] not in skip and (not only or l['n'] in only)}
     # 1. each article's lead image file (one call)
     q = batch(list(want.values()), prop='pageimages', piprop='name')
@@ -95,7 +106,7 @@ def main():
     redir = {r['from']: r['to'] for r in q.get('redirects', [])}
     norm = {r['from']: r['to'] for r in q.get('normalized', [])}
     info = {pg['title']: (pg.get('imageinfo') or [None])[0] for pg in q['pages']}
-    cp = os.path.join(ROOT, 'data/landmark-credits.json')
+    cp = os.path.join(ROOT, 'data/nj-landmark-credits.json' if nj else 'data/landmark-credits.json')
     credits = json.load(open(cp)) if only and os.path.exists(cp) else {}
     for n, f in files.items():
         t = 'File:' + f
