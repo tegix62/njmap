@@ -42,7 +42,7 @@ def chrysler(b):
                 out.append((lo, hi, g))
     out.append(shaft)
     top = shaft[1]
-    crown_top = 276.0   # where the arches end and the spire starts (the spire's tip is at the official 319 m)
+    crown_top = 286.0   # where the arches end and the spire starts (the spire's tip is at the official 319 m)
     tip = 319.0
     STONE, SILVER, DARK, NEEDLE = '#e6e0d3', '#d6dbe0', '#5f6a74', '#c5cbd0'
     coloured = [(lo, hi, g, STONE) for lo, hi, g in out]
@@ -62,9 +62,18 @@ def chrysler(b):
             pts.append([round(cx + uu[0] * a_ + vv[0] * b_, 1), round(cy + uu[1] * a_ + vv[1] * b_, 1)])
         return Polygon(pts)
     C = crown_top - top
-    def env(z):  # the crown's outline, as a share of the shaft's size: about 78% at the foot, closing like an ogive to ~8%
-        u = max(0.0, min(1.0, (z - top) / C))
-        return 0.78 * (1 - 0.92 * u ** 2.1)
+    # The crown's outline, measured from the survey's own facets (its slices are ragged: at some heights the ring of facets does
+    # not close; where it does it is 30 m wide for the first 30 m of the crown, 22 m at 256 m, 17 m at 265 m, 11 m at 275 m and
+    # 7 m at 283 m), as a share of the shaft's 40 m.
+    ENV = [(top, 0.83), (214.0, 0.80), (236.0, 0.74), (243.0, 0.69), (256.0, 0.55), (265.0, 0.42), (273.0, 0.28), (281.0, 0.18), (crown_top, 0.10)]
+    def env(z):
+        zs = [p[0] for p in ENV]; ws = [p[1] for p in ENV]
+        if z <= zs[0]:
+            return ws[0]
+        for (z0_, w0), (z1_, w1) in zip(ENV, ENV[1:]):
+            if z <= z1_:
+                return w0 + (w1 - w0) * (z - z0_) / (z1_ - z0_)
+        return ws[-1]
     # the dark core
     z = top
     while z < crown_top - 0.01:
