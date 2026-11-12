@@ -3184,6 +3184,53 @@ body[data-mode='explore'][data-region='manhattan'] .fab3d { display: grid; }
 
 /* shared: a line saying where the thing is, and a two-state toggle chip */
 .where { font-size: 13px; margin-top: 3px; color: var(--good); font-weight: 600; }
-.chip.toggle { float: left; margin-right: 10px; padding: 3px 10px; font-size: 12px; }
+.score.row { display: flex; align-items: center; gap: 6px; }
+.score.row .pts { margin-left: auto; }
+.chip.toggle { padding: 3px 10px; font-size: 12px; }
 .chip.toggle[aria-pressed='false'] { background: var(--accent); color: #fff; }
 body.ink .where { color: #166534; }
+
+/* ---- Hologram look (js/holo.js): a dark projection table, thin cyan lines, scan overlay ---------------- */
+#holoFx { position: fixed; inset: 0; z-index: 4; pointer-events: none; overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 45%, rgba(0, 0, 0, 0) 55%, rgba(0, 8, 14, 0.62) 100%),
+    repeating-linear-gradient(to bottom, rgba(120, 240, 255, 0.045) 0 1px, rgba(0, 0, 0, 0) 1px 3px); }
+#holoFx[hidden] { display: none; }
+#holoFx::after { content: ''; position: absolute; left: 0; right: 0; height: 22vh; top: -22vh;
+  background: linear-gradient(to bottom, rgba(95, 243, 255, 0), rgba(95, 243, 255, 0.08) 70%, rgba(95, 243, 255, 0.22) 99%, rgba(95, 243, 255, 0));
+  animation: holosweep 7s linear infinite; }
+@keyframes holosweep { to { transform: translateY(150vh); } }
+@media (prefers-reduced-motion: reduce) { #holoFx::after { animation: none; display: none; } }
+
+body.holo #hud, body.holo #sheet {
+  --panel-ink: #d4fbff; --panel-muted: #78b6c4; --accent: #5ff3ff; --good: #4dffb0; --bad: #ff7a5e; --ink: #d4fbff;
+  background:
+    linear-gradient(#5ff3ff, #5ff3ff) left top / 14px 2px no-repeat, linear-gradient(#5ff3ff, #5ff3ff) left top / 2px 14px no-repeat,
+    linear-gradient(#5ff3ff, #5ff3ff) right top / 14px 2px no-repeat, linear-gradient(#5ff3ff, #5ff3ff) right top / 2px 14px no-repeat,
+    linear-gradient(#5ff3ff, #5ff3ff) left bottom / 14px 2px no-repeat, linear-gradient(#5ff3ff, #5ff3ff) left bottom / 2px 14px no-repeat,
+    linear-gradient(#5ff3ff, #5ff3ff) right bottom / 14px 2px no-repeat, linear-gradient(#5ff3ff, #5ff3ff) right bottom / 2px 14px no-repeat,
+    rgba(2, 18, 28, 0.78);
+  border: 1px solid rgba(95, 243, 255, 0.28); border-radius: 3px;
+  box-shadow: 0 0 22px rgba(60, 220, 255, 0.18), inset 0 0 30px rgba(60, 220, 255, 0.07);
+  -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px);
+  color: var(--panel-ink);
+}
+body.holo .qkind, body.holo .score, body.holo .where, body.holo .hint, body.holo .fb .muted {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; letter-spacing: 0.04em;
+}
+body.holo .qkind { color: #5ff3ff; text-transform: uppercase; }
+body.holo .q { text-shadow: 0 0 12px rgba(95, 243, 255, 0.35); }
+body.holo .where { color: #4dffb0; }
+body.holo .choice, body.holo .chip {
+  background: rgba(60, 220, 255, 0.06); color: var(--panel-ink); border: 1px solid rgba(95, 243, 255, 0.38); border-radius: 2px;
+  text-transform: uppercase; letter-spacing: 0.06em; font-size: 13px;
+}
+body.holo .choice:not(:disabled):active, body.holo .chip:active { background: rgba(95, 243, 255, 0.22); }
+body.holo .choice.right { background: rgba(77, 255, 176, 0.16); border-color: #4dffb0; box-shadow: 0 0 14px rgba(77, 255, 176, 0.35); }
+body.holo .choice.wrong { background: rgba(255, 122, 94, 0.14); border-color: #ff7a5e; box-shadow: 0 0 14px rgba(255, 122, 94, 0.3); }
+body.holo .chip.toggle[aria-pressed='false'] { background: rgba(95, 243, 255, 0.22); color: #fff; }
+body.holo .fb.ok { color: #9dffd2; }
+body.holo .fb.no { color: #ffb4a3; }
+body.holo .fb b, body.holo .q b { color: #fff; }
+body.holo .primary { background: rgba(95, 243, 255, 0.2); color: #fff; border: 1px solid #5ff3ff; border-radius: 2px; text-transform: uppercase; letter-spacing: 0.1em; box-shadow: 0 0 16px rgba(95, 243, 255, 0.3); }
+body.holo #sheet #orbNext { box-shadow: 0 -8px 12px rgba(2, 18, 28, 0.9); }

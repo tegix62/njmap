@@ -333,3 +333,8 @@ In the game the bands are the `orb-geom-band` layer and pulse twice per flash (r
 ### Shared question UI (`js/ui.js`)
 
 Every game builds its answer buttons, hint lines and "where it is" line through the same helpers (`choicesHtml`, `hintsHtml`, `whereHtml`) and the same classes (`.choices/.choice`, `.hint`, `.where`, `.fb`, `.chip`) in `css/app.css`. These follow the active theme (Ink and Classic), so a visual change there reaches Practice, Name that place and the grid games together. "Name that place" used to carry its own hard-coded light buttons (white on white in Classic); it now uses the shared ones. Region-specific games differ in what they ask, not in how a question looks.
+
+### Hologram look (prototype, `js/holo.js`)
+
+"Name that place" in New Jersey now draws as a projection table: a dark void, the land as stacked 20 m elevation bands (a MapLibre `color-relief` layer, each band a ramp to a bright rim, so the contour intervals read as lit slabs), water and roads as thin cyan lines, outlines and the flash in glowing teal, plus a faint scan overlay (`#holoFx`) and corner-bracket glass panels with monospace labels (`body.holo` in `css/app.css`). The **◇ Hologram / ▢ Plain map** chip in the sheet switches it; the choice is remembered. Turning it off restores every changed paint property from what was saved first, so Ink and Classic themes come back exactly. `createHolo(map)` is region-neutral: any game can call `apply(true)`.
+Not done yet: PS1/PS2-style rendering (vertex snapping, low-res upscale, dither), the paper-scan theme, and tinting the custom mesh layer (towers) for the hologram.
