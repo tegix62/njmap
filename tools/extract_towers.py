@@ -25,6 +25,7 @@ from shapely.validation import make_valid
 
 FT = 0.3048
 STEP = 6.0          # feet between slices
+GAP = 2.5          # feet: gaps between facets that are closed when a slice is a ring of separate pieces
 MERGE_IOU = 0.985   # slices this alike are one slab
 SIMPLIFY_FT = 1.5
 to_lonlat = Transformer.from_crs(2263, 4326, always_xy=True)
@@ -127,11 +128,19 @@ def outline_at(tri, z):
     if not segs:
         return None
     try:
-        polys = list(polygonize(unary_union(segs)))
-        if not polys:
-            return None
-        p = unary_union([make_valid(q).buffer(0) for q in polys]).buffer(1.0).buffer(-1.0)
+        net = unary_union(segs)
+        polys = list(polygonize(net))
+        p = unary_union([make_valid(q).buffer(0) for q in polys]).buffer(1.0).buffer(-1.0) if polys else None
+        # A ring made of many separate little facets (the Chrysler's crown) has small gaps and never closes: close them
+        # (buffer by a few inches), fill what the ring encloses, and take the buffer off again. Used when the clean
+        # polygons found are missing or are only a small part of what the ring encloses.
+        fat = net.buffer(GAP)
+        filled = unary_union([Polygon(g.exterior) for g in (fat.geoms if fat.geom_type == 'MultiPolygon' else [fat]) if g.geom_type == 'Polygon']).buffer(-GAP)
+        if not filled.is_empty and (p is None or p.is_empty or p.area < 0.5 * filled.area):
+            p = filled
     except Exception:  # (a slice with a bad edge: skip it, the slabs either side cover it)
+        return None
+    if p is None:
         return None
     return None if p.is_empty else p
 
