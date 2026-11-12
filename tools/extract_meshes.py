@@ -23,6 +23,10 @@ from shapely.strtree import STRtree
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UNIT_FT = {'Feet': 1.0, 'Millimeters': 1 / 304.8, 'Meters': 1 / 0.3048, 'Centimeters': 1 / 30.48, 'Inches': 1 / 12.0}
 FT = 0.3048
+# towers whose official height counts a mast or spire, or that the survey caught a little low: the survey height must fall in this
+# range of the official one (default 0.85 to 1.3)
+RANGE = {'4 Times Square': (0.85, 1.5), 'New York Times Building': (0.6, 1.3), 'Seagram Building': (0.78, 1.3)}
+ONLY = set(filter(None, os.environ.get('ONLY', '').split('|')))  # limit to these towers; the result is merged into an existing out file
 to_ft = Transformer.from_crs(4326, 2263, always_xy=True)
 to_ll = Transformer.from_crs(2263, 4326, always_xy=True)
 
@@ -132,6 +136,8 @@ def main():
         print(f'{path}: {len(fps)} footprints, {len(walls)} wall outlines, {len(roofs)} roof outlines', flush=True)
         tree = STRtree(fps)
         for t in towers:
+            if ONLY and t['n'] not in ONLY:
+                continue
             x, y = to_ft.transform(t['p'][0], t['p'][1])
             pt = Point(x, y)
             cand = [i for i in tree.query(pt.buffer(60)) if fps[i].distance(pt) < 60]
@@ -148,7 +154,8 @@ def main():
             z1 = max(p[2] for pl in mine for p in pl)
             h = (z1 - z0) * FT
             ratio = h / t['h']
-            if not 0.85 <= ratio <= 1.3:
+            lo, hi = RANGE.get(t['n'], (0.85, 1.3))
+            if not lo <= ratio <= hi:
                 print(f'  {t["n"]}: survey {h:.0f} m against {t["h"]} m: left to the slab model')
                 continue
             cx, cy = fp.centroid.coords[0]
@@ -176,6 +183,10 @@ def main():
             if t['n'] not in out or rec['tris'] > out[t['n']]['tris']:
                 out[t['n']] = rec
             print(f'  {t["n"]}: {len(idx) // 3} triangles, {len(verts)} vertices, survey {h:.0f} m against {t["h"]} m', flush=True)
+    if ONLY and os.path.exists(dst):
+        old = {r['n']: r for r in json.load(open(dst))['t']}
+        old.update(out)
+        out = old
     res = {'v': 2, 't': list(out.values())}
     json.dump(res, open(dst, 'w'), separators=(',', ':'))
     print(f'{len(out)} towers -> {dst} ({os.path.getsize(dst) // 1024} KB)')
