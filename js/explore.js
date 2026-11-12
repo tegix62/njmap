@@ -1,6 +1,7 @@
 import { bearing, compass8, ARROWS } from './geo.js';
 import { roadsInTown, roadsFrom, draftNote, countyNum } from './roads.js';
 import { editNote } from './notes.js';
+import { createMeshLayer, meshInfo } from './meshes.js';
 import { buildingFeatures, applySurveyTowers, applyParts, loadParts, loadSurveyTowers, groundFeatures, GROUND_PAINT } from './city3d.js';
 
 let L; // label colors of the active theme (set in initExplore)
@@ -56,6 +57,10 @@ export function initExplore(ctx) {
     uptown: [40.758, -74.005, 40.88, -73.9], // (everything outside the Midtown box, which has its own file)
   };
   const part = {}; // name -> 0 loading / 1 in the map
+  // the surveyed landmark and tower meshes (WebGL2): they stand in place of the extruded blocks where there is one
+  const meshes = createMeshLayer(map);
+  const canMesh = (() => { try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; } })();
+  const meshShow = () => meshes.show(on3d && map.getZoom() >= 14.2);
   const near = (c, [la1, lo1, la2, lo2], pad = 0.012) => c.lat > la1 - pad && c.lat < la2 + pad && c.lng > lo1 - pad && c.lng < lo2 + pad;
   async function ensureBuildings() {
     const c = map.getCenter();
@@ -63,9 +68,9 @@ export function initExplore(ctx) {
       if (part[name] !== undefined || !near(c, box)) continue;
       part[name] = 0;
       try {
-        const [d, towers, parts] = await Promise.all([fetch(`data/buildings-${name}.json`).then((r) => r.json()), loadSurveyTowers(), loadParts(name)]);
+        const [d, towers, parts, md] = await Promise.all([fetch(`data/buildings-${name}.json`).then((r) => r.json()), loadSurveyTowers(), loadParts(name), canMesh ? meshes.data() : null]);
         const id = 'x3d-' + name;
-        map.addSource(id, { type: 'geojson', data: { type: 'FeatureCollection', features: applyParts(applySurveyTowers(buildingFeatures(d, parts), towers)) } });
+        map.addSource(id, { type: 'geojson', data: { type: 'FeatureCollection', features: applyParts(applySurveyTowers(buildingFeatures(d, parts), towers, meshInfo(md))) } });
         const first = map.getStyle().layers.find((l) => l.type === 'symbol');
         const ground = await fetch(`data/ground-${name}.json`).then((r) => r.json()).catch(() => null);
         if (ground) {
@@ -85,6 +90,7 @@ export function initExplore(ctx) {
           },
           first && first.id
         );
+        if (canMesh) { await meshes.load(first && first.id); meshShow(); }
         part[name] = 1;
       } catch {
         delete part[name]; // try again at the next move
@@ -92,8 +98,10 @@ export function initExplore(ctx) {
     }
   }
   map.on('moveend', () => { if (on3d) ensureBuildings(); });
+  map.on('zoom', () => { if (meshes.ok) meshShow(); });
   function set3d(v, animate = true) {
     on3d = v;
+    if (meshes.ok) meshShow();
     if (x3d) {
       x3d.classList.toggle('on', v);
       x3d.setAttribute('aria-pressed', String(v));

@@ -117,6 +117,14 @@ const ringCentre = (ring) => {
   for (const p of ring) { x += p[0]; y += p[1]; }
   return [x / ring.length, y / ring.length];
 };
+const inRing = (p, ring) => {
+  let ins = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if (yi > p[1] !== yj > p[1] && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) ins = !ins;
+  }
+  return ins;
+};
 const mDist = (a, b) => Math.hypot((a[0] - b[0]) * 84200, (a[1] - b[1]) * 111000);
 /**
  * Swap a building for its surveyed shape. For each surveyed tower, the building (in `feats`, from buildingFeatures) that
@@ -130,13 +138,14 @@ export function applySurveyTowers(feats, towers, meshes = []) {
   const drop = new Set(), add = [];
   // a tower that has a real mesh (js/meshes.js) is drawn by that, so its footprint building, its model pieces and its survey slabs
   // all go: whatever stands within 48 m and is part of it
+  // (with the mesh's footprint: whatever has its middle inside it and is no taller than the mesh, so a tower built onto a landmark stays)
   for (const m of meshes) {
     info.forEach((o, i) => {
-      if (mDist(o.c, [m.lon, m.lat]) < 48 && (o.model || o.h >= 0.5 * m.h)) drop.add(i);
+      if (m.ring ? inRing(o.c, m.ring) && o.h <= m.h + 12 : mDist(o.c, [m.lon, m.lat]) < 48 && (o.model || o.h >= 0.5 * m.h)) drop.add(i);
     });
   }
   for (const [lon, lat, H, slabs] of towers.t) {
-    if (meshes.some((m) => mDist([lon, lat], [m.lon, m.lat]) < 40)) continue;
+    if (meshes.some((m) => mDist([lon, lat], [m.lon, m.lat]) < 40 && m.h >= 0.7 * H)) continue;
     let best = -1, bd = 45;
     info.forEach((o, i) => {
       if (drop.has(i)) return;

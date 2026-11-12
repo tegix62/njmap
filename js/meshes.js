@@ -89,6 +89,13 @@ const mul = (a, b) => {
   return o;
 };
 
+/** The meshes' places for city3d's applySurveyTowers: name, middle, height and footprint ring (lon/lat) where the data has it. */
+export function meshInfo(md) {
+  return md
+    ? md.t.map(({ n, lon, lat, h, fp }) => ({ n, lon, lat, h, ring: fp && fp.length >= 6 ? Array.from({ length: fp.length / 2 }, (_, i) => [lon + fp[2 * i] / 10 / 84200, lat + fp[2 * i + 1] / 10 / 111000]) : null }))
+    : [];
+}
+
 export function createMeshLayer(map) {
   const api = {
     ok: false, // set once the layer is in the map and WebGL2 is there
@@ -199,7 +206,10 @@ export function createMeshLayer(map) {
 
   let dataPromise = null;
   /** The mesh file, once (null if it can't be had). */
-  api.data = () => (dataPromise = dataPromise || fetch('data/tower-meshes.json').then((r) => r.json()).catch(() => null));
+  api.data = () => (dataPromise = dataPromise || Promise.all([
+    fetch('data/tower-meshes.json').then((r) => r.json()).catch(() => null),
+    fetch('data/landmark-meshes.json').then((r) => r.json()).catch(() => null), // the other landmark buildings (tools/extract_meshes.py, REGISTRY)
+  ]).then(([a, b]) => (a ? { v: 2, t: [...a.t, ...(b ? b.t : [])] } : null)));
   /** Put the layer in the map (below `beforeId`). Resolves to the list of tower names that have a mesh. */
   api.load = async (beforeId) => {
     if (api.towers.length) return api.names();

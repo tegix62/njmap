@@ -23,6 +23,7 @@ from shapely.strtree import STRtree
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UNIT_FT = {'Feet': 1.0, 'Millimeters': 1 / 304.8, 'Meters': 1 / 0.3048, 'Centimeters': 1 / 30.48, 'Inches': 1 / 12.0}
 FT = 0.3048
+REG_RGB = {}
 # towers whose official height counts a mast or spire, or that the survey caught a little low: the survey height must fall in this
 # range of the official one (default 0.85 to 1.3)
 RANGE = {'4 Times Square': (0.85, 1.5), 'New York Times Building': (0.6, 1.3)}  # (Seagram is left out: the survey has it 17% short)
@@ -43,7 +44,7 @@ COLORS = {
 
 
 def colour(name, z, height):
-    base = COLORS.get(name, STONE)
+    base = COLORS.get(name) or REG_RGB.get(name) or STONE
     if name == 'Chrysler Building' and z > 205:
         return (205, 211, 216)                      # the stainless-steel crown
     if name == 'Hearst Tower':
@@ -115,8 +116,13 @@ def triangulate(pts3):
 
 def main():
     dst = sys.argv[1]
-    towers = json.load(open(os.path.join(ROOT, 'data/skyscrapers.json')))
+    # REGISTRY=<json file>: other buildings to cut out, [{"n", "p": [lon, lat], "h": optional official height m, "rgb": optional [r,g,b]}]; with no h
+    # the survey's own height is taken as it is
+    towers = json.load(open(os.environ.get('REGISTRY') or os.path.join(ROOT, 'data/skyscrapers.json')))
     out = {}
+    for t in towers:
+        if t.get('rgb'):
+            REG_RGB[t['n']] = tuple(t['rgb'])
     for path in sys.argv[2:]:
         m = rhino3dm.File3dm.Read(path)
         u = UNIT_FT[str(m.Settings.ModelUnitSystem).split('.')[-1]]
@@ -153,12 +159,17 @@ def main():
             if not mine:
                 continue
             z0 = min(p[2] for pl in mine for p in pl)
+            if t.get('maxh'):                      # a landmark with a tower built onto it: keep only what is under maxh (metres above its ground)
+                mine = [pl for pl in mine if (max(p[2] for p in pl) - z0) * FT <= t['maxh']]
+                if not mine:
+                    continue
+                z0 = min(p[2] for pl in mine for p in pl)
             z1 = max(p[2] for pl in mine for p in pl)
             h = (z1 - z0) * FT
-            ratio = h / t['h']
+            ratio = h / t['h'] if t.get('h') else 1.0
             lo, hi = RANGE.get(t['n'], (0.85, 1.3))
             if not lo <= ratio <= hi:
-                print(f'  {t["n"]}: survey {h:.0f} m against {t["h"]} m: left to the slab model')
+                print(f'  {t["n"]}: survey {h:.0f} m against {t.get("h", "-")} m: left to the slab model')
                 continue
             cx, cy = fp.centroid.coords[0]
             lon, lat = to_ll.transform(cx, cy)
@@ -182,11 +193,12 @@ def main():
             P16 = np.array(verts, dtype=np.int16).reshape(-1)
             C8 = np.array(vcol, dtype=np.uint8).reshape(-1)
             I16 = np.array(idx, dtype=np.uint16)
-            rec = {'n': t['n'], 'lon': round(lon, 6), 'lat': round(lat, 6), 'h': round(h, 1), 'tris': len(idx) // 3,
+            fpr = list(fp.simplify(1.5).exterior.coords)[:-1] if fp.geom_type == 'Polygon' else []
+            rec = {'fp': [int(round(v)) for q in fpr for v in ((q[0] - cx) * FT * 10, (q[1] - cy) * FT * 10)], 'n': t['n'], 'lon': round(lon, 6), 'lat': round(lat, 6), 'h': round(h, 1), 'tris': len(idx) // 3,
                    'p': base64.b64encode(P16.tobytes()).decode(), 'c': base64.b64encode(C8.tobytes()).decode(), 'i': base64.b64encode(I16.tobytes()).decode()}
             if t['n'] not in out or rec['tris'] > out[t['n']]['tris']:
                 out[t['n']] = rec
-            print(f'  {t["n"]}: {len(idx) // 3} triangles, {len(verts)} vertices, survey {h:.0f} m against {t["h"]} m', flush=True)
+            print(f'  {t["n"]}: {len(idx) // 3} triangles, {len(verts)} vertices, survey {h:.0f} m against {t.get("h", "-")} m', flush=True)
     if ONLY and os.path.exists(dst):
         old = {r['n']: r for r in json.load(open(dst))['t']}
         old.update(out)

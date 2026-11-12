@@ -4,7 +4,7 @@
 // stands on). The towers you miss come round more often. The shapes are the same ones Explore and the drive games stand up
 // (NYC's footprints and the surveyed towers); the base map's labels are hidden so nothing gives the name away.
 import { buildingFeatures, applySurveyTowers, applyParts, loadParts, loadSurveyTowers, groundFeatures, GROUND_PAINT } from './city3d.js';
-import { createMeshLayer } from './meshes.js';
+import { createMeshLayer, meshInfo } from './meshes.js';
 
 const KEY = 'orbit';
 const ROUND = 10;
@@ -101,7 +101,7 @@ export function initOrbit(ctx) {
       ]);
       const files = rest.slice(0, 3), grounds = rest.slice(3, 6), streetFiles = rest.slice(6, 9), partFiles = rest.slice(9, 12);
       const md = canMesh ? await meshes.data() : null;
-      const meshList = md ? md.t.map(({ n, lon, lat, h }) => ({ n, lon, lat, h })) : [];
+      const meshList = meshInfo(md);
       const feats = applyParts(applySurveyTowers(files.flatMap((d, i) => buildingFeatures(d, partFiles[i])), towers, meshList));
       const cx = feats.map((f) => {
         const r = f.geometry.coordinates[0];
