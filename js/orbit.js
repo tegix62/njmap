@@ -6,7 +6,7 @@
 import { buildingFeatures, applySurveyTowers, applyParts, loadParts, loadSurveyTowers, groundFeatures, GROUND_PAINT } from './city3d.js';
 import { createMeshLayer, meshInfo } from './meshes.js';
 import { choicesHtml, hintsHtml, whereHtml } from './ui.js';
-import { createHolo } from './holo.js';
+import { createHolo, createScan } from './holo.js';
 import { createRetro, createLabels } from './retro.js';
 
 const KEY = 'orbit';
@@ -82,6 +82,7 @@ export function initOrbit(ctx) {
   const meshes = createMeshLayer(map); // the towers the survey has as real triangle meshes
   const holo = createHolo(map);                // the projection-table look (js/holo.js), on while the game runs unless turned off
   let holoOn = ctx.store.get('orbit.holo', true);
+  const scan = createScan(map);                // the + and × feature points on the terrain round the place asked about (hologram look)
   const retro = createRetro(map);              // PS1/PS2-style rendering (js/retro.js): off, PS2, PS1
   let retroLvl = ctx.store.get('orbit.retro', 0);
   const pxLabels = createLabels(map);          // town names as crisp text above a low-resolution map
@@ -681,6 +682,7 @@ export function initOrbit(ctx) {
     // does between questions; the orbit starts when the camera arrives.
     clearTimeout(compareTimer);
     q.flying = true;
+    scan.clear();
     const go = () => {
       if (!run || q.t !== t || !q.flying) return;
       q.flying = false;
@@ -689,6 +691,7 @@ export function initOrbit(ctx) {
       render();
       raf = requestAnimationFrame(tick);
       flashPlace(t);
+      if (cfg && holo.on && t.k === 'nat') { scan.boost([1, 1.6, 3.2][retroLvl]); scan.build(t.p); scan.pulse(true); }
     };
     // (easeTo, not flyTo: flyTo's long zoom-out makes MapLibre throw from its tile bookkeeping now and then; the towers are
     // only a few km apart, so a plain ease reads as a swing anyway)
@@ -785,6 +788,7 @@ export function initOrbit(ctx) {
     clearTimeout(compareTimer);
     clearPins();
     endFlash();
+    scan.clear();
     if (flashed) flashTown(null, false);
     if (!run) return;
     run = null;
@@ -843,6 +847,7 @@ export function initOrbit(ctx) {
     const t = q.t;
     q.done = true;
     endFlash();
+    scan.pulse(false);
     q.picked = name;
     q.ok = name === t.n;
     if (!q.ok && cfg && t.k === 'nat') {
@@ -985,6 +990,7 @@ export function initOrbit(ctx) {
       holoOn = !holoOn;
       ctx.store.set('orbit.holo', holoOn);
       holo.apply(holoOn);
+      if (!holoOn) scan.clear();
       render();
     });
     document.getElementById('orbSpin')?.addEventListener('click', () => {

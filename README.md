@@ -347,3 +347,7 @@ Not possible without a vertex stage in MapLibre: PS1 vertex wobble and affine te
 #### Crisp text over the retro map
 
 At PS1/PS2 strength the map's own text would be blocky, so town names are drawn as DOM text above the map instead (`createLabels` in `js/retro.js`, placed with `map.project`, no overlapping): small caps, monospace, hard stepped shadow like a PS1 menu. The same hard-shadow monospace style is applied to the heading and question; the compare-view pins take it too. Answer buttons, hints and the result text stay plain on purpose. Which pieces get the retro text treatment is a handful of selectors at the end of `css/app.css`.
+
+### Scan points (hologram look, `createScan` in `js/holo.js`)
+
+Small + and × strokes are pinned to the terrain round the place being asked about, like a camera tracker's feature points or a Death Stranding scan. They are seeded on a jittered grid covering about what is on screen and kept where the terrain model is steepest (so they outline the relief), plus a few on flat ground. While the question is open a ring sweeps outward from the place every 7 s and lights them as it passes; after you answer they sit still. They are drawn as short line strokes (draped on the ground), not text, because MapLibre drops text and icons whose terrain tile has not loaded. Under the retro pass the strokes are thickened (×1.6 PS2, ×3.2 PS1) so they survive the low resolution and dither. They follow the Hologram chip.
