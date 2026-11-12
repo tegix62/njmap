@@ -83,10 +83,12 @@ export function initOrbit(ctx) {
   // (the same outline and label layers the Manhattan game uses for the neighbourhood), then cleared as the camera drops in.
   // The shapes of the natural places (rivers as lines, lakes and parks as polygons) as map features, to outline what a question is about.
   const GEOM_COLOR = { target: '#0b9a82', wrong: '#d9622b' };
+  const BAND_OPACITY = ['match', ['get', 'band'], 0, 0.15, 1, 0.26, 2, 0.4, 0.2];   // a mountain's three bands: stronger toward the top
   const ptsOf = (g) => {
     const out = [];
     const walk = (c) => { if (typeof c[0] === 'number') out.push(c); else c.forEach(walk); };
     walk(g.coordinates);
+    if (g.bands) walk(g.bands);                 // (a mountain's mass, as well as its crest or summit)
     return out;
   };
   /** [west, south, east, north] of a shape; for a long river only the part within `km` of `near`. */
@@ -130,6 +132,7 @@ export function initOrbit(ctx) {
       let at = place ? place.p : null;                    // (a ridge or a peak with no outline: its name at its point)
       if (g) {
         feats.push({ type: 'Feature', properties: { role, name }, geometry: g });
+        (g.bands || []).forEach((ring, i) => feats.push({ type: 'Feature', properties: { role, name, band: i }, geometry: { type: 'Polygon', coordinates: [ring] } }));
         if (g.type === 'Polygon' || g.type === 'MultiPolygon') for (const w of wallFeatures(g, 3)) walls.push({ ...w, properties: { role, h: place && place.kind === 'lake' ? 70 : 160 } });
         const b = boundsOf(g, place && place.kind === 'river' ? place.p : null, place && place.kind === 'river' ? 22 : 0);
         at = place && place.kind === 'river' ? place.p : [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
@@ -163,6 +166,7 @@ export function initOrbit(ctx) {
     const g = city.geoms && city.geoms[t.n];
     if (!g || t.n === 'Delaware and Raritan Canal') return null;
     if (g.type === 'Polygon' || g.type === 'MultiPolygon') return { kind: 'poly' };
+    if (g.type === 'Point' && g.bands) return { kind: 'mass' };                // a peak: the mass round the summit pulses, no comet
     const chains = g.type === 'MultiLineString' ? g.coordinates : g.type === 'LineString' ? [g.coordinates] : null;
     if (!chains) return null;
     let best = null;
@@ -175,7 +179,7 @@ export function initOrbit(ctx) {
     if (coords.length < 2) return null;
     const cum = [0];
     for (let i = 1; i < coords.length; i++) cum.push(cum[i - 1] + mDist(coords[i - 1], coords[i]));
-    return { kind: 'line', coords, cum, total: cum[cum.length - 1], ridge: !!g.ridge };
+    return { kind: 'line', coords, cum, total: cum[cum.length - 1], ridge: !!g.ridge, mass: !!g.bands };
   }
   const pointAt = (f, d) => {
     let i = 1;
@@ -198,7 +202,12 @@ export function initOrbit(ctx) {
       const first = f.coords[0], last = f.coords[f.coords.length - 1];
       feats.push({ type: 'Feature', properties: { k: f.ridge ? 'ridge-end' : 'start' }, geometry: { type: 'Point', coordinates: first } });
       if (f.ridge || s > f.total * 0.85) feats.push({ type: 'Feature', properties: { k: f.ridge ? 'ridge-end' : 'end' }, geometry: { type: 'Point', coordinates: last } });
-    } else if (f.kind === 'poly') {                          // pulse the tint and the edge twice
+    }
+    if (f.mass || f.kind === 'mass') {                         // a mountain: its three bands pulse twice, stronger
+      const pulse = u >= 1 ? 0 : (1 - Math.cos(4 * Math.PI * u)) / 2;
+      if (map.getLayer('orb-geom-band')) map.setPaintProperty('orb-geom-band', 'fill-opacity', ['*', 1 + 1.3 * pulse, BAND_OPACITY]);
+    }
+    if (f.kind === 'poly') {                                   // pulse the tint and the edge twice
       const pulse = u >= 1 ? 0 : (1 - Math.cos(4 * Math.PI * u)) / 2;
       for (const id of ['orb-geom-fill', 'orb-geom-fill2']) if (map.getLayer(id)) map.setPaintProperty(id, 'fill-opacity', 0.3 + 0.38 * pulse);
       if (map.getLayer('orb-geom-line')) map.setPaintProperty('orb-geom-line', 'line-width', ['interpolate', ['linear'], ['zoom'], 8, 3 + 4 * pulse, 12, 6 + 6 * pulse]);
@@ -209,6 +218,7 @@ export function initOrbit(ctx) {
     const src = map.getSource('orb-flash');
     if (src) src.setData({ type: 'FeatureCollection', features: [] });
     for (const id of ['orb-geom-fill', 'orb-geom-fill2']) if (map.getLayer(id)) map.setPaintProperty(id, 'fill-opacity', 0.3);
+    if (map.getLayer('orb-geom-band')) map.setPaintProperty('orb-geom-band', 'fill-opacity', BAND_OPACITY);
     if (map.getLayer('orb-geom-line')) map.setPaintProperty('orb-geom-line', 'line-width', ['interpolate', ['linear'], ['zoom'], 8, 3, 12, 6]);
   }
   function endFlash() {
@@ -216,11 +226,12 @@ export function initOrbit(ctx) {
     const src = map.getSource('orb-flash');
     if (src) src.setData({ type: 'FeatureCollection', features: [] });
     for (const id of ['orb-geom-fill', 'orb-geom-fill2']) if (map.getLayer(id)) map.setPaintProperty(id, 'fill-opacity', 0.3);
+    if (map.getLayer('orb-geom-band')) map.setPaintProperty('orb-geom-band', 'fill-opacity', BAND_OPACITY);
     if (map.getLayer('orb-geom-line')) map.setPaintProperty('orb-geom-line', 'line-width', ['interpolate', ['linear'], ['zoom'], 8, 3, 12, 6]);
   }
   function flashPlace(t) {
     endFlash();
-    if (!cfg || t.k !== 'nat' || !['river', 'lake'].includes(t.kind) && !(t.kind === 'mountain' && city.geoms && city.geoms[t.n] && city.geoms[t.n].ridge)) return;
+    if (!cfg || t.k !== 'nat' || !['river', 'lake'].includes(t.kind) && !(t.kind === 'mountain' && city.geoms && city.geoms[t.n] && (city.geoms[t.n].ridge || city.geoms[t.n].bands))) return;
     const f = flowOf(t);
     if (!f) return;
     const dur = FLASH_MS * (ctx.reduceMotion ? 0.5 : 1);
@@ -329,10 +340,11 @@ export function initOrbit(ctx) {
       const none = { type: 'FeatureCollection', features: [] };
       map.addSource('orb-geom', { type: 'geojson', data: none });
       map.addSource('orb-geom-wall', { type: 'geojson', data: none });
-      map.addLayer({ id: 'orb-geom-fill', type: 'fill', source: 'orb-geom', filter: ['==', ['geometry-type'], 'Polygon'], layout: { visibility: 'none' }, paint: { 'fill-color': col, 'fill-opacity': 0.3 } }, before);
-      map.addLayer({ id: 'orb-geom-fill2', type: 'fill', source: 'orb-geom', filter: ['==', ['geometry-type'], 'MultiPolygon'], layout: { visibility: 'none' }, paint: { 'fill-color': col, 'fill-opacity': 0.3 } }, before);
-      map.addLayer({ id: 'orb-geom-casing', type: 'line', source: 'orb-geom', layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 6, 12, 11], 'line-opacity': 0.9 } }, before);
-      map.addLayer({ id: 'orb-geom-line', type: 'line', source: 'orb-geom', layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': col, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 3, 12, 6] } }, before);
+      map.addLayer({ id: 'orb-geom-band', type: 'fill', source: 'orb-geom', filter: ['has', 'band'], layout: { visibility: 'none' }, paint: { 'fill-color': col, 'fill-opacity': BAND_OPACITY } }, before);
+      map.addLayer({ id: 'orb-geom-fill', type: 'fill', source: 'orb-geom', filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!', ['has', 'band']]], layout: { visibility: 'none' }, paint: { 'fill-color': col, 'fill-opacity': 0.3 } }, before);
+      map.addLayer({ id: 'orb-geom-fill2', type: 'fill', source: 'orb-geom', filter: ['all', ['==', ['geometry-type'], 'MultiPolygon'], ['!', ['has', 'band']]], layout: { visibility: 'none' }, paint: { 'fill-color': col, 'fill-opacity': 0.3 } }, before);
+      map.addLayer({ id: 'orb-geom-casing', type: 'line', source: 'orb-geom', filter: ['!', ['has', 'band']], layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 6, 12, 11], 'line-opacity': 0.9 } }, before);
+      map.addLayer({ id: 'orb-geom-line', type: 'line', source: 'orb-geom', filter: ['!', ['has', 'band']], layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': col, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 3, 12, 6] } }, before);
       map.addLayer({ id: 'orb-geom-wall', type: 'fill-extrusion', source: 'orb-geom-wall', layout: { visibility: 'none' }, paint: { 'fill-extrusion-color': col, 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': 0.4, 'fill-extrusion-vertical-gradient': true } }, before);
       map.addSource('orb-towns', { type: 'geojson', data: none });
       map.addLayer({ id: 'orb-town-name', type: 'symbol', source: 'orb-towns', layout: { visibility: 'none', 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Medium'], 'text-size': 12.5, 'text-letter-spacing': 0.06, 'text-transform': 'uppercase', 'text-pitch-alignment': 'viewport', 'text-rotation-alignment': 'viewport', 'text-allow-overlap': false, 'text-padding': 3 }, paint: { 'text-color': '#2f3d37', 'text-halo-color': '#ffffff', 'text-halo-width': 2 } });
@@ -405,7 +417,7 @@ export function initOrbit(ctx) {
       map.stop();                                                // (terrain switched on or off in the middle of an ease makes MapLibre throw)
       map.setTerrain(on ? { source: 'orb-dem', exaggeration: 2.1 } : null);
     }
-    for (const id of ['orb-geom-fill', 'orb-geom-fill2', 'orb-geom-casing', 'orb-geom-line', 'orb-geom-wall', 'orb-town-name', 'orb-flash-glow', 'orb-flash-line', 'orb-flash-dot']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+    for (const id of ['orb-geom-band', 'orb-geom-fill', 'orb-geom-fill2', 'orb-geom-casing', 'orb-geom-line', 'orb-geom-wall', 'orb-town-name', 'orb-flash-glow', 'orb-flash-line', 'orb-flash-dot']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
     for (const id of ['orb-walk', 'orb-road', 'orb-park', 'orb-ghost', 'orb-others', 'orb-hood-fill', 'orb-hood-line', 'orb-hood-wall', 'orb-lab', 'orb-lm', 'orb-hood-name', 'orb-target']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
     if (on) {
       // no names on the map while this runs

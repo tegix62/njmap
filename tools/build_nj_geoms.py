@@ -6,6 +6,9 @@ water_lakes.pkl and parks.pkl); simplified to about 10 to 30 m and rounded to 5 
 import io, json, math, os, pickle, sys, urllib.request
 import numpy as np
 from PIL import Image
+from scipy import ndimage
+from skimage import measure
+from shapely.geometry import Polygon
 from shapely import wkb
 from shapely.geometry import mapping, shape, LineString, MultiLineString
 from shapely.strtree import STRtree
@@ -140,6 +143,46 @@ def crest(lon0, lat0, R_km):
     return [[round(float(a), 5), round(float(b), 5)] for a, b in arr]
 
 
+def mountain_bands(seeds, window_km, max_d=3200):
+    """The mass of a mountain or range as three nested bands (the lowest and biggest first), from the terrain: ground above 30%, 55% and 78% of the
+    way from the surrounding valley floor up to the crest height, within `max_d` metres of the crest (or summit) and joined to it. Drawn as tints
+    that grow stronger toward the top, they make the mountain itself a shape."""
+    lon0 = sum(p[0] for p in seeds) / len(seeds)
+    lat0 = sum(p[1] for p in seeds) / len(seeds)
+    E, lons, lats = dem_window(lon0, lat0, window_km)
+    LON, LAT = np.meshgrid(lons, lats)
+    X, Y = (LON - lon0) * 84200, (LAT - lat0) * 111000
+    D = np.full(E.shape, 1e9)
+    seed_px = []
+    for sx, sy in seeds:
+        D = np.minimum(D, np.hypot(X - (sx - lon0) * 84200, Y - (sy - lat0) * 111000))
+        seed_px.append((int(np.abs(lats - sy).argmin()), int(np.abs(lons - sx).argmin())))
+    near = D < max_d
+    base = np.percentile(E[D < max_d * 1.7], 8)
+    crest = np.percentile([E[r, c] for r, c in seed_px], 60)
+    relief = max(crest - base, 60)
+    out = []
+    for f in (0.30, 0.55, 0.78):
+        m = near & (E >= base + f * relief)
+        lab, n = ndimage.label(m)
+        keep = {lab[r, c] for r, c in seed_px if lab[r, c] > 0}
+        if not keep:
+            continue
+        mk = ndimage.binary_fill_holes(np.isin(lab, list(keep)))
+        cs = measure.find_contours(np.pad(mk.astype(float), 1), 0.5)
+        if not cs:
+            continue
+        c = max(cs, key=len)
+        ring = [(float(np.interp(x - 1, np.arange(len(lons)), lons)), float(np.interp(y - 1, np.arange(len(lats)), lats))) for y, x in c]
+        poly = Polygon(ring).buffer(0)
+        if poly.geom_type == 'MultiPolygon':
+            poly = max(poly.geoms, key=lambda g: g.area)
+        poly = poly.buffer(0.0004).buffer(-0.0004).simplify(0.0003)   # (smoothed a little, so it is not the DEM's pixel steps)
+        if poly.geom_type == 'Polygon' and poly.area > 1e-7:
+            out.append([[round(x, 5), round(y, 5)] for x, y in poly.exterior.coords])
+    return out
+
+
 def join_chains(lines, tol=0.0025):
     """Join line pieces whose ends are within about 200 m of each other (the data breaks a river into many pieces; a comet needs one run)."""
     chains = [list(l.coords) for l in lines]
@@ -181,7 +224,18 @@ def list_towns(places, out):
             continue
         g = out.get(p['n'])
         towns = []
-        if g and g['type'] in ('LineString', 'MultiLineString'):
+        if g and g.get('bands'):                                           # a mountain: the towns its mass lies in (along the crest, for a range)
+            zone = Polygon(g['bands'][0]).buffer(0)
+            crest_ln = LineString(g['coordinates']) if g['type'] == 'LineString' else None
+            hits = []
+            for i in tree.query(zone):
+                inter = polys[i].intersection(zone)
+                if inter.is_empty or inter.area / zone.area < 0.04:
+                    continue
+                pos = crest_ln.project(inter.representative_point()) if crest_ln is not None else -inter.area
+                hits.append((pos, props[i]['full'], props[i]['c']))
+            towns = [(n, c) for pos, n, c in sorted(hits)]
+        elif g and g['type'] in ('LineString', 'MultiLineString'):
             gg = shape(g)
             chains = list(gg.geoms) if gg.geom_type == 'MultiLineString' else [gg]
             main = max(chains, key=lambda c: c.length)
@@ -263,6 +317,13 @@ def main():
             c = crest(p['p'][0], p['p'][1], RIDGE_KM[p['n']])
             if len(c) >= 3:
                 out[p['n']] = {'type': 'LineString', 'coordinates': c, 'ridge': True}
+                bands = mountain_bands(c, RIDGE_KM[p['n']] * 1.25)
+                if bands:
+                    out[p['n']]['bands'] = bands
+        elif p['kind'] == 'mountain' and 'elev' in p:                                  # a single peak: the mass round its summit
+            bands = mountain_bands([p['p']], 5.5, 2600)
+            if bands:
+                out[p['n']] = {'type': 'Point', 'coordinates': p['p'], 'peak': True, 'bands': bands}
     out = {k: v for k, v in out.items() if v}
     kept = []
     for p in places:
