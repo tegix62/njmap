@@ -32,6 +32,9 @@ TOWERS = {
 SPLIT = {}  # (none now: the survey's Hearst is better than a base and a plain box)
 TAPER = {'One Vanderbilt': (120, 330, 0.60), '53 West 53rd': (90, 320, 0.72)}
 # towers the parts do not have (or have wrong): extruded from the footprint data's outline to the official height, the shader draws the facade
+# outlines taken from Overture's whole-building layer (OpenStreetMap's way, 320 m, 77 floors, 2,176 m2) where the NYC footprint is less exact:
+# 53 West 53rd, a long sliver with a zig-zag edge
+OUTLINE = {'53 West 53rd': [[-73.977804, 40.761918], [-73.977777, 40.761956], [-73.978122, 40.762097], [-73.97816, 40.762046], [-73.978208, 40.761984], [-73.978263, 40.761907], [-73.978322, 40.761932], [-73.978424, 40.761792], [-73.978484, 40.761709], [-73.978529, 40.761644], [-73.978122, 40.761479], [-73.978101, 40.761509], [-73.978032, 40.761606], [-73.977917, 40.761764], [-73.977996, 40.761797], [-73.977968, 40.761836], [-73.977887, 40.761803]]}
 HULL = {'Seagram Building'}
 PRISMS = {'Seagram Building': 157.0, '53 West 53rd': 320.0}
 # open steel crowns above the roof: name -> roof height in metres (posts and rails round the roof's outline, 22 m up)
@@ -84,6 +87,8 @@ def footprint_prisms(sky):
             c = g.centroid
             if g.geom_type == 'Polygon' and math.hypot((c.x - lon0) * 84200, (c.y - lat0) * 111000) < 25 and (best is None or g.area > best.area):
                 best = g
+        if name in OUTLINE:
+            best = Polygon(OUTLINE[name]).buffer(0)
         if best is not None:
             if name in HULL:
                 best = best.convex_hull        # (the outline has a notch cut into it; the real tower is a plain rectangle)
