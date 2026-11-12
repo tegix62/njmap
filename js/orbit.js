@@ -208,12 +208,15 @@ export function initOrbit(ctx) {
       const cur = best.get(sg.name);
       if (!cur || d < cur.d) best.set(sg.name, { d, sg, d0: mDist(sg.mid, p) });
     }
-    const labels = [...best.values()].sort((a, b) => a.d - b.d).slice(0, 24).map((b) => ({ type: 'Feature', properties: { name: b.sg.name }, geometry: { type: 'Point', coordinates: b.sg.mid } }));
+    // only a few: the two numbered streets and the two avenues (or other named streets) nearest the tower
+    const all = [...best.values()].sort((a, b) => a.d - b.d);
+    const isNum = (b) => /^\d+\w\w St$/.test(b.sg.name);
+    const labels = [...all.filter(isNum).slice(0, 2), ...all.filter((b) => !isNum(b)).slice(0, 2)].map((b) => ({ type: 'Feature', properties: { name: b.sg.name }, geometry: { type: 'Point', coordinates: b.sg.mid } }));
     map.getSource('orb-lab').setData({ type: 'FeatureCollection', features: labels });
     // landmarks that are not themselves towers of the quiz (those would give the answers away)
     const taken = new Set(city.list.map((x) => x.n));
     for (const [tower, lm] of Object.entries(ALIAS)) if (taken.has(tower)) taken.add(lm);
-    const lm = city.lms.filter((l) => !taken.has(l.n) && mDist(l.p, p) < 700 && mDist(l.p, p) > 25).map((l) => ({ type: 'Feature', properties: { name: l.n }, geometry: { type: 'Point', coordinates: l.p } }));
+    const lm = city.lms.filter((l) => !taken.has(l.n) && mDist(l.p, p) < 700 && mDist(l.p, p) > 25).sort((a, b) => mDist(a.p, p) - mDist(b.p, p)).slice(0, 6).map((l) => ({ type: 'Feature', properties: { name: l.n }, geometry: { type: 'Point', coordinates: l.p } }));
     map.getSource('orb-lm').setData({ type: 'FeatureCollection', features: lm });
     // the neighbourhood
     const m = ctx.locate ? ctx.locate(p) : null;
@@ -259,16 +262,18 @@ export function initOrbit(ctx) {
 
   function camera(t, spin0, first) {
     cancelAnimationFrame(raf);
-    // The foot of the tower sits low in the free area and the zoom is worked out so its top clears the top card: a tower this
-    // many metres high shows about sin(pitch) x height / (metres per pixel) pixels tall on the screen, with some slack for
-    // perspective.
+    // The tower is centred in the free area (the space between the top card and the answers): about 78% of that height, its
+    // middle at the middle. A tower this many metres high shows about 1.15 x sin(pitch) x height / (metres per pixel) pixels
+    // tall; its foot goes half of that below the middle, and the camera padding is worked out to put the foot there.
     const pad = ctx.padding();
-    const free = Math.max(120, window.innerHeight - pad.top - pad.bottom);
-    const top = pad.top + free * 0.42;
-    const baseY = (top + window.innerHeight - pad.bottom) / 2;
-    const avail = Math.max(120, baseY - pad.top - 28);
+    const winH = window.innerHeight;
+    const free = Math.max(120, winH - pad.top - pad.bottom);
     const mpp0 = 78271.5 * Math.cos((t.p[1] * Math.PI) / 180);
-    const zoom = Math.max(14.4, Math.min(17, Math.log2((mpp0 * avail) / (1.3 * Math.sin((PITCH * Math.PI) / 180) * t.h))));
+    const sinP = Math.sin((PITCH * Math.PI) / 180);
+    const zoom = Math.max(14.4, Math.min(17, Math.log2((mpp0 * 0.78 * free) / (1.15 * sinP * t.h))));
+    const pxTall = (1.15 * sinP * t.h * Math.pow(2, zoom)) / mpp0;
+    const baseY = pad.top + free / 2 + pxTall / 2;
+    const top = Math.max(pad.top, 2 * baseY - (winH - pad.bottom));
     let bearing = spin0;
     let last = performance.now();
     const cam = { center: t.p, zoom, pitch: PITCH, bearing, padding: { top, bottom: pad.bottom, left: 0, right: 0 } };
@@ -294,7 +299,7 @@ export function initOrbit(ctx) {
     };
     // (easeTo, not flyTo: flyTo's long zoom-out makes MapLibre throw from its tile bookkeeping now and then; the towers are
     // only a few km apart, so a plain ease reads as a swing anyway)
-    map.easeTo({ ...cam, duration: ctx.dur ? ctx.dur(first ? 1800 : 2800) : 2800, easing: (x) => x * x * (3 - 2 * x), essential: true });
+    map.easeTo({ ...cam, duration: ctx.dur ? ctx.dur(first ? 1100 : 1500) : 1500, easing: (x) => x * x * (3 - 2 * x), essential: true });
     // (after easeTo starts: starting it ends any motion already under way, and that motion's own "moveend" must not count)
     if (map.isMoving()) map.once('moveend', go);
     else go();
@@ -348,7 +353,7 @@ export function initOrbit(ctx) {
     // the last tower stays in place until the camera is about halfway there, then the new one stands up where it's going
     if (first) focus(t);
     else {
-      const wait = ctx.dur ? ctx.dur(3000) * 0.45 : 1350;
+      const wait = ctx.dur ? ctx.dur(1500) * 0.45 : 700;
       setTimeout(() => {
         if (!run || !q || q.t !== t) return;
         focus(t);
