@@ -207,7 +207,7 @@ export function initOrbit(ctx) {
     return city.list.find((t) => !run.seen.includes(t.n)) || rand(city.list);
   }
   function choicesFor(t) {
-    const others = city.list.filter((o) => o.n !== t.n);
+    const others = city.list.filter((o) => o.n !== t.n && (o.k || 't') === (t.k || 't')); // (landmarks against landmarks, towers against towers)
     const near = shuffle(others.filter((o) => Math.abs(o.h - t.h) / t.h < 0.3));
     const far = shuffle(others);
     const out = [];
@@ -286,7 +286,7 @@ export function initOrbit(ctx) {
     const labels = [...all.filter(isNum).slice(0, 2), ...all.filter((b) => !isNum(b)).slice(0, 2)].map((b) => ({ type: 'Feature', properties: { name: b.sg.name }, geometry: { type: 'Point', coordinates: b.sg.mid } }));
     map.getSource('orb-lab').setData({ type: 'FeatureCollection', features: labels });
     // landmarks that are not themselves towers of the quiz (those would give the answers away)
-    const taken = new Set(city.list.map((x) => x.n));
+    const taken = new Set((q && q.choices ? q.choices : city.list).map((x) => x.n));
     for (const [tower, lm] of Object.entries(ALIAS)) if (taken.has(tower)) taken.add(lm);
     const lm = city.lms.filter((l) => !taken.has(l.n) && mDist(l.p, p) < 700 && mDist(l.p, p) > 25).sort((a, b) => mDist(a.p, p) - mDist(b.p, p)).slice(0, 6).map((l) => ({ type: 'Feature', properties: { name: l.n }, geometry: { type: 'Point', coordinates: l.p } }));
     map.getSource('orb-lm').setData({ type: 'FeatureCollection', features: lm });
@@ -370,8 +370,9 @@ export function initOrbit(ctx) {
     const free = Math.max(120, winH - pad.top - pad.bottom);
     const mpp0 = 78271.5 * Math.cos((t.p[1] * Math.PI) / 180);
     const sinP = Math.sin((PITCH * Math.PI) / 180);
-    const zoom = Math.max(14.4, Math.min(16.9, Math.log2((mpp0 * 0.86 * free) / (1.15 * sinP * t.h))));
-    const pxTall = (1.15 * sinP * t.h * Math.pow(2, zoom)) / mpp0;
+    const hh = t.k === 'lm' ? Math.max(t.h, 85) : t.h; // a landmark is low and wide: frame it as if it stood a little taller
+    const zoom = Math.max(14.4, Math.min(16.9, Math.log2((mpp0 * 0.86 * free) / (1.15 * sinP * hh))));
+    const pxTall = (1.15 * sinP * hh * Math.pow(2, zoom)) / mpp0;
     const baseY = pad.top + free / 2 + pxTall / 2;
     const top = Math.max(pad.top, 2 * baseY - (winH - pad.bottom));
     let bearing = spin0;
@@ -483,7 +484,7 @@ export function initOrbit(ctx) {
     camera(t, Math.random() * 360, first);
   }
   const HINTS = [
-    (t) => `<b>${t.h} m</b> (${ft(t.h)} ft), finished in <b>${t.y}</b>.`,
+    (t) => (t.k === 'lm' ? `Opened in <b>${t.y}</b>.` : `<b>${t.h} m</b> (${ft(t.h)} ft), finished in <b>${t.y}</b>.`),
     (t) => `You'd find it at <b>${esc(t.at)}</b>.`,
     (t) => `${esc(t.line)}.`,
   ];
@@ -523,7 +524,7 @@ export function initOrbit(ctx) {
     return `<div class="fb ${q.ok ? 'ok' : 'no'} orb-reveal">
       ${pic ? `<img class="orb-thumb" src="${esc(pic.img)}" alt="Photo of ${esc(t.n)}: tap to enlarge" data-n="${esc(t.n)}" tabindex="0" />` : ''}
       <div><b>${q.ok ? '✓' : '✗'} ${esc(t.n)}</b> <span class="muted">${q.ok ? `+${q.pts}` : ''}</span><br>
-      ${esc(t.line)}.<br><span class="muted">${t.h} m (${ft(t.h)} ft) · ${t.y} · ${esc(t.at)}</span></div>
+      ${esc(t.line)}.<br><span class="muted">${t.k === 'lm' ? '' : `${t.h} m (${ft(t.h)} ft) · `}${t.y} · ${esc(t.at)}</span></div>
     </div>`;
   }
   /** The photo large, over everything, with its credit; a tap anywhere (or Escape) closes it. */
@@ -566,7 +567,7 @@ export function initOrbit(ctx) {
     }
     const hints = HINTS.slice(0, q.hints).map((h) => `<div class="orb-hint">${h(q.t)}</div>`).join('');
     const where = q.hood ? `<div class="orb-where">📍 ${esc(q.hood)}</div>` : '';
-    ctx.hud(`<div class="qkind">🏙 Name that tower · ${run.n + (q.done ? 0 : 1)}/${ROUND}</div><div class="q">${q.done ? (q.ok ? 'Yes.' : 'Not quite.') : q.flying ? 'Swinging over…' : 'Which tower is this?'}</div>${q.flying ? '' : where}${q.flying ? '' : hints}`);
+    ctx.hud(`<div class="qkind">🏙 Name that tower · ${run.n + (q.done ? 0 : 1)}/${ROUND}</div><div class="q">${q.done ? (q.ok ? 'Yes.' : 'Not quite.') : q.flying ? 'Swinging over…' : (q.t.k === 'lm' ? 'Which landmark is this?' : 'Which tower is this?')}</div>${q.flying ? '' : where}${q.flying ? '' : hints}`);
     const btn = (c) => {
       const cls = q.done ? (c.n === q.t.n ? ' right' : c.n === q.picked ? ' wrong' : '') : '';
       return `<button class="orb-choice${cls}" data-n="${esc(c.n)}"${q.done || q.flying ? ' disabled' : ''}>${esc(c.n)}</button>`;
@@ -574,7 +575,7 @@ export function initOrbit(ctx) {
     ctx.sheet(`${run.opts.header()}<div id="qbody">
       <div class="score"><button type="button" id="orbSpin" class="orb-mini" aria-pressed="${spinOn}">${spinOn ? '↻ Orbiting' : '✋ Drag to turn'}</button> ${run.pts} points${run.streak >= 3 ? ` · 🔥 ${run.streak}` : ''}</div>
       <div class="orb-choices">${q.choices.map(btn).join('')}</div>
-      ${q.done ? `${reveal()}<button class="primary" id="orbNext">${run.n >= ROUND ? 'Finish' : 'Next tower'}</button>` : `<button id="orbHint"${q.hints >= HINTS.length || q.flying ? ' disabled' : ''}>💡 Hint (−1 point)</button>`}
+      ${q.done ? `${reveal()}<button class="primary" id="orbNext">${run.n >= ROUND ? 'Finish' : q.t.k === 'lm' ? 'Next' : 'Next tower'}</button>` : `<button id="orbHint"${q.hints >= HINTS.length || q.flying ? ' disabled' : ''}>💡 Hint (−1 point)</button>`}
     </div>`);
     run.opts.bindHeader();
     for (const b of document.querySelectorAll('.orb-choice')) b.addEventListener('click', () => answer(b.dataset.n));

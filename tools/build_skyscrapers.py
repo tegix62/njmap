@@ -43,6 +43,31 @@ S = [
 ]
 
 
+# landmark buildings in the same game (k = 'lm'): name, year, a line, where. Where it stands and how tall comes from its survey mesh
+# (data/landmark-meshes.json, tools/extract_meshes.py); the height is not asked or hinted (a survey footprint can include a tower built
+# onto it), only used to frame the camera.
+LM = [
+    ('Madison Square Garden', 1968, 'the round arena on top of Penn Station, home of the Knicks and the Rangers', '8th Ave & 32nd St', 'Midtown South'),
+    ('Grand Central Terminal', 1913, 'the Beaux-Arts rail terminal, with the star-ceiling concourse', '42nd St & Park Ave', 'Midtown East'),
+    ('New York Public Library', 1911, 'the Beaux-Arts main branch, guarded by two stone lions', '5th Ave & 42nd St', 'Midtown'),
+    ("St. Patrick's Cathedral", 1879, 'a Neo-Gothic cathedral with two white spires, across from Rockefeller Center', '5th Ave & 51st St', 'Midtown'),
+    ('Trinity Church', 1846, 'a Gothic Revival church at the head of Wall Street, the tallest building in the city until 1890', 'Broadway & Wall St', 'Financial District'),
+    ('City Hall', 1812, 'the Federal-style seat of city government, in City Hall Park', 'Broadway & Chambers St', 'Civic Center'),
+    ('Plaza Hotel', 1907, 'a French Renaissance chateau of a hotel at the corner of Central Park', '5th Ave & 59th St', 'Midtown'),
+    ('Radio City Music Hall', 1932, 'the Art Deco theater with the glowing marquee, home of the Rockettes', '6th Ave & 50th St', 'Midtown'),
+    ('Carnegie Hall', 1891, 'the red-brick concert hall', '57th St & 7th Ave', 'Midtown'),
+    ('MoMA', 1939, 'the Museum of Modern Art, with its sculpture garden', '53rd St, 5th Ave to 6th Ave', 'Midtown'),
+    ('Guggenheim', 1959, "Frank Lloyd Wright's white spiral museum", '5th Ave & 89th St', 'Upper East Side'),
+    ('The Dakota', 1884, 'the gabled Victorian apartment house where John Lennon lived', 'Central Park West & 72nd St', 'Upper West Side'),
+    ('Natural History Museum', 1877, 'the Romanesque museum with the dinosaur halls and the blue-whale model', 'Central Park West & 79th St', 'Upper West Side'),
+    ('Metropolitan Opera House', 1966, 'the glass-fronted opera house at Lincoln Center, with the Chagall murals', 'Columbus Ave & 64th St', 'Lincoln Square'),
+    ('Whitney Museum', 2015, "Renzo Piano's angular museum at the south end of the High Line", 'Gansevoort St & Washington St', 'Meatpacking District'),
+    ('Javits Center', 1986, 'the glass-box convention center on the Hudson', '11th Ave & 36th St', 'Hudson Yards'),
+    ("Macy's Herald Square", 1902, 'the flagship store, billed as the largest in the world', 'Broadway & 34th St', 'Herald Square'),
+    ('United Nations', 1952, 'the green-glass Secretariat slab on the East River', '1st Ave & 46th St', 'Turtle Bay'),
+]
+
+
 def check():
     towers = json.load(open(os.path.join(ROOT, 'data/towers.json')))['t']
     sys.path.insert(0, os.path.join(ROOT, 'tools'))
@@ -109,6 +134,13 @@ def write():
             print('  NO footprint of about this height within 110 m:', n)
     print('snapped to the footprint:', ', '.join(moved))
     out = [{'n': n, 'p': list(p), 'h': h, 'y': y, 'line': line, 'at': at, 'hood': hood} for n, p, h, y, line, at, hood in S]
+    meshes = {t['n']: t for t in json.load(open(os.path.join(ROOT, 'data/landmark-meshes.json')))['t']}
+    for n, y, line, at, hood in LM:
+        m = meshes.get(n)
+        if not m:
+            print('  no mesh for the landmark', n)
+            continue
+        out.append({'n': n, 'p': [m['lon'], m['lat']], 'h': round(m['h']), 'y': y, 'line': line, 'at': at, 'hood': hood, 'k': 'lm'})
     json.dump(out, open(os.path.join(ROOT, 'data/skyscrapers.json'), 'w'), ensure_ascii=False, separators=(',', ':'))
     path = os.path.join(ROOT, 'data/landmarks.json')
     lm = json.load(open(path))
