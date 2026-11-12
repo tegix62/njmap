@@ -19,13 +19,13 @@ const BASE = {
   'muni-fill': { 'fill-color': HOLO.land, 'fill-opacity': 1 },
   water: { 'fill-color': HOLO.water, 'fill-opacity': 0.85 },
   // lines are widened and brightened: at PS1 resolution a one-pixel line is half a rendered pixel and would vanish
-  river: { 'line-color': '#4fd0ea', 'line-opacity': 1, 'line-width': 2.4 },
-  'road-minor': { 'line-color': '#1b7088', 'line-opacity': 0.7, 'line-width': 1.2 },
-  'road-mid': { 'line-color': '#2290aa', 'line-opacity': 0.85, 'line-width': 1.8 },
-  'road-major': { 'line-color': '#3cc3e0', 'line-opacity': 0.95, 'line-width': 2.4 },
-  'hwy-color': { 'line-color': '#9af0ff', 'line-opacity': 1, 'line-width': 3.2 },
-  'muni-line': { 'line-color': '#2aa8c4', 'line-opacity': 0.8, 'line-width': 1.6 },
-  'county-line': { 'line-color': '#7fe6ff', 'line-opacity': 1, 'line-width': 2.6 },
+  river: { 'line-color': '#4fd0ea', 'line-opacity': TUNE.ps1.lines['river'][1], 'line-width': TUNE.ps1.lines['river'][0] },
+  'road-minor': { 'line-color': '#1b7088', 'line-opacity': TUNE.ps1.lines['road-minor'][1], 'line-width': TUNE.ps1.lines['road-minor'][0] },
+  'road-mid': { 'line-color': '#2290aa', 'line-opacity': TUNE.ps1.lines['road-mid'][1], 'line-width': TUNE.ps1.lines['road-mid'][0] },
+  'road-major': { 'line-color': '#3cc3e0', 'line-opacity': TUNE.ps1.lines['road-major'][1], 'line-width': TUNE.ps1.lines['road-major'][0] },
+  'hwy-color': { 'line-color': '#9af0ff', 'line-opacity': TUNE.ps1.lines['hwy-color'][1], 'line-width': TUNE.ps1.lines['hwy-color'][0] },
+  'muni-line': { 'line-color': '#2aa8c4', 'line-opacity': TUNE.ps1.lines['muni-line'][1], 'line-width': TUNE.ps1.lines['muni-line'][0] },
+  'county-line': { 'line-color': '#7fe6ff', 'line-opacity': TUNE.ps1.lines['county-line'][1], 'line-width': TUNE.ps1.lines['county-line'][0] },
 };
 
 // the elevation bands: a quiet ground. Every STEP metres the shade steps up a little, with no bright rim, so the relief

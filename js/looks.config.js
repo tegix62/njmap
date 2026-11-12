@@ -67,5 +67,10 @@ export const TUNE = {
     gridMajor: 0.34,
     bandMetres: 40,          // elevation step of the terrain shading
     outlineWidth: [4, 7],    // answer outline width at zoom 8 and 12
+    // base-map lines under PS1: [width px, opacity]. Wide enough to survive the low resolution, soft enough not to shout at state scale
+    lines: {
+      river: [2.2, 0.95], 'road-minor': [1.1, 0.6], 'road-mid': [1.5, 0.75], 'road-major': [2, 0.85], 'hwy-color': [2.8, 0.95],
+      'muni-line': [1.1, 0.45], 'county-line': [1.7, 0.75],
+    },
   },
 };
