@@ -2,7 +2,7 @@
 // cached, so "which town am I in" keeps working with no signal. Online, the
 // app's own files come from the network first (the latest version every time). Background map
 // tiles are only cached opportunistically.
-const VERSION = 'njtf-v139';
+const VERSION = 'njtf-v140';
 const SHELL = [
   './',
   'index.html',
@@ -24,6 +24,9 @@ const SHELL = [
   'js/regions.js',
   'js/anchors.js',
   'js/gridgame.js',
+  'data/skyscrapers.json',
+  'js/orbit.js',
+  'js/city3d.js',
   'js/gridclassic.js',
   'js/briefing.js',
   'js/motion.js',

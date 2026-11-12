@@ -3166,3 +3166,13 @@ body[data-mode='explore'][data-region='manhattan'] .fab3d { display: grid; }
 #ggZone.show { animation: ggzone 2.2s ease-out forwards; }
 @keyframes ggzone { 0% { opacity: 0; transform: translate(-50%, -10px) scale(0.9); } 12% { opacity: 1; transform: translate(-50%, 0) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, 0); } }
 @media (prefers-reduced-motion: reduce) { #ggZone.show { animation-duration: 0.01s; } }
+
+/* Name that tower */
+.orb-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
+.orb-choice { padding: 11px 8px; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.18); background: #fff; color: inherit; font: inherit; font-weight: 600; font-size: 14px; line-height: 1.2; min-height: 48px; cursor: pointer; }
+.orb-choice.right { background: #d6f0dc; border-color: #2f9e55; }
+.orb-choice.wrong { background: #f8d9d6; border-color: #c4443a; }
+.orb-choice:disabled { cursor: default; }
+.orb-hint { font-size: 13px; margin-top: 4px; }
+.orb-reveal { display: flex; gap: 10px; align-items: flex-start; }
+.orb-reveal img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; flex: none; }

@@ -30,6 +30,7 @@ const TYPES = {
   rapid: '⚡ Rapid round',
   gridmid: '🚕 Drive Midtown (new)',
   gridup: '🚕 Drive Uptown (new)',
+  orbit: '🏙 Name that tower (new)',
   gridgame: '🚕 Drive Downtown (new)',
   gridclassic: '🚕 Drive Midtown (classic grid)',
   frames: '🧭 Left, right & compass',
@@ -45,12 +46,14 @@ const DESC = {
   gridgame: 'Drive Downtown: plan the route through the tangle below 14th St, then ride it. Tunnels and bridges in.',
   gridclassic: 'The original: a straightened grid, 14th to 110th St.',
   frames: 'Left, right and compass: face every direction.',
+  orbit: 'The camera circles a skyscraper, alone in a ghost of the city: which one is it? Ten a round, hints cost a point.',
   trip: 'Quiz yourself on your last drive.',
 };
 // How the kinds group in the picker (anything not listed lands in Quizzes)
 const GROUPS = [
   ['Timed', ['rapid']],
   ['Driving practice', ['gridup', 'gridgame', 'gridclassic', 'frames']],
+  ['Landmarks', ['orbit']],
 ];
 // The modes that get a tile at the top of Practice (the rest are under "More")
 const TILE_LABEL = {
@@ -74,7 +77,7 @@ export function initPractice(ctx) {
   const CFG_KEY = R.id === 'nj' ? 'practice' : `practice.${R.id}`;
   const cfg = { type: R.gridAngle ? 'gridmid' : 'today', area: R.wellKnown ? 'known' : 'all', ...store.get(CFG_KEY, {}) };
   const SC = R.gridAngle ? 0.12 : 1; // Manhattan distances are short
-  const allowed = ['today', 'mix', 'rapid', ...(R.gridAngle ? ['gridmid', 'gridup', 'gridgame', 'gridclassic'] : []), 'frames', ...R.quizTypes, 'trip'];
+  const allowed = ['today', 'mix', 'rapid', ...(R.gridAngle ? ['gridmid', 'gridup', 'gridgame', 'gridclassic', 'orbit'] : []), 'frames', ...R.quizTypes, 'trip'];
   if (cfg.type === 'dropin') cfg.type = 'today'; // (the county puzzle is gone)
   if (!allowed.includes(cfg.type)) cfg.type = 'mix';
   // the whole-island game isn't reliable yet: anyone on it moves to the classic once
@@ -576,6 +579,7 @@ export function initPractice(ctx) {
   }
   function next() {
     stopRapidTimer();
+    if (cfg.type !== 'orbit') ctx.orbit.stop();
     if (cfg.type === 'today') return nextToday();
     if (cfg.type === 'rapid') return nextRapid();
     if (cfg.type !== 'gridgame') ctx.gridgame.stop();
@@ -585,6 +589,7 @@ export function initPractice(ctx) {
     if (cfg.type === 'gridgame') return startGridGame(ctx.gridgame);
     if (cfg.type === 'gridmid') return startGridGame(ctx.gridmid);
     if (cfg.type === 'gridup') return startGridGame(ctx.gridup);
+    if (cfg.type === 'orbit') return startOrbit();
     if (cfg.type === 'gridclassic') return startGridClassic();
     if (cfg.type === 'frames') {
       q = { kind: 'frames', m: null, answered: false };
@@ -801,6 +806,14 @@ export function initPractice(ctx) {
     game.start({ header: () => header(), bindHeader: () => bindHeader() });
   }
 
+  function startOrbit() {
+    q = { kind: 'gridgame', m: null, answered: false };
+    ctx.clearHighlights();
+    ctx.reveal([]);
+    ctx.line(null);
+    ctx.orbit.start({ header: () => header(), bindHeader: () => bindHeader() });
+  }
+
   function startGridClassic() {
     q = { kind: 'gridgame', m: null, answered: false };
     ctx.clearHighlights();
@@ -835,7 +848,7 @@ export function initPractice(ctx) {
         <select id="qArea" aria-label="Area">${area}</select>
       </div><div class="score todaybar"><span class="dots">${dots}</span>${streak() ? `<span>🔥 ${streak()} day${streak() === 1 ? '' : 's'}</span>` : ''}</div>`;
     }
-    if (cfg.type === 'gridgame' || cfg.type === 'gridmid' || cfg.type === 'gridup' || cfg.type === 'gridclassic' || cfg.type === 'frames')
+    if (cfg.type === 'gridgame' || cfg.type === 'gridmid' || cfg.type === 'gridup' || cfg.type === 'gridclassic' || cfg.type === 'orbit' || cfg.type === 'frames')
       // these have no use for the neighborhood/town list
       return `${typeBtn()}<div class="score"></div>`;
     if (cfg.type === 'rapid' && !rapid.on)
@@ -1658,6 +1671,7 @@ export function initPractice(ctx) {
       ctx.gridmid.stop();
       ctx.gridup.stop();
       ctx.gridclassic.stop();
+      ctx.orbit.stop();
       ctx.frames.stop();
       ctx.clearHighlights();
       ctx.reveal([]);

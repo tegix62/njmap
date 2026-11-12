@@ -25,6 +25,12 @@ TITLES = {
     'Natural History Museum': 'American Museum of Natural History', "Zabar's": "Zabar's", 'Frick Collection': 'Frick Collection',
     'The Met': 'Metropolitan Museum of Art', 'Guggenheim': 'Solomon R. Guggenheim Museum', 'Mount Sinai Hospital': 'Mount Sinai Hospital (Manhattan)',
     'Queensboro Bridge': 'Queensboro Bridge', 'Roosevelt Island Tram': 'Roosevelt Island Tramway',
+    'Bank of America Tower': 'Bank of America Tower (New York City)', 'MetLife Building': 'MetLife Building', 'Citigroup Center': 'Citigroup Center',
+    'Hearst Tower': 'Hearst Tower (New York City)', 'New York Times Building': 'The New York Times Building', 'One Vanderbilt': 'One Vanderbilt',
+    'Central Park Tower': 'Central Park Tower', '432 Park Avenue': '432 Park Avenue', '111 West 57th Street': '111 West 57th Street', 'Seagram Building': 'Seagram Building',
+    '8 Spruce Street': '8 Spruce Street', 'Four World Trade Center': '4 World Trade Center', '4 Times Square': '4 Times Square',
+    'Metropolitan Life Tower': 'Metropolitan Life Insurance Company Tower', 'Chanin Building': 'Chanin Building', 'Municipal Building': 'Manhattan Municipal Building',
+    '53 West 53rd': '53 West 53rd',
     'Columbia University': 'Columbia University', 'Cathedral of St. John the Divine': 'Cathedral of St. John the Divine', 'Riverside Church': 'Riverside Church (New York City)',
     "Grant's Tomb": "General Grant National Memorial", 'Apollo Theater': 'Apollo Theater',
 }

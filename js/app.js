@@ -15,6 +15,7 @@ import { initAnchors } from './anchors.js';
 import { initGridGame } from './gridgame.js';
 import { initGridClassic } from './gridclassic.js';
 import { initFrames } from './frames.js';
+import { initOrbit } from './orbit.js';
 
 /** Map filter for one road, by the label people use ("I-287", "Columbia Turnpike"). */
 const roadFilter = (label) => (label ? ['==', LABEL_EXPR, label] : ['==', ['get', 'ref'], '__none__']);
@@ -559,6 +560,7 @@ async function main() {
   ctx.gridup = initGridGame(ctx, 'uptown');
   ctx.gridclassic = initGridClassic(ctx);
   ctx.frames = initFrames(ctx);
+  ctx.orbit = initOrbit(ctx);
   for (const m of munis) ctx.setKnow(m);
 
   // ---- modes ----------------------------------------------------------------
