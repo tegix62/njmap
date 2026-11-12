@@ -98,22 +98,46 @@ export function initOrbit(ctx) {
     }
     return pts.reduce((b, p) => [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])], [180, 90, -180, -90]);
   }
-  function setGeom(items, labelled = false) {     // items: [{ name, role }]; the names are drawn only once the question is answered (they would give it away)
-    const feats = [], walls = [], labs = [];
+  // Pins and their names are drawn by hand as a small overlay positioned with map.project: map layers drop a point under terrain when the elevation
+  // tile there is not loaded yet, and MapLibre's own markers fade out as "behind the terrain" for the same reason.
+  let pinEls = [];
+  function placePins() {
+    for (const p of pinEls) {
+      const s = map.project(p.ll);
+      p.el.style.transform = `translate(${s.x}px, ${s.y}px) translate(-50%, -9px)`;
+    }
+  }
+  function clearPins() {
+    for (const p of pinEls) p.el.remove();
+    pinEls = [];
+  }
+  function addPin(name, role, lonlat) {
+    const el = document.createElement('div');
+    el.className = 'orb-pin';
+    const col = GEOM_COLOR[role] || GEOM_COLOR.target;
+    el.style.cssText = 'position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;pointer-events:none;z-index:3;';
+    el.innerHTML = `<span style="width:16px;height:16px;border-radius:50%;background:${col};border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45)"></span><span style="margin-top:3px;font:600 13px system-ui,sans-serif;color:${col};text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff,0 0 3px #fff;white-space:nowrap">${esc(name)}</span>`;
+    map.getContainer().appendChild(el);
+    pinEls.push({ el, ll: lonlat });
+    placePins();
+  }
+  function setGeom(items, labelled = false) {     // items: [{ name, role }]; the pins and names are drawn only once the question is answered (they would give it away)
+    const feats = [], walls = [];
+    clearPins();
     for (const { name, role } of items) {
       const place = city.list.find((x) => x.n === name);
       const g = city.geoms && city.geoms[name];
+      let at = place ? place.p : null;                    // (a ridge or a peak with no outline: its name at its point)
       if (g) {
         feats.push({ type: 'Feature', properties: { role, name }, geometry: g });
         if (g.type === 'Polygon' || g.type === 'MultiPolygon') for (const w of wallFeatures(g, 3)) walls.push({ ...w, properties: { role, h: place && place.kind === 'lake' ? 70 : 160 } });
         const b = boundsOf(g, place && place.kind === 'river' ? place.p : null, place && place.kind === 'river' ? 22 : 0);
-        if (labelled) labs.push({ type: 'Feature', properties: { role, name }, geometry: { type: 'Point', coordinates: place && place.kind === 'river' ? place.p : [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2] } });
-      } else if (place && labelled) {
-        labs.push({ type: 'Feature', properties: { role, name }, geometry: { type: 'Point', coordinates: place.p } });   // (a ridge or a peak has no outline: its name at its point)
+        at = place && place.kind === 'river' ? place.p : [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
       }
+      if (labelled && at) addPin(name, role, at);
     }
     const fc = (f) => ({ type: 'FeatureCollection', features: f });
-    for (const [s, f] of [['orb-geom', feats], ['orb-geom-wall', walls], ['orb-geom-lab', labs]]) if (map.getSource(s)) map.getSource(s).setData(fc(f));
+    for (const [s, f] of [['orb-geom', feats], ['orb-geom-wall', walls]]) if (map.getSource(s)) map.getSource(s).setData(fc(f));
   }
   // The place flash: on arrival, a quick pulse that shows what the place IS. A river: a bright comet runs downstream along it (the way the
   // water goes) from one end of the stretch on screen to the other, with its two ends marked; a range: the same along its crest; a lake
@@ -131,6 +155,7 @@ export function initOrbit(ctx) {
     if (src) src.setData({ type: 'FeatureCollection', features: list.map((m) => ({ type: 'Feature', properties: { name: m.n }, geometry: { type: 'Point', coordinates: m.pt } })) });
   }
   let placeRaf = 0;
+  let compareTimer = 0;
   const FLASH_MS = 1500;
   const easeIO = (x) => x * x * (3 - 2 * x);
   /** The line to run a comet along for a river or a range: the stretch of the chain nearest the point, within 22 km of it (so a long river does not blow out the view). */
@@ -304,7 +329,6 @@ export function initOrbit(ctx) {
       const none = { type: 'FeatureCollection', features: [] };
       map.addSource('orb-geom', { type: 'geojson', data: none });
       map.addSource('orb-geom-wall', { type: 'geojson', data: none });
-      map.addSource('orb-geom-lab', { type: 'geojson', data: none });
       map.addLayer({ id: 'orb-geom-fill', type: 'fill', source: 'orb-geom', filter: ['==', ['geometry-type'], 'Polygon'], layout: { visibility: 'none' }, paint: { 'fill-color': col, 'fill-opacity': 0.3 } }, before);
       map.addLayer({ id: 'orb-geom-fill2', type: 'fill', source: 'orb-geom', filter: ['==', ['geometry-type'], 'MultiPolygon'], layout: { visibility: 'none' }, paint: { 'fill-color': col, 'fill-opacity': 0.3 } }, before);
       map.addLayer({ id: 'orb-geom-casing', type: 'line', source: 'orb-geom', layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 6, 12, 11], 'line-opacity': 0.9 } }, before);
@@ -316,8 +340,8 @@ export function initOrbit(ctx) {
       map.addLayer({ id: 'orb-flash-glow', type: 'line', source: 'orb-flash', filter: ['==', ['get', 'k'], 'comet'], layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffd54a', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 12, 12, 22], 'line-blur': 6, 'line-opacity': ['*', 0.6, ['get', 'a']] } }, before);
       map.addLayer({ id: 'orb-flash-line', type: 'line', source: 'orb-flash', filter: ['==', ['get', 'k'], 'comet'], layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 5, 12, 9], 'line-opacity': ['get', 'a'] } }, before);
       map.addLayer({ id: 'orb-flash-dot', type: 'circle', source: 'orb-flash', filter: ['!=', ['get', 'k'], 'comet'], layout: { visibility: 'none' }, paint: { 'circle-radius': ['match', ['get', 'k'], 'ridge-end', 5, 8], 'circle-pitch-alignment': 'map', 'circle-color': ['match', ['get', 'k'], 'start', '#ffffff', 'ridge-end', '#ffffff', '#0b9a82'], 'circle-stroke-color': ['match', ['get', 'k'], 'start', '#0b9a82', 'ridge-end', '#0b9a82', '#ffffff'], 'circle-stroke-width': 3 } }, before);
-      map.addLayer({ id: 'orb-geom-name', type: 'symbol', source: 'orb-geom-lab', layout: { visibility: 'none', 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Medium'], 'text-size': 13, 'text-pitch-alignment': 'viewport', 'text-rotation-alignment': 'viewport', 'text-allow-overlap': true }, paint: { 'text-color': col, 'text-halo-color': '#ffffff', 'text-halo-width': 2 } });
     }
+    map.on('render', () => { if (pinEls.length) placePins(); });
     map.addSource('orb-target', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     const col = ['case', ['has', 'c'], ['get', 'c'], ['interpolate', ['linear'], ['get', 'h'], 6, '#e9e3d6', 60, '#d6cdbb', 200, '#bdb29d', 300, '#a99d88']];
     map.addLayer(
@@ -381,7 +405,7 @@ export function initOrbit(ctx) {
       map.stop();                                                // (terrain switched on or off in the middle of an ease makes MapLibre throw)
       map.setTerrain(on ? { source: 'orb-dem', exaggeration: 2.1 } : null);
     }
-    for (const id of ['orb-geom-fill', 'orb-geom-fill2', 'orb-geom-casing', 'orb-geom-line', 'orb-geom-wall', 'orb-geom-name', 'orb-town-name', 'orb-flash-glow', 'orb-flash-line', 'orb-flash-dot']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+    for (const id of ['orb-geom-fill', 'orb-geom-fill2', 'orb-geom-casing', 'orb-geom-line', 'orb-geom-wall', 'orb-town-name', 'orb-flash-glow', 'orb-flash-line', 'orb-flash-dot']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
     for (const id of ['orb-walk', 'orb-road', 'orb-park', 'orb-ghost', 'orb-others', 'orb-hood-fill', 'orb-hood-line', 'orb-hood-wall', 'orb-lab', 'orb-lm', 'orb-hood-name', 'orb-target']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
     if (on) {
       // no names on the map while this runs
@@ -624,6 +648,7 @@ export function initOrbit(ctx) {
     };
     // Swing over from wherever the camera is (the last tower, or the map you came from) to the next one, as the rest of the app
     // does between questions; the orbit starts when the camera arrives.
+    clearTimeout(compareTimer);
     q.flying = true;
     const go = () => {
       if (!run || q.t !== t || !q.flying) return;
@@ -726,6 +751,8 @@ export function initOrbit(ctx) {
   function stop() {
     cancelAnimationFrame(raf);
     cancelAnimationFrame(arcRaf);
+    clearTimeout(compareTimer);
+    clearPins();
     endFlash();
     if (flashed) flashTown(null, false);
     if (!run) return;
@@ -787,6 +814,15 @@ export function initOrbit(ctx) {
     endFlash();
     q.picked = name;
     q.ok = name === t.n;
+    if (!q.ok && cfg && t.k === 'nat') {
+      const o2 = city.list.find((x) => x.n === name);
+      if (o2) {
+        const dx = (o2.p[0] - t.p[0]) * 84200, dy = (o2.p[1] - t.p[1]) * 111000;
+        const dir = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'][Math.round((((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360) / 45) % 8];
+        const mi = Math.hypot(dx, dy) / 1609;
+        q.rel = `${o2.n} is about ${mi < 10 ? mi.toFixed(1) : Math.round(mi)} miles ${dir} of ${t.n}.`;
+      }
+    }
     const pts = q.ok ? Math.max(1, 3 - q.hints) : 0;
     run.n++;
     run.pts += pts;
@@ -823,8 +859,8 @@ export function initOrbit(ctx) {
     const boxH = map.getContainer().clientHeight || window.innerHeight;
     const hudEl = document.getElementById('hud'), sheetEl = document.getElementById('sheet');
     const mapTop = map.getContainer().getBoundingClientRect().top;
-    const top = (hudEl && !hudEl.hidden ? hudEl.getBoundingClientRect().bottom - mapTop : 0) + 24;
-    const bottom = (sheetEl && !sheetEl.hidden ? boxH - (sheetEl.getBoundingClientRect().top - mapTop) : 0) + 24;
+    const top = (hudEl && !hudEl.hidden ? hudEl.getBoundingClientRect().bottom - mapTop : 0) + 64;                      // (room for the pin and its name)
+    const bottom = (sheetEl && !sheetEl.hidden ? boxH - (sheetEl.getBoundingClientRect().top - mapTop) : 0) + 64;
     map.stop();
     // (not fitBounds: it refuses, and does nothing at all, when the two places will not fit with the padding, as with a river in the north and
     // one in the south; this works out the zoom for the area between the top card and the answers, and centres on the middle of that area)
@@ -834,6 +870,19 @@ export function initOrbit(ctx) {
     const mpp0 = 78271.5 * Math.cos((((bb[1] + bb[3]) / 2) * Math.PI) / 180);
     const z = Math.max(6.2, Math.min(12.4, Math.log2(Math.min((availW * mpp0) / dx, (availH * mpp0) / dy)) - 0.15));
     map.easeTo({ center: [(bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2], zoom: z, pitch: z < 8.8 ? 0 : 32, bearing: 0, padding: { top, bottom, left: 36, right: 36 }, duration: ctx.dur ? ctx.dur(1100) : 1100, essential: true });
+    // Far apart (a lake in the north and one in the south): at that height a lake is a speck, so after a look at where the two are, settle onto
+    // the right place and show its shape.
+    clearTimeout(compareTimer);
+    if (picked && mDist(picked.p, t.p) > 45000) {
+      compareTimer = setTimeout(() => {
+        if (!run || !q || !q.done || q.t !== t) return;
+        const g = city.geoms && city.geoms[t.n];
+        const b = g ? boundsOf(g, t.kind === 'river' ? t.p : null, t.kind === 'river' ? 22 : 0) : [t.p[0], t.p[1], t.p[0], t.p[1]];
+        const ext = Math.max((b[2] - b[0]) * 84200, (b[3] - b[1]) * 111000, 1800);
+        const z2 = Math.max(9.4, Math.min(12.2, Math.log2((0.55 * W * mpp0) / ext)));
+        map.easeTo({ center: t.kind === 'river' ? t.p : [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], zoom: z2, pitch: 40, bearing: 0, padding: { top, bottom, left: 36, right: 36 }, duration: ctx.dur ? ctx.dur(1300) : 1300, essential: true });
+      }, ctx.dur ? ctx.dur(2300) : 2300);
+    }
   }
 
   function reveal() {
@@ -841,7 +890,7 @@ export function initOrbit(ctx) {
     const pic = city.pics[t.n] || city.pics[ALIAS[t.n]];
     return `<div class="fb ${q.ok ? 'ok' : 'no'} orb-reveal">
       ${pic ? `<img class="orb-thumb" src="${esc(pic.img)}" alt="Photo of ${esc(t.n)}: tap to enlarge" data-n="${esc(t.n)}" tabindex="0" />` : ''}
-      <div><b>${q.ok ? '✓' : '✗'} ${esc(t.n)}</b> <span class="muted">${q.ok ? `+${q.pts}` : ''}</span>${cfg && t.k === 'nat' && !q.ok && q.picked ? `<div class="orb-legend"><span style="display:inline-block;width:.8em;height:.8em;border-radius:2px;background:${GEOM_COLOR.target};margin-right:.35em"></span>${esc(t.n)}<br><span style="display:inline-block;width:.8em;height:.8em;border-radius:2px;background:${GEOM_COLOR.wrong};margin-right:.35em"></span>${esc(q.picked)} <span class="muted">(your pick)</span></div>` : ''}<br>
+      <div><b>${q.ok ? '✓' : '✗'} ${esc(t.n)}</b> <span class="muted">${q.ok ? `+${q.pts}` : ''}</span>${cfg && t.k === 'nat' && !q.ok && q.picked ? `<div class="orb-legend"><span style="display:inline-block;width:.8em;height:.8em;border-radius:2px;background:${GEOM_COLOR.target};margin-right:.35em"></span>${esc(t.n)}<br><span style="display:inline-block;width:.8em;height:.8em;border-radius:2px;background:${GEOM_COLOR.wrong};margin-right:.35em"></span>${esc(q.picked)} <span class="muted">(your pick)</span>${q.rel ? `<br><span class="muted">${esc(q.rel)}</span>` : ''}</div>` : ''}<br>
       ${esc(t.line)}.<br><span class="muted">${t.k === 'nat' ? `${t.elev ? `${t.elev.toLocaleString()} ft · ` : ''}${townsOf(t).length > 1 ? `${t.kind === 'river' ? 'Through ' : t.kind === 'mountain' ? 'Across ' : 'In '}${esc(listOf(townsOf(t), 14))} (${townsOf(t).length} towns, ${countiesOf(t).length > 1 ? `${esc(listOf(countiesOf(t), 8))} counties` : `${esc(countiesOf(t)[0])} County`})` : `${esc(t.at)}, ${esc(t.c)} County`}` : `${t.k === 'lm' ? '' : `${t.h} m (${ft(t.h)} ft) · `}${t.y} · ${esc(t.at)}`}</span></div>
     </div>`;
   }
