@@ -14,11 +14,8 @@
 // Not done (MapLibre has no vertex stage to hook): the PS1's vertex wobble and affine texture warping.
 // The panels, text and buttons are DOM above the map and stay sharp.
 
-const LEVELS = [
-  null,
-  null,   // (a softer PS2 level was tried and dropped)
-  { name: 'PS1', ratio: 0.5, smooth: false, levels: 10, dither: 0.12, grain: 0, fog: 0.75, tone: 'contrast(1.12) saturate(1.05)' },
-];
+import { RETRO } from './looks.config.js';
+const LEVELS = [null, null, RETRO.crisp, RETRO.generic];   // 2: PS1 with crisp DOM labels, 3: PS1 over a map whose text stays as drawn
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -58,7 +55,7 @@ export function createRetro(map) {
     get level() { return level; },
     get name() { return level ? LEVELS[level].name : 'Off'; },
     apply(want) {
-      want = Math.max(0, Math.min(2, want | 0));
+      want = Math.max(0, Math.min(3, want | 0));
       const L = LEVELS[want];
       const canvas = map.getCanvas();
       if (want && !level) {
@@ -87,10 +84,10 @@ export function createRetro(map) {
       ditherEl.hidden = !(L.dither || L.grain);
       ditherEl.style.opacity = String(L.dither || L.grain);
       ditherEl.style.imageRendering = 'pixelated';
-      ditherEl.style.backgroundSize = want === 2 ? '6px 6px' : '3px 3px';
+      ditherEl.style.backgroundSize = want >= 2 ? '4px 4px' : '3px 3px';
       // draw distance
       try {
-        const fog = document.body.classList.contains('paper') ? '#efe8b4' : want === 2 ? '#02101a' : '#031722';
+        const fog = document.body.classList.contains('paper') ? '#efe8b4' : '#031722';
         if (map.setSky) map.setSky({ 'sky-color': fog, 'horizon-color': fog, 'fog-color': fog, 'sky-horizon-blend': 0.6, 'horizon-fog-blend': L.fog, 'fog-ground-blend': L.fog * 0.8, 'atmosphere-blend': 0 });
       } catch { /* no sky support: skip the fog */ }
     },

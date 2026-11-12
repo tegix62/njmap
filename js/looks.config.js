@@ -1,0 +1,71 @@
+// EVERY KNOB OF THE LOOKS, IN ONE PLACE.
+//
+// The app has three looks (see js/looks.js): Default (the app's own Ink/Classic theme), Paper (a printed road map)
+// and PS1 (a projection-table map drawn at PlayStation-1 resolution). Their colours and strengths are all here; the code
+// that applies them is js/paper.js, js/holo.js (PS1 colours), js/retro.js (PS1 resolution/dither/fog) and js/world.js
+// (texture in map space). Change a number here and every game mode picks it up on the next load.
+
+// ---- PS1: colours of the projection table --------------------------------------------------------------
+export const HOLO = {
+  void: '#02101a',
+  land: '#04202c',
+  water: '#0a5a72',
+  line: '#2aa8c4',
+  glow: '#7ffcff',
+  target: '#3df5d0',      // what a question is about
+  wrong: '#ff8a4a',       // what you picked, when wrong
+  text: '#bff7ff',
+  halo: '#021017',
+};
+
+// ---- Paper: palette after a Gulf road map of Washington, D.C. ----------------------------------------------
+export const PAPER = {
+  stock: '#f4efc4',
+  land: '#f6f1c9',
+  water: '#c3dcee',
+  waterInk: '#3f78ad',
+  ink: '#1d2a5b',
+  line: '#6a6a58',
+  road: '#e4893e',
+  hwy: '#d4552b',
+  target: '#e8603a',
+  wrong: '#2f6fb5',
+  fringeA: '#f2d63c',     // the two off-register plates behind a coloured mass
+  fringeB: '#3d78c9',
+  text: '#1d2a5b',
+  halo: '#f6f1c9',
+  band: ['match', ['get', 'band'], 0, 0.45, 1, 0.6, 2, 0.82, 0.5],   // a mountain's three bands, as flat ink strengths
+};
+
+// ---- PS1: resolution, colour levels, dither, fog ------------------------------------------------------------
+//   ratio   render scale (0.5 = each rendered pixel is 2 screen pixels); levels  colour steps per channel
+//   crisp   true: map text is hidden in favour of crisp DOM labels (games that supply them); false: map text stays as drawn
+export const RETRO = {
+  crisp:   { name: 'PS1', ratio: 0.5, smooth: false, levels: 10, dither: 0.12, fog: 0.75, tone: 'contrast(1.12) saturate(1.05)' },
+  generic: { name: 'PS1', ratio: 0.75, smooth: false, levels: 14, dither: 0.08, fog: 0.5, tone: 'contrast(1.08) saturate(1.05)' },
+};
+
+// ---- Numbers ---------------------------------------------------------------------------------------------------
+export const TUNE = {
+  paper: {
+    grain: 0.4,              // fibre over the whole sheet
+    blots: 0.04,             // soft ink/stock blotches (each of 6 stacked rings)
+    inkTexture: 0.9,         // pinholes and flecks over coloured masses
+    glow: 0.26,              // dark ink bleed under the main lines
+    registration: 0.4,       // blue off-register copy of the main lines
+    registrationOffset: [1.6, 1.2],
+    plateOpacity: 0.55,      // yellow and blue plates behind coloured masses
+    plateOffsetA: [4, 3],
+    plateOffsetB: [-3, -3],
+    roughenMetres: 55,       // how far hand-pulled edges wander (answer outlines)
+    creaseOpacity: 0.3,
+    pinholes: 5000,          // count over the region
+  },
+  ps1: {
+    gridStep: 0.05,          // degrees between graticule lines (every fifth is major)
+    gridMinor: 0.13,         // graticule opacity
+    gridMajor: 0.34,
+    bandMetres: 40,          // elevation step of the terrain shading
+    outlineWidth: [4, 7],    // answer outline width at zoom 8 and 12
+  },
+};

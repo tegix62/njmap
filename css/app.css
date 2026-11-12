@@ -3289,3 +3289,7 @@ body.paper .px-label { font-family: 'Gill Sans', 'Trebuchet MS', system-ui, sans
 body.paper .q, body.paper .choice, body.paper .qkind { text-shadow: 0 0 1px rgba(29, 42, 91, 0.45); }
 
 /* (paper text carries no glow or offset plate: on small text both turned to mud; the bleed and misregistration live on the map linework and masses) */
+
+.gamerow { display: flex; align-items: center; gap: 8px; }
+.gamerow .gamebar { width: auto; flex: 1; }
+.gamerow .chip { flex: none; white-space: nowrap; text-transform: none; letter-spacing: 0; font-size: 12px; padding: 3px 9px; }

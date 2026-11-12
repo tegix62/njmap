@@ -1,4 +1,5 @@
 import { blots, specks, creases, grainImage, inkImage } from './world.js';
+import { PAPER, TUNE } from './looks.config.js';
 
 // "Paper" look for a map: a printed road map from the 1960s–70s (cream stock, a few flat spot inks, halftone water,
 // plates that don't quite line up, fold creases). Same shape as js/holo.js:
@@ -11,23 +12,7 @@ import { blots, specks, creases, grainImage, inkImage } from './world.js';
 // parks, pale blue water, thin dark linework, orange arterials.
 // Only paint properties are changed, each remembered before it is; the overlay and panels are CSS under `body.paper`.
 
-export const PAPER = {
-  stock: '#f4efc4',
-  land: '#f6f1c9',
-  water: '#c3dcee',
-  waterInk: '#3f78ad',
-  ink: '#1d2a5b',
-  line: '#6a6a58',
-  road: '#e4893e',
-  hwy: '#d4552b',
-  target: '#e8603a',
-  wrong: '#2f6fb5',
-  fringeA: '#f2d63c',      // the two off-register plates behind a coloured mass
-  fringeB: '#3d78c9',
-  text: '#1d2a5b',
-  halo: '#f6f1c9',
-  band: ['match', ['get', 'band'], 0, 0.45, 1, 0.6, 2, 0.82, 0.5],   // a mountain's three bands, as flat ink strengths
-};
+export { PAPER };
 
 const BASE = {
   bg: { 'background-color': PAPER.stock },
@@ -56,13 +41,22 @@ function dotsImage(rgb = [63, 120, 173]) {
 
 export function createPaper(map, bounds) {
   const saved = new Map();
-  let on = false;
+  let on = false, fillsOn = false;
 
   const set = (id, prop, val) => {
     if (!map.getLayer(id)) return;
     const key = id + '|' + prop;
     if (!saved.has(key)) saved.set(key, map.getPaintProperty(id, prop));
     map.setPaintProperty(id, prop, val);
+  };
+  /** Put back only one layer's saved paint (used when a game stops asking for the county fill to be recoloured). */
+  const restoreLayer = (lid) => {
+    for (const [key, v] of [...saved]) {
+      const [id, prop] = key.split('|');
+      if (id !== lid) continue;
+      if (map.getLayer(id)) map.setPaintProperty(id, prop, v === undefined ? null : v);
+      saved.delete(key);
+    }
   };
   const restore = () => {
     for (const [key, v] of saved) {
@@ -87,9 +81,9 @@ export function createPaper(map, bounds) {
     map.addSource('orb-paper-blots', { type: 'geojson', data: blots(bounds) });
     map.addSource('orb-paper-creases', { type: 'geojson', data: creases(bounds) });
     map.addSource('orb-paper-specks', { type: 'geojson', data: specks(bounds) });
-    map.addLayer({ id: 'orb-paper-grain', type: 'fill', source: 'orb-paper-sheet', layout: hide, paint: { 'fill-pattern': 'paper-grain', 'fill-opacity': 0.4 } }, under);
-    map.addLayer({ id: 'orb-paper-blots', type: 'fill', source: 'orb-paper-blots', layout: hide, paint: { 'fill-color': ['case', ['==', ['get', 'w'], 1], '#8a6a2c', '#1d2a5b'], 'fill-opacity': 0.04 } }, under);
-    map.addLayer({ id: 'orb-paper-crease-dark', type: 'line', source: 'orb-paper-creases', layout: hide, paint: { 'line-color': '#6e5a28', 'line-opacity': 0.3, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.8, 12, 1.6], 'line-blur': 0.6 } }, under);
+    map.addLayer({ id: 'orb-paper-grain', type: 'fill', source: 'orb-paper-sheet', layout: hide, paint: { 'fill-pattern': 'paper-grain', 'fill-opacity': TUNE.paper.grain } }, under);
+    map.addLayer({ id: 'orb-paper-blots', type: 'fill', source: 'orb-paper-blots', layout: hide, paint: { 'fill-color': ['case', ['==', ['get', 'w'], 1], '#8a6a2c', '#1d2a5b'], 'fill-opacity': TUNE.paper.blots } }, under);
+    map.addLayer({ id: 'orb-paper-crease-dark', type: 'line', source: 'orb-paper-creases', layout: hide, paint: { 'line-color': '#6e5a28', 'line-opacity': TUNE.paper.creaseOpacity, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.8, 12, 1.6], 'line-blur': 0.6 } }, under);
     map.addLayer({ id: 'orb-paper-crease-pale', type: 'line', source: 'orb-paper-creases', layout: hide, paint: { 'line-color': '#fffff0', 'line-opacity': 0.6, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.8, 12, 1.5], 'line-translate': [1.6, 1], 'line-blur': 0.5 } }, under);
     map.addLayer({ id: 'orb-paper-specks', type: 'circle', source: 'orb-paper-specks', layout: hide, paint: { 'circle-color': PAPER.halo, 'circle-opacity': 0.9, 'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, ['*', 0.7, ['+', 0.6, ['get', 's']]], 13, ['*', 1.8, ['+', 0.6, ['get', 's']]]], 'circle-pitch-alignment': 'map' } }, over);
   }
@@ -108,8 +102,8 @@ export function createPaper(map, bounds) {
       if (!s || s.type !== 'line') continue;
       const w = ['interpolate', ['linear'], ['zoom'], 8, id === 'county-line' ? 3.2 : 2.4, 12, id === 'county-line' ? 6 : 4.5];
       const base = { ...s, layout: { ...(s.layout || {}), visibility: 'none' } };
-      map.addLayer({ ...base, id: id + '-pglow', paint: { 'line-color': PAPER.ink, 'line-opacity': 0.26, 'line-blur': 3, 'line-width': w } }, id);
-      if (id !== 'muni-line') map.addLayer({ ...base, id: id + '-preg', paint: { 'line-color': PAPER.fringeB, 'line-opacity': 0.4, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 12, 2], 'line-translate': [1.6, 1.2], 'line-translate-anchor': 'viewport' } }, id);
+      map.addLayer({ ...base, id: id + '-pglow', paint: { 'line-color': PAPER.ink, 'line-opacity': TUNE.paper.glow, 'line-blur': 3, 'line-width': w } }, id);
+      if (id !== 'muni-line') map.addLayer({ ...base, id: id + '-preg', paint: { 'line-color': PAPER.fringeB, 'line-opacity': TUNE.paper.registration, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 12, 2], 'line-translate': TUNE.paper.registrationOffset, 'line-translate-anchor': 'viewport' } }, id);
       GLOW.push(id + '-pglow');
       if (id !== 'muni-line') GLOW.push(id + '-preg');
     }
@@ -121,9 +115,9 @@ export function createPaper(map, bounds) {
     const before = 'orb-geom-band';
     const f = ['any', ['has', 'band'], ['==', ['geometry-type'], 'Polygon'], ['==', ['geometry-type'], 'MultiPolygon']];
     if (!map.hasImage('paper-ink')) map.addImage('paper-ink', inkImage(), { pixelRatio: 2 });
-    map.addLayer({ id: 'orb-paper-inktex', type: 'fill', source: 'orb-geom', filter: f, layout: { visibility: 'none' }, paint: { 'fill-pattern': 'paper-ink', 'fill-opacity': 0.9 } }, map.getLayer('orb-geom-fill') ? 'orb-geom-fill' : undefined);
-    for (const [id, col, tr] of [['orb-paper-a', PAPER.fringeA, [4, 3]], ['orb-paper-b', PAPER.fringeB, [-3, -3]]])
-      map.addLayer({ id, type: 'fill', source: 'orb-geom', filter: f, layout: { visibility: 'none' }, paint: { 'fill-color': col, 'fill-opacity': 0.55, 'fill-translate': tr, 'fill-translate-anchor': 'viewport' } }, before);
+    map.addLayer({ id: 'orb-paper-inktex', type: 'fill', source: 'orb-geom', filter: f, layout: { visibility: 'none' }, paint: { 'fill-pattern': 'paper-ink', 'fill-opacity': TUNE.paper.inkTexture } }, map.getLayer('orb-geom-fill') ? 'orb-geom-fill' : undefined);
+    for (const [id, col, tr] of [['orb-paper-a', PAPER.fringeA, TUNE.paper.plateOffsetA], ['orb-paper-b', PAPER.fringeB, TUNE.paper.plateOffsetB]])
+      map.addLayer({ id, type: 'fill', source: 'orb-geom', filter: f, layout: { visibility: 'none' }, paint: { 'fill-color': col, 'fill-opacity': TUNE.paper.plateOpacity, 'fill-translate': tr, 'fill-translate-anchor': 'viewport' } }, before);
   }
 
   /** What the game draws on top, in this look. */
@@ -155,6 +149,15 @@ export function createPaper(map, bounds) {
 
   return {
     get on() { return on; },
+    /** Whether this look also recolours the town/county fills. Off for games that colour them to mean something (knowledge shading, highlights). */
+    fills(want) {
+      want = !!want;
+      if (want === fillsOn) return;
+      fillsOn = want;
+      if (!on) return;
+      if (want) for (const [p, v] of Object.entries(BASE['muni-fill'])) set('muni-fill', p, v);
+      else restoreLayer('muni-fill');
+    },
     apply(want) {
       want = !!want;
       if (want === on) { if (want) { plates(); world(); game(); } return; }
@@ -164,7 +167,7 @@ export function createPaper(map, bounds) {
         plates();
         world();
         linework();
-        for (const [id, props] of Object.entries(BASE)) for (const [p, v] of Object.entries(props)) set(id, p, v);
+        for (const [id, props] of Object.entries(BASE)) if (id !== 'muni-fill' || fillsOn) for (const [p, v] of Object.entries(props)) set(id, p, v);
         for (const [id, b] of Object.entries(BLEED)) set(id, 'line-blur', b);
         game();
         for (const id of ['orb-paper-a', 'orb-paper-b', ...WORLD, ...GLOW]) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');

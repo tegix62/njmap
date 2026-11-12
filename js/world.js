@@ -1,3 +1,5 @@
+import { TUNE } from './looks.config.js';
+
 // Texture that belongs to the map, not the screen.
 //
 // A grain, crease or grid laid over the screen stays put while the map moves under it, which reads as a filter. Everything
@@ -43,7 +45,7 @@ export function blots([[w, s], [e, n]], count = 120, seed = 7) {
 }
 
 /** Pinholes: scattered points over the region. */
-export function specks([[w, s], [e, n]], count = 5000, seed = 3) {
+export function specks([[w, s], [e, n]], count = TUNE.paper.pinholes, seed = 3) {
   const r = rng(seed), out = [];
   for (let i = 0; i < count; i++)
     out.push({ type: 'Feature', properties: { s: r() }, geometry: { type: 'Point', coordinates: [w + r() * (e - w), s + r() * (n - s)] } });
@@ -111,7 +113,7 @@ function vnoise(x, y) {
  * Hand-pulled edges: every line and ring is cut into short pieces and each point pushed sideways by noise that depends only on where it is
  * on the Earth (so the wobble is part of the land and does not swim as the map moves). amp in metres.
  */
-export function roughen(geom, amp = 55) {
+export function roughen(geom, amp = TUNE.paper.roughenMetres) {
   const rough = (coords) => {
     const out = [];
     for (let i = 0; i < coords.length; i++) {

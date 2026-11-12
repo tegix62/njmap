@@ -1,4 +1,5 @@
 import { graticule } from './world.js';
+import { HOLO, TUNE } from './looks.config.js';
 
 // "Hologram" look for a map: a dark projection table with the land drawn as stacked elevation bands,
 // everything else reduced to thin glowing lines. One module so any game can switch it on.
@@ -10,17 +11,7 @@ import { graticule } from './world.js';
 // Only paint properties are changed, and each one is remembered before it is, so turning it off restores the
 // theme (Ink or Classic) whatever it was. The panels, buttons and scan overlay are CSS under `body.holo`.
 
-export const HOLO = {
-  void: '#02101a',
-  land: '#04202c',
-  water: '#0a5a72',
-  line: '#2aa8c4',
-  glow: '#7ffcff',
-  target: '#3df5d0',
-  wrong: '#ff8a4a',
-  text: '#bff7ff',
-  halo: '#021017',
-};
+export { HOLO };
 
 // base-map layers (the app's own style, js/style.js) and what the hologram does to them
 const BASE = {
@@ -39,7 +30,7 @@ const BASE = {
 
 // the elevation bands: a quiet ground. Every STEP metres the shade steps up a little, with no bright rim, so the relief
 // is felt rather than drawn (the first version had a lit rim on every band and fought the outlines)
-const STEP = 40;
+const STEP = TUNE.ps1.bandMetres;
 function reliefColor() {
   const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
   const rgb = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
@@ -57,13 +48,22 @@ const body = () => document.body;
 
 export function createHolo(map, bounds) {
   const saved = new Map();   // `${layer}|${prop}` → original value
-  let on = false;
+  let on = false, fillsOn = false;
 
   const set = (id, prop, val) => {
     if (!map.getLayer(id)) return;
     const key = id + '|' + prop;
     if (!saved.has(key)) saved.set(key, map.getPaintProperty(id, prop));
     map.setPaintProperty(id, prop, val);
+  };
+  /** Put back only one layer's saved paint (used when a game stops asking for the county fill to be recoloured). */
+  const restoreLayer = (lid) => {
+    for (const [key, v] of [...saved]) {
+      const [id, prop] = key.split('|');
+      if (id !== lid) continue;
+      if (map.getLayer(id)) map.setPaintProperty(id, prop, v === undefined ? null : v);
+      saved.delete(key);
+    }
   };
   const restore = () => {
     for (const [key, v] of saved) {
@@ -82,9 +82,9 @@ export function createHolo(map, bounds) {
   /** The table's graticule: lines of latitude and longitude on the ground (so it moves with the land, unlike a grid on the screen). */
   function grid() {
     if (!bounds || map.getSource('holo-grid')) return;
-    map.addSource('holo-grid', { type: 'geojson', data: graticule(bounds) });
+    map.addSource('holo-grid', { type: 'geojson', data: graticule(bounds, TUNE.ps1.gridStep) });
     const before = map.getLayer('river') ? 'river' : undefined;
-    map.addLayer({ id: 'holo-grid', type: 'line', source: 'holo-grid', layout: { visibility: 'none' }, paint: { 'line-color': '#3cc3e0', 'line-opacity': ['case', ['==', ['get', 'm'], 1], 0.34, 0.13], 'line-width': ['case', ['==', ['get', 'm'], 1], 1.1, 0.7] } }, before);
+    map.addLayer({ id: 'holo-grid', type: 'line', source: 'holo-grid', layout: { visibility: 'none' }, paint: { 'line-color': '#3cc3e0', 'line-opacity': ['case', ['==', ['get', 'm'], 1], TUNE.ps1.gridMajor, TUNE.ps1.gridMinor], 'line-width': ['case', ['==', ['get', 'm'], 1], 1.1, 0.7] } }, before);
   }
 
   /** The look of what the game itself draws on top (outlines, bands, flash, names). */
@@ -92,7 +92,7 @@ export function createHolo(map, bounds) {
     const col = ['match', ['get', 'role'], 'wrong', onNow ? HOLO.wrong : '#d9622b', onNow ? HOLO.target : '#0b9a82'];
     for (const id of ['orb-geom-band', 'orb-geom-fill', 'orb-geom-fill2']) set(id, 'fill-color', col);
     set('orb-geom-line', 'line-color', col);
-    set('orb-geom-line', 'line-width', ['interpolate', ['linear'], ['zoom'], 8, 4, 12, 7]);
+    set('orb-geom-line', 'line-width', ['interpolate', ['linear'], ['zoom'], 8, TUNE.ps1.outlineWidth[0], 12, TUNE.ps1.outlineWidth[1]]);
     set('orb-geom-wall', 'fill-extrusion-color', col);
     set('orb-geom-casing', 'line-color', HOLO.halo);
     set('orb-geom-casing', 'line-opacity', 0.75);
@@ -111,6 +111,15 @@ export function createHolo(map, bounds) {
 
   return {
     get on() { return on; },
+    /** Whether this look also recolours the town/county fills. Off for games that colour them to mean something (knowledge shading, highlights). */
+    fills(want) {
+      want = !!want;
+      if (want === fillsOn) return;
+      fillsOn = want;
+      if (!on) return;
+      if (want) for (const [p, v] of Object.entries(BASE['muni-fill'])) set('muni-fill', p, v);
+      else restoreLayer('muni-fill');
+    },
     apply(want) {
       want = !!want;
       if (want === on) { if (want) { ensureRelief(); game(true); } return; }
@@ -119,7 +128,7 @@ export function createHolo(map, bounds) {
       if (on) {
         ensureRelief();
         grid();
-        for (const [id, props] of Object.entries(BASE)) for (const [p, v] of Object.entries(props)) set(id, p, v);
+        for (const [id, props] of Object.entries(BASE)) if (id !== 'muni-fill' || fillsOn) for (const [p, v] of Object.entries(props)) set(id, p, v);
         game(true);
         for (const id of ['holo-relief', 'holo-grid']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
       } else {

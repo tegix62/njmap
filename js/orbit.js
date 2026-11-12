@@ -6,10 +6,9 @@
 import { buildingFeatures, applySurveyTowers, applyParts, loadParts, loadSurveyTowers, groundFeatures, GROUND_PAINT } from './city3d.js';
 import { createMeshLayer, meshInfo } from './meshes.js';
 import { choicesHtml, hintsHtml, whereHtml } from './ui.js';
-import { createHolo } from './holo.js';
-import { createPaper, PAPER } from './paper.js';
+import { PAPER } from './looks.config.js';
 import { roughen } from './world.js';
-import { createRetro, createLabels } from './retro.js';
+import { createLabels } from './retro.js';
 
 const KEY = 'orbit';
 const ROUND = 10;
@@ -82,33 +81,18 @@ export function initOrbit(ctx) {
   let city = null; // loaded once: { feats, cx, cy, list, pics }
   let loading = null;
   const meshes = createMeshLayer(map); // the towers the survey has as real triangle meshes
-  const holo = createHolo(map, ctx.region.bounds);                // the projection-table look (js/holo.js), on while the game runs unless turned off
-  const paper = createPaper(map, ctx.region.bounds);              // the printed-road-map look (js/paper.js)
-  // the look: 'plain' (the app's own theme), 'paper' (a printed road map) or 'ps1' (projection-table terrain drawn at PlayStation-1 resolution,
-  // dithered, with crisp labels). The old 'holo' setting is the PS1 look now.
-  const savedLook = ctx.store.get('orbit.look', 'plain');
-  let look = savedLook === 'holo' ? 'ps1' : savedLook;
-  const LOOKS = ['plain', 'paper', 'ps1'];
-  const LOOK_LABEL = { plain: '▢ Default', paper: '▤ Paper', ps1: '🕹 PS1' };
-  const retro = createRetro(map);              // the low-resolution / dither / fog pass (js/retro.js)
-  const applyLook = (on) => {
-    const wantHolo = on && look === 'ps1', wantPaper = on && look === 'paper';
-    // switch the old look OFF before the new one goes on: each look saves the paint it finds and puts it back, so a look that saved
-    // while another was still on would later restore that other look's colours (the map stayed half-paper under Default)
-    if (!wantHolo) holo.apply(false);
-    if (!wantPaper) paper.apply(false);
-    holo.apply(wantHolo);
-    paper.apply(wantPaper);
-    retro.apply(wantHolo ? 2 : 0);
-    syncLabels();
-  };
-  const roleColor = (r) => (paper.on ? paper.color(r) : holo.color(r));
-  const curBand = () => (paper.on ? PAPER.band : BAND_OPACITY);
+  // the look (Default / Paper / PS1) is the app's, shared by every game: ctx.looks (js/looks.js). This game asks it to recolour the county
+  // fills too (it does not colour them itself) and says it draws its own crisp labels, so PS1 can hide the map's text and render coarser.
+  const looks = ctx.looks;
+  const applyLook = (on) => { looks.use(on ? { fills: true, crisp: true } : {}); syncLabels(); };
+  const roleColor = (r) => looks.roleColor(r);
+  const curBand = () => (looks.paperOn ? PAPER.band : BAND_OPACITY);
   const pxLabels = createLabels(map);          // town names as crisp text above a low-resolution map
   let gameOn = false;
+  looks.on(() => { if (gameOn) { syncLabels(); if (run && !run.loading) render(); } });
   /** Town names: drawn by the map normally, as DOM text over it while the retro pass is on. */
   const syncLabels = () => {
-    const px = gameOn && look === 'ps1';
+    const px = gameOn && looks.ps1On;
     pxLabels.show(px);
     if (map.getLayer('orb-town-name')) map.setLayoutProperty('orb-town-name', 'visibility', gameOn && !px ? 'visible' : 'none');
     // every other piece of map text would be blocky at low resolution too: under PS1 only the crisp labels and the HUD name things
@@ -177,7 +161,7 @@ export function initOrbit(ctx) {
       if (labelled && at) addPin(name, role, at);
     }
     const fc = (f) => ({ type: 'FeatureCollection', features: f });
-    if (paper.on) for (const f of feats) if (f.properties.band === undefined || true) f.geometry = roughen(f.geometry);   // hand-pulled edges, in map space
+    if (looks.paperOn) for (const f of feats) f.geometry = roughen(f.geometry);   // hand-pulled edges, in map space
     for (const [s, f] of [['orb-geom', feats], ['orb-geom-wall', walls]]) if (map.getSource(s)) map.getSource(s).setData(fc(f));
   }
   // The place flash: on arrival, a quick pulse that shows what the place IS. A river: a bright comet runs downstream along it (the way the
@@ -990,19 +974,13 @@ export function initOrbit(ctx) {
     const where = q.t.k === 'nat' ? (q.towns && q.towns.shown.length ? whereHtml(q.towns.shown.slice(0, 4).map((m) => m.n).join(' · ') + (q.towns.shown.length + q.towns.more > 4 ? ` · +${q.towns.shown.length + q.towns.more - 4} more` : '')) : '') : whereHtml(q.hood || '');
     ctx.hud(`<div class="qkind">${ICON} ${TITLE} · ${run.n + (q.done ? 0 : 1)}/${ROUND} · ${run.pts} pts${run.streak >= 3 ? ` · 🔥${run.streak}` : ''}</div><div class="q">${q.done ? (q.ok ? 'Yes.' : 'Not quite.') : q.flying ? 'Swinging over…' : (cfg ? `Which ${NOUN[q.t.kind] || 'place'} is this?` : q.t.k === 'lm' ? 'Which landmark is this?' : 'Which tower is this?')}</div>${q.flying ? '' : where}${q.flying ? '' : hints}`);
     ctx.sheet(`${run.opts.header()}<div id="qbody">
-      <div class="score row"><button type="button" id="orbSpin" class="chip toggle" aria-pressed="${spinOn}">${spinOn ? '↻ Orbit' : '✋ Drag'}</button>${cfg ? `<button type="button" id="orbHolo" class="chip toggle" aria-pressed="${look === 'plain'}">${LOOK_LABEL[look]}</button>` : ''}</div>
+      <div class="score row"><button type="button" id="orbSpin" class="chip toggle" aria-pressed="${spinOn}">${spinOn ? '↻ Orbit' : '✋ Drag'}</button></div>
       ${choicesHtml(q.choices, { attr: 'n', data: (c) => c.n, label: (c) => c.n, off: q.done || q.flying, state: (c) => (q.done ? (c.n === q.t.n ? 'right' : c.n === q.picked ? 'wrong' : '') : '') })}
       ${q.done ? `${reveal()}<div class="stickybar"><button class="primary" id="orbNext">${run.n >= ROUND ? 'Finish' : cfg || q.t.k === 'lm' ? 'Next' : 'Next tower'}</button></div>` : `<button id="orbHint" class="chip"${q.hints >= HINTS.length || q.flying ? ' disabled' : ''}>💡 Hint (−1 point)</button>`}
     </div>`);
     run.opts.bindHeader();
     for (const b of document.querySelectorAll('#sheet .choice')) b.addEventListener('click', () => answer(b.dataset.n));
     document.getElementById('orbNext')?.addEventListener('click', next);
-    document.getElementById('orbHolo')?.addEventListener('click', () => {
-      look = LOOKS[(LOOKS.indexOf(look) + 1) % 3];       // default → paper → PS1 → default
-      ctx.store.set('orbit.look', look);
-      applyLook(true);
-      render();
-    });
     document.getElementById('orbSpin')?.addEventListener('click', () => {
       spinOn = !spinOn;
       ctx.store.set('orbit.spin', spinOn);
@@ -1019,7 +997,7 @@ export function initOrbit(ctx) {
       return !!run;
     },
     _state: () => ({ run, q }),
-    _look: (v) => { look = v; applyLook(true); },
+    _look: (v) => looks.set(v),
     _flash: (name, u) => { const t = city.list.find((x) => x.n === name); drawFlash(t, flowOf(t), u); },   // (a single frame, for checking how it looks)
   };
 }

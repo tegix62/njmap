@@ -16,6 +16,7 @@ import { initGridGame } from './gridgame.js';
 import { initGridClassic } from './gridclassic.js';
 import { initFrames } from './frames.js';
 import { initOrbit } from './orbit.js';
+import { createLooks } from './looks.js';
 
 /** Map filter for one road, by the label people use ("I-287", "Columbia Turnpike"). */
 const roadFilter = (label) => (label ? ['==', LABEL_EXPR, label] : ['==', ['get', 'ref'], '__none__']);
@@ -30,6 +31,7 @@ const DEFAULT_SETTINGS = {
   driveQuiz: false, // spoken questions while driving (no tapping)
   driveQuizMin: 4, // minutes between them
   mapStyle: 'ink',
+  look: 'plain', // the map's look: plain (the theme), paper, or ps1 (see js/looks.js)
   basemap: 'streets',
   northUp: false,
   northLine: true, // Drive: a line from you to the N on the map edge
@@ -560,6 +562,7 @@ async function main() {
   ctx.gridup = initGridGame(ctx, 'uptown');
   ctx.gridclassic = initGridClassic(ctx);
   ctx.frames = initFrames(ctx);
+  ctx.looks = createLooks(ctx);   // before the games, so each can ask it for what it needs
   ctx.orbit = initOrbit(ctx);
   for (const m of munis) ctx.setKnow(m);
 
@@ -663,6 +666,7 @@ async function main() {
     ctx.saveSettings();
     if (k === 'basemap') ctx.setBasemap(el.value);
     if (k === 'mapStyle') location.reload();
+    if (k === 'look') ctx.looks.set(el.value);
     if (k === 'northUp') modes.drive.applyOrientation();
     if (k === 'driveInset') modes.drive.updateInset();
     if (k === 'rememberPlaces' && !el.checked) {
