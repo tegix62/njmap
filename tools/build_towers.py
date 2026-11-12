@@ -44,26 +44,62 @@ def chrysler(b):
     top = shaft[1]
     crown_top = 276.0   # where the arches end and the spire starts (the spire's tip is at the official 319 m)
     tip = 319.0
-    STONE, SILVER, GLASS, NEEDLE = '#e6e0d3', '#cfd4d9', '#8b939b', '#c5cbd0'
+    STONE, SILVER, DARK, NEEDLE = '#e6e0d3', '#d6dbe0', '#5f6a74', '#c5cbd0'
     coloured = [(lo, hi, g, STONE) for lo, hi, g in out]
-    # The crown, traced from a photograph: about 78% of the shaft's width where it starts, nearly that for the first third,
-    # then closing like an ogive to about 12% at the top: width(u) = 1 - 0.9 u^2.1 of that, u = 0 to 1 up the crown. Seven
-    # terraced arches, each a little narrower at its top (so the outline scallops), each a silver band under a darker band
-    # (the triangular windows).
-    ARCHES, RINGS = 7, 5
-    span = (crown_top - top) / ARCHES
-    for a in range(ARCHES):
-        for r in range(RINGS):
-            f = (r + 0.5) / RINGS
-            u = (a + f) / ARCHES
-            k = 0.78 * (1 - 0.9 * u ** 2.1) * (1 - 0.09 * f)
-            z0 = top + a * span + r * span / RINGS
-            coloured.append((z0, z0 + span / RINGS, affinity.scale(sp, k, k, origin=sp.centroid), SILVER if f < 0.6 else GLASS))
-    # the spire: a needle from 12% of the shaft's width at the top of the arches down to 3% at the tip
+    # The crown is seven nested arches (upside-down U shapes) on each of the four faces, over a dark core that shows between them
+    # as the triangular windows. Everything is in the shaft's own axes: u along its long side, v across it.
+    mrr = sp.minimum_rotated_rectangle
+    P = list(mrr.exterior.coords)[:4]
+    e1 = (P[1][0] - P[0][0], P[1][1] - P[0][1]); e2 = (P[2][0] - P[1][0], P[2][1] - P[1][1])
+    L1, L2 = math.hypot(*e1), math.hypot(*e2)
+    uu = (e1[0] / L1, e1[1] / L1); vv = (e2[0] / L2, e2[1] / L2)
+    hu, hv = L1 / 2, L2 / 2
+    cx, cy = sp.centroid.coords[0]
+    def rect(cu, cv, du, dv):
+        pts = []
+        for su, sv in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+            a_, b_ = cu + su * du, cv + sv * dv
+            pts.append([round(cx + uu[0] * a_ + vv[0] * b_, 1), round(cy + uu[1] * a_ + vv[1] * b_, 1)])
+        return Polygon(pts)
+    C = crown_top - top
+    def env(z):  # the crown's outline, as a share of the shaft's size: about 78% at the foot, closing like an ogive to ~8%
+        u = max(0.0, min(1.0, (z - top) / C))
+        return 0.78 * (1 - 0.92 * u ** 2.1)
+    # the dark core
+    z = top
+    while z < crown_top - 0.01:
+        z2 = min(z + 6.0, crown_top)
+        k = env((z + z2) / 2) * 0.86
+        coloured.append((z, z2, affinity.scale(sp, k, k, origin=sp.centroid), DARK))
+        z = z2
+    ARCHES, BAND, DEPTH = 7, 2.4, 1.2
+    for k in range(ARCHES):
+        apex = top + C * (0.34 + 0.095 * k)
+        frac = 1 - 0.115 * k                    # each inner arch spans a little less of the face
+        z = top
+        while z < apex - 0.01:
+            z2 = min(z + 3.0, apex)
+            zm = (z + z2) / 2
+            e = env(zm)
+            t = (zm - top) / (apex - top)
+            half = math.sqrt(max(0.0, 1 - t * t))   # a semi-ellipse standing on the foot of the crown
+            for along_u in (True, False):
+                span = (hu if along_u else hv) * e * frac * half   # how far each leg stands from the middle of the face
+                off = (hv if along_u else hu) * e * 0.97           # how far out the face is
+                for sgn in (-1, 1):
+                    if span <= BAND:       # the two legs have met: the top of the arch, one piece
+                        parts = [(0.0, max(span, 0.5))]
+                    else:
+                        parts = [(-(span - BAND / 2), BAND / 2), ((span - BAND / 2), BAND / 2)]
+                    for cu_, du_ in parts:
+                        g = rect(cu_, sgn * off, du_, DEPTH) if along_u else rect(sgn * off, cu_, DEPTH, du_)
+                        coloured.append((z, z2, g, SILVER))
+            z = z2
+    # the spire: a needle from 10% of the shaft's width at the top of the arches down to 3% at the tip
     z = crown_top
     while z < tip - 0.01:
         z2 = min(z + 6.0, tip)
-        k = 0.12 - 0.09 * ((z + z2) / 2 - crown_top) / (tip - crown_top)
+        k = 0.10 - 0.07 * ((z + z2) / 2 - crown_top) / (tip - crown_top)
         coloured.append((z, z2, affinity.scale(sp, k, k, origin=sp.centroid), NEEDLE))
         z = z2
     out = coloured
