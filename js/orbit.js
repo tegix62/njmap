@@ -3,7 +3,7 @@
 // Ten towers a round, four names to choose from. Hints cost a point (neighborhood, then height and year, then the corner it
 // stands on). The towers you miss come round more often. The shapes are the same ones Explore and the drive games stand up
 // (NYC's footprints and the surveyed towers); the base map's labels are hidden so nothing gives the name away.
-import { buildingFeatures, applySurveyTowers, loadSurveyTowers, groundFeatures, GROUND_PAINT } from './city3d.js';
+import { buildingFeatures, applySurveyTowers, applyParts, loadParts, loadSurveyTowers, groundFeatures, GROUND_PAINT } from './city3d.js';
 import { createMeshLayer } from './meshes.js';
 
 const KEY = 'orbit';
@@ -97,11 +97,12 @@ export function initOrbit(ctx) {
         ...AREAS.map((a) => fetch(`data/buildings-${a}.json`).then((r) => r.json())),
         ...AREAS.map((a) => fetch(`data/ground-${a}.json`).then((r) => r.json()).catch(() => null)),
         ...AREAS.map((a) => fetch(`data/${a}-streets.json`).then((r) => r.json()).catch(() => null)),
+        ...AREAS.map((a) => loadParts(a)),
       ]);
-      const files = rest.slice(0, 3), grounds = rest.slice(3, 6), streetFiles = rest.slice(6);
+      const files = rest.slice(0, 3), grounds = rest.slice(3, 6), streetFiles = rest.slice(6, 9), partFiles = rest.slice(9, 12);
       const md = canMesh ? await meshes.data() : null;
       const meshList = md ? md.t.map(({ n, lon, lat, h }) => ({ n, lon, lat, h })) : [];
-      const feats = applySurveyTowers(files.flatMap((d) => buildingFeatures(d)), towers, meshList);
+      const feats = applyParts(applySurveyTowers(files.flatMap((d, i) => buildingFeatures(d, partFiles[i])), towers, meshList));
       const cx = feats.map((f) => {
         const r = f.geometry.coordinates[0];
         let x = 0, y = 0;

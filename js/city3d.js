@@ -51,9 +51,18 @@ export function towerFeatures(ring, H, model) {
   }
 
 /** Decode data/buildings-midtown.json into GeoJSON features ({h: roof metres, lm: 1 where a landmark stands, or a model's pieces}). */
-export function buildingFeatures(d) {
+const partsOf = new WeakMap(); // plain building feature -> the OpenStreetMap parts it is drawn from (see applyParts)
+let partsCache = {};
+/** data/parts-<area>.json (tools/build_parts.py), once per area; null if it can't be had. */
+export function loadParts(area) {
+  return (partsCache[area] = partsCache[area] || fetch(`data/parts-${area}.json`).then((r) => r.json()).catch(() => null));
+}
+export function buildingFeatures(d, parts) {
   const feats = [];
+  const grp = new Map((parts ? parts.g : []).map((g) => [g[0], g]));
+  let bi = -1;
   for (const b of d.b) {
+    bi++;
     const ring = [];
     let x = 0, y = 0;
     for (let i = 2; i < b.length; i += 2) {
@@ -67,9 +76,34 @@ export function buildingFeatures(d) {
       continue;
     }
     ring.push(ring[0]);
-    feats.push({ type: 'Feature', properties: { h: b[0], lm: b[1] ? 1 : 0 }, geometry: { type: 'Polygon', coordinates: [ring] } });
+    const f = { type: 'Feature', properties: { h: b[0], lm: b[1] ? 1 : 0 }, geometry: { type: 'Polygon', coordinates: [ring] } };
+    if (grp.has(bi)) partsOf.set(f, { g: grp.get(bi), o: parts.o, s: parts.s });
+    feats.push(f);
   }
   return feats;
+}
+/**
+ * Draw the buildings that OpenStreetMap maps as parts (a podium and a tower, setbacks, floating floors) from those parts: each part
+ * from its base to its top. Run after applySurveyTowers: a building the survey replaced is already gone from `feats`.
+ */
+export function applyParts(feats) {
+  const out = [];
+  for (const f of feats) {
+    const p = partsOf.get(f);
+    if (!p) { out.push(f); continue; }
+    for (let k = 1; k < p.g.length; k++) {
+      const [base, top, ...flat] = p.g[k];
+      let x = 0, y = 0;
+      const ring = [];
+      for (let i = 0; i < flat.length; i += 2) {
+        x += flat[i]; y += flat[i + 1];
+        ring.push([p.o[0] + x / p.s, p.o[1] + y / p.s]);
+      }
+      ring.push(ring[0]);
+      out.push({ type: 'Feature', properties: { h: top, b: base, lm: f.properties.lm }, geometry: { type: 'Polygon', coordinates: [ring] } });
+    }
+  }
+  return out;
 }
 
 let towersPromise = null;

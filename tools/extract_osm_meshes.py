@@ -48,7 +48,8 @@ def earclip(pts):
     return out
 
 
-def fetch_parts():
+def fetch_parts(boxes=None):
+    BOXES_ = boxes or BOXES
     import urllib.request, re
     base = 'https://overturemaps-us-west-2.s3.us-west-2.amazonaws.com/'
     key = re.search(r'<Key>([^<]+\.parquet)</Key>', urllib.request.urlopen(base + f'?list-type=2&prefix=release/{RELEASE}/theme=buildings/type=building_part/').read().decode()).group(1)
@@ -59,11 +60,11 @@ def fetch_parts():
     for g in range(md.num_row_groups):
         rg = md.row_group(g)
         st = lambda n: (rg.column(ix[n]).statistics.min, rg.column(ix[n]).statistics.max)
-        if not any(not (st('bbox.xmax')[1] < B[0] or st('bbox.xmin')[0] > B[2] or st('bbox.ymax')[1] < B[1] or st('bbox.ymin')[0] > B[3]) for B in BOXES):
+        if not any(not (st('bbox.xmax')[1] < B[0] or st('bbox.xmin')[0] > B[2] or st('bbox.ymax')[1] < B[1] or st('bbox.ymin')[0] > B[3]) for B in BOXES_):
             continue
         for r in pf.read_row_group(g, columns=['height', 'min_height', 'geometry', 'bbox']).to_pylist():
             b = r['bbox']
-            if r['height'] and any(b['xmin'] > B[0] and b['xmax'] < B[2] and b['ymin'] > B[1] and b['ymax'] < B[3] for B in BOXES):
+            if r['height'] and any(b['xmin'] > B[0] and b['xmax'] < B[2] and b['ymin'] > B[1] and b['ymax'] < B[3] for B in BOXES_):
                 out.append((wkb.loads(bytes(r['geometry'])), r['min_height'] or 0.0, r['height']))
     return out
 
