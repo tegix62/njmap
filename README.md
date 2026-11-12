@@ -386,3 +386,5 @@ Lines are widened and brightened (county borders 2.6 px, highways 3.2 px, outlin
 Not done: a world-anchored ink shader (a custom WebGL layer that draws fibre, mottling and pinholes from noise in map coordinates). Risky next to terrain draping; not started.
 
 Paper text glow, tuned: the first version (soft 6 px dark glow) made text hard to read. It is now a tight, near-solid spread (1 px at 0.9 opacity on panel text; a 0.7 px, 0.3-blur halo on map labels) with a faint orange plate (0.22 opacity), so it only thickens the ink a hair.
+
+Looks fix: switching looks turned the new one on before the old one off, so a look saved the other look's colours as "original" and restored them later (Default still showed Paper's map colours and bold navy labels after PS1 → Default). `applyLook` now switches the old look off first. Paper text glow removed altogether: a dark glow of any size around small text turned it to mud on a phone; map labels use a plain stock-coloured halo again, and the bleed/misregistration stays on the linework and coloured masses.

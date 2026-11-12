@@ -91,7 +91,17 @@ export function initOrbit(ctx) {
   const LOOKS = ['plain', 'paper', 'ps1'];
   const LOOK_LABEL = { plain: '▢ Default', paper: '▤ Paper', ps1: '🕹 PS1' };
   const retro = createRetro(map);              // the low-resolution / dither / fog pass (js/retro.js)
-  const applyLook = (on) => { holo.apply(on && look === 'ps1'); paper.apply(on && look === 'paper'); retro.apply(on && look === 'ps1' ? 2 : 0); syncLabels(); };
+  const applyLook = (on) => {
+    const wantHolo = on && look === 'ps1', wantPaper = on && look === 'paper';
+    // switch the old look OFF before the new one goes on: each look saves the paint it finds and puts it back, so a look that saved
+    // while another was still on would later restore that other look's colours (the map stayed half-paper under Default)
+    if (!wantHolo) holo.apply(false);
+    if (!wantPaper) paper.apply(false);
+    holo.apply(wantHolo);
+    paper.apply(wantPaper);
+    retro.apply(wantHolo ? 2 : 0);
+    syncLabels();
+  };
   const roleColor = (r) => (paper.on ? paper.color(r) : holo.color(r));
   const curBand = () => (paper.on ? PAPER.band : BAND_OPACITY);
   const pxLabels = createLabels(map);          // town names as crisp text above a low-resolution map
