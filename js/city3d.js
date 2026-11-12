@@ -15,7 +15,8 @@ export const TOWERS = {
     '432 Park Avenue': { color: '#f0eee8', tiers: [{ h: 1, s: 1 }] },
     'Hearst Tower': { color: '#7a8a98', tiers: [{ h: 0.2, s: 1, color: '#cdbfa5' }, { h: 1, s: 0.7 }] },
     'New York Times Building': { color: '#cfd4d8', tiers: [{ h: 0.93, s: 1 }, { h: 1, s: 0.78 }], mast: { m: 89, s: 0.03, color: '#dfe5e9' } },
-    'One Vanderbilt': { color: '#c7ccd0', tiers: [{ h: 0.16, s: 1 }, { h: 0.38, s: 0.9 }, { h: 0.58, s: 0.78 }, { h: 0.76, s: 0.64 }, { h: 0.9, s: 0.5 }, { h: 1, s: 0.32 }], mast: { m: 20, s: 0.03, color: '#dfe5e9' } },
+    // a modern glass tower: a low podium, then a shaft that tapers all the way up and ends in a faceted point
+    'One Vanderbilt': { color: '#c5ccd1', tiers: [{ h: 0.1, s: 1, color: '#b3bcc3' }, { h: 0.18, s: 0.8 }, { h: 0.27, s: 0.75 }, { h: 0.36, s: 0.7 }, { h: 0.45, s: 0.66 }, { h: 0.54, s: 0.62 }, { h: 0.63, s: 0.58 }, { h: 0.71, s: 0.54 }, { h: 0.78, s: 0.49 }, { h: 0.84, s: 0.43 }, { h: 0.89, s: 0.36 }, { h: 0.93, s: 0.28 }, { h: 0.965, s: 0.19 }, { h: 1, s: 0.09 }], mast: { m: 22, s: 0.025, color: '#dfe5e9' } },
     'Central Park Tower': { color: '#d3d6d9', tiers: [{ h: 0.46, s: 1 }, { h: 0.62, s: 0.85 }, { h: 0.78, s: 0.78 }, { h: 1, s: 0.72 }] },
     'Waldorf Astoria': { color: '#d8cdb6', tiers: [{ h: 0.45, s: 1 }, { b: 0.45, h: 0.72, s: [0.36, 0.5], c: [0.28, 0.5] }, { b: 0.45, h: 0.72, s: [0.36, 0.5], c: [0.72, 0.5] }, { b: 0.72, h: 1, s: [0.2, 0.3], c: [0.28, 0.5] }, { b: 0.72, h: 1, s: [0.2, 0.3], c: [0.72, 0.5] }] },
     'Time Warner Center': { color: '#aeb9c2', tiers: [{ h: 0.25, s: 1 }, { b: 0.25, h: 1, s: [0.42, 1], c: [0.24, 0.5] }, { b: 0.25, h: 1, s: [0.42, 1], c: [0.76, 0.5] }] },

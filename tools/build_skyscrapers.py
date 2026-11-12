@@ -64,7 +64,43 @@ def check():
         print(f'{name:28s} {h:7d}  {str([(round(a), b) for a, b in near]):46s} {[(round(a), b, c) for a, b, c in sv]}')
 
 
+def footprints():
+    """(lon, lat, roof height m) of every building in the three footprint files (the middle of each outline)."""
+    feats = []
+    for area in ('downtown', 'midtown', 'uptown'):
+        d = json.load(open(os.path.join(ROOT, f'data/buildings-{area}.json')))
+        for b in d['b']:
+            x = y = 0
+            xs, ys = [], []
+            for i in range(2, len(b), 2):
+                x += b[i]; y += b[i + 1]
+                xs.append(d['o'][0] + x / d['s']); ys.append(d['o'][1] + y / d['s'])
+            feats.append((sum(xs) / len(xs), sum(ys) / len(ys), b[0]))
+    return feats
+
+
+def snap(p, h, feats):
+    """The middle of the real building: the nearest footprint within 110 m that is about this tall (the data's roof heights run
+    a good deal under the architectural height, which counts the spire: half to 1.3 times it)."""
+    best = None
+    for lo, la, hh in feats:
+        d = math.hypot((p[0] - lo) * 84200, (p[1] - la) * 111000)
+        if d < 110 and 0.5 * h <= hh <= 1.3 * h and (best is None or d < best[0]):
+            best = (d, (lo, la))
+    return best
+
+
 def write():
+    feats = footprints()
+    moved = []
+    for i, (n, p, h, y, line, at, hood) in enumerate(S):
+        b = snap(p, h, feats)
+        if b:
+            S[i] = (n, (round(b[1][0], 6), round(b[1][1], 6)), h, y, line, at, hood)
+            moved.append(f'{n} {b[0]:.0f} m')
+        else:
+            print('  NO footprint of about this height within 110 m:', n)
+    print('snapped to the footprint:', ', '.join(moved))
     out = [{'n': n, 'p': list(p), 'h': h, 'y': y, 'line': line, 'at': at, 'hood': hood} for n, p, h, y, line, at, hood in S]
     json.dump(out, open(os.path.join(ROOT, 'data/skyscrapers.json'), 'w'), ensure_ascii=False, separators=(',', ':'))
     path = os.path.join(ROOT, 'data/landmarks.json')

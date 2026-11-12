@@ -117,10 +117,10 @@ export function initOrbit(ctx) {
     const p = t.p;
     const ids = [], mine = [];
     // the building itself: the nearest one of about the right height (not its neighbours, even tall ones)
-    let main = -1, bd = 48;
+    let main = -1, bd = 110;
     city.feats.forEach((f, i) => {
       const d = mDist(city.cx[i], p);
-      if (d < bd && f.properties.h >= 0.7 * t.h * 0.85) { bd = d; main = i; }
+      if (d < bd && f.properties.h >= 0.5 * t.h) { bd = d; main = i; }
     });
     if (main >= 0) {
       const mc = city.cx[main];
@@ -140,11 +140,16 @@ export function initOrbit(ctx) {
 
   function camera(t, spin0) {
     cancelAnimationFrame(raf);
-    // zoomed out far enough to see the whole tower; its foot sits in the lower part of the free area, so it rises into the rest
-    const zoom = Math.max(14.6, Math.min(16.9, 17.3 - t.h * 0.0046));
+    // The foot of the tower sits low in the free area and the zoom is worked out so its top clears the top card: a tower this
+    // many metres high shows about sin(pitch) x height / (metres per pixel) pixels tall on the screen, with some slack for
+    // perspective.
     const pad = ctx.padding();
     const free = Math.max(120, window.innerHeight - pad.top - pad.bottom);
-    const top = pad.top + free * 0.34;
+    const top = pad.top + free * 0.42;
+    const baseY = (top + window.innerHeight - pad.bottom) / 2;
+    const avail = Math.max(120, baseY - pad.top - 28);
+    const mpp0 = 78271.5 * Math.cos((t.p[1] * Math.PI) / 180);
+    const zoom = Math.max(14.4, Math.min(17, Math.log2((mpp0 * avail) / (1.3 * Math.sin((PITCH * Math.PI) / 180) * t.h))));
     let bearing = spin0;
     let last = performance.now();
     map.jumpTo({ center: t.p, zoom, pitch: PITCH, bearing, padding: { top, bottom: pad.bottom, left: 0, right: 0 } });
