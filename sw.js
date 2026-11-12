@@ -2,7 +2,7 @@
 // cached, so "which town am I in" keeps working with no signal. Online, the
 // app's own files come from the network first (the latest version every time). Background map
 // tiles are only cached opportunistically.
-const VERSION = 'njtf-v140';
+const VERSION = 'njtf-v141';
 const SHELL = [
   './',
   'index.html',
@@ -81,7 +81,7 @@ self.addEventListener('fetch', (e) => {
           if (r.ok) c.put(req, r.clone());
           return r;
         });
-        const slow = new Promise((res) => setTimeout(res, 4000, null));
+        const slow = new Promise((res) => setTimeout(res, 8000, null));
         try {
           const r = await Promise.race([net, slow]);
           if (r) return r;

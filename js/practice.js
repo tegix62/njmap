@@ -579,7 +579,7 @@ export function initPractice(ctx) {
   }
   function next() {
     stopRapidTimer();
-    if (cfg.type !== 'orbit') ctx.orbit.stop();
+    if (cfg.type !== 'orbit') ctx.orbit?.stop();
     if (cfg.type === 'today') return nextToday();
     if (cfg.type === 'rapid') return nextRapid();
     if (cfg.type !== 'gridgame') ctx.gridgame.stop();
@@ -1671,7 +1671,7 @@ export function initPractice(ctx) {
       ctx.gridmid.stop();
       ctx.gridup.stop();
       ctx.gridclassic.stop();
-      ctx.orbit.stop();
+      ctx.orbit?.stop();
       ctx.frames.stop();
       ctx.clearHighlights();
       ctx.reveal([]);
