@@ -90,7 +90,7 @@ export function createRetro(map) {
       ditherEl.style.backgroundSize = want === 2 ? '6px 6px' : '3px 3px';
       // draw distance
       try {
-        const fog = want === 2 ? '#02101a' : '#031722';
+        const fog = document.body.classList.contains('paper') ? '#efe8b4' : want === 2 ? '#02101a' : '#031722';
         if (map.setSky) map.setSky({ 'sky-color': fog, 'horizon-color': fog, 'fog-color': fog, 'sky-horizon-blend': 0.6, 'horizon-fog-blend': L.fog, 'fog-ground-blend': L.fog * 0.8, 'atmosphere-blend': 0 });
       } catch { /* no sky support: skip the fog */ }
     },

@@ -7,6 +7,7 @@ import { buildingFeatures, applySurveyTowers, applyParts, loadParts, loadSurveyT
 import { createMeshLayer, meshInfo } from './meshes.js';
 import { choicesHtml, hintsHtml, whereHtml } from './ui.js';
 import { createHolo, createScan } from './holo.js';
+import { createPaper, PAPER } from './paper.js';
 import { createRetro, createLabels } from './retro.js';
 
 const KEY = 'orbit';
@@ -81,7 +82,13 @@ export function initOrbit(ctx) {
   let loading = null;
   const meshes = createMeshLayer(map); // the towers the survey has as real triangle meshes
   const holo = createHolo(map);                // the projection-table look (js/holo.js), on while the game runs unless turned off
-  let holoOn = ctx.store.get('orbit.holo', true);
+  const paper = createPaper(map);              // the printed-road-map look (js/paper.js)
+  // the look: 'holo' (projection table), 'paper' (printed map) or 'plain' (the app's own theme); the older on/off setting still counts
+  let look = ctx.store.get('orbit.look', ctx.store.get('orbit.holo', true) === false ? 'plain' : 'holo');
+  const LOOKS = ['plain', 'paper', 'holo'];
+  const applyLook = (on) => { holo.apply(on && look === 'holo'); paper.apply(on && look === 'paper'); if (!(on && look === 'holo')) scan.clear(); };
+  const roleColor = (r) => (paper.on ? paper.color(r) : holo.color(r));
+  const curBand = () => (paper.on ? PAPER.band : BAND_OPACITY);
   const scan = createScan(map);                // the + and × feature points on the terrain round the place asked about (hologram look)
   const retro = createRetro(map);              // PS1/PS2-style rendering (js/retro.js): off, PS2, PS1
   let retroLvl = ctx.store.get('orbit.retro', 0);
@@ -132,7 +139,7 @@ export function initOrbit(ctx) {
   function addPin(name, role, lonlat) {
     const el = document.createElement('div');
     el.className = 'orb-pin';
-    const col = holo.color(role);
+    const col = roleColor(role);
     el.style.cssText = 'position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;pointer-events:none;z-index:3;';
     el.innerHTML = `<span style="width:16px;height:16px;border-radius:50%;background:${col};border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45)"></span><span style="margin-top:3px;font:600 13px system-ui,sans-serif;color:${col};text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff,0 0 3px #fff;white-space:nowrap">${esc(name)}</span>`;
     map.getContainer().appendChild(el);
@@ -222,7 +229,7 @@ export function initOrbit(ctx) {
     }
     if (f.mass || f.kind === 'mass') {                         // a mountain: its three bands pulse twice, stronger
       const pulse = u >= 1 ? 0 : (1 - Math.cos(4 * Math.PI * u)) / 2;
-      if (map.getLayer('orb-geom-band')) map.setPaintProperty('orb-geom-band', 'fill-opacity', ['*', 1 + 1.3 * pulse, BAND_OPACITY]);
+      if (map.getLayer('orb-geom-band')) map.setPaintProperty('orb-geom-band', 'fill-opacity', ['*', 1 + 1.3 * pulse, curBand()]);
     }
     if (f.kind === 'poly') {                                   // pulse the tint and the edge twice
       const pulse = u >= 1 ? 0 : (1 - Math.cos(4 * Math.PI * u)) / 2;
@@ -235,7 +242,7 @@ export function initOrbit(ctx) {
     const src = map.getSource('orb-flash');
     if (src) src.setData({ type: 'FeatureCollection', features: [] });
     for (const id of ['orb-geom-fill', 'orb-geom-fill2']) if (map.getLayer(id)) map.setPaintProperty(id, 'fill-opacity', 0.3);
-    if (map.getLayer('orb-geom-band')) map.setPaintProperty('orb-geom-band', 'fill-opacity', BAND_OPACITY);
+    if (map.getLayer('orb-geom-band')) map.setPaintProperty('orb-geom-band', 'fill-opacity', curBand());
     if (map.getLayer('orb-geom-line')) map.setPaintProperty('orb-geom-line', 'line-width', ['interpolate', ['linear'], ['zoom'], 8, 3, 12, 6]);
   }
   function endFlash() {
@@ -243,7 +250,7 @@ export function initOrbit(ctx) {
     const src = map.getSource('orb-flash');
     if (src) src.setData({ type: 'FeatureCollection', features: [] });
     for (const id of ['orb-geom-fill', 'orb-geom-fill2']) if (map.getLayer(id)) map.setPaintProperty(id, 'fill-opacity', 0.3);
-    if (map.getLayer('orb-geom-band')) map.setPaintProperty('orb-geom-band', 'fill-opacity', BAND_OPACITY);
+    if (map.getLayer('orb-geom-band')) map.setPaintProperty('orb-geom-band', 'fill-opacity', curBand());
     if (map.getLayer('orb-geom-line')) map.setPaintProperty('orb-geom-line', 'line-width', ['interpolate', ['linear'], ['zoom'], 8, 3, 12, 6]);
   }
   function flashPlace(t) {
@@ -430,7 +437,7 @@ export function initOrbit(ctx) {
   const show = (on) => {
     meshes.show(on);
     gameOn = on;
-    if (cfg) { holo.apply(on && holoOn); retro.apply(on ? retroLvl : 0); }
+    if (cfg) { applyLook(on); retro.apply(on ? retroLvl : 0); }
     if (cfg && map.getLayer('orb-relief')) map.setLayoutProperty('orb-relief', 'visibility', on ? 'visible' : 'none');
     if (cfg && map.getSource('orb-dem')) {
       map.stop();                                                // (terrain switched on or off in the middle of an ease makes MapLibre throw)
@@ -926,7 +933,7 @@ export function initOrbit(ctx) {
     const pic = city.pics[t.n] || city.pics[ALIAS[t.n]];
     return `<div class="fb ${q.ok ? 'ok' : 'no'} orb-reveal">
       ${pic ? `<img class="orb-thumb" src="${esc(pic.img)}" alt="Photo of ${esc(t.n)}: tap to enlarge" data-n="${esc(t.n)}" tabindex="0" />` : ''}
-      <div><b>${q.ok ? '✓' : '✗'} ${esc(t.n)}</b> <span class="muted">${q.ok ? `+${q.pts}` : ''}</span>${cfg && t.k === 'nat' && !q.ok && q.picked ? `<div class="orb-legend"><span style="display:inline-block;width:.8em;height:.8em;border-radius:2px;background:${holo.color('target')};margin-right:.35em"></span>${esc(t.n)}<br><span style="display:inline-block;width:.8em;height:.8em;border-radius:2px;background:${holo.color('wrong')};margin-right:.35em"></span>${esc(q.picked)} <span class="muted">(your pick)</span>${q.rel ? `<br><span class="muted">${esc(q.rel)}</span>` : ''}</div>` : ''}<br>
+      <div><b>${q.ok ? '✓' : '✗'} ${esc(t.n)}</b> <span class="muted">${q.ok ? `+${q.pts}` : ''}</span>${cfg && t.k === 'nat' && !q.ok && q.picked ? `<div class="orb-legend"><span style="display:inline-block;width:.8em;height:.8em;border-radius:2px;background:${roleColor('target')};margin-right:.35em"></span>${esc(t.n)}<br><span style="display:inline-block;width:.8em;height:.8em;border-radius:2px;background:${roleColor('wrong')};margin-right:.35em"></span>${esc(q.picked)} <span class="muted">(your pick)</span>${q.rel ? `<br><span class="muted">${esc(q.rel)}</span>` : ''}</div>` : ''}<br>
       ${esc(t.line)}.<br><span class="muted">${t.k === 'nat' ? `${t.elev ? `${t.elev.toLocaleString()} ft · ` : ''}${townsOf(t).length > 1 ? `${t.kind === 'river' ? 'Through ' : t.kind === 'mountain' ? 'Across ' : 'In '}${esc(listOf(townsOf(t), 14))} (${townsOf(t).length} towns, ${countiesOf(t).length > 1 ? `${esc(listOf(countiesOf(t), 8))} counties` : `${esc(countiesOf(t)[0])} County`})` : `${esc(t.at)}, ${esc(t.c)} County`}` : `${t.k === 'lm' ? '' : `${t.h} m (${ft(t.h)} ft) · `}${t.y} · ${esc(t.at)}`}</span></div>
     </div>`;
   }
@@ -972,7 +979,7 @@ export function initOrbit(ctx) {
     const where = q.t.k === 'nat' ? (q.towns && q.towns.shown.length ? whereHtml(q.towns.shown.map((m) => m.full).join(' · ') + (q.towns.more ? ` · +${q.towns.more} more along it` : '')) : '') : whereHtml(q.hood || '');
     ctx.hud(`<div class="qkind">${ICON} ${TITLE} · ${run.n + (q.done ? 0 : 1)}/${ROUND}</div><div class="q">${q.done ? (q.ok ? 'Yes.' : 'Not quite.') : q.flying ? 'Swinging over…' : (cfg ? `Which ${NOUN[q.t.kind] || 'place'} is this?` : q.t.k === 'lm' ? 'Which landmark is this?' : 'Which tower is this?')}</div>${q.flying ? '' : where}${q.flying ? '' : hints}`);
     ctx.sheet(`${run.opts.header()}<div id="qbody">
-      <div class="score row"><button type="button" id="orbSpin" class="chip toggle" aria-pressed="${spinOn}">${spinOn ? '↻ Orbiting' : '✋ Drag to turn'}</button>${cfg ? `<button type="button" id="orbHolo" class="chip toggle" aria-pressed="${!holoOn}">${holoOn ? '◇ Hologram' : '▢ Plain map'}</button><button type="button" id="orbRetro" class="chip toggle" aria-pressed="${retroLvl === 0}">🕹 ${['Retro off', 'PS2', 'PS1'][retroLvl]}</button>` : ''} <span class="pts">${run.pts} points${run.streak >= 3 ? ` · 🔥 ${run.streak}` : ''}</span></div>
+      <div class="score row"><button type="button" id="orbSpin" class="chip toggle" aria-pressed="${spinOn}">${spinOn ? '↻ Orbiting' : '✋ Drag to turn'}</button>${cfg ? `<button type="button" id="orbHolo" class="chip toggle" aria-pressed="${look === 'plain'}">${{ plain: '▢ Plain map', paper: '▤ Paper', holo: '◇ Hologram' }[look]}</button>` : ''} <span class="pts">${run.pts} points${run.streak >= 3 ? ` · 🔥 ${run.streak}` : ''}</span></div>
       ${choicesHtml(q.choices, { attr: 'n', data: (c) => c.n, label: (c) => c.n, off: q.done || q.flying, state: (c) => (q.done ? (c.n === q.t.n ? 'right' : c.n === q.picked ? 'wrong' : '') : '') })}
       ${q.done ? `${reveal()}<button class="primary" id="orbNext">${run.n >= ROUND ? 'Finish' : cfg || q.t.k === 'lm' ? 'Next' : 'Next tower'}</button>` : `<button id="orbHint" class="chip"${q.hints >= HINTS.length || q.flying ? ' disabled' : ''}>💡 Hint (−1 point)</button>`}
     </div>`);
@@ -987,10 +994,9 @@ export function initOrbit(ctx) {
       render();
     });
     document.getElementById('orbHolo')?.addEventListener('click', () => {
-      holoOn = !holoOn;
-      ctx.store.set('orbit.holo', holoOn);
-      holo.apply(holoOn);
-      if (!holoOn) scan.clear();
+      look = LOOKS[(LOOKS.indexOf(look) + 2) % 3];       // hologram → paper → plain → hologram
+      ctx.store.set('orbit.look', look);
+      applyLook(true);
       render();
     });
     document.getElementById('orbSpin')?.addEventListener('click', () => {
@@ -1009,7 +1015,7 @@ export function initOrbit(ctx) {
       return !!run;
     },
     _state: () => ({ run, q }),
-    _holo: (v) => { holoOn = v; holo.apply(v); },
+    _look: (v) => { look = v; applyLook(true); },
     _retro: (v) => { retroLvl = v; retro.apply(v); syncLabels(); },
     _flash: (name, u) => { const t = city.list.find((x) => x.n === name); drawFlash(t, flowOf(t), u); },   // (a single frame, for checking how it looks)
   };
