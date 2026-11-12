@@ -25,7 +25,7 @@ UNIT_FT = {'Feet': 1.0, 'Millimeters': 1 / 304.8, 'Meters': 1 / 0.3048, 'Centime
 FT = 0.3048
 # towers whose official height counts a mast or spire, or that the survey caught a little low: the survey height must fall in this
 # range of the official one (default 0.85 to 1.3)
-RANGE = {'4 Times Square': (0.85, 1.5), 'New York Times Building': (0.6, 1.3), 'Seagram Building': (0.78, 1.3)}
+RANGE = {'4 Times Square': (0.85, 1.5), 'New York Times Building': (0.6, 1.3)}  # (Seagram is left out: the survey has it 17% short)
 ONLY = set(filter(None, os.environ.get('ONLY', '').split('|')))  # limit to these towers; the result is merged into an existing out file
 to_ft = Transformer.from_crs(4326, 2263, always_xy=True)
 to_ll = Transformer.from_crs(2263, 4326, always_xy=True)
