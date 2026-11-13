@@ -309,12 +309,43 @@ export function initOrbit(ctx) {
   // with the glow comet riding the same curve and the two ends marked; then it rests (a touch stops it, and the "Flow" chip plays it again).
   let flyRaf = 0;
   const stopFly = () => { cancelAnimationFrame(flyRaf); flyRaf = 0; };
+  /** progress (0-1, by time) -> progress along the line (0-1): slower within ~2 km of each point where another highway crosses it. */
+  function flyWarp(t, f) {
+    if (t.kind !== 'highway' || !t.meets || !t.meets.length) return (x) => x;
+    const dwell = [];
+    for (const n of t.meets) {
+      const g = city.geoms && city.geoms[n];
+      if (!g) continue;
+      const chains = g.type === 'MultiLineString' ? g.coordinates : [g.coordinates];
+      let best = null;
+      f.coords.forEach((p, i) => { for (const c of chains) for (let k = 0; k < c.length; k += 2) { const d = mDist(p, c[k]); if (d < 200 && (!best || d < best.d)) best = { d, s: f.cum[i] }; } });
+      if (best) dwell.push(best.s);
+    }
+    if (!dwell.length) return (x) => x;
+    const N = 240, T = [0];                                            // cumulative time over N equal steps of distance
+    for (let i = 1; i <= N; i++) {
+      const d = ((i - 0.5) / N) * f.total;
+      const near = Math.min(...dwell.map((s) => Math.abs(s - d)));
+      T.push(T[i - 1] + 1 / (1 - 0.45 * Math.exp(-(near * near) / (2 * 1800 * 1800))));   // (a step takes up to 1.8x as long beside a crossing)
+    }
+    const tot = T[N];
+    return (x) => {                                                     // invert: the distance fraction reached by time fraction x
+      const target = x * tot;
+      let i = 1;
+      while (i < N && T[i] < target) i++;
+      const k = (target - T[i - 1]) / Math.max(1e-9, T[i] - T[i - 1]);
+      return Math.min(1, (i - 1 + k) / N);
+    };
+  }
   function flyDown(t) {
     stopFly();
     endFlash();
     const f = t.flyF;
     if (!f) return;
-    const dur = ctx.dur ? ctx.dur(Math.max(4500, Math.min(8000, f.total / 12))) : 6000;     // ~12 km a second
+    // Pace: about 8.5 km a second, 5.5 to 11 s in all, and slower where the road meets another one (so you can see what crosses it): the camera
+    // lingers for a moment round each crossing instead of flying past at one speed.
+    const dur = ctx.dur ? ctx.dur(Math.max(5500, Math.min(11000, f.total / 8.5))) : 7500;
+    const warp = flyWarp(t, f);
     map.jumpTo({ center: f.coords[0] });
     const t0 = performance.now();
     const off = () => { map.off('mousedown', skip); map.off('touchstart', skip); };
@@ -324,7 +355,7 @@ export function initOrbit(ctx) {
     const step = (now) => {
       if (!run || !q || q.t !== t || q.done) { off(); return endFlash(); }
       const prog = Math.min(1, (now - t0) / dur);
-      const s = easeIO(prog) * f.total;
+      const s = warp(0.5 * prog + 0.5 * easeIO(prog)) * f.total;   // (half eased: a gentle start and finish without the fast middle of a full ease)
       map.jumpTo({ center: pointAt(f, s) });
       drawFlash(t, f, prog * 0.82);
       if (prog < 1) flyRaf = requestAnimationFrame(step);
