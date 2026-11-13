@@ -33,6 +33,7 @@ const TYPES = {
   gridup: '🚕 Drive Uptown (new)',
   orbit: '🏙 Name that tower (new)',
   highways: '🛣 Name that highway',
+  drivemix: '🛣 Driving mix',
   gridgame: '🚕 Drive Downtown (new)',
   gridclassic: '🚕 Drive Midtown (classic grid)',
   frames: '🧭 Left, right & compass',
@@ -48,6 +49,7 @@ const DESC = {
   gridgame: 'Drive Downtown: plan the route through the tangle below 14th St, then ride it. Tunnels and bridges in.',
   gridclassic: 'The original: a straightened grid, 14th to 110th St.',
   frames: 'Left, right and compass: face every direction.',
+  drivemix: 'Just the road questions: which road gets you there, left or right, which way a highway runs, where highways end and cross.',
   highways: 'The camera flies along a New Jersey highway: which one is it? Interstates, routes, the Turnpike and the Parkway, with the ones that meet it as the wrong answers.',
   orbit: 'The camera circles a skyscraper, alone in a ghost of the city: which one is it? Ten a round, hints cost a point.',
   trip: 'Quiz yourself on your last drive.',
@@ -85,7 +87,7 @@ export function initPractice(ctx) {
     TYPES.orbit = `${R.orbit.icon || '🏙'} ${R.orbit.title} (new)`;
     DESC.orbit = R.orbit.desc;
   }
-  const allowed = ['today', 'mix', 'rapid', ...(R.gridAngle ? ['gridmid', 'gridup', 'gridgame', 'gridclassic', 'orbit'] : R.orbit ? ['orbit', 'highways'] : []), 'frames', ...R.quizTypes, 'trip'];
+  const allowed = ['today', 'mix', 'rapid', ...(R.gridAngle ? ['gridmid', 'gridup', 'gridgame', 'gridclassic', 'orbit'] : R.orbit ? ['orbit', 'highways', 'drivemix'] : []), 'frames', ...R.quizTypes, 'trip'];
   if (cfg.type === 'dropin') cfg.type = 'today'; // (the county puzzle is gone)
   if (!allowed.includes(cfg.type)) cfg.type = 'mix';
   // the whole-island game isn't reliable yet: anyone on it moves to the classic once
@@ -615,11 +617,12 @@ export function initPractice(ctx) {
     // Mixed mode interleaves question types and never repeats one back to back
     // (interleaving helps tell similar things apart; Kornell & Bjork, 2008).
     let t = cfg.type;
-    if (t === 'mix') {
+    if (t === 'mix' || t === 'drivemix') {
       // Play: the mix leans on the kinds of question you get wrong most (unseen kinds count as average), never the same kind twice running
       const ks = store.get('kindStats', {});
       const wt = (k) => { const [n = 0, r = 0] = ks[k] || []; return (WEIGHT[k] || 1) * (0.6 + 1.6 * (1 - (r + 1) / (n + 2))); };
-      const bag = R.quizTypes.flatMap((k) => Array(Math.max(1, Math.round(wt(k) * 2))).fill(k));
+      const kinds = t === 'drivemix' ? R.quizTypes.filter((k) => ['roadto', 'leftright', 'hwydir', 'hwyfact', 'dir'].includes(k)) : R.quizTypes;
+      const bag = kinds.flatMap((k) => Array(Math.max(1, Math.round(wt(k) * 2))).fill(k));
       do t = rand(bag);
       while (t === lastType);
     }
@@ -665,6 +668,11 @@ export function initPractice(ctx) {
   const SET_SIZE = 10;
   const ANGLES = ['find', 'borders', 'leftright', 'name', 'dir', 'point'];
   const dayStr = (t = Date.now()) => new Date(t).toLocaleDateString('en-CA');
+  // New Jersey leans north-east: 4x at Newark-Paterson, fading to 1x by 90 km, for the places Today picks fresh and tops up with
+  const NE = [-74.1, 40.85];
+  const leanW = (m) => (R.id === 'nj' ? 1 + 3 * Math.max(0, 1 - Math.hypot((m.pt[0] - NE[0]) * 84.2, (m.pt[1] - NE[1]) * 111) / 90) : 1);
+  const wshuffle = (arr) => arr.map((m) => [-Math.log(Math.random()) / leanW(m), m]).sort((a, b) => a[0] - b[0]).map((x) => x[1]);   // weighted random order
+  const wrand = (arr) => wshuffle(arr)[0];
   function buildToday() {
     const p = pool();
     const s = srs();
@@ -672,7 +680,7 @@ export function initPractice(ctx) {
     const angles = ANGLES.filter((a) => R.quizTypes.includes(a));
     const due = p.filter((m) => s[m.key] && s[m.key].due <= now).sort((a, b) => s[a.key].due - s[b.key].due).slice(0, 6);
     const listed = new Set(ctx.myList.keys());
-    const fresh = shuffle(p.filter((m) => !s[m.key])).sort((a, b) => (listed.has(b.key) ? 2 : b.wellKnown ? 1 : 0) - (listed.has(a.key) ? 2 : a.wellKnown ? 1 : 0));
+    const fresh = wshuffle(p.filter((m) => !s[m.key])).sort((a, b) => (listed.has(b.key) ? 2 : b.wellKnown ? 1 : 0) - (listed.has(a.key) ? 2 : a.wellKnown ? 1 : 0));
     const nNew = Math.max(2, Math.min(3, Math.ceil((SET_SIZE - due.length) / 3)));
     const news = fresh.slice(0, nNew);
     const reviewItems = due.map((m) => ({ key: m.key, fmt: rand(angles.filter((a) => a !== (s[m.key] && s[m.key].f))) }));
@@ -691,10 +699,17 @@ export function initPractice(ctx) {
     items.push(...queue);
     // top up with well-known places in a format they haven't had lately
     while (items.length < SET_SIZE) {
-      const m = rand(p.filter((x) => x.wellKnown).length ? p.filter((x) => x.wellKnown) : p);
+      const m = wrand(p.filter((x) => x.wellKnown).length ? p.filter((x) => x.wellKnown) : p);
       items.push({ key: m.key, fmt: rand(angles) });
     }
-    return { date: dayStr(), items: items.slice(0, Math.max(SET_SIZE, items.length)).slice(0, 12), i: 0, right: 0, done: false };
+    // The whole region in one session: the questions above, with short rounds of the map games between them (New Jersey: two places and two highways;
+    // New York: two towers), each a few questions long.
+    const quiz = items.slice(0, Math.max(SET_SIZE, items.length)).slice(0, 9);
+    const acts = R.orbit ? [{ act: 'place', n: 2 }, { act: 'highway', n: 2 }] : [{ act: 'tower', n: 2 }];
+    const out = [...quiz];
+    out.splice(Math.min(3, out.length), 0, acts[0]);
+    if (acts[1]) out.splice(Math.min(8, out.length), 0, acts[1]);
+    return { date: dayStr(), items: out, i: 0, right: 0, done: false, v: 2 };
   }
   function todayState() {
     let t = store.get(TODAY_KEY, null);
@@ -702,6 +717,7 @@ export function initPractice(ctx) {
       t = buildToday();
       store.set(TODAY_KEY, t);
     }
+    if (t.v !== 2 && !t.done && t.i === 0) { t = buildToday(); store.set(TODAY_KEY, t); }   // (a set not yet started, from before the map games joined Today, is rebuilt)
     return t;
   }
   function streak() {
@@ -729,6 +745,18 @@ export function initPractice(ctx) {
       return show();
     }
     const it = t.items[t.i];
+    if (it.act) {                                    // a short round of a map game, then back here
+      q = { kind: 'gridgame', m: null, answered: false, today: true, act: it.act };
+      ctx.clearHighlights();
+      ctx.reveal([]);
+      ctx.line(null);
+      const title = { place: 'Name that place', highway: 'Name that highway', tower: 'Name that tower' }[it.act];
+      return ctx.orbit.start({
+        header: () => header(), bindHeader: () => bindHeader(), rounds: it.n, title, icon: it.act === 'highway' ? '🛣' : undefined,
+        only: it.act === 'highway' ? ['highway'] : undefined, neBias: R.id === 'nj',
+        onDone: () => { q = { kind: 'todayact', m: null, answered: true, today: true }; nextToday(); },     // (nextToday moves on past an answered Today step)
+      });
+    }
     const m = ctx.byKey.get(it.key);
     const p = pool();
     if (!m || !MAKERS[it.fmt]) {
@@ -910,12 +938,12 @@ export function initPractice(ctx) {
     }
     const card = (k) =>
       `<button class="pcard${k === cfg.type ? ' on' : ''}" data-type="${k}"><span class="pt">${esc(TYPES[k])}</span>${DESC[k] ? `<span class="pd">${esc(DESC[k])}</span>` : ''}</button>`;
-    const used = new Set([...GROUPS.flatMap(([, ks]) => ks), 'today', 'mix', 'gridmid']);
+    const used = new Set([...GROUPS.flatMap(([, ks]) => ks), 'today', 'mix', 'gridmid', 'drivemix']);
     const groups = GROUPS.map(([name, ks]) => [name, ks.filter((k) => allowed.includes(k))]);
     groups.push(['Quizzes', allowed.filter((k) => !used.has(k))]);
     const quizChip = (k) => `<button class="pchip${k === cfg.type ? ' on' : ''}" data-type="${k}">${esc(TYPES[k])}</button>`;
     const recent = store.get('practice.recent', []).filter((k) => allowed.includes(k) && k !== cfg.type).slice(0, 3);
-    const start = ['today', 'mix', ...(R.gridAngle ? ['gridmid'] : [])].filter((k) => allowed.includes(k));
+    const start = ['today', 'mix', ...(R.gridAngle ? ['gridmid'] : ['drivemix'])].filter((k) => allowed.includes(k));
     dlg.innerHTML = `<div class="pscroll"><h2>Practice</h2>
       ${start.length ? `<div class="pgroup"><div class="pname">Start here</div><div class="pcards">${start.map(card).join('')}</div></div>` : ''}
       ${recent.length ? `<div class="pgroup"><div class="pname">Recently</div><div class="precent">${recent.map((k) => `<button class="pchip" data-type="${k}">${esc(TYPES[k])}</button>`).join('')}</div></div>` : ''}

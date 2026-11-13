@@ -12,6 +12,8 @@ import { createLabels } from './retro.js';
 
 const KEY = 'orbit';
 const ROUND = 10;
+const NE_CENTER = [-74.1, 40.85];           // north-east New Jersey (Newark-Paterson): where Today leans
+const neWeight = (p) => 1 + 3 * Math.max(0, 1 - Math.hypot((p[0] - NE_CENTER[0]) * 84.2, (p[1] - NE_CENTER[1]) * 111) / 90);   // 4x at the centre, fading to 1x by 90 km
 const SPIN = 7; // degrees a second: a full turn in under a minute
 const PITCH = 52; // tilted down more than the drive games' view, so the top of the tower shows and it can be framed closer
 const TALL = 150; // metres: buildings at least this tall stand up in full round the tower
@@ -601,7 +603,7 @@ export function initOrbit(ctx) {
       if (run.opts.only ? !run.opts.only.includes(t.kind) : t.kind === 'highway') return 0;     // (highways have their own game)
       const s = st[t.n] || { r: 0, w: 0 };
       const n = s.r + s.w;
-      return (n === 0 ? 3 : 1 + 4 * (s.w / n)) * (t.kind === 'landmark' ? 0.3 : 1);   // (a building landmark comes up now and then)
+      return (n === 0 ? 3 : 1 + 4 * (s.w / n)) * (t.kind === 'landmark' ? 0.3 : 1) * (run.opts.neBias ? neWeight(t.p) : 1);   // (a building landmark comes up now and then)
     });
     let x = Math.random() * w.reduce((a, b) => a + b, 0);
     for (let i = 0; i < w.length; i++) if ((x -= w[i]) <= 0) return city.list[i];
@@ -981,10 +983,12 @@ export function initOrbit(ctx) {
     for (const l of map.getStyle().layers) if (l.type === 'symbol' && (l.id.startsWith('road-ref') || l.id === 'road-name')) map.setLayoutProperty(l.id, 'visibility', visible ? 'visible' : 'none');
     if (map.getLayer('hwy-color')) map.setLayoutProperty('hwy-color', 'visibility', visible ? 'visible' : 'none');   // (the named highways are drawn in their own colours, which would give them away too)
   }
+  const rounds = () => (run && run.opts.rounds) || ROUND;
   function next() {
     if (!run) return;
     roadLabels(!hwyGame());
-    if (run.n >= ROUND) {
+    if (run.n >= rounds()) {
+      if (run.opts.onDone) { const f = run.opts.onDone; stop(); return f(); }      // (a short act inside Today: hand back to it)
       run.done = true;
       q = null;
       cancelAnimationFrame(raf);
@@ -1148,10 +1152,10 @@ export function initOrbit(ctx) {
   function render() {
     if (!run || run.loading) return;
     if (run.done) {
-      const best = run.pts + '/' + ROUND * 3;
+      const best = run.pts + '/' + rounds() * 3;
       ctx.hud(`<div class="qkind">${ico()} ${ttl()}</div><div class="q">Round done: <b>${best}</b></div>`);
       ctx.sheet(`${run.opts.header()}<div id="qbody">
-        <div class="score">${run.right}/${ROUND} named · ${run.pts} points</div>
+        <div class="score">${run.right}/${rounds()} named · ${run.pts} points</div>
         ${run.misses.length ? `<div class="fb no">To look at again: ${run.misses.map(esc).join(', ')}</div>` : '<div class="fb ok">Every one named.</div>'}
         <button class="primary" id="orbAgain">Another ten</button></div>`);
       run.opts.bindHeader();
@@ -1160,11 +1164,11 @@ export function initOrbit(ctx) {
     }
     const hints = hintsHtml(HINTS.slice(0, q.hints).map((h) => h(q.t)));
     const where = q.t.k === 'nat' ? (q.towns && q.towns.shown.length ? whereHtml(q.towns.shown.slice(0, 4).map((m) => m.n).join(' · ') + (q.towns.shown.length + q.towns.more > 4 ? ` · +${q.towns.shown.length + q.towns.more - 4} more` : '')) : '') : whereHtml(q.hood || '');
-    ctx.hud(`<div class="qkind">${ico()} ${ttl()} · ${run.n + (q.done ? 0 : 1)}/${ROUND} · ${run.pts} pts${run.streak >= 3 ? ` · 🔥${run.streak}` : ''}</div><div class="q">${q.done ? (q.ok ? 'Yes.' : 'Not quite.') : q.flying ? 'Swinging over…' : (cfg ? `Which ${NOUN[q.t.kind] || 'place'} is this?` : q.t.k === 'lm' ? 'Which landmark is this?' : 'Which tower is this?')}</div>${q.flying ? '' : where}${q.flying ? '' : hints}`);
+    ctx.hud(`<div class="qkind">${ico()} ${ttl()} · ${run.n + (q.done ? 0 : 1)}/${rounds()} · ${run.pts} pts${run.streak >= 3 ? ` · 🔥${run.streak}` : ''}</div><div class="q">${q.done ? (q.ok ? 'Yes.' : 'Not quite.') : q.flying ? 'Swinging over…' : (cfg ? `Which ${NOUN[q.t.kind] || 'place'} is this?` : q.t.k === 'lm' ? 'Which landmark is this?' : 'Which tower is this?')}</div>${q.flying ? '' : where}${q.flying ? '' : hints}`);
     ctx.toolbar.set([...(q.t.flyF ? [{ id: 'flow', label: '↻ Flow', pressed: false, title: 'Fly down the river again', onClick: () => { if (q && !q.flying) flyDown(q.t); } }] : []), { id: 'spin', label: spinOn ? '↻ Orbit' : '✋ Drag', pressed: spinOn, title: 'Camera circles by itself, or holds still so you can turn it', onClick: () => { spinOn = !spinOn; ctx.store.set('orbit.spin', spinOn); render(); } }]);
     ctx.sheet(`${run.opts.header()}<div id="qbody">
       ${choicesHtml(q.choices, { attr: 'n', data: (c) => c.n, label: (c) => c.n, off: q.done || q.flying, state: (c) => (q.done ? (c.n === q.t.n ? 'right' : c.n === q.picked ? 'wrong' : '') : '') })}
-      ${q.done ? `${reveal()}<div class="stickybar"><button class="primary" id="orbNext">${run.n >= ROUND ? 'Finish' : cfg || q.t.k === 'lm' ? 'Next' : 'Next tower'}</button></div>` : `<button id="orbHint" class="chip"${q.hints >= HINTS.length || q.flying ? ' disabled' : ''}>💡 Hint (−1 point)</button>`}
+      ${q.done ? `${reveal()}<div class="stickybar"><button class="primary" id="orbNext">${run.n >= rounds() ? 'Finish' : cfg || q.t.k === 'lm' ? 'Next' : 'Next tower'}</button></div>` : `<button id="orbHint" class="chip"${q.hints >= HINTS.length || q.flying ? ' disabled' : ''}>💡 Hint (−1 point)</button>`}
     </div>`);
     run.opts.bindHeader();
     for (const b of document.querySelectorAll('#sheet .choice')) b.addEventListener('click', () => answer(b.dataset.n));
