@@ -64,6 +64,7 @@ export const TUNE = {
     plateOpacity: 0.55,      // yellow and blue plates behind coloured masses
     plateOffsetA: [4, 3],
     plateOffsetB: [-3, -3],
+    edgeRoughMetres: 14,     // how far the county borders' own geometry wanders (fine: the stroke texture does the rest)
     roughenMetres: 55,       // how far hand-pulled edges wander (answer outlines)
     boil: { metres: 16, fps: 4.5, frames: 4 },   // the outline re-drawn by hand a few times a second (animated line boil): how far each drawing differs, how often, how many drawings
     creaseOpacity: 0.3,

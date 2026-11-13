@@ -435,3 +435,7 @@ After the street map, the western-US map and the sheet-music cover you sent: Pap
 - **Borders:** county borders heavy navy with a hard offset shadow (`TUNE.paper.border`); town borders dashed blue.
 - **Label hierarchy by ink** (`.l-<layer>` classes in `css/app.css`): towns red, the larger ones in letterspaced caps with a star; regions and counties navy letterspaced caps; water and street names blue.
 Dropped: the glow and blue registration copies under roads and borders (they were tints and blur; this look is crisp).
+
+### Paper: inky lines (`inkStroke` in `js/world.js`)
+
+Every printed line is drawn with a stroke texture through `line-pattern`, not a flat colour: ragged edges (the ink spreading unevenly into the stock), uneven density along the stroke, pinholes where the ink missed, a few specks of spatter, dashes built into the texture for town borders. The image is stretched across the line's width, so the roughness scales with the line and shows on wide lines (borders, street-zoom roads) and averages out on hairlines. The stock-coloured core of a two-line road has ragged edges too, which lets the blue casing show through unevenly (`edge` in `INKS`, `js/paper.js`). The county borders' own geometry is also roughened (`TUNE.paper.edgeRoughMetres`). One texture per ink (`ink-blue`, `ink-red`, `ink-navy`, `ink-stock`, `ink-blue-dash`) because `line-pattern` ignores `line-color`. Checked on test streets at 2× at zoom 15; not on real road tiles.

@@ -1,4 +1,4 @@
-import { blots, specks, creases, grainImage, inkImage } from './world.js';
+import { blots, specks, creases, grainImage, inkImage, inkStroke, roughen } from './world.js';
 import { PAPER, TUNE, HL } from './looks.config.js';
 
 // "Paper" look for a map: a printed road map from the 1960s–70s (cream stock, a few flat spot inks, halftone water,
@@ -19,7 +19,7 @@ const BASE = {
   'muni-fill': { 'fill-color': PAPER.land, 'fill-opacity': 1 },
   water: { 'fill-color': PAPER.stock, 'fill-opacity': 1 },
   river: { 'line-color': PAPER.blue, 'line-opacity': 1, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1.4, 14, 3.2] },
-  'muni-line': { 'line-color': PAPER.blue, 'line-opacity': 0.9, 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.9, 16, 1.6], 'line-dasharray': [4, 2.2] },
+  'muni-line': { 'line-color': PAPER.blue, 'line-opacity': 0.9, 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.9, 16, 1.6]},
   'county-line': { 'line-color': PAPER.ink, 'line-opacity': 1, 'line-width': ['interpolate', ['linear'], ['zoom'], ...TUNE.paper.border.width.flat()] },
 };
 // the main roads' cores (their casings are separate layers, see linework())
@@ -119,6 +119,33 @@ export function createPaper(map, bounds) {
    *    layer recoloured stock (red for the main roads): the blocks between roads read as outlined shapes;
    *  - county borders get a hard navy shadow a couple of pixels off, as on the western-US map.
    */
+  /**
+   * Inky lines: every printed line is drawn with a stroke texture (ragged edges, uneven density, pinholes, spatter) instead of a flat colour, and
+   * the county borders' own geometry is roughened. line-pattern ignores line-color, so there is one texture per ink.
+   */
+  const INKS = { 'ink-blue': [PAPER.blue, {}], 'ink-red': [PAPER.red, {}], 'ink-navy': [PAPER.ink, {}], 'ink-stock': [PAPER.stock, { holes: 0, seed: 9, edge: 0.75 }], 'ink-blue-dash': [PAPER.blue, { gaps: true, seed: 13 }] };
+  const origEdges = new Map();
+  function inkLines(want) {
+    if (want) {
+      for (const [name, [col, o]] of Object.entries(INKS)) if (!map.hasImage(name)) map.addImage(name, inkStroke(col, o), { pixelRatio: 1 });
+      for (const id of GLOW) if (id.endsWith('-pcase') || id.endsWith('-pshadow')) map.setPaintProperty(id, 'line-pattern', id.endsWith('-pshadow') ? 'ink-navy' : 'ink-blue');
+      for (const [id, r] of Object.entries(TUNE.paper.roads)) set(id, 'line-pattern', r.fill === 'red' ? 'ink-red' : 'ink-stock');
+      set('county-line', 'line-pattern', 'ink-navy');
+      set('river', 'line-pattern', 'ink-blue');
+      set('muni-line', 'line-pattern', 'ink-blue-dash');
+      // the county borders' own geometry, roughened a little (hand-drawn, in map space)
+      const cs = map.getStyle().layers.find((l) => l.id === 'county-line');
+      const src = cs && map.getSource(cs.source);
+      if (src && src.type === 'geojson' && !origEdges.has(cs.source) && src._data && typeof src._data === 'object') {
+        origEdges.set(cs.source, src._data);
+        src.setData({ ...src._data, features: src._data.features.map((f) => ({ ...f, geometry: roughen(f.geometry, TUNE.paper.edgeRoughMetres, -1, 110) })) });
+      }
+    } else {
+      for (const id of GLOW) if (map.getLayer(id)) map.setPaintProperty(id, 'line-pattern', null);
+      for (const [sid, data] of origEdges) { const s = map.getSource(sid); if (s) s.setData(data); }
+      origEdges.clear();
+    }
+  }
   const GLOW = [];
   function linework() {
     if (GLOW.length) return;
@@ -206,12 +233,14 @@ export function createPaper(map, bounds) {
         plates();
         world();
         linework();
+        inkLines(true);
         for (const [id, props] of Object.entries(BASE)) if (id !== 'muni-fill' || fillsOn) for (const [p, v] of Object.entries(props)) set(id, p, v);
         game();
         for (const id of ['orb-paper-a', 'orb-paper-b', ...WORLD, ...GLOW]) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
         if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) swimTo(true);
       } else {
         swimTo(false);
+        inkLines(false);
         for (const id of ['orb-paper-a', 'orb-paper-b', ...WORLD, ...GLOW]) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
         restore();
       }

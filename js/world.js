@@ -119,7 +119,7 @@ function vnoise(x, y) {
  * Hand-pulled edges: every line and ring is cut into short pieces and each point pushed sideways by noise that depends only on where it is
  * on the Earth (so the wobble is part of the land and does not swim as the map moves). amp in metres.
  */
-export function roughen(geom, amp = TUNE.paper.roughenMetres, phase = -1) {
+export function roughen(geom, amp = TUNE.paper.roughenMetres, phase = -1, step = 140) {
   const rough = (coords) => {
     const out = [];
     for (let i = 0; i < coords.length; i++) {
@@ -127,7 +127,7 @@ export function roughen(geom, amp = TUNE.paper.roughenMetres, phase = -1) {
       if (i > 0) {
         const q = coords[i - 1], k = km(p[1]);
         const dm = Math.hypot((p[0] - q[0]) / k.lng, (p[1] - q[1]) / k.lat) * 1000;
-        const n = Math.min(60, Math.floor(dm / 140));
+        const n = Math.min(60, Math.floor(dm / step));
         for (let s = 1; s <= n; s++) out.push(shift([q[0] + ((p[0] - q[0]) * s) / (n + 1), q[1] + ((p[1] - q[1]) * s) / (n + 1)]));
       }
       out.push(shift(p));
@@ -196,4 +196,43 @@ export function snapGeom(geom, step = 0.0012, seed = -1) {
   const out = { ...geom, coordinates: walk(geom.coordinates, depth) };
   if (geom.bands) out.bands = geom.bands.map((r) => dedupe(r.map(snap)));
   return out;
+}
+
+/**
+ * An ink stroke as a texture for a map line's `line-pattern`: the image is stretched across the line's width, so the roughness scales with
+ * the line. Ragged edges (the ink spread unevenly into the stock), uneven density along the stroke, pinholes where the ink missed, and a few
+ * specks of spatter beside it. `gaps` makes a dashed stroke; `holes` 0 gives a clean one (for the stock-coloured core of a two-line road, whose
+ * ragged edge lets the blue casing show through unevenly). Periodic along its length, so repeats do not show a seam.
+ */
+export function inkStroke(color, { gaps = false, holes = 1, seed = 5, W = 154, H = 20, edge = 1 } = {}) {
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const r = rng(seed);
+  const periodic = (k, ph) => Math.sin((k / W) * 6.283 * 3 + ph) + 0.6 * Math.sin((k / W) * 6.283 * 7 + ph * 2.3) + 0.3 * Math.sin((k / W) * 6.283 * 14 + ph * 0.7);
+  const p1 = r() * 6, p2 = r() * 6, p3 = r() * 6;
+  g.fillStyle = color;
+  for (let x = 0; x < W; x++) {
+    if (gaps && x % 22 >= 14) continue;                                           // dashes: 14 on, 8 off
+    const top = (1.2 + 1.3 * (periodic(x, p1) + 1.9) / 3.8 * 2.2) * edge;          // ragged edges
+    const bot = (1.2 + 1.3 * (periodic(x, p2) + 1.9) / 3.8 * 2.2) * edge;
+    const a = 0.86 + 0.14 * (periodic(x, p3) + 1.9) / 3.8;                       // density along the stroke
+    g.globalAlpha = a;
+    g.fillRect(x, top, 1, H - top - bot);
+  }
+  g.globalAlpha = 1;
+  g.globalCompositeOperation = 'destination-out';                                 // pinholes
+  for (let i = 0; i < 26 * holes; i++) {
+    const x = r() * W, y = 3 + r() * (H - 6), rad = 0.5 + r() * 1.1;
+    g.globalAlpha = 0.5 + r() * 0.5;
+    g.beginPath(); g.arc(x, y, rad, 0, 6.283); g.fill();
+  }
+  g.globalCompositeOperation = 'source-over';                                     // spatter
+  g.fillStyle = color;
+  if (holes) for (let i = 0; i < 14; i++) {
+    const x = r() * W, y = r() < 0.5 ? r() * 2 : H - r() * 2;
+    g.globalAlpha = 0.35 + r() * 0.4;
+    g.beginPath(); g.arc(x, y, 0.4 + r() * 0.6, 0, 6.283); g.fill();
+  }
+  return g.getImageData(0, 0, W, H);
 }
