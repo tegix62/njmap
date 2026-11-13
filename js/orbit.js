@@ -89,7 +89,12 @@ export function initOrbit(ctx) {
   const curBand = () => (looks.paperOn ? PAPER.band : BAND_OPACITY);
   const pxLabels = createLabels(map);          // town names as crisp text above a low-resolution map
   let gameOn = false;
-  looks.on(() => { if (gameOn) { syncLabels(); if (run && !run.loading) render(); } });
+  looks.on(() => {
+    if (!gameOn) return;
+    syncLabels();
+    if (cfg && map.getSource('orb-dem-ps1')) { map.stop(); map.setTerrain({ source: looks.ps1On ? 'orb-dem-ps1' : 'orb-dem', exaggeration: 2.1 }); }   // (PS1: the coarse, faceted terrain)
+    if (run && !run.loading) render();
+  });
   /** Town names: drawn by the map normally, as DOM text over it while the retro pass is on. */
   const syncLabels = () => {
     const px = gameOn && (looks.ps1On || looks.paperOn);
@@ -377,6 +382,9 @@ export function initOrbit(ctx) {
     map.addSource('orb-city', { type: 'geojson', generateId: true, data: { type: 'FeatureCollection', features: city.feats } });
     if (cfg && !map.getSource('orb-dem')) {                      // real relief: AWS terrain tiles (public elevation data), shaded
       map.addSource('orb-dem', { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 11, attribution: 'Terrain: AWS Terrain Tiles (USGS 3DEP, SRTM and others)' });
+      // a second, coarse copy for PS1: declared as 1024-px tiles it loads tiles two zoom levels lower, so MapLibre's fixed-size terrain mesh covers
+      // four times the ground per triangle: big flat facets, and the facets re-form ("reset") as the zoom crosses a level, as PS1 level-of-detail did
+      map.addSource('orb-dem-ps1', { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 1024, maxzoom: 11 });
       map.addSource('orb-dem-hs', { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 11 });   // (its own source: MapLibre wants the shading and the terrain apart)
       map.addLayer({ id: 'orb-relief', type: 'hillshade', source: 'orb-dem-hs', layout: { visibility: 'none' }, paint: { 'hillshade-exaggeration': 0.55, 'hillshade-shadow-color': '#4d5a52', 'hillshade-highlight-color': '#ffffff', 'hillshade-accent-color': '#6e7d70' } }, first && first.id);
     }
@@ -462,7 +470,7 @@ export function initOrbit(ctx) {
     if (cfg && map.getLayer('orb-relief')) map.setLayoutProperty('orb-relief', 'visibility', on ? 'visible' : 'none');
     if (cfg && map.getSource('orb-dem')) {
       map.stop();                                                // (terrain switched on or off in the middle of an ease makes MapLibre throw)
-      map.setTerrain(on ? { source: 'orb-dem', exaggeration: 2.1 } : null);
+      map.setTerrain(on ? { source: looks.ps1On ? 'orb-dem-ps1' : 'orb-dem', exaggeration: 2.1 } : null);
     }
     for (const id of ['orb-geom-band', 'orb-geom-fill', 'orb-geom-fill2', 'orb-geom-casing', 'orb-geom-line', 'orb-geom-wall', 'orb-town-name', 'orb-flash-glow', 'orb-flash-line', 'orb-flash-dot']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
     for (const id of ['orb-walk', 'orb-road', 'orb-park', 'orb-ghost', 'orb-others', 'orb-hood-fill', 'orb-hood-line', 'orb-hood-wall', 'orb-lab', 'orb-lm', 'orb-hood-name', 'orb-target']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
