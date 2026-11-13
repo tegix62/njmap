@@ -698,16 +698,17 @@ export function initOrbit(ctx) {
       }
     }
     const cam = { center, zoom, pitch: t.k === 'nat' ? t.pitch : PITCH, bearing, padding: { top, bottom: pad.bottom, left: 0, right: 0 } };
-    let spinT0 = performance.now(), lastSpin = spinT0;
+    let spinT0 = performance.now(), lastSpin = spinT0, touched = false;
     const tick = (now) => {
       if (!run || q.t !== t) return;
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
       if (!document.hidden) {
         bearing = map.getBearing();
-        // The spin re-renders the whole map every frame. In battery saver it runs at ~30 fps and stops by itself after 25 s on a question.
+        // The spin re-renders the whole map every frame. In battery saver it runs at ~30 fps and stops by itself after 10 s on a question, or at your first touch.
         const saver = looks.saver;
-        const spinning = spinOn && !drag && !(cfg && q.done && q.t.k === 'nat') && !(saver && now - spinT0 > 25000);
+        if (drag) touched = true;
+        const spinning = spinOn && !drag && !(cfg && q.done && q.t.k === 'nat') && !(saver && (touched || now - spinT0 > 10000));   // (saver: 10 s, or until you first touch the map)
         if (spinning && (!saver || now - lastSpin >= 33)) {
           const sdt = saver ? Math.min(0.1, (now - lastSpin) / 1000) : dt;
           lastSpin = now;
