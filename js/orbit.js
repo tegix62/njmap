@@ -90,6 +90,7 @@ export function initOrbit(ctx) {
   const pxLabels = createLabels(map);          // town names as crisp text above a low-resolution map
   let gameOn = false;
   looks.on(() => {
+    restyleFlash();
     if (!gameOn) return;
     syncLabels();
     restyleGeom();
@@ -111,6 +112,23 @@ export function initOrbit(ctx) {
   // (the same outline and label layers the Manhattan game uses for the neighbourhood), then cleared as the camera drops in.
   // The shapes of the natural places (rivers as lines, lakes and parks as polygons) as map features, to outline what a question is about.
   const GEOM_COLOR = { target: '#0b9a82', wrong: '#d9622b' };
+  // The comet that shows which way a river flows: transparent at the tail, bright at the head (the head is where the water is going). Colours follow the look.
+  const FLASH = {
+    plain: { glow: [255, 213, 74], core: [255, 255, 255] },
+    paper: { glow: [232, 69, 42], core: [20, 35, 94] },
+    ps1: { glow: [61, 245, 208], core: [220, 255, 255] },
+  };
+  const flashRGB = () => FLASH[looks.look] || FLASH.plain;
+  const flashHead = () => { const c = flashRGB().core; return `rgb(${c[0]},${c[1]},${c[2]})`; };
+  const flashGradient = (which) => {
+    const [r, g, b] = flashRGB()[which];
+    return ['interpolate', ['linear'], ['line-progress'], 0, `rgba(${r},${g},${b},0)`, 0.55, `rgba(${r},${g},${b},${which === 'glow' ? 0.35 : 0.5})`, 1, `rgba(${r},${g},${b},1)`];
+  };
+  const restyleFlash = () => {
+    if (map.getLayer('orb-flash-glow')) map.setPaintProperty('orb-flash-glow', 'line-gradient', flashGradient('glow'));
+    if (map.getLayer('orb-flash-line')) map.setPaintProperty('orb-flash-line', 'line-gradient', flashGradient('core'));
+    if (map.getLayer('orb-flash-dot')) map.setPaintProperty('orb-flash-dot', 'circle-color', ['match', ['get', 'k'], 'head', flashHead(), 'start', '#ffffff', 'ridge-end', '#ffffff', '#0b9a82']);
+  };
   const BAND_OPACITY = ['match', ['get', 'band'], 0, 0.15, 1, 0.26, 2, 0.4, 0.2];   // a mountain's three bands: stronger toward the top
   const ptsOf = (g) => {
     const out = [];
@@ -254,6 +272,7 @@ export function initOrbit(ctx) {
       sub.push(pointAt(f, s));
       if (u < 1.5 && sub.length > 1) feats.push({ type: 'Feature', properties: { k: 'comet', a: u > 1 ? Math.max(0, 1.5 - u) * 2 : 1 }, geometry: { type: 'LineString', coordinates: sub } });
       const first = f.coords[0], last = f.coords[f.coords.length - 1];
+      if (u < 1.5 && sub.length > 1) feats.push({ type: 'Feature', properties: { k: 'head' }, geometry: { type: 'Point', coordinates: sub[sub.length - 1] } });
       feats.push({ type: 'Feature', properties: { k: f.ridge ? 'ridge-end' : 'start' }, geometry: { type: 'Point', coordinates: first } });
       if (f.ridge || s > f.total * 0.85) feats.push({ type: 'Feature', properties: { k: f.ridge ? 'ridge-end' : 'end' }, geometry: { type: 'Point', coordinates: last } });
     }
@@ -432,10 +451,10 @@ export function initOrbit(ctx) {
       map.addLayer({ id: 'orb-geom-wall', type: 'fill-extrusion', source: 'orb-geom-wall', layout: { visibility: 'none' }, paint: { 'fill-extrusion-color': col, 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': 0.4, 'fill-extrusion-vertical-gradient': true } }, before);
       map.addSource('orb-towns', { type: 'geojson', data: none });
       map.addLayer({ id: 'orb-town-name', type: 'symbol', source: 'orb-towns', layout: { visibility: 'none', 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Medium'], 'text-size': 12.5, 'text-letter-spacing': 0.06, 'text-transform': 'uppercase', 'text-pitch-alignment': 'viewport', 'text-rotation-alignment': 'viewport', 'text-allow-overlap': false, 'text-padding': 3 }, paint: { 'text-color': '#2f3d37', 'text-halo-color': '#ffffff', 'text-halo-width': 2 } });
-      map.addSource('orb-flash', { type: 'geojson', data: none });
-      map.addLayer({ id: 'orb-flash-glow', type: 'line', source: 'orb-flash', filter: ['==', ['get', 'k'], 'comet'], layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffd54a', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 12, 12, 22], 'line-blur': 6, 'line-opacity': ['*', 0.6, ['get', 'a']] } }, before);
-      map.addLayer({ id: 'orb-flash-line', type: 'line', source: 'orb-flash', filter: ['==', ['get', 'k'], 'comet'], layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 5, 12, 9], 'line-opacity': ['get', 'a'] } }, before);
-      map.addLayer({ id: 'orb-flash-dot', type: 'circle', source: 'orb-flash', filter: ['!=', ['get', 'k'], 'comet'], layout: { visibility: 'none' }, paint: { 'circle-radius': ['match', ['get', 'k'], 'ridge-end', 5, 8], 'circle-pitch-alignment': 'map', 'circle-color': ['match', ['get', 'k'], 'start', '#ffffff', 'ridge-end', '#ffffff', '#0b9a82'], 'circle-stroke-color': ['match', ['get', 'k'], 'start', '#0b9a82', 'ridge-end', '#0b9a82', '#ffffff'], 'circle-stroke-width': 3 } }, before);
+      map.addSource('orb-flash', { type: 'geojson', data: none, lineMetrics: true });   // (lineMetrics: the comet is a gradient along its length, faint tail to bright head, so you can tell which way the water goes)
+      map.addLayer({ id: 'orb-flash-glow', type: 'line', source: 'orb-flash', filter: ['==', ['get', 'k'], 'comet'], layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-gradient': flashGradient('glow'), 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 12, 12, 22], 'line-blur': 6, 'line-opacity': ['*', 0.6, ['get', 'a']] } }, before);
+      map.addLayer({ id: 'orb-flash-line', type: 'line', source: 'orb-flash', filter: ['==', ['get', 'k'], 'comet'], layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-gradient': flashGradient('core'), 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 5, 12, 9], 'line-opacity': ['get', 'a'] } }, before);
+      map.addLayer({ id: 'orb-flash-dot', type: 'circle', source: 'orb-flash', filter: ['!=', ['get', 'k'], 'comet'], layout: { visibility: 'none' }, paint: { 'circle-radius': ['match', ['get', 'k'], 'ridge-end', 5, 'head', 6.5, 8], 'circle-pitch-alignment': 'map', 'circle-color': ['match', ['get', 'k'], 'head', flashHead(), 'start', '#ffffff', 'ridge-end', '#ffffff', '#0b9a82'], 'circle-stroke-color': ['match', ['get', 'k'], 'start', '#0b9a82', 'ridge-end', '#0b9a82', '#ffffff'], 'circle-stroke-width': 3 } }, before);
     }
     map.on('render', () => { if (pinEls.length) placePins(); });
     map.addSource('orb-target', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });

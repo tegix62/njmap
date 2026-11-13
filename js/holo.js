@@ -113,7 +113,6 @@ export function createHolo(map, bounds) {
     set('orb-geom-wall', 'fill-extrusion-color', col);
     set('orb-geom-casing', 'line-color', HOLO.halo);
     set('orb-geom-casing', 'line-opacity', 0.75);
-    set('orb-flash-glow', 'line-color', HOLO.glow);
     set('orb-town-name', 'text-color', HOLO.text);
     set('orb-town-name', 'text-halo-color', HOLO.halo);
     set('orb-target', 'fill-extrusion-color', '#5ff3ff');            // buildings: lit glass instead of cream blocks

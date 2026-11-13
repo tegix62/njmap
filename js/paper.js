@@ -238,7 +238,6 @@ export function createPaper(map, bounds, rich = () => false) {
     set('orb-geom-casing', 'line-blur', 0.8);
     set('orb-geom-line', 'line-blur', 0.6);
     set('orb-geom-casing', 'line-width', ['interpolate', ['linear'], ['zoom'], 8, 4.5, 12, 8]);
-    set('orb-flash-glow', 'line-color', '#f2d63c');
     set('orb-town-name', 'text-color', PAPER.text);
     set('orb-town-name', 'text-halo-color', PAPER.halo);          // a plain stock-coloured halo: any dark glow on small text turned it to mud
     set('orb-town-name', 'text-halo-width', 1.6);
