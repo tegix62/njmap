@@ -2,7 +2,7 @@
 // cached, so "which town am I in" keeps working with no signal. Online, the
 // app's own files come from the network first (the latest version every time). Background map
 // tiles are only cached opportunistically.
-const VERSION = 'njtf-v203';
+const VERSION = 'njtf-v204';
 const SHELL = [
   './',
   'index.html',
@@ -30,6 +30,7 @@ const SHELL = [
   'js/holo.js',
   'js/paper.js',
   'js/looks.js',
+  'js/maptext.js',
   'js/looks.config.js',
   'js/world.js',
   'js/retro.js',

@@ -3293,3 +3293,8 @@ body.paper .q, body.paper .choice, body.paper .qkind { text-shadow: 0 0 1px rgba
 .gamerow { display: flex; align-items: center; gap: 8px; }
 .gamerow .gamebar { width: auto; flex: 1; }
 .gamerow .chip { flex: none; white-space: nowrap; text-transform: none; letter-spacing: 0; font-size: 12px; padding: 3px 9px; }
+
+/* the map's own text redrawn crisp over a PS1 map (js/maptext.js) */
+#pxMapText { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
+#pxMapText[hidden] { display: none; }
+.px-map { font-size: 11px; letter-spacing: 0.06em; font-weight: 600; }

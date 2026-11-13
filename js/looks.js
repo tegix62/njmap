@@ -20,6 +20,7 @@
 import { createHolo } from './holo.js';
 import { createPaper } from './paper.js';
 import { createRetro } from './retro.js';
+import { createMapText } from './maptext.js';
 import { HOLO, PAPER } from './looks.config.js';
 
 export const LOOKS = ['plain', 'paper', 'ps1'];
@@ -31,6 +32,7 @@ export function createLooks(ctx) {
   const holo = createHolo(map, bounds);
   const paper = createPaper(map, bounds);
   const retro = createRetro(map);
+  const mapText = createMapText(map);   // PS1: the map's own text redrawn as crisp DOM labels (games with their own labels opt out via crisp)
   const listeners = new Set();
   let needs = { fills: false, crisp: false };
 
@@ -50,6 +52,7 @@ export function createLooks(ctx) {
     holo.apply(wantHolo);
     paper.apply(wantPaper);
     retro.apply(wantHolo ? (needs.crisp ? 2 : 3) : 0);
+    mapText.show(wantHolo && !needs.crisp);
   }
   const safe = () => { try { apply(); } catch (e) { console.warn('look failed', e); } };
   // apply as soon as the style has its layers (the map may have loaded already, or not yet)

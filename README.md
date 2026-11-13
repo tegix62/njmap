@@ -397,3 +397,7 @@ Default / Paper / PS1 is now an app-wide setting (`settings.look`, Settings → 
 - **Known gaps outside "Name that place":** under PS1 the map's own text stays as drawn (blocky at 0.75×); game-specific layers of the grid games and Drive (route lines, highlights, one-way arrows) keep their theme colours; the county fill is left alone so knowledge shading and highlights still mean something.
 
 PS1 base-map lines (width px, opacity per layer) now live in `js/looks.config.js` → `TUNE.ps1.lines`, and are calmer than the first pass (county borders 1.7 px at 0.75, town borders 1.1 px at 0.45, highways 2.8 px).
+
+### Crisp map text under PS1, in every game (`js/maptext.js`)
+
+Under PS1 the map's own text layers are made invisible (`text-opacity` 0) but left in place, so MapLibre still decides what shows and what collides; a few times a second the labels it placed are read back (`queryRenderedFeatures`) and drawn as ordinary DOM text (`.px-label.px-map`) above the map, kept a few pixels apart (max 70). Games that draw their own labels ("Name that place") opt out with `looks.use({ crisp: true })`. Line labels (road names) sit at the middle of their on-screen part, not along the line. Known gap: a game's own highlight colours (e.g. Manhattan's blue outline) are dark on the PS1 black and need a PS1 colour of their own.
