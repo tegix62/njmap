@@ -927,7 +927,42 @@ export function initPractice(ctx) {
     next();
   }
   /** A grouped list of everything there is to practice, with a line on each. */
-  ctx.openPicker = () => openPicker();
+  ctx.openPicker = () => showHub();
+  // ---- Play hub ------------------------------------------------------------------------------------------------
+  // The front door of Play, one per region: Today (the whole region in one session), Mixed for you (endless, leaning on what you miss), and Driving
+  // (New Jersey: the road questions; New York: Drive Midtown), then the single games, and a way to the full list.
+  function showHub() {
+    stopRapidTimer();
+    rapid.on = false;
+    ctx.gridgame.stop(); ctx.gridmid.stop(); ctx.gridup.stop(); ctx.gridclassic.stop(); ctx.orbit?.stop(); ctx.frames.stop();
+    ctx.clearHighlights();
+    ctx.reveal([]);
+    ctx.line(null);
+    q = { kind: 'hub', m: null, answered: true };
+    const t = todayState();
+    const sk = streak();
+    const nj = !!R.orbit && !R.gridAngle;
+    const today = t.done ? `Done today ✓${sk ? ` · ${sk}-day streak` : ''}` : t.i ? `${t.i} of ${t.items.length} done` : `${t.items.length} stops · ${nj ? 'places, highways, towns' : 'neighborhoods, towers, directions'}`;
+    const drive = nj ? ['drivemix', '🛣 Driving', 'Roads, highways, directions'] : R.gridAngle ? ['gridmid', '🚕 Drive Midtown', 'Plan the route, then ride it'] : null;
+    const tile = (type, title, sub, cls = '') => `<button class="hub-tile ${cls}" data-go="${type}"><b>${esc(title)}</b><small>${esc(sub)}</small></button>`;
+    const games = [
+      allowed.includes('orbit') ? ['orbit', R.gridAngle ? 'Name that tower' : 'Name that place'] : null,
+      nj ? ['highways', 'Name that highway'] : null,
+      allowed.includes('rapid') ? ['rapid', 'Rapid round'] : null,
+      R.gridAngle ? ['gridup', 'Drive Uptown'] : null,
+      R.gridAngle ? ['gridgame', 'Drive Downtown'] : null,
+    ].filter(Boolean);
+    ctx.hud(`<div class="qkind">Play · ${esc(R.name)}</div><div class="q">What do you want to do?</div>`);
+    ctx.sheet(`<div class="hub">
+      ${tile('today', t.done ? '☀ Today' : '☀ Start today', today, 'hub-big')}
+      <div class="hub-row">${tile('mix', '∞ Mixed for you', 'endless, from what you miss')}${drive ? tile(drive[0], drive[1], drive[2]) : ''}</div>
+      <div class="hub-chips">${games.map(([k, n]) => `<button class="chip" data-go="${k}">${esc(n)}</button>`).join('')}<button class="chip" data-all="1">All types ▸</button></div>
+    </div>`);
+    for (const b of document.querySelectorAll('#sheet [data-go]')) b.addEventListener('click', () => chooseType(b.dataset.go));
+    document.querySelector('#sheet [data-all]')?.addEventListener('click', openPicker);
+    ctx.updateEdges();
+  }
+  ctx.playHub = () => showHub();
   function openPicker() {
     let dlg = document.getElementById('pickDlg');
     if (!dlg) {
@@ -968,7 +1003,7 @@ export function initPractice(ctx) {
   }
   let lookOff = null;
   function bindHeader() {
-    document.getElementById('qType').addEventListener('click', openPicker);
+    document.getElementById('qType').addEventListener('click', showHub);
     ctx.toolbar && ctx.toolbar.bind();
     const lc = document.getElementById('lookChip');                                       // the look: one switch for every game
     if (lc && ctx.looks) {
@@ -1717,19 +1752,9 @@ export function initPractice(ctx) {
   return {
     enter() {
       ctx.clearHighlights();
-      // Easy to come back to: once a day, Practice opens on Today until it's done
-      const offered = store.get('todayOffered', '');
-      if (offered !== dayStr() && !todayState().done && cfg.type !== 'today') {
-        store.set('todayOffered', dayStr());
-        cfg.type = 'today';
-        store.set(CFG_KEY, cfg);
-        q = null;
-        return next();
-      }
-      const GAMES = ['gridgame', 'gridmid', 'gridup', 'gridclassic', 'orbit', 'highways', 'frames', 'rapid'];
-      if (!cfg.pinned && !GAMES.includes(cfg.type) && cfg.type !== 'today' && cfg.type !== 'mix') { cfg.type = 'mix'; store.set(CFG_KEY, cfg); q = null; return next(); }   // Play opens on the adaptive mix, not on whatever you played last
-      if (q && !q.answered && !q.rapid && q.kind !== 'gridgame' && q.kind !== 'frames' && q.kind !== 'rapidend') show();
-      else next();
+      // Play opens on its hub (Today, Mixed, Driving, the games), unless you are partway through a question: that resumes
+      if (q && !q.answered && !q.rapid && q.kind !== 'gridgame' && q.kind !== 'frames' && q.kind !== 'rapidend' && q.kind !== 'hub') show();
+      else showHub();
     },
     leave() {
       stopRapidTimer();
