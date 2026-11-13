@@ -37,6 +37,7 @@ export function createMapText(map) {
   map.getContainer().appendChild(box);
   box.hidden = true;
 
+  let hideRoads = false;               // the highway quiz: no route numbers or road names anywhere until the answer is in (they would give it away)
   let sparse = false;                 // a game that wants the map quiet: only the bigger towns, water and a handful of shields
   let on = false, mode = 'all', last = 0, raf = 0, layers = [];   // mode: 'all' (every text layer) or 'shields' (route numbers only)
   const saved = new Map();
@@ -44,7 +45,7 @@ export function createMapText(map) {
   const pool = [];                     // elements reused between updates
 
   const textLayers = () =>
-    map.getStyle().layers.filter((l) => l.type === 'symbol' && !SKIP(l.id) && l.layout && l.layout['text-field'] && (mode === 'all' || l.id.startsWith('road-ref')) && !(sparse && (l.id === 'road-name' || l.id.startsWith('section-label') || l.id === 'county-label' || l.id === 'landmark-label')) && map.getLayoutProperty(l.id, 'visibility') !== 'none');
+    map.getStyle().layers.filter((l) => l.type === 'symbol' && !SKIP(l.id) && l.layout && l.layout['text-field'] && (mode === 'all' || l.id.startsWith('road-ref')) && !(hideRoads && (l.id.startsWith('road-ref') || l.id === 'road-name')) && !(sparse && (l.id === 'road-name' || l.id.startsWith('section-label') || l.id === 'county-label' || l.id === 'landmark-label')) && map.getLayoutProperty(l.id, 'visibility') !== 'none');
 
   function hideNative() {
     layers = textLayers();
@@ -109,7 +110,7 @@ export function createMapText(map) {
       }
     }
     // Named highways always get shields: their lines are drawn from low zoom, but the route-number labels need room, so take them from the line layer
-    if (map.getLayer('hwy-color') && map.getLayoutProperty('hwy-color', 'visibility') !== 'none') {
+    if (!hideRoads && map.getLayer('hwy-color') && map.getLayoutProperty('hwy-color', 'visibility') !== 'none') {
       for (const f of map.queryRenderedFeatures({ layers: ['hwy-color'] })) {
         const lab = labelOf(f.properties || {});
         if (!lab) continue;
@@ -179,6 +180,7 @@ export function createMapText(map) {
 
   return {
     setSaver(v) { saverOn = !!v; },
+    setHideRoads(v) { v = !!v; if (v === hideRoads) return; hideRoads = v; if (on) { showNative(); hideNative(); } schedule(); },
     show(want, how = 'all', quiet = false) {
       want = !!want;
       if (quiet !== sparse) { sparse = quiet; if (on) { showNative(); } }

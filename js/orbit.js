@@ -933,6 +933,7 @@ export function initOrbit(ctx) {
     cancelAnimationFrame(arcRaf);
     clearTimeout(compareTimer);
     ctx.toolbar.clear();
+    looks.hideRoads(false);
     clearPins();
     clearInterval(jitterT);
     endFlash();
@@ -949,8 +950,16 @@ export function initOrbit(ctx) {
     show(false);
     map.easeTo({ pitch: 0, center: map.getCenter(), duration: ctx.dur ? ctx.dur(400) : 400 });
   }
+  // The highway game must not show the answer: no route numbers or road names anywhere on the map until the question is answered.
+  const hwyGame = () => !!(run && run.opts.only && run.opts.only.includes('highway'));
+  function roadLabels(visible) {
+    looks.hideRoads(!visible);
+    for (const l of map.getStyle().layers) if (l.type === 'symbol' && (l.id.startsWith('road-ref') || l.id === 'road-name')) map.setLayoutProperty(l.id, 'visibility', visible ? 'visible' : 'none');
+    if (map.getLayer('hwy-color')) map.setLayoutProperty('hwy-color', 'visibility', visible ? 'visible' : 'none');   // (the named highways are drawn in their own colours, which would give them away too)
+  }
   function next() {
     if (!run) return;
+    roadLabels(!hwyGame());
     if (run.n >= ROUND) {
       run.done = true;
       q = null;
@@ -994,6 +1003,7 @@ export function initOrbit(ctx) {
     const t = q.t;
     q.done = true;
     endFlash();
+    if (hwyGame()) roadLabels(true);               // (now the shields may show)
     q.picked = name;
     q.ok = name === t.n;
     if (!q.ok && cfg && t.k === 'nat') {

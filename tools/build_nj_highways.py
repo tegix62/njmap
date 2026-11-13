@@ -106,7 +106,7 @@ for lab, g in out.items():
     fam = 'Interstate' if lab.startswith('I-') else 'Route' if lab.startswith('Route') else lab
     new.append({
         'n': lab, 'kind': 'highway', 'k': 'nat', 'p': mt['mid'], 'z': 11.2, 'pitch': 60, 'bearing': mt['ang'],
-        'line': f"{'Interstate ' + lab[2:] if lab.startswith('I-') else lab if lab.startswith('Route') else 'The ' + lab} runs {DIRW(mt['ang'])} through New Jersey",
+        'line': f"{'An Interstate' if lab.startswith('I-') else 'A state or US route' if lab.startswith('Route') else 'A toll road'} running {DIRW(mt['ang'])} through New Jersey",
         'at': tw['full'] if tw else '', 'c': tw['c'] if tw else '', 'meets': mt['meets'][:10],
     })
 places += new

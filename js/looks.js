@@ -118,6 +118,8 @@ export function createLooks(ctx) {
     get ps1On() { return holo.on; },
     get label() { return LOOK_LABEL[look]; },
     get quality() { return res.quality; },
+    /** A quiz that must not name the roads: no route shields or road names drawn by the map's text layer until it says otherwise. */
+    hideRoads(v) { mapText.setHideRoads(v); },
     _res: res,
     /** Battery saver (the default): no full-screen filters, no per-frame extras, 30 fps orbit. Set in Settings → Effects. */
     get saver() { return isSaver(); },
