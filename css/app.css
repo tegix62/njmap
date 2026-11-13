@@ -3312,3 +3312,11 @@ body.paper .px-shield.sh-interstate { min-width: 26px; height: 24px; padding: 3p
   background: linear-gradient(#e8603a 0 30%, #1d2a5b 30%); clip-path: polygon(0 0, 100% 0, 100% 64%, 50% 100%, 0 64%); filter: drop-shadow(1.5px 1.5px 0 rgba(232, 96, 58, 0.5)); }
 body.paper .px-shield.sh-county { min-width: 20px; height: 20px; padding: 0 3px; box-sizing: border-box; background: #f6f1c9; border: 1.5px solid #1d2a5b; font-size: 10px; }
 body.paper .px-shield.sh-plate { padding: 3px 6px; background: #f6f1c9; border: 1.5px solid #1d2a5b; border-radius: 2px; font-size: 10px; letter-spacing: 0.08em; box-shadow: 1.5px 1.5px 0 rgba(232, 96, 58, 0.5); }
+
+/* Paper: label hierarchy by ink, as on the printed maps: towns red (the big ones with a star), regions navy letterspaced caps, water italic blue */
+body.paper .px-map.l-muni-label-major { color: #e8452a; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; font-size: 12.5px; }
+body.paper .px-map.l-muni-label-major::before { content: '\2605\00a0'; font-size: 10px; }
+body.paper .px-map.l-muni-label { color: #e8452a; font-weight: 600; }
+body.paper .px-map.l-region-label, body.paper .px-map.l-county-label { color: #14235e; font-weight: 700; text-transform: uppercase; letter-spacing: 0.22em; font-size: 12px; }
+body.paper .px-map.l-river-name, body.paper .px-map.l-lake-name, body.paper .px-map.l-road-name { color: #2438a8; font-style: italic; font-weight: 500; }
+body.paper .px-map.l-road-name { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; font-style: normal; }

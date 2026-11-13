@@ -20,20 +20,25 @@ export const HOLO = {
 
 // ---- Paper: palette after a Gulf road map of Washington, D.C. ----------------------------------------------
 export const PAPER = {
-  stock: '#f4efc4',
-  land: '#f6f1c9',
-  water: '#c3dcee',
-  waterInk: '#3f78ad',
-  ink: '#1d2a5b',
-  line: '#6a6a58',
-  road: '#e4893e',
-  hwy: '#d4552b',
-  target: '#e8603a',
-  wrong: '#2f6fb5',
-  fringeA: '#f2d63c',     // the two off-register plates behind a coloured mass
+  // Strict ink separation (after the street map, the western-US map and the sheet-music cover): a cream-yellow stock and a few flat spot inks.
+  // No greys and no translucent tints; tone comes from dot screens.
+  stock: '#f2ea9c',
+  land: '#f2ea9c',
+  water: '#f2ea9c',        // water is a blue dot screen over the stock
+  waterInk: '#2438a8',
+  blue: '#2438a8',         // linework ink
+  red: '#e8452a',          // arterials, towns, what is asked about
+  green: '#1f6b3a',
+  ink: '#14235e',          // navy: borders, text
+  line: '#2438a8',
+  road: '#e8452a',
+  hwy: '#e8452a',
+  target: '#e8452a',
+  wrong: '#2438a8',
+  fringeA: '#f2d63c',      // the two off-register plates behind a coloured mass
   fringeB: '#3d78c9',
-  text: '#1d2a5b',
-  halo: '#f6f1c9',
+  text: '#14235e',
+  halo: '#f2ea9c',
   band: ['match', ['get', 'band'], 0, 0.45, 1, 0.6, 2, 0.82, 0.5],   // a mountain's three bands, as flat ink strengths
 };
 
@@ -62,6 +67,14 @@ export const TUNE = {
     roughenMetres: 55,       // how far hand-pulled edges wander (answer outlines)
     boil: { metres: 16, fps: 4.5, frames: 4 },   // the outline re-drawn by hand a few times a second (animated line boil): how far each drawing differs, how often, how many drawings
     creaseOpacity: 0.3,
+    // two-line roads: a blue casing under a core in stock colour (red for the main roads), so blocks read as outlined shapes. Widths in px at three zooms [z, width].
+    roads: {
+      'road-minor': { core: [[12, 0.4], [15, 3], [17, 9]],  case: [[12, 1], [15, 5.2], [17, 11.2]], fill: 'stock' },
+      'road-mid':   { core: [[10, 0.5], [13, 2.6], [17, 11]], case: [[10, 1.2], [13, 4.8], [17, 13.2]], fill: 'stock' },
+      'road-major': { core: [[8, 0.6], [12, 2], [16, 8]],    case: [[8, 1.6], [12, 4.2], [16, 10.2]], fill: 'red' },
+      'hwy-color':  { core: [[6, 1], [9, 1.8], [12, 3], [16, 10]], case: [[6, 2], [9, 3.2], [12, 5.2], [16, 12.2]], fill: 'red' },
+    },
+    border: { width: [[8, 2.2], [12, 4.2]], shadow: [2.2, 2.2], shadowOpacity: 0.35 },   // county borders: heavy navy with a hard offset shadow
     swim: { grain: 0.16, blots: 0.07, ink: 0.24 },   // texture swim: how far each texture layer slides against the map as the camera moves (fraction of the camera's screen movement; 0 = locked to the map)
     pinholes: 60,            // pinholes visible on a typical screen (the count over the region is scaled to the region's size)
     blotSize: [0.004, 0.034],// blotch radius as a fraction of the region's diagonal: [smallest, largest]

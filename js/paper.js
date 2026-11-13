@@ -17,25 +17,23 @@ export { PAPER };
 const BASE = {
   bg: { 'background-color': PAPER.stock },
   'muni-fill': { 'fill-color': PAPER.land, 'fill-opacity': 1 },
-  water: { 'fill-color': PAPER.water, 'fill-opacity': 1 },
-  river: { 'line-color': PAPER.waterInk, 'line-opacity': 0.9 },
-  'road-minor': { 'line-color': PAPER.line, 'line-opacity': 0.75 },
-  'road-mid': { 'line-color': '#4a4a3c', 'line-opacity': 0.85 },
-  'road-major': { 'line-color': PAPER.road, 'line-opacity': 1 },
-  'hwy-color': { 'line-color': PAPER.hwy, 'line-opacity': 1 },
-  'muni-line': { 'line-color': '#9a9a7a', 'line-opacity': 0.55 },
-  'county-line': { 'line-color': PAPER.ink, 'line-opacity': 0.6 },
+  water: { 'fill-color': PAPER.stock, 'fill-opacity': 1 },
+  river: { 'line-color': PAPER.blue, 'line-opacity': 1, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1.4, 14, 3.2] },
+  'muni-line': { 'line-color': PAPER.blue, 'line-opacity': 0.9, 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.9, 16, 1.6], 'line-dasharray': [4, 2.2] },
+  'county-line': { 'line-color': PAPER.ink, 'line-opacity': 1, 'line-width': ['interpolate', ['linear'], ['zoom'], ...TUNE.paper.border.width.flat()] },
 };
-// ink spreads a little into the stock: a hair of blur on printed lines
-const BLEED = { river: 0.5, 'road-minor': 0.45, 'road-mid': 0.45, 'road-major': 0.55, 'hwy-color': 0.6, 'muni-line': 0.5, 'county-line': 0.6 };
+// the main roads' cores (their casings are separate layers, see linework())
+const INK = { stock: PAPER.stock, red: PAPER.red };
+for (const [id, r] of Object.entries(TUNE.paper.roads))
+  BASE[id] = { 'line-color': INK[r.fill], 'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], ...r.core.flat()] };
 
 /** A tile of blue halftone dots (transparent between), for the water. */
-function dotsImage(rgb = [63, 120, 173]) {
+function dotsImage(rgb = [36, 56, 168]) {
   const S = 8, c = document.createElement('canvas');
   c.width = c.height = S;
   const g = c.getContext('2d');
-  g.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.55)`;
-  for (const [x, y] of [[2, 2], [6, 6]]) { g.beginPath(); g.arc(x, y, 1.35, 0, Math.PI * 2); g.fill(); }
+  g.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.85)`;
+  for (const [x, y] of [[2, 2], [6, 6]]) { g.beginPath(); g.arc(x, y, 1.25, 0, Math.PI * 2); g.fill(); }
   return g.getImageData(0, 0, S, S);
 }
 
@@ -116,22 +114,29 @@ export function createPaper(map, bounds) {
   const WORLD = ['orb-paper-inktex', 'orb-paper-grain', 'orb-paper-blots', 'orb-paper-crease-dark', 'orb-paper-crease-pale', 'orb-paper-specks'];
 
   /**
-   * Ink bleed and missed registration for the printed linework: under each main line a soft dark glow (the ink spreading into the stock), and
-   * a blue copy a pixel or two off (a plate that did not line up). Cloned from the base style's own layers.
+   * Printed linework, cloned from the base style's own layers:
+   *  - two-line roads: a blue casing under every road, all casings below all cores (so crossings merge cleanly), the core being the style's own
+   *    layer recoloured stock (red for the main roads): the blocks between roads read as outlined shapes;
+   *  - county borders get a hard navy shadow a couple of pixels off, as on the western-US map.
    */
   const GLOW = [];
   function linework() {
     if (GLOW.length) return;
     const specs = map.getStyle().layers;
-    for (const id of ['river', 'road-major', 'hwy-color', 'county-line', 'muni-line']) {
+    const firstRoad = Object.keys(TUNE.paper.roads).map((id) => specs.findIndex((l) => l.id === id)).filter((i) => i >= 0).sort((a, b) => a - b)[0];
+    const beforeRoads = firstRoad >= 0 ? specs[firstRoad].id : undefined;
+    for (const [id, r] of Object.entries(TUNE.paper.roads)) {
       const s = specs.find((l) => l.id === id);
       if (!s || s.type !== 'line') continue;
-      const w = ['interpolate', ['linear'], ['zoom'], 8, id === 'county-line' ? 3.2 : 2.4, 12, id === 'county-line' ? 6 : 4.5];
-      const base = { ...s, layout: { ...(s.layout || {}), visibility: 'none' } };
-      map.addLayer({ ...base, id: id + '-pglow', paint: { 'line-color': PAPER.ink, 'line-opacity': TUNE.paper.glow, 'line-blur': 3, 'line-width': w } }, id);
-      if (id !== 'muni-line') map.addLayer({ ...base, id: id + '-preg', paint: { 'line-color': PAPER.fringeB, 'line-opacity': TUNE.paper.registration, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 12, 2], 'line-translate': TUNE.paper.registrationOffset, 'line-translate-anchor': 'viewport' } }, id);
-      GLOW.push(id + '-pglow');
-      if (id !== 'muni-line') GLOW.push(id + '-preg');
+      const base = { ...s, layout: { ...(s.layout || {}), visibility: 'none', 'line-cap': 'butt', 'line-join': 'round' } };
+      map.addLayer({ ...base, id: id + '-pcase', paint: { ...(s.paint || {}), 'line-color': PAPER.blue, 'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], ...r.case.flat()] } }, beforeRoads);
+      GLOW.push(id + '-pcase');
+    }
+    const cs = specs.find((l) => l.id === 'county-line');
+    if (cs && cs.type === 'line') {
+      const B = TUNE.paper.border;
+      map.addLayer({ ...cs, id: 'county-line-pshadow', layout: { ...(cs.layout || {}), visibility: 'none' }, paint: { 'line-color': PAPER.ink, 'line-opacity': B.shadowOpacity, 'line-width': ['interpolate', ['linear'], ['zoom'], ...B.width.flat()], 'line-translate': B.shadow, 'line-translate-anchor': 'viewport' } }, 'county-line');
+      GLOW.push('county-line-pshadow');
     }
   }
 
@@ -202,7 +207,6 @@ export function createPaper(map, bounds) {
         world();
         linework();
         for (const [id, props] of Object.entries(BASE)) if (id !== 'muni-fill' || fillsOn) for (const [p, v] of Object.entries(props)) set(id, p, v);
-        for (const [id, b] of Object.entries(BLEED)) set(id, 'line-blur', b);
         game();
         for (const id of ['orb-paper-a', 'orb-paper-b', ...WORLD, ...GLOW]) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
         if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) swimTo(true);
