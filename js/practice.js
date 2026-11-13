@@ -6,7 +6,7 @@ import { sampleRoads, roadsThrough } from './roads.js';
 let L; // label colors of the active theme (set in initPractice)
 
 const TYPES = {
-  mix: 'Mixed',
+  mix: 'Mixed for you',
   find: 'Find it on the map',
   name: 'Name the highlighted town',
   dir: 'Which direction?',
@@ -40,7 +40,7 @@ const TYPES = {
 // What each kind is, in a line, for the picker (the ones worth explaining)
 const DESC = {
   today: 'A short set picked for you today. The best place to start.',
-  mix: 'A bit of everything.',
+  mix: 'Questions chosen from what you have missed: due places come first, and the kinds of question you get wrong most come up most.',
   rapid: 'Timed one-tap rounds, three lives.',
   gridmid: 'Drive Midtown: plan the route avenue by avenue and street by street, then ride it.',
   gridup: 'Drive Uptown: 60th to 110th St, the Upper East and West Sides round Central Park, then ride it.',
@@ -154,6 +154,12 @@ export function initPractice(ctx) {
   const DAY = 864e5;
   const srs = () => store.get('srs', {});
   function record(m, ok) {
+    if (lastType) {                                   // how you do on each kind of question, so Play can lean on the kinds you miss
+      const ks = store.get('kindStats', {});
+      const [kn = 0, kr = 0] = ks[lastType] || [];
+      ks[lastType] = [kn + 1, kr + (ok ? 1 : 0)];
+      store.set('kindStats', ks);
+    }
     const st = store.get('stats', {});
     const [seen = 0, right = 0] = st[m.key] || [];
     st[m.key] = [seen + 1, right + (ok ? 1 : 0)];
@@ -606,7 +612,10 @@ export function initPractice(ctx) {
     // (interleaving helps tell similar things apart; Kornell & Bjork, 2008).
     let t = cfg.type;
     if (t === 'mix') {
-      const bag = R.quizTypes.flatMap((k) => Array(WEIGHT[k] || 1).fill(k));
+      // Play: the mix leans on the kinds of question you get wrong most (unseen kinds count as average), never the same kind twice running
+      const ks = store.get('kindStats', {});
+      const wt = (k) => { const [n = 0, r = 0] = ks[k] || []; return (WEIGHT[k] || 1) * (0.6 + 1.6 * (1 - (r + 1) / (n + 2))); };
+      const bag = R.quizTypes.flatMap((k) => Array(Math.max(1, Math.round(wt(k) * 2))).fill(k));
       do t = rand(bag);
       while (t === lastType);
     }
@@ -881,6 +890,7 @@ export function initPractice(ctx) {
     const recent = [cfg.type, ...store.get('practice.recent', [])].filter((x, i, a) => x && a.indexOf(x) === i && x !== t);
     store.set('practice.recent', recent.slice(0, 4));
     cfg.type = t;
+    cfg.pinned = t !== 'mix' && t !== 'today';        // a type picked by hand stays until you pick Mixed or Today; otherwise Play is the adaptive mix
     store.set(CFG_KEY, cfg);
     next();
   }
@@ -1675,6 +1685,8 @@ export function initPractice(ctx) {
         q = null;
         return next();
       }
+      const GAMES = ['gridgame', 'gridmid', 'gridup', 'gridclassic', 'orbit', 'frames', 'rapid'];
+      if (!cfg.pinned && !GAMES.includes(cfg.type) && cfg.type !== 'today' && cfg.type !== 'mix') { cfg.type = 'mix'; store.set(CFG_KEY, cfg); q = null; return next(); }   // Play opens on the adaptive mix, not on whatever you played last
       if (q && !q.answered && !q.rapid && q.kind !== 'gridgame' && q.kind !== 'frames' && q.kind !== 'rapidend') show();
       else next();
     },
