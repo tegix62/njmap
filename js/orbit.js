@@ -216,7 +216,7 @@ export function initOrbit(ctx) {
   const FLASH_MS = 1500;
   const easeIO = (x) => x * x * (3 - 2 * x);
   /** The line to run a comet along for a river or a range: the stretch of the chain nearest the point, within 22 km of it (so a long river does not blow out the view). */
-  function flowOf(t) {
+  function flowOf(t, clip = 22000) {
     const g = city.geoms && city.geoms[t.n];
     if (!g || t.n === 'Delaware and Raritan Canal') return null;
     if (g.type === 'Polygon' || g.type === 'MultiPolygon') return { kind: 'poly' };
@@ -227,8 +227,8 @@ export function initOrbit(ctx) {
     chains.forEach((c, ci) => c.forEach((p, i) => { const d = mDist(p, t.p); if (!best || d < best.d) best = { d, ci, i }; }));
     const c = chains[best.ci];
     let a = best.i, b = best.i;
-    while (a > 0 && mDist(c[a - 1], t.p) < 22000) a--;
-    while (b < c.length - 1 && mDist(c[b + 1], t.p) < 22000) b++;
+    while (a > 0 && mDist(c[a - 1], t.p) < clip) a--;
+    while (b < c.length - 1 && mDist(c[b + 1], t.p) < clip) b++;
     const coords = c.slice(a, b + 1);
     if (coords.length < 2) return null;
     const cum = [0];
@@ -282,6 +282,33 @@ export function initOrbit(ctx) {
     for (const id of ['orb-geom-fill', 'orb-geom-fill2']) if (map.getLayer(id)) map.setPaintProperty(id, 'fill-opacity', 0.3);
     if (map.getLayer('orb-geom-band')) map.setPaintProperty('orb-geom-band', 'fill-opacity', curBand());
     if (map.getLayer('orb-geom-line')) map.setPaintProperty('orb-geom-line', 'line-width', ['interpolate', ['linear'], ['zoom'], 8, 3, 12, 6]);
+  }
+  // The fly-down: for a river too long to fill the screen. The camera follows the water downstream at a fixed zoom (about 5-8 s, eased at both ends),
+  // with the glow comet riding the same curve and the two ends marked; then it rests (a touch stops it, and the "Flow" chip plays it again).
+  let flyRaf = 0;
+  const stopFly = () => { cancelAnimationFrame(flyRaf); flyRaf = 0; };
+  function flyDown(t) {
+    stopFly();
+    endFlash();
+    const f = t.flyF;
+    if (!f) return;
+    const dur = ctx.dur ? ctx.dur(Math.max(4500, Math.min(8000, f.total / 12))) : 6000;     // ~12 km a second
+    map.jumpTo({ center: f.coords[0] });
+    const t0 = performance.now();
+    const off = () => { map.off('mousedown', skip); map.off('touchstart', skip); };
+    const skip = () => { stopFly(); off(); clearFlashVisual(); drawFlash(t, f, 1.3); };
+    map.once('mousedown', skip);
+    map.once('touchstart', skip);
+    const step = (now) => {
+      if (!run || !q || q.t !== t || q.done) { off(); return endFlash(); }
+      const prog = Math.min(1, (now - t0) / dur);
+      const s = easeIO(prog) * f.total;
+      map.jumpTo({ center: pointAt(f, s) });
+      drawFlash(t, f, prog * 0.82);
+      if (prog < 1) flyRaf = requestAnimationFrame(step);
+      else { off(); flyRaf = 0; setTimeout(() => { if (run && q && q.t === t) endFlash(); }, 900); }
+    };
+    flyRaf = requestAnimationFrame(step);
   }
   function flashPlace(t) {
     endFlash();
@@ -702,6 +729,13 @@ export function initOrbit(ctx) {
         const ext = Math.max((b[2] - b[0]) * 84200, (b[3] - b[1]) * 111000, 1500);
         zoom = Math.max(9.4, Math.min(12, Math.log2((0.5 * (map.getContainer().clientWidth || 400) * mpp0) / ext)));   // (not closer than 12, and the outline fills about half the width: room for the places round it)
         if (t.kind !== 'river') center = [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
+        // A river too long to fill the screen at a readable zoom: fly down it instead (zoom 11, the camera follows the water, north stays near the top)
+        const zFit = Math.log2((0.5 * (map.getContainer().clientWidth || 400) * mpp0) / ext);
+        t.flyF = null;
+        if (t.kind === 'river' && zFit < 10.6 && !ctx.reduceMotion) {
+          const ff = flowOf(t, 45000);
+          if (ff && ff.total > 8000) { t.flyF = ff; center = ff.coords[0]; zoom = 11; }
+        }
       }
     }
     const cam = { center, zoom, pitch: t.k === 'nat' ? t.pitch : PITCH, bearing, padding: { top, bottom: pad.bottom, left: 0, right: 0 } };
@@ -743,7 +777,7 @@ export function initOrbit(ctx) {
       updateOcclusion(bearing);
       render();
       raf = requestAnimationFrame(tick);
-      flashPlace(t);
+      if (t.flyF) flyDown(t); else flashPlace(t);
     };
     // (easeTo, not flyTo: flyTo's long zoom-out makes MapLibre throw from its tile bookkeeping now and then; the towers are
     // only a few km apart, so a plain ease reads as a swing anyway)
@@ -1023,7 +1057,7 @@ export function initOrbit(ctx) {
     const hints = hintsHtml(HINTS.slice(0, q.hints).map((h) => h(q.t)));
     const where = q.t.k === 'nat' ? (q.towns && q.towns.shown.length ? whereHtml(q.towns.shown.slice(0, 4).map((m) => m.n).join(' · ') + (q.towns.shown.length + q.towns.more > 4 ? ` · +${q.towns.shown.length + q.towns.more - 4} more` : '')) : '') : whereHtml(q.hood || '');
     ctx.hud(`<div class="qkind">${ICON} ${TITLE} · ${run.n + (q.done ? 0 : 1)}/${ROUND} · ${run.pts} pts${run.streak >= 3 ? ` · 🔥${run.streak}` : ''}</div><div class="q">${q.done ? (q.ok ? 'Yes.' : 'Not quite.') : q.flying ? 'Swinging over…' : (cfg ? `Which ${NOUN[q.t.kind] || 'place'} is this?` : q.t.k === 'lm' ? 'Which landmark is this?' : 'Which tower is this?')}</div>${q.flying ? '' : where}${q.flying ? '' : hints}`);
-    ctx.toolbar.set([{ id: 'spin', label: spinOn ? '↻ Orbit' : '✋ Drag', pressed: spinOn, title: 'Camera circles by itself, or holds still so you can turn it', onClick: () => { spinOn = !spinOn; ctx.store.set('orbit.spin', spinOn); render(); } }]);
+    ctx.toolbar.set([...(q.t.flyF ? [{ id: 'flow', label: '↻ Flow', pressed: false, title: 'Fly down the river again', onClick: () => { if (q && !q.flying) flyDown(q.t); } }] : []), { id: 'spin', label: spinOn ? '↻ Orbit' : '✋ Drag', pressed: spinOn, title: 'Camera circles by itself, or holds still so you can turn it', onClick: () => { spinOn = !spinOn; ctx.store.set('orbit.spin', spinOn); render(); } }]);
     ctx.sheet(`${run.opts.header()}<div id="qbody">
       ${choicesHtml(q.choices, { attr: 'n', data: (c) => c.n, label: (c) => c.n, off: q.done || q.flying, state: (c) => (q.done ? (c.n === q.t.n ? 'right' : c.n === q.picked ? 'wrong' : '') : '') })}
       ${q.done ? `${reveal()}<div class="stickybar"><button class="primary" id="orbNext">${run.n >= ROUND ? 'Finish' : cfg || q.t.k === 'lm' ? 'Next' : 'Next tower'}</button></div>` : `<button id="orbHint" class="chip"${q.hints >= HINTS.length || q.flying ? ' disabled' : ''}>💡 Hint (−1 point)</button>`}
