@@ -53,7 +53,11 @@ export function createLooks(ctx) {
   const dpr = () => window.devicePixelRatio || 1;
   const res = {
     moving: false, timer: 0, lastSet: 0,
-    target() { return isSaver() ? Math.min(dpr(), this.moving ? 1.5 : 2) : dpr(); },
+    quality: Math.max(0.55, Math.min(1, +ctx.store.get('perf.quality', 1) || 1)),   // set by the governor below; remembered between sessions
+    target() {
+      const base = isSaver() ? Math.min(dpr(), this.moving ? 1.5 : 2) : dpr();
+      return Math.max(1, Math.round(base * this.quality * 20) / 20);            // (never below 1x: text and lines would blur)
+    },
     refresh() {
       if (look === 'ps1' || !map.setPixelRatio) return;
       const t = this.target();
@@ -62,6 +66,24 @@ export function createLooks(ctx) {
     start() { if (!this.moving) { this.moving = true; this.refresh(); } this.end(); },
     end() { clearTimeout(this.timer); this.timer = setTimeout(() => { if (map.isMoving()) return this.end(); this.moving = false; this.refresh(); }, 600); },
   };
+  // Governor: while the camera moves, time the frames the phone really manages. Slow (under ~26 fps) → lower the resolution a notch; fast (over ~45 fps)
+  // → raise it again. The result is remembered, so a phone that struggles starts the next session already adapted, and a fast one stays sharp. This is what
+  // lets the effects stay on without a battery setting: the phone sets its own limit.
+  const gov = { last: 0, dts: [] };
+  map.on('render', () => {
+    const now = performance.now();
+    const dt = now - gov.last;
+    gov.last = now;
+    if (!res.moving || res.busy || dt > 300) { gov.dts.length = 0; return; }   // (only frames inside continuous motion count)
+    gov.dts.push(dt);
+    if (gov.dts.length < 24) return;
+    const avg = gov.dts.reduce((a, b) => a + b, 0) / gov.dts.length;
+    gov.dts.length = 0;
+    const q0 = res.quality;
+    if (avg > 38) res.quality = Math.max(0.55, res.quality * 0.88);
+    else if (avg < 22 && res.quality < 1) res.quality = Math.min(1, res.quality * 1.06);
+    if (res.quality !== q0) { ctx.store.set('perf.quality', +res.quality.toFixed(3)); res.refresh(); }
+  });
   map.on('movestart', () => { if (!res.busy) res.start(); });
   map.on('move', () => { if (res.moving && !res.busy) res.end(); });   // (every move event renews the 600 ms timer, so a lost moveend cannot leave the map coarse)
   map.on('moveend', () => { if (!res.busy) res.end(); });
@@ -95,6 +117,7 @@ export function createLooks(ctx) {
     get paperOn() { return paper.on; },
     get ps1On() { return holo.on; },
     get label() { return LOOK_LABEL[look]; },
+    get quality() { return res.quality; },
     _res: res,
     /** Battery saver (the default): no full-screen filters, no per-frame extras, 30 fps orbit. Set in Settings → Effects. */
     get saver() { return isSaver(); },

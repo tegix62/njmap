@@ -507,3 +507,7 @@ When you have been on a road steadily for a few seconds, Drive says it: "Route 1
 ### Performance test (`js/perftest.js`)
 
 Settings → "Run performance test (about 40 s)": turns the map for 6 s in each of plain/paper/PS1 × saver/full on your phone, times every frame as the phone draws it, and shows a table (fps, average ms, slowest 5%, frames over 50 ms, render ratio) to screenshot and send back. A web page cannot read battery or temperature on an iPhone, so frame time (GPU busy time) is the measure. Ran end to end here (the numbers from my software-rendered browser mean nothing).
+
+### Governor (adaptive resolution, `js/looks.js`)
+
+While the camera moves, the real frame times are measured (24 frames at a time). Under about 26 fps the render resolution drops a notch (×0.88, never below 1×); over about 45 fps it rises again (×1.06, up to the normal ratio). The level is remembered between sessions (`perf.quality`), so a phone that struggles starts already adapted and a fast one stays sharp. It applies in every look, in saver and in Full; PS1 keeps its own fixed low ratio. In my software-rendered test a 30 s turn took it from 1.0 to 0.68 and the setting was saved; on a fast phone it should stay at 1. The aim is that the effects can stay on without a battery option; the performance test (Settings) shows how your phone does.
