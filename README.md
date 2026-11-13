@@ -416,3 +416,5 @@ Under Paper the answer outline is redrawn by hand a few times a second: four sli
 ### PS1 wobble (`js/retro.js`, `RETRO.*.wobble` in `js/looks.config.js`)
 
 Under PS1 the whole map picture is displaced by a few pixels (SVG `feDisplacementMap`, `#ps1Wobble`) with noise that is re-rolled 8 times a second, so edges swim like PS1 geometry did; the colour snapping runs after it. It is a full-screen filter, so it times its own frames for the first 3 s and switches itself off for the session if they average over 42 ms; it is not applied under reduced motion. It moves the map canvas only (labels, panels and the crisp text are not displaced). Knobs: `scale` (pixels), `fps`.
+
+Wobble switched off by default (`wobble: null` in `RETRO`): the displacement filter over the whole map canvas froze the map on a phone. Safety valve: open the app with `?look=plain` (or `paper`, `ps1`) to force a look and save it, e.g. if a look ever stops the map from loading.

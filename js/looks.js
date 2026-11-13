@@ -39,6 +39,9 @@ export function createLooks(ctx) {
   // the setting; the older per-game ones still count once
   const old = ctx.store.get('orbit.look', null);
   let look = ctx.settings.look || (old === 'holo' ? 'ps1' : old) || 'plain';
+  // escape hatch: open the app with ?look=plain (or paper, ps1) to force a look, e.g. if one ever stops the map from loading
+  const forced = new URLSearchParams(location.search).get('look');
+  if (forced && LOOKS.includes(forced)) { look = forced; ctx.settings.look = forced; ctx.saveSettings && ctx.saveSettings(); }
   if (!LOOKS.includes(look)) look = 'plain';
 
   function apply() {
