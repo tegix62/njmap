@@ -455,3 +455,5 @@ Every printed line is drawn with a stroke texture through `line-pattern`, not a 
 Not done yet: misregistration on every printed area, and map furniture (title box, scale bar, compass rose).
 
 Fix: leaving Paper threw (it tried to clear a line pattern on the water's fill layer), which aborted the switch before the colours were restored, so the app stayed in Paper whatever you chose. Clearing now only touches line layers, and the rest of Paper's teardown runs even if one step fails. Verified by cycling Paper → PS1 → Default → Paper → PS1 → Default with the chip.
+
+Fix: route shields (and every DOM map label) lagged the camera and "blinked around". Positions were computed only when the label set was re-read (about 3 times a second), so between reads they stayed at old screen positions, and the anchor point on a line could jump to a different part of it each read. Labels are now pinned to a ground position (lng/lat) and re-projected on every map frame (a few dozen transforms); only *which* labels show is still re-read a few times a second. Checked: moving the camera in 0.01° steps moved a shield by a steady 9 px each frame, in the same frame.

@@ -39,6 +39,7 @@ export function createMapText(map) {
 
   let on = false, mode = 'all', last = 0, raf = 0, layers = [];   // mode: 'all' (every text layer) or 'shields' (route numbers only)
   const saved = new Map();
+  const placed = [];                 // what is on screen now: { el, ll (ground position), rot }
   const pool = [];                     // elements reused between updates
 
   const textLayers = () =>
@@ -67,9 +68,10 @@ export function createMapText(map) {
     const pts = [];
     const walk = (c) => { if (typeof c[0] === 'number') pts.push(c); else c.forEach(walk); };
     walk(geom.coordinates);
-    const sp = pts.map((p) => map.project(p)).filter((s) => s.x > -20 && s.y > -20 && s.x < W + 20 && s.y < H + 20);
+    const sp = pts.map((p) => ({ p, s: map.project(p) })).filter((q) => q.s.x > -20 && q.s.y > -20 && q.s.x < W + 20 && q.s.y < H + 20);
     if (!sp.length) return null;
-    return sp[Math.floor(sp.length / 2)];
+    const q = sp[Math.floor(sp.length / 2)];
+    return { x: q.s.x, y: q.s.y, ll: q.p };            // (the ground position too: labels are pinned to it and re-projected every frame)
   }
 
   function update() {
@@ -101,7 +103,7 @@ export function createMapText(map) {
         const key = text + '|' + Math.round(s.x / 24) + '|' + Math.round(s.y / 24);
         if (seen.has(key)) continue;
         seen.add(key);
-        out.push({ text, x: s.x, y: s.y, lid: l.id, shield: shield && shield.kind, line: f.geometry.type !== 'Point' && f.geometry.type !== 'MultiPoint' });
+        out.push({ text, x: s.x, y: s.y, ll: s.ll, lid: l.id, shield: shield && shield.kind, line: f.geometry.type !== 'Point' && f.geometry.type !== 'MultiPoint' });
         if (out.length >= MAX * 3) break;
       }
     }
@@ -116,7 +118,7 @@ export function createMapText(map) {
         if (seen.has(key)) continue;
         seen.add(key);
         const sh = shieldOf(lab);
-        out.unshift({ text: sh.text, x: s.x, y: s.y, lid: 'hwy-color', shield: sh.kind, line: true });   // (first: they win ties over other labels)
+        out.unshift({ text: sh.text, x: s.x, y: s.y, ll: s.ll, lid: 'hwy-color', shield: sh.kind, line: true });   // (first: they win ties over other labels)
       }
     }
     // greedy: first come (the style lists the more important layers late, so later ones win ties by being drawn after) keep a few pixels apart
@@ -133,10 +135,21 @@ export function createMapText(map) {
       el.className = it.shield ? `px-label px-map px-shield ${it.shield}` : `px-label px-map l-${it.lid}`;
       if (el.textContent !== it.text) el.textContent = it.text;
       el.style.display = '';
-      el.style.transform = `translate(${it.x}px, ${it.y}px) translate(-50%, -50%)${paperOn && !it.shield ? ` rotate(${tilt(it.text, 1.6).toFixed(2)}deg)` : ''}`;
+      placed[n] = { el, ll: it.ll, rot: paperOn && !it.shield ? ` rotate(${tilt(it.text, 1.6).toFixed(2)}deg)` : '' };
       n++;
     }
+    placed.length = n;
     for (let i = n; i < pool.length; i++) pool[i].style.display = 'none';
+    reproject();
+  }
+  /** Every frame: move each label to where its ground point is now. Cheap (a few dozen transforms), so labels track the camera exactly; only
+   *  the choice of WHICH labels show is re-read a few times a second. */
+  function reproject() {
+    if (!on) return;
+    for (const q of placed) {
+      const s = map.project(q.ll);
+      q.el.style.transform = `translate(${s.x.toFixed(1)}px, ${s.y.toFixed(1)}px) translate(-50%, -50%)${q.rot}`;
+    }
   }
 
   const schedule = () => {
@@ -163,10 +176,13 @@ export function createMapText(map) {
         hideNative();
         map.on('move', onMove);
         map.on('idle', onIdle);
+        map.on('render', reproject);
         schedule();
       } else {
         map.off('move', onMove);
         map.off('idle', onIdle);
+        map.off('render', reproject);
+        placed.length = 0;
         clearTimeout(raf);
         cancelAnimationFrame(raf);
         raf = 0;
