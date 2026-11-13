@@ -6,6 +6,8 @@
 //   - a few times a second the labels it placed are read back (queryRenderedFeatures), and drawn as `.px-label` elements.
 // Games that draw their own crisp labels (Name that place) keep their `orb-*` layers out of this.
 
+import { tilt } from './world.js';
+
 const SKIP = (id) => id.startsWith('orb-');
 const MAX = 70;
 
@@ -63,6 +65,7 @@ export function createMapText(map) {
   function update() {
     raf = 0;
     if (!on) return;
+    const paperOn = document.body.classList.contains('paper');
     const out = [];
     const seen = new Set();
     for (const l of layers) {
@@ -98,7 +101,7 @@ export function createMapText(map) {
       if (!el) { el = document.createElement('div'); el.className = 'px-label px-map'; box.appendChild(el); pool[n] = el; }
       if (el.textContent !== it.text) el.textContent = it.text;
       el.style.display = '';
-      el.style.transform = `translate(${it.x}px, ${it.y}px) translate(-50%, -50%)`;
+      el.style.transform = `translate(${it.x}px, ${it.y}px) translate(-50%, -50%)${paperOn ? ` rotate(${tilt(it.text, 1.6).toFixed(2)}deg)` : ''}`;
       n++;
     }
     for (let i = n; i < pool.length; i++) pool[i].style.display = 'none';

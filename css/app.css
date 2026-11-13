@@ -1,3 +1,8 @@
+/* Type: Cabin (SIL OFL, fonts/) is the Gill Sans stand-in where the system has no Gill Sans (iOS and macOS do) */
+@font-face { font-family: Cabin; font-weight: 400; font-style: normal; font-display: swap; src: url('../fonts/cabin-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: Cabin; font-weight: 600; font-style: normal; font-display: swap; src: url('../fonts/cabin-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: Cabin; font-weight: 700; font-style: normal; font-display: swap; src: url('../fonts/cabin-latin-700-normal.woff2') format('woff2'); }
+:root { --font-paper: 'Gill Sans', 'Gill Sans MT', 'Gill Sans Nova', Cabin, 'Trebuchet MS', system-ui, sans-serif; --font-ps1: ui-monospace, 'SF Mono', Menlo, Consolas, 'Courier New', monospace; }
 :root {
   --ink: #101828;
   --ink-2: #344054;
@@ -3205,7 +3210,7 @@ body.holo #hud, body.holo #sheet {
   color: var(--panel-ink);
 }
 body.holo .qkind, body.holo .score, body.holo .where, body.holo .hint, body.holo .fb .muted {
-  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; letter-spacing: 0.04em;
+  font-family: var(--font-ps1); letter-spacing: 0.04em;
 }
 body.holo .qkind { color: #5ff3ff; text-transform: uppercase; }
 body.holo .q { text-shadow: 0 0 12px rgba(95, 243, 255, 0.35); }
@@ -3247,13 +3252,13 @@ body.paper #hud, body.paper #sheet {
   background: #f6f1c9; color: #1d2a5b; border: 2px solid #1d2a5b; border-radius: 0;
   box-shadow: 3px 3px 0 rgba(29, 42, 91, 0.35), inset 0 0 0 3px #f6f1c9, inset 0 0 0 4px rgba(29, 42, 91, 0.55);
 }
-body.paper .qkind, body.paper .score { font-family: 'Gill Sans', 'Trebuchet MS', 'Franklin Gothic Medium', system-ui, sans-serif; text-transform: uppercase; letter-spacing: 0.1em; }
+body.paper .qkind, body.paper .score { font-family: var(--font-paper); text-transform: uppercase; letter-spacing: 0.1em; }
 body.paper .qkind { color: #c8451f; }
-body.paper .q { font-family: Georgia, 'Times New Roman', serif; font-weight: 700; }
+body.paper .q { font-family: var(--font-paper); font-weight: 700; letter-spacing: 0.01em; }
 body.paper .where { color: #2e7d46; }
 body.paper .choice, body.paper .chip {
   background: #fbf7d9; color: #1d2a5b; border: 1.5px solid #1d2a5b; border-radius: 0; box-shadow: 2px 2px 0 rgba(29, 42, 91, 0.3);
-  font-family: 'Gill Sans', 'Trebuchet MS', system-ui, sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; font-size: 13px;
+  font-family: var(--font-paper); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; font-size: 13px;
 }
 body.paper .choice:not(:disabled):active, body.paper .chip:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 rgba(29, 42, 91, 0.3); }
 body.paper .choice.right { background: #bfe3a8; border-color: #2e7d46; }
@@ -3274,7 +3279,8 @@ body.paper .primary { background: #e8603a; color: #fff; border: 2px solid #1d2a5
 body.holo #hud, body.holo #sheet { --panel: #05202c; }
 body.holo .gamebar, body.paper .gamebar { text-transform: uppercase; letter-spacing: 0.08em; }
 body.holo .score.row .chip, body.paper .score.row .chip { text-transform: none; letter-spacing: 0; font-size: 12px; padding: 3px 8px; }
-body.paper .px-label { font-family: 'Gill Sans', 'Trebuchet MS', system-ui, sans-serif; color: #1d2a5b; text-shadow: 1px 0 #f6f1c9, -1px 0 #f6f1c9, 0 1px #f6f1c9, 0 -1px #f6f1c9; }
+body.paper .px-label { font-family: var(--font-paper); font-weight: 600; text-transform: none; letter-spacing: 0.03em; color: #1d2a5b; text-shadow: 1px 0 #f6f1c9, -1px 0 #f6f1c9, 0 1px #f6f1c9, 0 -1px #f6f1c9, 0 0 3px #f6f1c9; }
+body.paper .px-map { font-size: 12px; }
 
 /* the practice picker fits the visible screen (not the browser's tallest layout), scrolls inside, and keeps Close in reach */
 #pickDlg { max-height: calc(100vh - 48px); max-height: calc(100dvh - 24px - var(--safe-t, 0px) - var(--safe-b, 0px)); overflow: hidden; }

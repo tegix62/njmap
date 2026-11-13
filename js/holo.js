@@ -1,5 +1,5 @@
 import { graticule } from './world.js';
-import { HOLO, TUNE } from './looks.config.js';
+import { HOLO, TUNE, HL } from './looks.config.js';
 
 // "Hologram" look for a map: a dark projection table with the land drawn as stacked elevation bands,
 // everything else reduced to thin glowing lines. One module so any game can switch it on.
@@ -89,6 +89,15 @@ export function createHolo(map, bounds) {
 
   /** The look of what the game itself draws on top (outlines, bands, flash, names). */
   function game(onNow) {
+    const hl = ['match', ['coalesce', ['feature-state', 'hl'], '']];
+    for (const [k, v] of Object.entries(HL.ps1)) hl.push(k, v);
+    hl.push('rgba(0,0,0,0)');
+    set('muni-hl', 'fill-color', hl);
+    set('muni-hl-line', 'line-color', hl);
+    set('muni-hl-line', 'line-width', ['interpolate', ['linear'], ['zoom'], 7, 2.5, 12, 4, 16, 5.5]);
+    set('road-focus', 'line-color', HL.ps1.sel);
+    set('road-focus-bad', 'line-color', HL.ps1.bad);
+    set('trip-line', 'line-color', '#ffd54a');
     const col = ['match', ['get', 'role'], 'wrong', onNow ? HOLO.wrong : '#d9622b', onNow ? HOLO.target : '#0b9a82'];
     for (const id of ['orb-geom-band', 'orb-geom-fill', 'orb-geom-fill2']) set(id, 'fill-color', col);
     set('orb-geom-line', 'line-color', col);

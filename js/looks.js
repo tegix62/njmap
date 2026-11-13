@@ -52,7 +52,7 @@ export function createLooks(ctx) {
     holo.apply(wantHolo);
     paper.apply(wantPaper);
     retro.apply(wantHolo ? (needs.crisp ? 2 : 3) : 0);
-    mapText.show(wantHolo && !needs.crisp);
+    mapText.show((wantHolo && !needs.crisp) || wantPaper);   // PS1: crisp text over a coarse map; Paper: the map's words set in Gill Sans (canvas text cannot use a system font)
   }
   const safe = () => { try { apply(); } catch (e) { console.warn('look failed', e); } };
   // apply as soon as the style has its layers (the map may have loaded already, or not yet)

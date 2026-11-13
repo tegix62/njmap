@@ -1,5 +1,5 @@
 import { blots, specks, creases, grainImage, inkImage } from './world.js';
-import { PAPER, TUNE } from './looks.config.js';
+import { PAPER, TUNE, HL } from './looks.config.js';
 
 // "Paper" look for a map: a printed road map from the 1960s–70s (cream stock, a few flat spot inks, halftone water,
 // plates that don't quite line up, fold creases). Same shape as js/holo.js:
@@ -85,7 +85,7 @@ export function createPaper(map, bounds) {
     map.addLayer({ id: 'orb-paper-blots', type: 'fill', source: 'orb-paper-blots', layout: hide, paint: { 'fill-color': ['case', ['==', ['get', 'w'], 1], '#8a6a2c', '#1d2a5b'], 'fill-opacity': TUNE.paper.blots } }, under);
     map.addLayer({ id: 'orb-paper-crease-dark', type: 'line', source: 'orb-paper-creases', layout: hide, paint: { 'line-color': '#6e5a28', 'line-opacity': TUNE.paper.creaseOpacity, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.8, 12, 1.6], 'line-blur': 0.6 } }, under);
     map.addLayer({ id: 'orb-paper-crease-pale', type: 'line', source: 'orb-paper-creases', layout: hide, paint: { 'line-color': '#fffff0', 'line-opacity': 0.6, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.8, 12, 1.5], 'line-translate': [1.6, 1], 'line-blur': 0.5 } }, under);
-    map.addLayer({ id: 'orb-paper-specks', type: 'circle', source: 'orb-paper-specks', layout: hide, paint: { 'circle-color': PAPER.halo, 'circle-opacity': 0.9, 'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, ['*', 0.7, ['+', 0.6, ['get', 's']]], 13, ['*', 1.8, ['+', 0.6, ['get', 's']]]], 'circle-pitch-alignment': 'map' } }, over);
+    map.addLayer({ id: 'orb-paper-specks', type: 'circle', source: 'orb-paper-specks', layout: hide, paint: { 'circle-color': PAPER.halo, 'circle-opacity': 0.9, 'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, ['*', 0.45, ['+', 0.6, ['get', 's']]], 14, ['*', 1.2, ['+', 0.6, ['get', 's']]]], 'circle-pitch-alignment': 'map' } }, over);
   }
   const WORLD = ['orb-paper-inktex', 'orb-paper-grain', 'orb-paper-blots', 'orb-paper-crease-dark', 'orb-paper-crease-pale', 'orb-paper-specks'];
 
@@ -122,6 +122,14 @@ export function createPaper(map, bounds) {
 
   /** What the game draws on top, in this look. */
   function game() {
+    const hl = ['match', ['coalesce', ['feature-state', 'hl'], '']];
+    for (const [k, v] of Object.entries(HL.paper)) hl.push(k, v);
+    hl.push('rgba(0,0,0,0)');
+    set('muni-hl', 'fill-color', hl);
+    set('muni-hl-line', 'line-color', hl);
+    set('road-focus', 'line-color', HL.paper.sel);
+    set('road-focus-bad', 'line-color', HL.paper.bad);
+    set('trip-line', 'line-color', PAPER.hwy);
     const col = ['match', ['get', 'role'], 'wrong', PAPER.wrong, PAPER.target];
     for (const id of ['orb-geom-band', 'orb-geom-fill', 'orb-geom-fill2']) set(id, 'fill-color', col);
     set('orb-geom-band', 'fill-opacity', PAPER.band);

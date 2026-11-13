@@ -7,7 +7,7 @@ import { buildingFeatures, applySurveyTowers, applyParts, loadParts, loadSurveyT
 import { createMeshLayer, meshInfo } from './meshes.js';
 import { choicesHtml, hintsHtml, whereHtml } from './ui.js';
 import { PAPER } from './looks.config.js';
-import { roughen } from './world.js';
+import { roughen, snapGeom } from './world.js';
 import { createLabels } from './retro.js';
 
 const KEY = 'orbit';
@@ -92,11 +92,12 @@ export function initOrbit(ctx) {
   looks.on(() => { if (gameOn) { syncLabels(); if (run && !run.loading) render(); } });
   /** Town names: drawn by the map normally, as DOM text over it while the retro pass is on. */
   const syncLabels = () => {
-    const px = gameOn && looks.ps1On;
+    const px = gameOn && (looks.ps1On || looks.paperOn);
     pxLabels.show(px);
     if (map.getLayer('orb-town-name')) map.setLayoutProperty('orb-town-name', 'visibility', gameOn && !px ? 'visible' : 'none');
     // every other piece of map text would be blocky at low resolution too: under PS1 only the crisp labels and the HUD name things
     if (px) for (const l of map.getStyle().layers) if (l.type === 'symbol' && l.id.startsWith('orb-')) map.setLayoutProperty(l.id, 'visibility', 'none');
+    restyleGeom();
   };
   const canMesh = (() => { try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; } })();
   let hiddenSymbols = [];
@@ -144,6 +145,21 @@ export function initOrbit(ctx) {
     pinEls.push({ el, ll: lonlat });
     placePins();
   }
+  // The answer outline in the current look: Paper pulls its edges by hand (map-space noise); PS1 snaps every vertex to a coarse grid, and a few
+  // times a second some vertices hop to a neighbouring grid point, so the outline shimmers like polygons on the real hardware.
+  let baseFeats = [], jitterT = 0, jitterN = 0;
+  function restyleGeom() {
+    clearInterval(jitterT);
+    jitterT = 0;
+    const src = map.getSource('orb-geom');
+    if (!src) return;
+    const draw = (seed) => {
+      const f = baseFeats.map((x) => ({ ...x, geometry: looks.paperOn ? roughen(x.geometry) : looks.ps1On ? snapGeom(x.geometry, 0.0012, seed) : x.geometry }));
+      src.setData({ type: 'FeatureCollection', features: f });
+    };
+    draw(looks.ps1On ? 0 : -1);
+    if (looks.ps1On && gameOn && baseFeats.length && !ctx.reduceMotion) jitterT = setInterval(() => { if (!run || !gameOn) return; draw(++jitterN % 7); }, 170);
+  }
   function setGeom(items, labelled = false) {     // items: [{ name, role }]; the pins and names are drawn only once the question is answered (they would give it away)
     const feats = [], walls = [];
     clearPins();
@@ -161,8 +177,9 @@ export function initOrbit(ctx) {
       if (labelled && at) addPin(name, role, at);
     }
     const fc = (f) => ({ type: 'FeatureCollection', features: f });
-    if (looks.paperOn) for (const f of feats) f.geometry = roughen(f.geometry);   // hand-pulled edges, in map space
-    for (const [s, f] of [['orb-geom', feats], ['orb-geom-wall', walls]]) if (map.getSource(s)) map.getSource(s).setData(fc(f));
+    baseFeats = feats;
+    if (map.getSource('orb-geom-wall')) map.getSource('orb-geom-wall').setData(fc(walls));
+    restyleGeom();
   }
   // The place flash: on arrival, a quick pulse that shows what the place IS. A river: a bright comet runs downstream along it (the way the
   // water goes) from one end of the stretch on screen to the other, with its two ends marked; a range: the same along its crest; a lake
@@ -791,6 +808,7 @@ export function initOrbit(ctx) {
     cancelAnimationFrame(arcRaf);
     clearTimeout(compareTimer);
     clearPins();
+    clearInterval(jitterT);
     endFlash();
     if (flashed) flashTown(null, false);
     if (!run) return;

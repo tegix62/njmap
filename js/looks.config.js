@@ -49,7 +49,7 @@ export const RETRO = {
 export const TUNE = {
   paper: {
     grain: 0.4,              // fibre over the whole sheet
-    blots: 0.04,             // soft ink/stock blotches (each of 6 stacked rings)
+    blots: 0.022,            // soft ink/stock blotches (each of 6 stacked rings)
     inkTexture: 0.9,         // pinholes and flecks over coloured masses
     glow: 0.26,              // dark ink bleed under the main lines
     registration: 0.4,       // blue off-register copy of the main lines
@@ -59,7 +59,8 @@ export const TUNE = {
     plateOffsetB: [-3, -3],
     roughenMetres: 55,       // how far hand-pulled edges wander (answer outlines)
     creaseOpacity: 0.3,
-    pinholes: 5000,          // count over the region
+    pinholes: 60,            // pinholes visible on a typical screen (the count over the region is scaled to the region's size)
+    blotSize: [0.004, 0.034],// blotch radius as a fraction of the region's diagonal: [smallest, largest]
   },
   ps1: {
     gridStep: 0.05,          // degrees between graticule lines (every fifth is major)
@@ -73,4 +74,19 @@ export const TUNE = {
       'muni-line': [1.1, 0.45], 'county-line': [1.7, 0.75],
     },
   },
+};
+
+// ---- Highlight states of the shared base map (what a quiz is about / right / wrong / the neighbours / you are here) ----
+// These are the colours of `muni-hl`, `muni-hl-line` and the focused-road layers, which every game uses through feature-state.
+export const HL = {
+  ps1:   { cur: '#ffd54a', sel: '#3df5d0', q: '#3df5d0', good: '#4dffb0', bad: '#ff7a5e', near: '#2a7f94' },
+  paper: { cur: '#e8603a', sel: '#e8603a', q: '#e8603a', good: '#2e7d46', bad: '#b8321c', near: '#9a9a7a' },
+};
+
+// ---- Type -----------------------------------------------------------------------------------------------------
+// Paper is set in Gill Sans (the face of mid-century road maps). iOS and macOS ship it, so the first name resolves to the real thing there
+// with nothing served from this site; elsewhere the bundled Cabin (SIL OFL, fonts/) stands in. PS1 uses the system monospace.
+export const FONT = {
+  paper: "'Gill Sans', 'Gill Sans MT', 'Gill Sans Nova', Cabin, 'Trebuchet MS', system-ui, sans-serif",
+  ps1: "ui-monospace, 'SF Mono', Menlo, Consolas, 'Courier New', monospace",
 };

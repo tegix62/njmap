@@ -25,13 +25,15 @@ const km = (lat) => ({ lat: 1 / 111.2, lng: 1 / (111.2 * Math.cos((lat * Math.PI
 export function blots([[w, s], [e, n]], count = 120, seed = 7) {
   const r = rng(seed), out = [];
   const k = km((s + n) / 2);
+  const diag = Math.hypot((e - w) / k.lng, (n - s) / k.lat);               // km: sizes are fractions of the region, so a small region is not swamped
+  const [rmin, rmax] = TUNE.paper.blotSize;
   for (let i = 0; i < count; i++) {
     const cx = w + r() * (e - w), cy = s + r() * (n - s);
-    const R = 1 + Math.pow(r(), 2) * 8;               // km: mostly small, a few large
+    const R = diag * (rmin + Math.pow(r(), 2) * (rmax - rmin));               // km: mostly small, a few large
     const warm = r() < 0.86;
     const phase = r() * 6.28, wob = 0.18 + r() * 0.2, squash = 0.6 + r() * 0.6;
-    for (let ring = 0; ring < 6; ring++) {
-      const rr = R * (1 - ring * 0.14);
+    for (let ring = 0; ring < 9; ring++) {
+      const rr = R * (1 - ring * 0.1);
       const pts = [];
       for (let a = 0; a <= 16; a++) {
         const t = (a % 16) / 16 * 6.283;
@@ -45,8 +47,12 @@ export function blots([[w, s], [e, n]], count = 120, seed = 7) {
 }
 
 /** Pinholes: scattered points over the region. */
-export function specks([[w, s], [e, n]], count = TUNE.paper.pinholes, seed = 3) {
+export function specks([[w, s], [e, n]], perScreen = TUNE.paper.pinholes, seed = 3) {
   const r = rng(seed), out = [];
+  // `perScreen` specks on a typical screen, where a screen is about an eighth of the region across
+  const k = km((s + n) / 2), wk = (e - w) / k.lng, hk = (n - s) / k.lat, diag = Math.hypot(wk, hk);
+  const screenKm2 = Math.pow(diag / 8, 2) * 1.5;
+  const count = Math.min(9000, Math.round((perScreen * wk * hk) / screenKm2));
   for (let i = 0; i < count; i++)
     out.push({ type: 'Feature', properties: { s: r() }, geometry: { type: 'Point', coordinates: [w + r() * (e - w), s + r() * (n - s)] } });
   return fc(out);
@@ -156,4 +162,32 @@ export function inkImage(size = 128) {
   for (let i = 0; i < 170; i++) dot(r() * size, r() * size, 0.5 + r() * 1.2, `rgba(246,241,201,${(0.35 + r() * 0.4).toFixed(2)})`);
   for (let i = 0; i < 70; i++) dot(r() * size, r() * size, 0.6 + r() * 1.4, `rgba(29,42,91,${(0.1 + r() * 0.16).toFixed(2)})`);
   return g.getImageData(0, 0, size, size);
+}
+
+/** A small tilt (degrees) for a piece of lettering, the same every time for the same text: hand-set type is never quite square. */
+export function tilt(text, max = 1.3) {
+  let h = 0;
+  for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) | 0;
+  return (((h >>> 0) % 2001) / 1000 - 1) * max;
+}
+
+/** PS1 vertex snapping: every vertex of a shape pulled to a coarse grid (a faceted, low-polygon outline); with a seed, some vertices flip
+ *  to a neighbouring grid point, which when the seed advances makes the outline shimmer the way PS1 polygons did. */
+export function snapGeom(geom, step = 0.0012, seed = -1) {
+  const snap = (p) => {
+    let x = Math.round(p[0] / step), y = Math.round(p[1] / step);
+    if (seed >= 0) {
+      const h = hash2(x * 0.37 + seed * 1.3, y * 0.61 - seed * 0.7);
+      if (h > 0.72) x += h > 0.86 ? 1 : -1;
+      else if (h < 0.18) y += h < 0.09 ? 1 : -1;
+    }
+    return [x * step, y * step];
+  };
+  const dedupe = (c) => c.filter((p, i) => i === 0 || p[0] !== c[i - 1][0] || p[1] !== c[i - 1][1]);
+  const walk = (c, d) => (d === 0 ? dedupe(c.map(snap)) : c.map((x) => walk(x, d - 1)));
+  const depth = { Point: -1, LineString: 0, Polygon: 1, MultiLineString: 1, MultiPolygon: 2 }[geom.type];
+  if (depth === undefined || depth < 0) return geom;
+  const out = { ...geom, coordinates: walk(geom.coordinates, depth) };
+  if (geom.bands) out.bands = geom.bands.map((r) => dedupe(r.map(snap)));
+  return out;
 }

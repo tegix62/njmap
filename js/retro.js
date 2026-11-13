@@ -15,6 +15,7 @@
 // The panels, text and buttons are DOM above the map and stay sharp.
 
 import { RETRO } from './looks.config.js';
+import { tilt } from './world.js';
 const LEVELS = [null, null, RETRO.crisp, RETRO.generic];   // 2: PS1 with crisp DOM labels, 3: PS1 over a map whose text stays as drawn
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -115,7 +116,7 @@ export function createLabels(map) {
       const r = { x: s.x - w / 2, y: s.y - h / 2, w, h };
       const clash = taken.some((t) => r.x < t.x + t.w + 4 && r.x + r.w + 4 > t.x && r.y < t.y + t.h + 2 && r.y + r.h + 2 > t.y);
       it.el.style.visibility = clash ? 'hidden' : 'visible';
-      it.el.style.transform = `translate(${s.x}px, ${s.y}px) translate(-50%, -50%)`;
+      it.el.style.transform = `translate(${s.x}px, ${s.y}px) translate(-50%, -50%)${document.body.classList.contains('paper') ? ` rotate(${tilt(it.name, 1.6).toFixed(2)}deg)` : ''}`;
       if (!clash) taken.push(r);
     }
   }
