@@ -39,7 +39,7 @@ export const PAPER = {
   fringeB: '#3d78c9',
   text: '#14235e',
   halo: '#f2ea9c',
-  band: ['match', ['get', 'band'], 0, 0.45, 1, 0.6, 2, 0.82, 0.5],   // a mountain's three bands, as flat ink strengths
+  band: ['match', ['get', 'band'], 0, 0.2, 1, 0.32, 2, 0.46, 0.3],   // a mountain's three bands, as flat ink strengths
 };
 
 // ---- PS1: resolution, colour levels, dither, fog ------------------------------------------------------------
@@ -76,12 +76,14 @@ export const TUNE = {
       'hwy-color':  { core: [[6, 1], [9, 1.8], [12, 3], [16, 10]], case: [[6, 2], [9, 3.2], [12, 5.2], [16, 12.2]], fill: 'red' },
     },
     border: { width: [[8, 2.2], [12, 4.2]], shadow: [2.2, 2.2], shadowOpacity: 0.35 },   // county borders: heavy navy with a hard offset shadow
+    grid: { cells: 9, opacity: 0.5, width: 0.9 },   // the red index grid: about this many cells across the region
+    halftone: { dot: [0.8, 1.2, 1.7], plate: 0.6, plateOffset: [2.2, 1.6] },   // dot radius (px) for the three mountain bands; the water's offset red plate
     swim: { grain: 0.16, blots: 0.07, ink: 0.24 },   // texture swim: how far each texture layer slides against the map as the camera moves (fraction of the camera's screen movement; 0 = locked to the map)
     pinholes: 60,            // pinholes visible on a typical screen (the count over the region is scaled to the region's size)
     blotSize: [0.004, 0.034],// blotch radius as a fraction of the region's diagonal: [smallest, largest]
   },
   ps1: {
-    gridStep: 0.05,          // degrees between graticule lines (every fifth is major)
+    gridStep: 0,             // degrees between graticule lines (0 = fit the region: about 24 cells across; every fifth is major)
     gridMinor: 0.13,         // graticule opacity
     gridMajor: 0.34,
     bandMetres: 40,          // elevation step of the terrain shading

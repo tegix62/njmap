@@ -1,4 +1,4 @@
-import { graticule } from './world.js';
+import { graticule, gridStepFor } from './world.js';
 import { HOLO, TUNE, HL } from './looks.config.js';
 
 // "Hologram" look for a map: a dark projection table with the land drawn as stacked elevation bands,
@@ -82,7 +82,7 @@ export function createHolo(map, bounds) {
   /** The table's graticule: lines of latitude and longitude on the ground (so it moves with the land, unlike a grid on the screen). */
   function grid() {
     if (!bounds || map.getSource('holo-grid')) return;
-    map.addSource('holo-grid', { type: 'geojson', data: graticule(bounds, TUNE.ps1.gridStep) });
+    map.addSource('holo-grid', { type: 'geojson', data: graticule(bounds, TUNE.ps1.gridStep || gridStepFor(bounds, 24)) });
     const before = map.getLayer('river') ? 'river' : undefined;
     map.addLayer({ id: 'holo-grid', type: 'line', source: 'holo-grid', layout: { visibility: 'none' }, paint: { 'line-color': '#3cc3e0', 'line-opacity': ['case', ['==', ['get', 'm'], 1], TUNE.ps1.gridMajor, TUNE.ps1.gridMinor], 'line-width': ['case', ['==', ['get', 'm'], 1], 1.1, 0.7] } }, before);
   }

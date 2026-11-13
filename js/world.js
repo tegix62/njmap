@@ -236,3 +236,10 @@ export function inkStroke(color, { gaps = false, holes = 1, seed = 5, W = 154, H
   }
   return g.getImageData(0, 0, W, H);
 }
+
+/** A graticule spacing that fits the region: about `cells` cells across its width, rounded to a tidy number of degrees. */
+export function gridStepFor([[w, s], [e, n]], cells = 8) {
+  const raw = (e - w) / cells;
+  const nice = [0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1];
+  return nice.reduce((a, b) => (Math.abs(b - raw) < Math.abs(a - raw) ? b : a));
+}

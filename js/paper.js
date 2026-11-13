@@ -1,4 +1,4 @@
-import { blots, specks, creases, grainImage, inkImage, inkStroke, roughen } from './world.js';
+import { blots, specks, creases, grainImage, inkImage, inkStroke, roughen, graticule, gridStepFor } from './world.js';
 import { PAPER, TUNE, HL } from './looks.config.js';
 
 // "Paper" look for a map: a printed road map from the 1960s–70s (cream stock, a few flat spot inks, halftone water,
@@ -27,15 +27,18 @@ const INK = { stock: PAPER.stock, red: PAPER.red };
 for (const [id, r] of Object.entries(TUNE.paper.roads))
   BASE[id] = { 'line-color': INK[r.fill], 'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], ...r.core.flat()] };
 
-/** A tile of blue halftone dots (transparent between), for the water. */
-function dotsImage(rgb = [36, 56, 168]) {
-  const S = 8, c = document.createElement('canvas');
+/** A tile of halftone dots in one ink (transparent between): `r` the dot radius, `S` the cell, `off` shifts the second dot (a different screen angle per ink). */
+function dotsImage(rgb, r = 1.25, S = 8, off = 0) {
+  const c = document.createElement('canvas');
   c.width = c.height = S;
   const g = c.getContext('2d');
-  g.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.85)`;
-  for (const [x, y] of [[2, 2], [6, 6]]) { g.beginPath(); g.arc(x, y, 1.25, 0, Math.PI * 2); g.fill(); }
+  g.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.88)`;
+  for (const [x, y] of [[S / 4 + off, S / 4], [(3 * S) / 4 + off, (3 * S) / 4]]) {
+    for (const [dx, dy] of [[0, 0], [S, 0], [-S, 0], [0, S], [0, -S]]) { g.beginPath(); g.arc(x + dx, y + dy, r, 0, Math.PI * 2); g.fill(); }
+  }
   return g.getImageData(0, 0, S, S);
 }
+const BLUE_RGB = [36, 56, 168], RED_RGB = [232, 69, 42];
 
 export function createPaper(map, bounds) {
   const saved = new Map();
@@ -56,7 +59,19 @@ export function createPaper(map, bounds) {
       saved.delete(key);
     }
   };
+  const savedL = new Map();                 // layout properties changed (rounder corners)
+  const setL = (id, prop, val) => {
+    if (!map.getLayer(id)) return;
+    const key = id + '|' + prop;
+    if (!savedL.has(key)) savedL.set(key, map.getLayoutProperty(id, prop));
+    map.setLayoutProperty(id, prop, val);
+  };
   const restore = () => {
+    for (const [key, v] of savedL) {
+      const [id, prop] = key.split('|');
+      if (map.getLayer(id)) map.setLayoutProperty(id, prop, v === undefined ? null : v);
+    }
+    savedL.clear();
     for (const [key, v] of saved) {
       const [id, prop] = key.split('|');
       if (map.getLayer(id)) map.setPaintProperty(id, prop, v === undefined ? null : v);
@@ -79,6 +94,9 @@ export function createPaper(map, bounds) {
     map.addSource('orb-paper-blots', { type: 'geojson', data: blots(bounds) });
     map.addSource('orb-paper-creases', { type: 'geojson', data: creases(bounds) });
     map.addSource('orb-paper-specks', { type: 'geojson', data: specks(bounds) });
+    // the red index grid, as on the street map: lines of latitude and longitude over the stock, under the roads
+    map.addSource('orb-paper-grid', { type: 'geojson', data: graticule(bounds, gridStepFor(bounds, TUNE.paper.grid.cells)) });
+    map.addLayer({ id: 'orb-paper-grid', type: 'line', source: 'orb-paper-grid', layout: hide, paint: { 'line-color': PAPER.red, 'line-opacity': TUNE.paper.grid.opacity, 'line-width': TUNE.paper.grid.width } }, map.getLayer('river') ? 'river' : under);
     map.addLayer({ id: 'orb-paper-grain', type: 'fill', source: 'orb-paper-sheet', layout: hide, paint: { 'fill-pattern': 'paper-grain', 'fill-opacity': TUNE.paper.grain, 'fill-translate-anchor': 'viewport' } }, under);
     map.addLayer({ id: 'orb-paper-blots', type: 'fill', source: 'orb-paper-blots', layout: hide, paint: { 'fill-color': ['case', ['==', ['get', 'w'], 1], '#8a6a2c', '#1d2a5b'], 'fill-opacity': TUNE.paper.blots, 'fill-translate-anchor': 'viewport' } }, under);
     map.addLayer({ id: 'orb-paper-crease-dark', type: 'line', source: 'orb-paper-creases', layout: hide, paint: { 'line-color': '#6e5a28', 'line-opacity': TUNE.paper.creaseOpacity, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.8, 12, 1.6], 'line-blur': 0.6 } }, under);
@@ -111,7 +129,7 @@ export function createPaper(map, bounds) {
       for (const [id] of SWIM) if (map.getLayer(id)) map.setPaintProperty(id, 'fill-translate', [0, 0]);
     }
   };
-  const WORLD = ['orb-paper-inktex', 'orb-paper-grain', 'orb-paper-blots', 'orb-paper-crease-dark', 'orb-paper-crease-pale', 'orb-paper-specks'];
+  const WORLD = ['orb-paper-grid', 'orb-paper-ht0', 'orb-paper-ht1', 'orb-paper-ht2', 'orb-paper-htp', 'orb-paper-inktex', 'orb-paper-grain', 'orb-paper-blots', 'orb-paper-crease-dark', 'orb-paper-crease-pale', 'orb-paper-specks'];
 
   /**
    * Printed linework, cloned from the base style's own layers:
@@ -136,7 +154,7 @@ export function createPaper(map, bounds) {
       // the county borders' own geometry, roughened a little (hand-drawn, in map space)
       const cs = map.getStyle().layers.find((l) => l.id === 'county-line');
       const src = cs && map.getSource(cs.source);
-      if (src && src.type === 'geojson' && !origEdges.has(cs.source) && src._data && typeof src._data === 'object') {
+      if (src && src.type === 'geojson' && !origEdges.has(cs.source) && src._data && Array.isArray(src._data.features)) {
         origEdges.set(cs.source, src._data);
         src.setData({ ...src._data, features: src._data.features.map((f) => ({ ...f, geometry: roughen(f.geometry, TUNE.paper.edgeRoughMetres, -1, 110) })) });
       }
@@ -159,6 +177,14 @@ export function createPaper(map, bounds) {
       map.addLayer({ ...base, id: id + '-pcase', paint: { ...(s.paint || {}), 'line-color': PAPER.blue, 'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], ...r.case.flat()] } }, beforeRoads);
       GLOW.push(id + '-pcase');
     }
+    // water: a second, red dot screen printed a little off behind the blue one (two-ink halftone, as on the sheet-music cover)
+    const ws = specs.find((l) => l.id === 'water');
+    if (ws && ws.type === 'fill') {
+      if (!map.hasImage('paper-dots-red')) map.addImage('paper-dots-red', dotsImage(RED_RGB, 1.1, 8, 2), { pixelRatio: 1 });
+      const Hh = TUNE.paper.halftone;
+      map.addLayer({ ...ws, id: 'water-pplate', layout: { ...(ws.layout || {}), visibility: 'none' }, paint: { 'fill-color': PAPER.stock, 'fill-pattern': 'paper-dots-red', 'fill-opacity': Hh.plate, 'fill-translate': Hh.plateOffset, 'fill-translate-anchor': 'viewport' } }, 'water');
+      GLOW.push('water-pplate');
+    }
     const cs = specs.find((l) => l.id === 'county-line');
     if (cs && cs.type === 'line') {
       const B = TUNE.paper.border;
@@ -174,6 +200,11 @@ export function createPaper(map, bounds) {
     const f = ['any', ['has', 'band'], ['==', ['geometry-type'], 'Polygon'], ['==', ['geometry-type'], 'MultiPolygon']];
     if (!map.hasImage('paper-ink')) map.addImage('paper-ink', inkImage(), { pixelRatio: 2 });
     map.addLayer({ id: 'orb-paper-inktex', type: 'fill', source: 'orb-geom', filter: f, layout: { visibility: 'none' }, paint: { 'fill-pattern': 'paper-ink', 'fill-opacity': TUNE.paper.inkTexture, 'fill-translate-anchor': 'viewport' } }, map.getLayer('orb-geom-fill') ? 'orb-geom-fill' : undefined);
+    // halftone: the three bands of a mass as dot screens of growing dot size (a flat tint beneath), a single screen for lakes and parks
+    const H = TUNE.paper.halftone;
+    H.dot.forEach((r, i) => { if (!map.hasImage('paper-ht' + i)) map.addImage('paper-ht' + i, dotsImage(RED_RGB, r, 6, i), { pixelRatio: 1 }); });
+    H.dot.forEach((r, i) => map.addLayer({ id: 'orb-paper-ht' + i, type: 'fill', source: 'orb-geom', filter: ['==', ['get', 'band'], i], layout: { visibility: 'none' }, paint: { 'fill-pattern': 'paper-ht' + i, 'fill-opacity': 0.95, 'fill-translate': [1.2, 0.8], 'fill-translate-anchor': 'viewport' } }, 'orb-paper-inktex'));
+    map.addLayer({ id: 'orb-paper-htp', type: 'fill', source: 'orb-geom', filter: ['all', ['!', ['has', 'band']], ['any', ['==', ['geometry-type'], 'Polygon'], ['==', ['geometry-type'], 'MultiPolygon']]], layout: { visibility: 'none' }, paint: { 'fill-pattern': 'paper-ht1', 'fill-opacity': 0.9, 'fill-translate': [1.2, 0.8], 'fill-translate-anchor': 'viewport' } }, 'orb-paper-inktex');
     for (const [id, col, tr] of [['orb-paper-a', PAPER.fringeA, TUNE.paper.plateOffsetA], ['orb-paper-b', PAPER.fringeB, TUNE.paper.plateOffsetB]])
       map.addLayer({ id, type: 'fill', source: 'orb-geom', filter: f, layout: { visibility: 'none' }, paint: { 'fill-color': col, 'fill-opacity': TUNE.paper.plateOpacity, 'fill-translate': tr, 'fill-translate-anchor': 'viewport' } }, before);
   }
@@ -208,7 +239,7 @@ export function createPaper(map, bounds) {
     set('orb-relief', 'hillshade-accent-color', '#a89a60');
     set('orb-relief', 'hillshade-exaggeration', 0.2);
     // water as a halftone screen over the stock
-    if (!map.hasImage('paper-dots')) map.addImage('paper-dots', dotsImage());
+    if (!map.hasImage('paper-dots')) map.addImage('paper-dots', dotsImage(BLUE_RGB), { pixelRatio: 1 });
     set('water', 'fill-pattern', 'paper-dots');
     try { if (map.setSky) map.setSky({ 'sky-color': PAPER.stock, 'horizon-color': PAPER.stock, 'fog-color': PAPER.stock, 'sky-horizon-blend': 0.5, 'horizon-fog-blend': 0.5, 'fog-ground-blend': 0.35, 'atmosphere-blend': 0 }); } catch { /* no sky support */ }   // (the strip above the horizon is stock too)
   }
@@ -234,6 +265,9 @@ export function createPaper(map, bounds) {
         world();
         linework();
         inkLines(true);
+        // less jagged corners than the plain or PS1 looks: round joins and caps on every printed line, and on the answer outline
+        for (const id of [...Object.keys(TUNE.paper.roads), 'river', 'county-line', 'muni-line', 'orb-geom-line', 'orb-geom-casing', 'road-focus', 'road-focus-bad', 'trip-line']) { setL(id, 'line-join', 'round'); setL(id, 'line-cap', 'round'); }
+        for (const id of GLOW) if (map.getLayer(id) && map.getLayer(id).type === 'line') { map.setLayoutProperty(id, 'line-join', 'round'); map.setLayoutProperty(id, 'line-cap', 'round'); }
         for (const [id, props] of Object.entries(BASE)) if (id !== 'muni-fill' || fillsOn) for (const [p, v] of Object.entries(props)) set(id, p, v);
         game();
         for (const id of ['orb-paper-a', 'orb-paper-b', ...WORLD, ...GLOW]) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
