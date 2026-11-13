@@ -337,6 +337,29 @@ export function initOrbit(ctx) {
       return Math.min(1, (i - 1 + k) / N);
     };
   }
+  /** The camera's route: the line resampled every 300 m and blurred (a Gaussian, sigma 3.2 km), so it follows the river or road in broad sweeps instead of
+   *  every kink and corner; the glow comet still follows the true line. Returns a function: distance along the line (m) -> [lng, lat]. */
+  function smoothRoute(f, sigma = 3200) {
+    const step = 300, n = Math.max(2, Math.floor(f.total / step) + 1);
+    const raw = [];
+    for (let i = 0; i < n; i++) raw.push(pointAt(f, Math.min(f.total, i * step)));
+    const R = Math.ceil((3 * sigma) / step), w = [];
+    for (let k = -R; k <= R; k++) w.push(Math.exp(-((k * step) ** 2) / (2 * sigma * sigma)));
+    const sm = raw.map((_, i) => {
+      let x = 0, y = 0, ws = 0;
+      for (let k = -R; k <= R; k++) {
+        const j = i + k;
+        if (j < 0 || j >= n) continue;
+        x += raw[j][0] * w[k + R]; y += raw[j][1] * w[k + R]; ws += w[k + R];
+      }
+      return [x / ws, y / ws];
+    });
+    sm[0] = raw[0]; sm[n - 1] = raw[n - 1];                                  // (start and finish on the true ends)
+    return (d) => {
+      const u = Math.max(0, Math.min(n - 1, d / step)), i = Math.min(n - 2, Math.floor(u)), k = u - i;
+      return [sm[i][0] + (sm[i + 1][0] - sm[i][0]) * k, sm[i][1] + (sm[i + 1][1] - sm[i][1]) * k];
+    };
+  }
   function flyDown(t) {
     stopFly();
     endFlash();
@@ -346,6 +369,7 @@ export function initOrbit(ctx) {
     // lingers for a moment round each crossing instead of flying past at one speed.
     const dur = ctx.dur ? ctx.dur(Math.max(5500, Math.min(11000, f.total / 8.5))) : 7500;
     const warp = flyWarp(t, f);
+    const route = smoothRoute(f);
     map.jumpTo({ center: f.coords[0] });
     const t0 = performance.now();
     const off = () => { map.off('mousedown', skip); map.off('touchstart', skip); };
@@ -356,7 +380,7 @@ export function initOrbit(ctx) {
       if (!run || !q || q.t !== t || q.done) { off(); return endFlash(); }
       const prog = Math.min(1, (now - t0) / dur);
       const s = warp(0.5 * prog + 0.5 * easeIO(prog)) * f.total;   // (half eased: a gentle start and finish without the fast middle of a full ease)
-      map.jumpTo({ center: pointAt(f, s) });
+      map.jumpTo({ center: route(s) });
       drawFlash(t, f, prog * 0.82);
       if (prog < 1) flyRaf = requestAnimationFrame(step);
       else { off(); flyRaf = 0; setTimeout(() => { if (run && q && q.t === t) endFlash(); }, 900); }
