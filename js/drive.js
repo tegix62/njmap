@@ -1,6 +1,6 @@
 /* global maplibregl */
 import { bearing, destination, distanceMi, compass8, compass16, dirWord, angleDiff } from './geo.js';
-import { nearbyRoads, alongRoad, travelDir, draftNote } from './roads.js';
+import { nearbyRoads, alongRoad, travelDir, draftNote, createRoadIndex } from './roads.js';
 import { initInset } from './inset.js';
 import { gridDir, gridSide, intersection } from './grid.js';
 import { ALL_REGIONS, switchRegion } from './region.js';
@@ -416,8 +416,12 @@ export function initDrive(ctx) {
   // ---- roads ------------------------------------------------------------------
   function updateRoads(pt) {
     st.roads = nearbyRoads(map, pt, 3, 3);
-    const top = st.roads[0];
+    // the road you are on: any named road (local streets too), by the nearest segment you are travelling along
+    roadIdx.update(map, pt);
+    const loc = roadIdx.size ? roadIdx.nearest(pt) : null;
+    const top = loc || st.roads[0];
     const on = top && top.d < 0.025 && st.heading != null && st.gpsHeading && alongRoad(st.heading, top.segBearing) ? top.label : null;
+    st.onRef = loc && on ? loc : st.roads[0];
     if (on && on === st.onCand) st.onCount++;
     else {
       st.onCand = on;
@@ -426,7 +430,7 @@ export function initDrive(ctx) {
     const steady = st.onCount >= 2 ? st.onCand : on === null ? null : st.onRoad;
     if (steady !== st.onRoad) {
       st.onRoad = steady;
-      if (steady && !firstTimeOn(st.roads[0])) announceRoad(st.roads[0]);   // (a road with a note says its name inside the note)
+      if (steady && !firstTimeOn(st.onRef || st.roads[0])) announceRoad(st.onRef || st.roads[0]);   // (a road with a note says its name inside the note)
     }
   }
   // How a road is said aloud: "I-287" → "Interstate 287", "Route 1&9" → "Route 1 and 9", the named roads with "the".
@@ -434,11 +438,12 @@ export function initDrive(ctx) {
     if (/^(Turnpike|Parkway|AC Expressway|Palisades Pkwy)$/.test(label)) return 'the ' + label.replace('Pkwy', 'Parkway');
     return label.replace(/I-(\d+)/g, 'Interstate $1').replace(/ \/ /g, ' and ').replace(/&/g, ' and ');
   };
+  const roadIdx = createRoadIndex();
   let lastRoadSaid = 0, lastRoadLabel = null;
   /** Say which road you are on, when you have been on it steadily for a few seconds: "Route 17 north." Not while other speech is going, and not more often than every 25 s. */
   function announceRoad(r) {
     if (!settings.voice || settings.sayRoads === false || !r || r.label === lastRoadLabel && Date.now() - lastRoadSaid < 120000) return false;
-    if (Date.now() - lastRoadSaid < 25000 || ('speechSynthesis' in window && speechSynthesis.speaking)) return false;
+    if (Date.now() - lastRoadSaid < (r.cls && !['motorway', 'trunk', 'primary'].includes(r.cls) ? 12000 : 25000) || ('speechSynthesis' in window && speechSynthesis.speaking)) return false;
     const h = st.heading;
     lastRoadSaid = Date.now();
     lastRoadLabel = r.label;

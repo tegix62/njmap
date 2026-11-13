@@ -86,6 +86,48 @@ export function nearbyRoads(map, pt, maxMi = 3, limit = 3) {
     .map((r) => ({ ...r, raw: [...r.raw].filter(Boolean), dir: compass8(bearing(pt, r.pt)) }));
 }
 
+/**
+ * Every named road near you, for Drive's "which road am I on": local streets too, not only the main roads. Reading all the loaded tiles every second
+ * would be slow, so the nearby road segments (within ~2 km) are copied into a small list that is rebuilt when you have moved a quarter of a mile or
+ * every 20 s (and when the map has loaded more tiles); the per-second question then scans only that list.
+ */
+const SKIP_CLASS = new Set(['service', 'track', 'path', 'pedestrian', 'footway', 'cycleway', 'steps', 'bridleway', 'raceway']);
+export function createRoadIndex() {
+  let center = null, built = 0, segs = [], tiles = 0;
+  return {
+    update(map, pt) {
+      const now = performance.now();
+      if (center && now - built < 20000 && Math.hypot(pt[0] - center[0], pt[1] - center[1]) < 0.004 && segs.length) return;
+      if (!map.getSource('omt')) return;
+      let fs = [];
+      try { fs = map.querySourceFeatures('omt', { sourceLayer: 'transportation_name' }); } catch { return; }
+      const near = (p) => Math.abs(p[0] - pt[0]) < 0.03 && Math.abs(p[1] - pt[1]) < 0.025;
+      const out = [];
+      for (const f of fs) {
+        const p = f.properties || {};
+        if (SKIP_CLASS.has(p.class)) continue;
+        const label = labelOf(p) || p.name || null;
+        if (!label) continue;
+        for (const line of lines(f.geometry)) for (let i = 1; i < line.length; i++) if (near(line[i - 1]) || near(line[i])) out.push({ a: line[i - 1], b: line[i], label, name: p.name || '', cls: p.class });
+      }
+      segs = out;
+      center = pt;
+      built = now;
+    },
+    get size() { return segs.length; },
+    /** The nearest named road within maxMi: { label, name, cls, d (mi), segBearing } or null. */
+    nearest(pt, maxMi = 0.03) {
+      const ky = 69.05, kx = 69.17 * Math.cos((pt[1] * Math.PI) / 180);
+      let best = null;
+      for (const s of segs) {
+        const q = nearestOnSegment(pt, s.a, s.b, kx, ky);
+        if (q.d <= maxMi && (!best || q.d < best.d)) best = { label: s.label, name: s.name, cls: s.cls, d: q.d, segBearing: bearing(s.a, s.b) };
+      }
+      return best;
+    },
+  };
+}
+
 /** Direction of travel the way highway signs say it: "I-80 W". */
 export function travelDir(heading) {
   return ['N', 'E', 'S', 'W'][Math.round((((heading % 360) + 360) % 360) / 90) % 4];
