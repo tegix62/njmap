@@ -499,3 +499,11 @@ By default the map rendered every device pixel on every frame: 3× on a recent i
 ### Drive says the road you are on
 
 When you have been on a road steadily for a few seconds, Drive says it: "Route 17 north.", "Interstate 287 south.", "the Turnpike north." (Settings → "…and say the road I am on", on by default, under "Speak when I cross into a new town"). Rules so it does not chatter: not while other speech is going, not more often than every 25 s, and the same road is not repeated within two minutes. A road that has a note reads its name inside the note instead ("On Route 46. …"), so it is not said twice. Spoken names: "I-287" is "Interstate 287", "Route 1&9" is "Route 1 and 9", the named roads get "the". Checked the wording and that the code runs; not tested driving (no road data in my test browser), so how often it speaks on real roads is untested.
+
+### Every road in Drive (`createRoadIndex` in `js/roads.js`)
+
+"Which road am I on" (the on-screen label and the spoken name) now uses every named road, local streets included, not only motorways, trunk and primary roads. Driveways, parking aisles, tracks and paths are skipped. The nearby segments (within about 2 km) are copied into a small index, rebuilt when you move a quarter of a mile or every 20 s, so the per-second check scans a short list instead of every loaded tile. Local streets are announced at most every 12 s (main roads every 25 s). Tested the index logic on made-up roads (a street, an avenue, an interstate, a parking aisle that must be skipped, a road out of range); real roads and real GPS untested.
+
+### Performance test (`js/perftest.js`)
+
+Settings → "Run performance test (about 40 s)": turns the map for 6 s in each of plain/paper/PS1 × saver/full on your phone, times every frame as the phone draws it, and shows a table (fps, average ms, slowest 5%, frames over 50 ms, render ratio) to screenshot and send back. A web page cannot read battery or temperature on an iPhone, so frame time (GPU busy time) is the measure. Ran end to end here (the numbers from my software-rendered browser mean nothing).

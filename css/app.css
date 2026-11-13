@@ -3381,3 +3381,7 @@ body.holo #inset { --panel: #04202c; --panel-ink: #bff7ff; font-family: var(--fo
 body.holo #inset .rim, body.holo #inset .county { stroke: #3cc3e0; stroke-opacity: 0.9; }
 body.holo #inset .towns .cur { fill: #ffd54a; fill-opacity: 0.25; stroke: #ffd54a; }
 body.holo #inset .me path { fill: #ffd54a; stroke: #02101a; }
+
+#perfDlg { border: 0; border-radius: 14px; padding: 16px; max-width: min(92vw, 460px); }
+#perfDlg::backdrop { background: rgba(0, 0, 0, 0.3); }
+#perfDlg pre { font: 11.5px/1.5 ui-monospace, Menlo, monospace; overflow-x: auto; margin: 8px 0; }
