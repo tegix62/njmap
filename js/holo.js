@@ -1,5 +1,6 @@
 import { graticule, gridStepFor } from './world.js';
 import { HOLO, TUNE, HL } from './looks.config.js';
+import { recolorOthers } from './inkmap.js';
 
 // "Hologram" look for a map: a dark projection table with the land drawn as stacked elevation bands,
 // everything else reduced to thin glowing lines. One module so any game can switch it on.
@@ -65,7 +66,13 @@ export function createHolo(map, bounds) {
       saved.delete(key);
     }
   };
+  // every layer the look does not handle by name (each game adds its own) is recoloured by one rule, see js/inkmap.js
+  const doneInk = new Set();
+  const recolor = () => recolorOthers(map, 'ps1', set, (id) => (id in BASE && (id !== 'muni-fill' || fillsOn)) || id.startsWith('orb-') || id.startsWith('holo-'), doneInk);
+  let styleT = 0;
+  const onStyle = () => { clearTimeout(styleT); styleT = setTimeout(() => { if (on) recolor(); }, 120); };
   const restore = () => {
+    doneInk.clear();
     for (const [key, v] of saved) {
       const [id, prop] = key.split('|');
       if (map.getLayer(id)) map.setPaintProperty(id, prop, v === undefined ? null : v);
@@ -131,16 +138,19 @@ export function createHolo(map, bounds) {
     },
     apply(want) {
       want = !!want;
-      if (want === on) { if (want) { ensureRelief(); game(true); } return; }
+      if (want === on) { if (want) { ensureRelief(); recolor(); game(true); } return; }
       on = want;
       body().classList.toggle('holo', on);
       if (on) {
         ensureRelief();
         grid();
+        recolor();
+        map.on('styledata', onStyle);
         for (const [id, props] of Object.entries(BASE)) if (id !== 'muni-fill' || fillsOn) for (const [p, v] of Object.entries(props)) set(id, p, v);
         game(true);
         for (const id of ['holo-relief', 'holo-grid']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
       } else {
+        map.off('styledata', onStyle);
         for (const id of ['holo-relief', 'holo-grid']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
         restore();
       }

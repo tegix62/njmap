@@ -477,7 +477,7 @@ export function initOrbit(ctx) {
     syncLabels();
     if (on) {
       // no names on the map while this runs
-      hiddenSymbols = map.getStyle().layers.filter((l) => !l.id.startsWith('orb-') && (l.type === 'symbol' || l.type === 'circle') && map.getLayoutProperty(l.id, 'visibility') !== 'none').map((l) => l.id);
+      hiddenSymbols = map.getStyle().layers.filter((l) => !l.id.startsWith('orb-') && !l.id.startsWith('road-ref') && (l.type === 'symbol' || l.type === 'circle') && map.getLayoutProperty(l.id, 'visibility') !== 'none').map((l) => l.id);
       for (const id of hiddenSymbols) map.setLayoutProperty(id, 'visibility', 'none');
     } else {
       for (const id of hiddenSymbols) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');

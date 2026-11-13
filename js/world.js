@@ -22,7 +22,7 @@ const fc = (features) => ({ type: 'FeatureCollection', features });
 const km = (lat) => ({ lat: 1 / 111.2, lng: 1 / (111.2 * Math.cos((lat * Math.PI) / 180)) });
 
 /** Soft ink and stock blotches: each a few stacked, uneven rings, so the edge is a gradient. [[w,s],[e,n]] bounds. */
-export function blots([[w, s], [e, n]], count = 120, seed = 7) {
+export function blots([[w, s], [e, n]], count = 120, seed = 7, rings = 9) {
   const r = rng(seed), out = [];
   const k = km((s + n) / 2);
   const diag = Math.hypot((e - w) / k.lng, (n - s) / k.lat);               // km: sizes are fractions of the region, so a small region is not swamped
@@ -32,8 +32,8 @@ export function blots([[w, s], [e, n]], count = 120, seed = 7) {
     const R = diag * (rmin + Math.pow(r(), 2) * (rmax - rmin));               // km: mostly small, a few large
     const warm = r() < 0.86;
     const phase = r() * 6.28, wob = 0.18 + r() * 0.2, squash = 0.6 + r() * 0.6;
-    for (let ring = 0; ring < 9; ring++) {
-      const rr = R * (1 - ring * 0.1);
+    for (let ring = 0; ring < rings; ring++) {
+      const rr = R * (1 - ring * (0.9 / rings));
       const pts = [];
       for (let a = 0; a <= 16; a++) {
         const t = (a % 16) / 16 * 6.283;

@@ -1,5 +1,6 @@
 import { blots, specks, creases, grainImage, inkImage, inkStroke, roughen, graticule, gridStepFor } from './world.js';
 import { PAPER, TUNE, HL } from './looks.config.js';
+import { recolorOthers } from './inkmap.js';
 
 // "Paper" look for a map: a printed road map from the 1960s–70s (cream stock, a few flat spot inks, halftone water,
 // plates that don't quite line up, fold creases). Same shape as js/holo.js:
@@ -40,7 +41,7 @@ function dotsImage(rgb, r = 1.25, S = 8, off = 0) {
 }
 const BLUE_RGB = [36, 56, 168], RED_RGB = [232, 69, 42];
 
-export function createPaper(map, bounds) {
+export function createPaper(map, bounds, rich = () => false) {
   const saved = new Map();
   let on = false, fillsOn = false;
 
@@ -66,7 +67,13 @@ export function createPaper(map, bounds) {
     if (!savedL.has(key)) savedL.set(key, map.getLayoutProperty(id, prop));
     map.setLayoutProperty(id, prop, val);
   };
+  // every layer the look does not handle by name (each game adds its own) is recoloured by one rule, see js/inkmap.js
+  const doneInk = new Set();
+  const recolor = () => recolorOthers(map, 'paper', set, (id) => (id in BASE && (id !== 'muni-fill' || fillsOn)) || id.startsWith('orb-') || /-p(case|shadow|plate)$/.test(id), doneInk);
+  let styleT = 0;
+  const onStyle = () => { clearTimeout(styleT); styleT = setTimeout(() => { if (on) recolor(); }, 120); };
   const restore = () => {
+    doneInk.clear();
     for (const [key, v] of savedL) {
       const [id, prop] = key.split('|');
       if (map.getLayer(id)) map.setLayoutProperty(id, prop, v === undefined ? null : v);
@@ -91,13 +98,13 @@ export function createPaper(map, bounds) {
     map.addImage('paper-grain', grainImage(), { pixelRatio: 2 });
     const [[w, s], [e, n]] = bounds;
     map.addSource('orb-paper-sheet', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[w - 1, s - 1], [e + 1, s - 1], [e + 1, n + 1], [w - 1, n + 1], [w - 1, s - 1]]] } } });
-    map.addSource('orb-paper-blots', { type: 'geojson', data: blots(bounds) });
+    map.addSource('orb-paper-blots', { type: 'geojson', data: rich() ? blots(bounds, 120, 7, 9) : blots(bounds, 55, 7, 5) });   // (light: fewer, fewer-ringed blotches, much less overdraw)
     map.addSource('orb-paper-creases', { type: 'geojson', data: creases(bounds) });
     map.addSource('orb-paper-specks', { type: 'geojson', data: specks(bounds) });
     // the red index grid, as on the street map: lines of latitude and longitude over the stock, under the roads
     map.addSource('orb-paper-grid', { type: 'geojson', data: graticule(bounds, gridStepFor(bounds, TUNE.paper.grid.cells)) });
     map.addLayer({ id: 'orb-paper-grid', type: 'line', source: 'orb-paper-grid', layout: hide, paint: { 'line-color': PAPER.red, 'line-opacity': TUNE.paper.grid.opacity, 'line-width': TUNE.paper.grid.width } }, map.getLayer('river') ? 'river' : under);
-    map.addLayer({ id: 'orb-paper-grain', type: 'fill', source: 'orb-paper-sheet', layout: hide, paint: { 'fill-pattern': 'paper-grain', 'fill-opacity': TUNE.paper.grain, 'fill-translate-anchor': 'viewport' } }, under);
+    if (rich()) map.addLayer({ id: 'orb-paper-grain', type: 'fill', source: 'orb-paper-sheet', layout: hide, paint: { 'fill-pattern': 'paper-grain', 'fill-opacity': TUNE.paper.grain, 'fill-translate-anchor': 'viewport' } }, under);
     map.addLayer({ id: 'orb-paper-blots', type: 'fill', source: 'orb-paper-blots', layout: hide, paint: { 'fill-color': ['case', ['==', ['get', 'w'], 1], '#8a6a2c', '#1d2a5b'], 'fill-opacity': TUNE.paper.blots, 'fill-translate-anchor': 'viewport' } }, under);
     map.addLayer({ id: 'orb-paper-crease-dark', type: 'line', source: 'orb-paper-creases', layout: hide, paint: { 'line-color': '#6e5a28', 'line-opacity': TUNE.paper.creaseOpacity, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.8, 12, 1.6], 'line-blur': 0.6 } }, under);
     map.addLayer({ id: 'orb-paper-crease-pale', type: 'line', source: 'orb-paper-creases', layout: hide, paint: { 'line-color': '#fffff0', 'line-opacity': 0.6, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.8, 12, 1.5], 'line-translate': [1.6, 1], 'line-blur': 0.5 } }, under);
@@ -257,7 +264,7 @@ export function createPaper(map, bounds) {
     },
     apply(want) {
       want = !!want;
-      if (want === on) { if (want) { plates(); world(); game(); } return; }
+      if (want === on) { if (want) { plates(); world(); recolor(); game(); } return; }
       on = want;
       document.body.classList.toggle('paper', on);
       if (on) {
@@ -265,14 +272,17 @@ export function createPaper(map, bounds) {
         world();
         linework();
         inkLines(true);
+        recolor();
+        map.on('styledata', onStyle);
         // less jagged corners than the plain or PS1 looks: round joins and caps on every printed line, and on the answer outline
         for (const id of [...Object.keys(TUNE.paper.roads), 'river', 'county-line', 'muni-line', 'orb-geom-line', 'orb-geom-casing', 'road-focus', 'road-focus-bad', 'trip-line']) { setL(id, 'line-join', 'round'); setL(id, 'line-cap', 'round'); }
         for (const id of GLOW) if (map.getLayer(id) && map.getLayer(id).type === 'line') { map.setLayoutProperty(id, 'line-join', 'round'); map.setLayoutProperty(id, 'line-cap', 'round'); }
         for (const [id, props] of Object.entries(BASE)) if (id !== 'muni-fill' || fillsOn) for (const [p, v] of Object.entries(props)) set(id, p, v);
         game();
         for (const id of ['orb-paper-a', 'orb-paper-b', ...WORLD, ...GLOW]) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
-        if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) swimTo(true);
+        if (rich() && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) swimTo(true);   // (the swim re-evaluates three layers every frame: only in the richer mode)
       } else {
+        map.off('styledata', onStyle);
         swimTo(false);
         inkLines(false);
         for (const id of ['orb-paper-a', 'orb-paper-b', ...WORLD, ...GLOW]) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');

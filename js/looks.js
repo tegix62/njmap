@@ -30,7 +30,7 @@ export function createLooks(ctx) {
   const { map } = ctx;
   const bounds = ctx.region && ctx.region.bounds;
   const holo = createHolo(map, bounds);
-  const paper = createPaper(map, bounds);
+  const paper = createPaper(map, bounds, () => !!ctx.settings.richTexture);   // richTexture: the heavier paper (full-screen fibre, texture swim); off by default, it costs battery
   const retro = createRetro(map);
   const mapText = createMapText(map);   // PS1: the map's own text redrawn as crisp DOM labels (games with their own labels opt out via crisp)
   const listeners = new Set();
@@ -55,7 +55,9 @@ export function createLooks(ctx) {
     holo.apply(wantHolo);
     paper.apply(wantPaper);
     retro.apply(wantHolo ? (needs.crisp ? 2 : 3) : 0);
-    mapText.show((wantHolo && !needs.crisp) || wantPaper);   // PS1: crisp text over a coarse map; Paper: the map's words set in Gill Sans (canvas text cannot use a system font)
+    // text as DOM: Paper sets the map's words in Gill Sans (canvas text cannot use a system font); PS1 keeps text crisp over a coarse map (unless the game
+    // draws its own); every look draws route numbers as shields, in its own style
+    mapText.show(true, wantPaper || (wantHolo && !needs.crisp) ? 'all' : 'shields');
   }
   const safe = () => { try { apply(); } catch (e) { console.warn('look failed', e); } };
   // apply as soon as the style has its layers (the map may have loaded already, or not yet)

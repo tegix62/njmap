@@ -37,12 +37,12 @@ export function createMapText(map) {
   map.getContainer().appendChild(box);
   box.hidden = true;
 
-  let on = false, last = 0, raf = 0, layers = [];
+  let on = false, mode = 'all', last = 0, raf = 0, layers = [];   // mode: 'all' (every text layer) or 'shields' (route numbers only)
   const saved = new Map();
   const pool = [];                     // elements reused between updates
 
   const textLayers = () =>
-    map.getStyle().layers.filter((l) => l.type === 'symbol' && !SKIP(l.id) && l.layout && l.layout['text-field'] && map.getLayoutProperty(l.id, 'visibility') !== 'none');
+    map.getStyle().layers.filter((l) => l.type === 'symbol' && !SKIP(l.id) && l.layout && l.layout['text-field'] && (mode === 'all' || l.id.startsWith('road-ref')) && map.getLayoutProperty(l.id, 'visibility') !== 'none');
 
   function hideNative() {
     layers = textLayers();
@@ -88,7 +88,7 @@ export function createMapText(map) {
         text = text || p.name || p.label || p.ref || p.c;
         if (!text) continue;
         let shield = null;
-        if (paperOn && l.id.startsWith('road-ref')) {                  // Paper: route numbers as printed shields, not plain text
+        if (l.id.startsWith('road-ref')) {                              // route numbers as shields in every look (drawn differently by each)
           const lab = labelOf(p) || String(text);
           shield = shieldOf(lab);
           text = shield.text;
@@ -103,6 +103,20 @@ export function createMapText(map) {
         seen.add(key);
         out.push({ text, x: s.x, y: s.y, lid: l.id, shield: shield && shield.kind, line: f.geometry.type !== 'Point' && f.geometry.type !== 'MultiPoint' });
         if (out.length >= MAX * 3) break;
+      }
+    }
+    // Named highways always get shields: their lines are drawn from low zoom, but the route-number labels need room, so take them from the line layer
+    if (map.getLayer('hwy-color') && map.getLayoutProperty('hwy-color', 'visibility') !== 'none') {
+      for (const f of map.queryRenderedFeatures({ layers: ['hwy-color'] })) {
+        const lab = labelOf(f.properties || {});
+        if (!lab) continue;
+        const s = anchor(f.geometry);
+        if (!s) continue;
+        const key = 'hwy|' + lab + '|' + Math.round(s.x / 190) + '|' + Math.round(s.y / 190);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const sh = shieldOf(lab);
+        out.unshift({ text: sh.text, x: s.x, y: s.y, lid: 'hwy-color', shield: sh.kind, line: true });   // (first: they win ties over other labels)
       }
     }
     // greedy: first come (the style lists the more important layers late, so later ones win ties by being drawn after) keep a few pixels apart
@@ -128,28 +142,31 @@ export function createMapText(map) {
   const schedule = () => {
     if (!on || raf) return;
     const now = performance.now();
-    if (now - last < 140) { raf = setTimeout(update, 140 - (now - last)); last = now + 140 - (now - last); return; }
+    if (now - last < 300) { raf = setTimeout(update, 300 - (now - last)); last = now + 300 - (now - last); return; }
     last = now;
     raf = requestAnimationFrame(update);
   };
-  const onMove = () => schedule();
+  // the labels only need re-reading when the camera has really moved (or the map has settled): a still map costs nothing
+  let camKey = '';
+  const cam = () => { const c = map.getCenter(); return [c.lng.toFixed(5), c.lat.toFixed(5), map.getZoom().toFixed(2), map.getBearing().toFixed(1), map.getPitch().toFixed(1)].join('|'); };
+  const onMove = () => { const k = cam(); if (k !== camKey) { camKey = k; schedule(); } };
+  const onIdle = () => { camKey = ''; schedule(); };
 
   return {
-    show(want) {
+    show(want, how = 'all') {
       want = !!want;
+      if (want && how !== mode) { if (on) showNative(); mode = how; }
       if (want === on) { if (want) { hideNative(); schedule(); } return; }
       on = want;
       box.hidden = !on;
       if (on) {
         hideNative();
         map.on('move', onMove);
-        map.on('idle', onMove);
-        map.on('sourcedata', onMove);
+        map.on('idle', onIdle);
         schedule();
       } else {
         map.off('move', onMove);
-        map.off('idle', onMove);
-        map.off('sourcedata', onMove);
+        map.off('idle', onIdle);
         clearTimeout(raf);
         cancelAnimationFrame(raf);
         raf = 0;

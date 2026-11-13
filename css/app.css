@@ -3305,13 +3305,23 @@ body.paper .q, body.paper .choice, body.paper .qkind { text-shadow: 0 0 1px rgba
 #pxMapText[hidden] { display: none; }
 .px-map { font-size: 11px; letter-spacing: 0.06em; font-weight: 600; }
 
-/* Paper: route numbers as printed shields (js/maptext.js). Gill Sans numerals, a plate a pixel off in orange as on the maps. */
-body.paper .px-shield { display: grid; place-items: center; font-family: var(--font-paper); font-weight: 700; font-size: 12px; letter-spacing: 0; line-height: 1; text-shadow: none; color: #1d2a5b; }
-body.paper .px-shield.sh-route { min-width: 22px; height: 22px; padding: 0 4px; border-radius: 999px; background: #f6f1c9; border: 2px solid #1d2a5b; box-shadow: 1.5px 1.5px 0 rgba(232, 96, 58, 0.55); box-sizing: border-box; }
-body.paper .px-shield.sh-interstate { min-width: 26px; height: 24px; padding: 3px 3px 7px; box-sizing: border-box; color: #f6f1c9; font-size: 11px;
-  background: linear-gradient(#e8603a 0 30%, #1d2a5b 30%); clip-path: polygon(0 0, 100% 0, 100% 64%, 50% 100%, 0 64%); filter: drop-shadow(1.5px 1.5px 0 rgba(232, 96, 58, 0.5)); }
-body.paper .px-shield.sh-county { min-width: 20px; height: 20px; padding: 0 3px; box-sizing: border-box; background: #f6f1c9; border: 1.5px solid #1d2a5b; font-size: 10px; }
-body.paper .px-shield.sh-plate { padding: 3px 6px; background: #f6f1c9; border: 1.5px solid #1d2a5b; border-radius: 2px; font-size: 10px; letter-spacing: 0.08em; box-shadow: 1.5px 1.5px 0 rgba(232, 96, 58, 0.5); }
+/* Route shields (js/maptext.js), one drawing per look. Default: clean flat shields. Paper: printed in the inks, a plate a pixel off. PS1: square pixel plates. */
+.px-shield { display: grid; place-items: center; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; font-weight: 700; font-size: 12px; letter-spacing: 0; line-height: 1; text-transform: none; text-shadow: none; color: #1f2937; }
+.px-shield.sh-route { min-width: 22px; height: 22px; padding: 0 4px; box-sizing: border-box; border-radius: 999px; background: #fff; border: 2px solid #1f2937; }
+.px-shield.sh-interstate { min-width: 26px; height: 24px; padding: 3px 3px 7px; box-sizing: border-box; color: #fff; font-size: 11px;
+  background: linear-gradient(#c8321c 0 30%, #1f4e9c 30%); clip-path: polygon(0 0, 100% 0, 100% 64%, 50% 100%, 0 64%); filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35)); }
+.px-shield.sh-county { min-width: 20px; height: 20px; padding: 0 3px; box-sizing: border-box; background: #fff; border: 1.5px solid #1f2937; border-radius: 3px; font-size: 10px; }
+.px-shield.sh-plate { padding: 3px 7px; background: #fff; border: 1.5px solid #1f2937; border-radius: 4px; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; }
+
+body.paper .px-shield { font-family: var(--font-paper); color: #14235e; text-shadow: none; }
+body.paper .px-shield.sh-route { background: #f2ea9c; border: 2px solid #2438a8; color: #2438a8; box-shadow: 1.5px 1.5px 0 rgba(232, 69, 42, 0.6); }
+body.paper .px-shield.sh-interstate { color: #f2ea9c; background: linear-gradient(#e8452a 0 30%, #2438a8 30%); filter: drop-shadow(1.5px 1.5px 0 rgba(232, 69, 42, 0.55)); }
+body.paper .px-shield.sh-county { background: #f2ea9c; border: 1.5px solid #2438a8; color: #2438a8; border-radius: 0; }
+body.paper .px-shield.sh-plate { background: #f2ea9c; border: 1.5px solid #2438a8; color: #2438a8; border-radius: 2px; box-shadow: 1.5px 1.5px 0 rgba(232, 69, 42, 0.55); }
+
+body.holo .px-shield { font-family: var(--font-ps1); color: #bff7ff; }
+body.holo .px-shield.sh-route, body.holo .px-shield.sh-county, body.holo .px-shield.sh-plate { border-radius: 0; background: #021017; border: 2px solid #3df5d0; color: #bff7ff; box-shadow: 2px 2px 0 rgba(61, 245, 208, 0.35); }
+body.holo .px-shield.sh-interstate { border-radius: 0; background: #0a3f50; color: #bff7ff; clip-path: none; filter: none; border: 2px solid #3df5d0; border-top: 5px solid #ff8a4a; padding: 1px 3px; box-shadow: 2px 2px 0 rgba(61, 245, 208, 0.35); }
 
 /* Paper: label hierarchy by ink, as on the printed maps: towns red (the big ones with a star), regions navy letterspaced caps, water italic blue */
 body.paper .px-map.l-muni-label-major { color: #e8452a; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; font-size: 12.5px; }
