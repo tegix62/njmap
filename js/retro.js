@@ -88,8 +88,9 @@ export function createRetro(map) {
   return {
     get level() { return level; },
     get name() { return level ? LEVELS[level].name : 'Off'; },
-    apply(want) {
+    apply(want, opts = {}) {
       want = Math.max(0, Math.min(3, want | 0));
+      const saver = !!opts.saver;
       const L = LEVELS[want];
       const canvas = map.getCanvas();
       if (want && !level) {
@@ -111,15 +112,17 @@ export function createRetro(map) {
       if (map.setPixelRatio) map.setPixelRatio(L.ratio);
       canvas.style.imageRendering = L.smooth ? '' : 'pixelated';
       // colour: snap channels, plus a little contrast
-      let f = L.tone;
-      ensureFilter(L.levels || 8);
-      if (L.wobble && !wobbleOff && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) f += ' url(#ps1Wobble)';   // (displace first, then snap the colours)
-      if (L.levels) f += ' url(#retroPost)';
+      // Battery saver: the coarse, pixelated canvas stays (it is cheaper than a full-resolution one), but the full-screen SVG filters and the blend-mode
+      // dither overlay, which the phone has to recomposite on every frame, are left out.
+      let f = saver ? '' : L.tone;
+      if (!saver) ensureFilter(L.levels || 8);
+      if (!saver && L.wobble && !wobbleOff && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) f += ' url(#ps1Wobble)';   // (displace first, then snap the colours)
+      if (!saver && L.levels) f += ' url(#retroPost)';
       canvas.style.filter = f;
-      startWobble(canvas, L);
+      if (saver) stopWobble(canvas, false); else startWobble(canvas, L);
       // dither / grain
       ensureDither();
-      ditherEl.hidden = !(L.dither || L.grain);
+      ditherEl.hidden = saver || !(L.dither || L.grain);
       ditherEl.style.opacity = String(L.dither || L.grain);
       ditherEl.style.imageRendering = 'pixelated';
       ditherEl.style.backgroundSize = want >= 2 ? '4px 4px' : '3px 3px';

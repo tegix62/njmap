@@ -44,6 +44,7 @@ export function createLooks(ctx) {
   if (forced && LOOKS.includes(forced)) { look = forced; ctx.settings.look = forced; ctx.saveSettings && ctx.saveSettings(); }
   if (!LOOKS.includes(look)) look = 'plain';
 
+  const isSaver = () => (ctx.settings.effects || 'saver') !== 'full';
   function apply() {
     const wantHolo = look === 'ps1', wantPaper = look === 'paper';
     // the look going away is switched OFF before the new one goes ON: each saves the paint it finds and puts it back, so one that saved
@@ -54,9 +55,10 @@ export function createLooks(ctx) {
     paper.fills(needs.fills);
     holo.apply(wantHolo);
     paper.apply(wantPaper);
-    retro.apply(wantHolo ? (needs.crisp ? 2 : 3) : 0);
+    retro.apply(wantHolo ? (needs.crisp ? 2 : 3) : 0, { saver: isSaver() });
     // text as DOM: Paper sets the map's words in Gill Sans (canvas text cannot use a system font); PS1 keeps text crisp over a coarse map (unless the game
     // draws its own); every look draws route numbers as shields, in its own style
+    mapText.setSaver && mapText.setSaver(isSaver());
     mapText.show(true, wantPaper || (wantHolo && !needs.crisp) ? 'all' : 'shields', !!needs.crisp);   // (a game that supplies its own labels wants the rest of the map quiet)
   }
   const safe = () => { try { apply(); } catch (e) { console.warn('look failed', e); } };
@@ -71,6 +73,9 @@ export function createLooks(ctx) {
     get paperOn() { return paper.on; },
     get ps1On() { return holo.on; },
     get label() { return LOOK_LABEL[look]; },
+    /** Battery saver (the default): no full-screen filters, no per-frame extras, 30 fps orbit. Set in Settings → Effects. */
+    get saver() { return isSaver(); },
+    refresh() { safe(); for (const f of listeners) f(look); },
     set(v) {
       if (!LOOKS.includes(v) || v === look) return;
       look = v;
@@ -95,5 +100,19 @@ export function createLooks(ctx) {
     PAPER,
     HOLO,
   };
+  // One floating look button for every mode, so the look can be switched anywhere. Hidden where the screen already carries the look chip (the practice header).
+  const fab = document.createElement('button');
+  fab.id = 'lookFab';
+  fab.type = 'button';
+  fab.setAttribute('aria-label', 'Map look');
+  fab.addEventListener('click', () => api.cycle());
+  document.body.appendChild(fab);
+  const paintFab = () => { fab.textContent = { plain: '▢', paper: '▤', ps1: '🕹' }[look]; fab.title = LOOK_LABEL[look]; };
+  const hasChip = () => !!document.getElementById('lookChip');
+  const syncFab = () => { fab.hidden = hasChip(); };
+  paintFab();
+  listeners.add(paintFab);
+  new MutationObserver(syncFab).observe(document.body, { childList: true, subtree: true });
+  syncFab();
   return api;
 }

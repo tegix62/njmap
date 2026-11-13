@@ -32,6 +32,7 @@ const DEFAULT_SETTINGS = {
   driveQuiz: false, // spoken questions while driving (no tapping)
   driveQuizMin: 4, // minutes between them
   mapStyle: 'ink',
+  effects: 'saver', // 'saver' (default): the looks keep their colours and shapes but drop the costly extras; 'full': every effect
   richTexture: false, // Paper look: full-screen fibre and texture swim (heavier on the battery)
   look: 'plain', // the map's look: plain (the theme), paper, or ps1 (see js/looks.js)
   basemap: 'streets',
@@ -671,6 +672,7 @@ async function main() {
     if (k === 'mapStyle') location.reload();
     if (k === 'look') ctx.looks.set(el.value);
     if (k === 'richTexture') location.reload();
+    if (k === 'effects') ctx.looks.refresh();
     if (k === 'northUp') modes.drive.applyOrientation();
     if (k === 'driveInset') modes.drive.updateInset();
     if (k === 'rememberPlaces' && !el.checked) {

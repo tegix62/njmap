@@ -92,6 +92,7 @@ export function initOrbit(ctx) {
   looks.on(() => {
     if (!gameOn) return;
     syncLabels();
+    restyleGeom();
     if (cfg && map.getSource('orb-dem-ps1')) { map.stop(); map.setTerrain({ source: looks.ps1On ? 'orb-dem-ps1' : 'orb-dem', exaggeration: 2.1 }); }   // (PS1: the coarse, faceted terrain)
     if (run && !run.loading) render();
   });
@@ -158,7 +159,7 @@ export function initOrbit(ctx) {
     jitterT = 0;
     const src = map.getSource('orb-geom');
     if (!src) return;
-    const still = ctx.reduceMotion || !gameOn || !baseFeats.length;
+    const still = ctx.reduceMotion || !gameOn || !baseFeats.length || looks.saver;   // (the line boil and the PS1 shimmer re-upload the outline several times a second: full effects only)
     const paperFrames = [];                                      // Paper: a few hand-drawn versions of the outline, built once, played in turn
     const frameOf = (k) => paperFrames[k] || (paperFrames[k] = { type: 'FeatureCollection', features: baseFeats.map((x) => ({ ...x, geometry: roughen(x.geometry, undefined, k) })) });
     const draw = (seed) => {
@@ -697,14 +698,20 @@ export function initOrbit(ctx) {
       }
     }
     const cam = { center, zoom, pitch: t.k === 'nat' ? t.pitch : PITCH, bearing, padding: { top, bottom: pad.bottom, left: 0, right: 0 } };
+    let spinT0 = performance.now(), lastSpin = spinT0;
     const tick = (now) => {
       if (!run || q.t !== t) return;
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
       if (!document.hidden) {
         bearing = map.getBearing();
-        if (spinOn && !drag && !(cfg && q.done && q.t.k === 'nat')) {
-          bearing = (bearing + SPIN * dt * (ctx.reduceMotion ? 0.3 : 1)) % 360;
+        // The spin re-renders the whole map every frame. In battery saver it runs at ~30 fps and stops by itself after 25 s on a question.
+        const saver = looks.saver;
+        const spinning = spinOn && !drag && !(cfg && q.done && q.t.k === 'nat') && !(saver && now - spinT0 > 25000);
+        if (spinning && (!saver || now - lastSpin >= 33)) {
+          const sdt = saver ? Math.min(0.1, (now - lastSpin) / 1000) : dt;
+          lastSpin = now;
+          bearing = (bearing + SPIN * sdt * (ctx.reduceMotion ? 0.3 : 1)) % 360;
           map.setBearing(bearing);
         }
         if (now - lastOcc > 90) {

@@ -154,8 +154,10 @@ export function createMapText(map) {
   }
   /** Every frame: move each label to where its ground point is now. Cheap (a few dozen transforms), so labels track the camera exactly; only
    *  the choice of WHICH labels show is re-read a few times a second. */
+  let saverOn = true, lastRe = 0;
   function reproject() {
     if (!on) return;
+    if (saverOn) { const t = performance.now(); if (t - lastRe < 40) return; lastRe = t; }   // (battery saver: labels follow at ~25 fps, not every frame)
     for (const q of placed) {
       const s = map.project(q.ll);
       q.el.style.transform = `translate(${s.x.toFixed(1)}px, ${s.y.toFixed(1)}px) translate(-50%, -50%)${q.rot}`;
@@ -176,6 +178,7 @@ export function createMapText(map) {
   const onIdle = () => { camKey = ''; schedule(); };
 
   return {
+    setSaver(v) { saverOn = !!v; },
     show(want, how = 'all', quiet = false) {
       want = !!want;
       if (quiet !== sparse) { sparse = quiet; if (on) { showNative(); } }
