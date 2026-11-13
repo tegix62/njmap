@@ -2,6 +2,7 @@
 // background map (OpenStreetMap data, OpenMapTiles schema).
 import { bearing, compass8, angleDiff } from './geo.js';
 import { labelOf } from './roadlabel.js';
+import { decodeLines, tileToLngLat, lngLatToTile } from './mvt.js';
 
 const MAJOR = ['motorway', 'trunk', 'primary'];
 export { normRef, countyNum, labelOf } from './roadlabel.js';
@@ -94,10 +95,46 @@ export function nearbyRoads(map, pt, maxMi = 3, limit = 3) {
 const SKIP_CLASS = new Set(['service', 'track', 'path', 'pedestrian', 'footway', 'cycleway', 'steps', 'bridleway', 'raceway']);
 export function createRoadIndex() {
   let center = null, built = 0, segs = [], tiles = 0;
+  // Local street names are only in the map's vector tiles from about zoom 13-14, and Drive's map is zoomed out to about 12.5, so the street names near you
+  // are fetched directly as zoom-14 tiles (one is a little over 2 km across), decoded (js/mvt.js) and kept (the last 16). They fill in as they arrive.
+  const TZ = 14, tileCache = new Map();
+  const tileSegs = (z, tx, ty, data) => {
+    const out = [];
+    for (const f of data.features) {
+      const p = f.props || {};
+      if (SKIP_CLASS.has(p.class)) continue;
+      const label = labelOf(p) || p.name || null;
+      if (!label) continue;
+      for (const line of f.lines) for (let i = 1; i < line.length; i++) out.push({ a: tileToLngLat(z, tx, ty, data.extent, line[i - 1][0], line[i - 1][1]), b: tileToLngLat(z, tx, ty, data.extent, line[i][0], line[i][1]), label, name: p.name || '', cls: p.class });
+    }
+    return out;
+  };
+  let tilesChanged = false;
+  function ensureTiles(map, pt) {
+    const src = map.getSource('omt');
+    const tpl = src && (src.tiles || (src._options && src._options.tiles) || [])[0];
+    if (!tpl) return;
+    const [cx, cy] = lngLatToTile(TZ, pt[0], pt[1]);
+    const want = [[cx, cy]];
+    const [wx, wy] = [lngLatToTile(TZ, pt[0] - 0.004, pt[1] + 0.003), lngLatToTile(TZ, pt[0] + 0.004, pt[1] - 0.003)];   // (a tile also when you are near its edge)
+    for (let x = wx[0]; x <= wy[0]; x++) for (let y = wx[1]; y <= wy[1]; y++) if (x !== cx || y !== cy) want.push([x, y]);
+    for (const [tx, ty] of want) {
+      const key = `${TZ}/${tx}/${ty}`;
+      if (tileCache.has(key)) { const v = tileCache.get(key); tileCache.delete(key); tileCache.set(key, v); continue; }   // (touched: most recent last)
+      tileCache.set(key, null);                                                                                       // (null: on its way)
+      fetch(tpl.replace('{z}', TZ).replace('{x}', tx).replace('{y}', ty)).then((res) => (res.ok ? res.arrayBuffer() : null)).then((buf) => {
+        if (!buf) { tileCache.delete(key); return; }
+        tileCache.set(key, tileSegs(TZ, tx, ty, decodeLines(buf, 'transportation_name')));
+        tilesChanged = true;
+        while (tileCache.size > 16) tileCache.delete(tileCache.keys().next().value);
+      }).catch(() => tileCache.delete(key));
+    }
+  }
   return {
     update(map, pt) {
       const now = performance.now();
-      if (center && now - built < 20000 && Math.hypot(pt[0] - center[0], pt[1] - center[1]) < 0.004 && segs.length) return;
+      if (map.getSource('omt')) ensureTiles(map, pt);
+      if (center && now - built < 20000 && Math.hypot(pt[0] - center[0], pt[1] - center[1]) < 0.004 && segs.length && !tilesChanged) return;
       if (!map.getSource('omt')) return;
       let fs = [];
       try { fs = map.querySourceFeatures('omt', { sourceLayer: 'transportation_name' }); } catch { return; }
@@ -110,6 +147,8 @@ export function createRoadIndex() {
         if (!label) continue;
         for (const line of lines(f.geometry)) for (let i = 1; i < line.length; i++) if (near(line[i - 1]) || near(line[i])) out.push({ a: line[i - 1], b: line[i], label, name: p.name || '', cls: p.class });
       }
+      for (const v of tileCache.values()) if (v) for (const s of v) if (near(s.a) || near(s.b)) out.push(s);
+      tilesChanged = false;
       segs = out;
       center = pt;
       built = now;

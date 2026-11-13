@@ -430,7 +430,10 @@ export function initDrive(ctx) {
     const steady = st.onCount >= 2 ? st.onCand : on === null ? null : st.onRoad;
     if (steady !== st.onRoad) {
       st.onRoad = steady;
-      if (steady && !firstTimeOn(st.onRef || st.roads[0])) announceRoad(st.onRef || st.roads[0]);   // (a road with a note says its name inside the note)
+      // a turn: the heading is well away from what it was when you joined the road you were on (or there was no road before)
+      const turned = st.roadHeading == null || st.heading == null || Math.abs(angleDiff(st.heading, st.roadHeading)) > 35;
+      if (steady) st.roadHeading = st.heading;
+      if (steady && !firstTimeOn(st.onRef || st.roads[0])) announceRoad(st.onRef || st.roads[0], turned);   // (a road with a note says its name inside the note)
     }
   }
   // How a road is said aloud: "I-287" → "Interstate 287", "Route 1&9" → "Route 1 and 9", the named roads with "the".
@@ -440,12 +443,16 @@ export function initDrive(ctx) {
   };
   const roadIdx = createRoadIndex();
   let lastRoadSaid = 0, lastRoadLabel = null;
-  /** Say which road you are on, when you have been on it steadily for a few seconds: "Route 17 north." Not while other speech is going, and not more often than every 25 s. */
-  function announceRoad(r) {
-    if (!settings.voice || settings.sayRoads === false || !r || r.label === lastRoadLabel && Date.now() - lastRoadSaid < 120000) return false;
-    if (Date.now() - lastRoadSaid < (r.cls && !['motorway', 'trunk', 'primary'].includes(r.cls) ? 12000 : 25000) || ('speechSynthesis' in window && speechSynthesis.speaking)) return false;
+  /** Say the road you have turned onto (or joined): "Valley Road north." Every turn is named; what is held back is flicker: the same road within 20 s of
+   *  being said, a change of name with no turn (a road that simply changes name) while other speech is still going. */
+  function announceRoad(r, turned) {
+    if (!settings.voice || settings.sayRoads === false || !r) return false;
+    const now = Date.now();
+    if (r.label === lastRoadLabel && now - lastRoadSaid < 20000) return false;
+    const busy = 'speechSynthesis' in window && speechSynthesis.speaking;
+    if (busy && !turned) return false;
     const h = st.heading;
-    lastRoadSaid = Date.now();
+    lastRoadSaid = now;
     lastRoadLabel = r.label;
     ctx.speak(`${sayRoad(r.label)}${h != null ? ' ' + { N: 'north', E: 'east', S: 'south', W: 'west' }[travelDir(h)] : ''}.`);
     return true;

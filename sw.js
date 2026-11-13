@@ -30,6 +30,7 @@ const SHELL = [
   'js/holo.js',
   'js/paper.js',
   'js/looks.js',
+  'js/mvt.js',
   'js/progress.js',
   'js/perftest.js',
   'js/toolbar.js',
