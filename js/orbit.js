@@ -1007,13 +1007,23 @@ export function initOrbit(ctx) {
     }
   }
 
+  /** "Flows from near A to near B": the towns at the two ends of a river's line (the line is oriented downstream). Null if there is no usable line. */
+  function flowEnds(t) {
+    if (t.kind !== 'river' || !ctx.locate) return null;
+    const f = flowOf(t, 1e9);
+    if (!f || f.total < 3000) return null;
+    const a = ctx.locate(f.coords[0]), z = ctx.locate(f.coords[f.coords.length - 1]);
+    if (!a || !z || a === z) return null;
+    return { from: a.n, to: z.n };
+  }
   function reveal() {
     const t = q.t;
+    const fe = flowEnds(t);
     const pic = city.pics[t.n] || city.pics[ALIAS[t.n]];
     return `<div class="fb ${q.ok ? 'ok' : 'no'} orb-reveal">
       ${pic ? `<img class="orb-thumb" src="${esc(pic.img)}" alt="Photo of ${esc(t.n)}: tap to enlarge" data-n="${esc(t.n)}" tabindex="0" />` : ''}
       <div><b>${q.ok ? '✓' : '✗'} ${esc(t.n)}</b> <span class="muted">${q.ok ? `+${q.pts}` : ''}</span>${cfg && t.k === 'nat' && !q.ok && q.picked ? `<div class="orb-legend"><span style="display:inline-block;width:.8em;height:.8em;border-radius:2px;background:${roleColor('target')};margin-right:.35em"></span>${esc(t.n)}<br><span style="display:inline-block;width:.8em;height:.8em;border-radius:2px;background:${roleColor('wrong')};margin-right:.35em"></span>${esc(q.picked)} <span class="muted">(your pick)</span>${q.rel ? `<br><span class="muted">${esc(q.rel)}</span>` : ''}</div>` : ''}<br>
-      ${esc(t.line)}.<details class="rev-more"><summary>Where exactly</summary><span class="muted">${t.k === 'nat' ? `${t.elev ? `${t.elev.toLocaleString()} ft · ` : ''}${townsOf(t).length > 1 ? `${t.kind === 'river' ? 'Through ' : t.kind === 'mountain' ? 'Across ' : 'In '}${esc(listOf(townsOf(t), 14))} (${townsOf(t).length} towns, ${countiesOf(t).length > 1 ? `${esc(listOf(countiesOf(t), 8))} counties` : `${esc(countiesOf(t)[0])} County`})` : `${esc(t.at)}, ${esc(t.c)} County`}` : `${t.k === 'lm' ? '' : `${t.h} m (${ft(t.h)} ft) · `}${t.y} · ${esc(t.at)}`}</span></details></div>
+      ${fe ? `<div class="orb-flow">Flows from near <b>${esc(fe.from)}</b> to near <b>${esc(fe.to)}</b>.</div>` : ''}${esc(t.line)}.<details class="rev-more"><summary>Where exactly</summary><span class="muted">${t.k === 'nat' ? `${t.elev ? `${t.elev.toLocaleString()} ft · ` : ''}${townsOf(t).length > 1 ? `${t.kind === 'river' ? 'Through ' : t.kind === 'mountain' ? 'Across ' : 'In '}${esc(listOf(townsOf(t), 14))} (${townsOf(t).length} towns, ${countiesOf(t).length > 1 ? `${esc(listOf(countiesOf(t), 8))} counties` : `${esc(countiesOf(t)[0])} County`})` : `${esc(t.at)}, ${esc(t.c)} County`}` : `${t.k === 'lm' ? '' : `${t.h} m (${ft(t.h)} ft) · `}${t.y} · ${esc(t.at)}`}</span></details></div>
     </div>`;
   }
   /** The photo large, over everything, with its credit; a tap anywhere (or Escape) closes it. */

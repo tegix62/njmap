@@ -3421,3 +3421,9 @@ body.paper .pg-bar, body.paper .pg-mini { border-radius: 0; }
 #tabs { gap: 0; }
 #tabs button { min-width: 0; }
 body.on-progress #lookFab, body.on-progress #compass, body.on-progress #x3d, body.on-progress #recenter { display: none; }
+
+/* context after an answer, right or wrong */
+.around, .orb-flow { margin-top: 6px; font-size: 13px; line-height: 1.4; opacity: 0.9; }
+.around b { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.7; margin-right: 4px; }
+
+.score:empty { display: none; }

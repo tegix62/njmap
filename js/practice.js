@@ -867,9 +867,9 @@ export function initPractice(ctx) {
       return `${gameBar(areaSel)}<div class="score todaybar"><span class="dots">${dots}</span>${streak() ? `<span>🔥 ${streak()} day${streak() === 1 ? '' : 's'}</span>` : ''}</div>`;
     }
     if (cfg.type === 'rapid')
-      return `${gameBar(areaSel)}${rapid.on ? `<div class="score"><span class="lives">${'♥'.repeat(Math.max(0, rapid.lives))}${'♡'.repeat(Math.max(0, 3 - rapid.lives))}</span> · ${rapid.score} right · round ${rapid.round}</div>` : ''}`;
+      return `${gameBar(areaSel)}<div class="score">${rapid.on ? `<span class="lives">${'♥'.repeat(Math.max(0, rapid.lives))}${'♡'.repeat(Math.max(0, 3 - rapid.lives))}</span> · ${rapid.score} right · round ${rapid.round}` : ''}</div>`;
     const bits = [due ? `<span class="due">${due} due for review</span>` : '', score.total ? `${score.right}/${score.total} · ${pct}%` : '', score.streak > 1 ? `streak ${score.streak}` : ''].filter(Boolean);
-    return `${gameBar(areaSel)}${bits.length ? `<div class="score">${bits.join(' · ')}</div>` : ''}`;
+    return `${gameBar(areaSel)}<div class="score">${bits.join(' · ')}</div>`;   // (always present, even empty: the row is rewritten after each answer)
   }
 
   /** The main modes as tiles (New York: Drive Midtown first), and a "More" button for everything else. */
@@ -1205,6 +1205,15 @@ export function initPractice(ctx) {
     });
   }
 
+  /** Right or wrong, where the place sits: the places it borders, and the counties across its line (not shown again if the answer already says it). */
+  function aroundHtml(qq) {
+    const m = qq && qq.m;
+    if (!m || !m.neighbors || !m.neighbors.length || qq.rapid) return '';
+    const near = m.neighbors.slice(0, 7).map((n) => esc(ctx.name(n)));
+    const other = [...new Set(m.neighbors.filter((n) => n.c !== m.c).map((n) => ctx.groupName(n.c)))];
+    return `<div class="around"><b>Borders</b> ${near.join(' · ')}${m.neighbors.length > 7 ? ` · +${m.neighbors.length - 7} more` : ''}${other.length ? `<br><b>Across the line</b> ${other.map(esc).join(' · ')}` : ''}</div>`;
+  }
+
   function feedback(ok, html) {
     if (q.rapid) return rapidResult(ok);
     if (q.today && ok) {
@@ -1223,7 +1232,7 @@ export function initPractice(ctx) {
     for (const g of qb.querySelectorAll('.choices, .rose8, .lrpad')) g.classList.add('answered');
     // a dial question: shrink the dial so the answer and Next fit
     for (const d of qb.querySelectorAll('.dialwrap')) d.classList.add('answered');
-    qb.insertAdjacentHTML('beforeend', `<div class="fb ${ok ? 'ok' : 'no'}">${html}</div><button class="primary" id="nextQ">Next</button>`);
+    qb.insertAdjacentHTML('beforeend', `<div class="fb ${ok ? 'ok' : 'no'}">${html}${aroundHtml(q)}</div><button class="primary" id="nextQ">Next</button>`);
     // make sure Next is in view, however long the feedback is
     requestAnimationFrame(() => {
       const sh = document.getElementById('sheet');
