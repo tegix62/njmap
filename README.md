@@ -412,3 +412,7 @@ Under PS1 the map's own text layers are made invisible (`text-opacity` 0) but le
 ### Paper: line boil (animated wobble)
 
 Under Paper the answer outline is redrawn by hand a few times a second: four slightly different versions of the same hand-pulled line (`roughen(geom, amp, phase)` in `js/world.js`), built once per question and played in turn at about 4.5 fps, the way hand-redrawn animation "boils". The knobs are `TUNE.paper.boil` in `js/looks.config.js` (`metres` how far each drawing differs, `fps`, `frames`). Static under reduced motion.
+
+### PS1 wobble (`js/retro.js`, `RETRO.*.wobble` in `js/looks.config.js`)
+
+Under PS1 the whole map picture is displaced by a few pixels (SVG `feDisplacementMap`, `#ps1Wobble`) with noise that is re-rolled 8 times a second, so edges swim like PS1 geometry did; the colour snapping runs after it. It is a full-screen filter, so it times its own frames for the first 3 s and switches itself off for the session if they average over 42 ms; it is not applied under reduced motion. It moves the map canvas only (labels, panels and the crisp text are not displaced). Knobs: `scale` (pixels), `fps`.

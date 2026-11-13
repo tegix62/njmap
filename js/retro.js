@@ -28,7 +28,7 @@ const bayerUri = () => {
 };
 
 export function createRetro(map) {
-  let level = 0, savedRatio = null, savedSky, filterEl = null, ditherEl = null;
+  let level = 0, savedRatio = null, savedSky, filterEl = null, ditherEl = null, wobbleT = 0, wobbleOff = false, watchRaf = 0;
 
   function ensureFilter(n) {
     if (!filterEl) {
@@ -36,7 +36,8 @@ export function createRetro(map) {
       svg.setAttribute('width', '0');
       svg.setAttribute('height', '0');
       svg.style.cssText = 'position:absolute;pointer-events:none';
-      svg.innerHTML = '<filter id="retroPost" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncR id="rfR" type="discrete"/><feFuncG id="rfG" type="discrete"/><feFuncB id="rfB" type="discrete"/></feComponentTransfer></filter>';
+      svg.innerHTML = '<filter id="retroPost" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncR id="rfR" type="discrete"/><feFuncG id="rfG" type="discrete"/><feFuncB id="rfB" type="discrete"/></feComponentTransfer></filter>'
+        + '<filter id="ps1Wobble" x="0" y="0" width="100%" height="100%"><feTurbulence id="wbT" type="fractalNoise" baseFrequency="0.07" numOctaves="1" seed="1"/><feDisplacementMap id="wbD" in="SourceGraphic" scale="3" xChannelSelector="R" yChannelSelector="G"/></filter>';
       document.body.appendChild(svg);
       filterEl = svg;
     }
@@ -50,6 +51,38 @@ export function createRetro(map) {
     ditherEl.setAttribute('aria-hidden', 'true');
     ditherEl.style.backgroundImage = bayerUri();
     document.body.appendChild(ditherEl);
+  }
+
+  /**
+   * PS1 vertex wobble: the whole picture is displaced by a few pixels with noise that is re-rolled several times a second, so edges swim
+   * the way PS1 geometry did. It is a full-screen filter, so it watches its own cost: if frames take too long in the first seconds it
+   * switches itself off for the session.
+   */
+  function startWobble(canvas, L) {
+    stopWobble(canvas, false);
+    if (!L.wobble || wobbleOff || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+    filterEl.querySelector('#wbD').setAttribute('scale', String(L.wobble.scale));
+    const t = filterEl.querySelector('#wbT');
+    let n = 0;
+    wobbleT = setInterval(() => t.setAttribute('seed', String(1 + (++n % 9))), 1000 / L.wobble.fps);
+    // cost watch: average frame time over the first 3 s of wobbling
+    const t0 = performance.now();
+    let frames = 0;
+    const watch = (now) => {
+      frames++;
+      if (now - t0 < 3000) { watchRaf = requestAnimationFrame(watch); return; }
+      if ((now - t0) / frames > 42) { wobbleOff = true; stopWobble(canvas, true); }
+    };
+    watchRaf = requestAnimationFrame(watch);
+    return true;
+  }
+  function stopWobble(canvas, refilter) {
+    clearInterval(wobbleT);
+    cancelAnimationFrame(watchRaf);
+    wobbleT = 0;
+    if (refilter && level) {                                   // drop the filter from the chain (too slow on this device)
+      canvas.style.filter = canvas.style.filter.replace(' url(#ps1Wobble)', '');
+    }
   }
 
   return {
@@ -68,6 +101,7 @@ export function createRetro(map) {
       if (!L) {
         if (savedRatio != null && map.setPixelRatio) map.setPixelRatio(savedRatio);
         canvas.style.imageRendering = '';
+        stopWobble(canvas, false);
         canvas.style.filter = '';
         try { if (map.setSky) map.setSky(savedSky || { 'sky-color': '#000000', 'sky-horizon-blend': 0, 'horizon-color': '#000000', 'horizon-fog-blend': 0, 'fog-color': '#000000', 'fog-ground-blend': 0, 'atmosphere-blend': 0 }); } catch { /* older MapLibre: no sky */ }
         if (ditherEl) ditherEl.hidden = true;
@@ -78,8 +112,11 @@ export function createRetro(map) {
       canvas.style.imageRendering = L.smooth ? '' : 'pixelated';
       // colour: snap channels, plus a little contrast
       let f = L.tone;
-      if (L.levels) { ensureFilter(L.levels); f += ' url(#retroPost)'; }
+      ensureFilter(L.levels || 8);
+      if (L.wobble && !wobbleOff && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) f += ' url(#ps1Wobble)';   // (displace first, then snap the colours)
+      if (L.levels) f += ' url(#retroPost)';
       canvas.style.filter = f;
+      startWobble(canvas, L);
       // dither / grain
       ensureDither();
       ditherEl.hidden = !(L.dither || L.grain);

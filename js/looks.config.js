@@ -39,10 +39,11 @@ export const PAPER = {
 
 // ---- PS1: resolution, colour levels, dither, fog ------------------------------------------------------------
 //   ratio   render scale (0.5 = each rendered pixel is 2 screen pixels); levels  colour steps per channel
+//   wobble  { scale: pixels the picture is displaced by, fps: how often the noise is re-rolled } (switches itself off on a slow device)
 //   crisp   true: map text is hidden in favour of crisp DOM labels (games that supply them); false: map text stays as drawn
 export const RETRO = {
-  crisp:   { name: 'PS1', ratio: 0.5, smooth: false, levels: 10, dither: 0.12, fog: 0.75, tone: 'contrast(1.12) saturate(1.05)' },
-  generic: { name: 'PS1', ratio: 0.75, smooth: false, levels: 14, dither: 0.08, fog: 0.5, tone: 'contrast(1.08) saturate(1.05)' },
+  crisp:   { name: 'PS1', ratio: 0.5, smooth: false, levels: 10, dither: 0.12, fog: 0.75, tone: 'contrast(1.12) saturate(1.05)', wobble: { scale: 3, fps: 8 } },
+  generic: { name: 'PS1', ratio: 0.75, smooth: false, levels: 14, dither: 0.08, fog: 0.5, tone: 'contrast(1.08) saturate(1.05)', wobble: { scale: 2.4, fps: 8 } },
 };
 
 // ---- Numbers ---------------------------------------------------------------------------------------------------
