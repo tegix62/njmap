@@ -3311,22 +3311,31 @@ body.paper .q, body.paper .choice, body.paper .qkind { text-shadow: 0 0 1px rgba
 .px-shield.sh-interstate { min-width: 26px; height: 24px; padding: 3px 3px 7px; box-sizing: border-box; color: #fff; font-size: 11px;
   background: linear-gradient(#c8321c 0 30%, #1f4e9c 30%); clip-path: polygon(0 0, 100% 0, 100% 64%, 50% 100%, 0 64%); filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35)); }
 .px-shield.sh-county { min-width: 20px; height: 20px; padding: 0 3px; box-sizing: border-box; background: #fff; border: 1.5px solid #1f2937; border-radius: 3px; font-size: 10px; }
-.px-shield.sh-plate { padding: 3px 7px; background: #fff; border: 1.5px solid #1f2937; border-radius: 4px; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; }
+.px-shield.sh-plate { padding: 0; background: none; border: 0; font-size: 11.5px; font-style: italic; letter-spacing: 0; text-shadow: 1px 0 #fff, -1px 0 #fff, 0 1px #fff, 0 -1px #fff; }
 
 body.paper .px-shield { font-family: var(--font-paper); color: #14235e; text-shadow: none; }
 body.paper .px-shield.sh-route { background: #f2ea9c; border: 2px solid #2438a8; color: #2438a8; box-shadow: 1.5px 1.5px 0 rgba(232, 69, 42, 0.6); }
 body.paper .px-shield.sh-interstate { color: #f2ea9c; background: linear-gradient(#e8452a 0 30%, #2438a8 30%); filter: drop-shadow(1.5px 1.5px 0 rgba(232, 69, 42, 0.55)); }
 body.paper .px-shield.sh-county { background: #f2ea9c; border: 1.5px solid #2438a8; color: #2438a8; border-radius: 0; }
-body.paper .px-shield.sh-plate { background: #f2ea9c; border: 1.5px solid #2438a8; color: #2438a8; border-radius: 2px; box-shadow: 1.5px 1.5px 0 rgba(232, 69, 42, 0.55); }
+body.paper .px-shield.sh-plate { background: none; border: 0; box-shadow: none; padding: 0; color: #2438a8; font-style: italic; font-weight: 600; font-size: 11.5px; letter-spacing: 0; text-shadow: 1px 0 #f2ea9c, -1px 0 #f2ea9c, 0 1px #f2ea9c, 0 -1px #f2ea9c; }
 
 body.holo .px-shield { font-family: var(--font-ps1); color: #bff7ff; }
 body.holo .px-shield.sh-route, body.holo .px-shield.sh-county, body.holo .px-shield.sh-plate { border-radius: 0; background: #021017; border: 2px solid #3df5d0; color: #bff7ff; box-shadow: 2px 2px 0 rgba(61, 245, 208, 0.35); }
 body.holo .px-shield.sh-interstate { border-radius: 0; background: #0a3f50; color: #bff7ff; clip-path: none; filter: none; border: 2px solid #3df5d0; border-top: 5px solid #ff8a4a; padding: 1px 3px; box-shadow: 2px 2px 0 rgba(61, 245, 208, 0.35); }
 
 /* Paper: label hierarchy by ink, as on the printed maps: towns red (the big ones with a star), regions navy letterspaced caps, water italic blue */
-body.paper .px-map.l-muni-label-major { color: #e8452a; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; font-size: 12.5px; }
+body.paper .px-map.l-muni-label-major { color: #e8452a; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; font-size: 12.5px; }
 body.paper .px-map.l-muni-label-major::before { content: '\2605\00a0'; font-size: 10px; }
-body.paper .px-map.l-muni-label { color: #e8452a; font-weight: 600; }
+body.paper .px-map.l-muni-label { color: #14235e; font-weight: 600; }
 body.paper .px-map.l-region-label, body.paper .px-map.l-county-label { color: #14235e; font-weight: 700; text-transform: uppercase; letter-spacing: 0.22em; font-size: 12px; }
 body.paper .px-map.l-river-name, body.paper .px-map.l-lake-name, body.paper .px-map.l-road-name { color: #2438a8; font-style: italic; font-weight: 500; }
 body.paper .px-map.l-road-name { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; font-style: normal; }
+
+/* Paper type on the panels: Gill Sans in ordinary case reads better than capitals; tighter tracking on the buttons (-0.02em), capitals only for tiny labels */
+body.paper .choice, body.paper .chip, body.paper .primary { text-transform: none; letter-spacing: -0.02em; font-weight: 600; font-size: 15px; }
+body.paper .chip.toggle, body.paper .chip { font-size: 13px; }
+body.paper .primary { font-size: 16px; font-weight: 700; }
+body.paper .gamebar { text-transform: none; letter-spacing: -0.01em; }
+body.paper .gamebar b { font-size: 14px; }
+body.paper .qkind { letter-spacing: 0.08em; font-size: 11px; }
+body.paper .q { letter-spacing: -0.01em; }

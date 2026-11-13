@@ -457,3 +457,11 @@ Not done yet: misregistration on every printed area, and map furniture (title bo
 Fix: leaving Paper threw (it tried to clear a line pattern on the water's fill layer), which aborted the switch before the colours were restored, so the app stayed in Paper whatever you chose. Clearing now only touches line layers, and the rest of Paper's teardown runs even if one step fails. Verified by cycling Paper → PS1 → Default → Paper → PS1 → Default with the chip.
 
 Fix: route shields (and every DOM map label) lagged the camera and "blinked around". Positions were computed only when the label set was re-read (about 3 times a second), so between reads they stayed at old screen positions, and the anchor point on a line could jump to a different part of it each read. Labels are now pinned to a ground position (lng/lat) and re-projected on every map frame (a few dozen transforms); only *which* labels show is still re-read a few times a second. Checked: moving the camera in 0.01° steps moved a shield by a steady 9 px each frame, in the same frame.
+
+### Less clutter, and type (round 4)
+
+- **Quiet map in a game that draws its own labels** (`looks.use({crisp:true})` → `maptext` `sparse`): road names, village/section names, county names and landmark labels are dropped, smaller towns only appear from zoom 11.5, at most 8 shields; elsewhere at most 14, with county-route shields only from zoom 12.
+- **Named roads are text, not boxes:** the Turnpike/Parkway/AC Expressway "plates" are now ordinary italic names (no capitals, no frame) in every look; numbered routes keep their shields.
+- **Paper map:** ordinary towns are navy; only the larger ones are red with a star; minor streets start at zoom 13.5 and secondary roads at 11.5 (a printed map shows them only at large scale; also far fewer lines to draw).
+- **Paper panel type:** Gill Sans in ordinary case, tracking -0.02em on buttons and the question (capitals only on the tiny kicker).
+- Fern Text (from your Drive folder) is not bundled: it is licensed for up to 15,000 monthly visitors, and the files are too large for me to move through the connector; to try it, drop `FernText-Regular.woff2` and `FernText-Bold.woff2` into `fonts/` and tell me.

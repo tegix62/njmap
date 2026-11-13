@@ -171,6 +171,7 @@ export function createPaper(map, bounds, rich = () => false) {
       origEdges.clear();
     }
   }
+  const zr = new Map();                // layer zoom ranges changed, to put back
   const GLOW = [];
   function linework() {
     if (GLOW.length) return;
@@ -274,6 +275,11 @@ export function createPaper(map, bounds, rich = () => false) {
         inkLines(true);
         recolor();
         map.on('styledata', onStyle);
+        // a printed map shows minor streets only at large scale: they start later than in the plain look (less clutter, and far fewer lines to draw)
+        for (const [id, z] of [['road-minor', 13.5], ['road-minor-pcase', 13.5], ['road-mid', 11.5], ['road-mid-pcase', 11.5]]) {
+          const ly = map.getLayer(id);
+          if (ly && !zr.has(id)) { zr.set(id, [ly.minzoom, ly.maxzoom]); map.setLayerZoomRange(id, Math.max(z, ly.minzoom || 0), ly.maxzoom || 24); }
+        }
         // less jagged corners than the plain or PS1 looks: round joins and caps on every printed line, and on the answer outline
         for (const id of [...Object.keys(TUNE.paper.roads), 'river', 'county-line', 'muni-line', 'orb-geom-line', 'orb-geom-casing', 'road-focus', 'road-focus-bad', 'trip-line']) { setL(id, 'line-join', 'round'); setL(id, 'line-cap', 'round'); }
         for (const id of GLOW) if (map.getLayer(id) && map.getLayer(id).type === 'line') { map.setLayoutProperty(id, 'line-join', 'round'); map.setLayoutProperty(id, 'line-cap', 'round'); }
@@ -282,6 +288,8 @@ export function createPaper(map, bounds, rich = () => false) {
         for (const id of ['orb-paper-a', 'orb-paper-b', ...WORLD, ...GLOW]) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
         if (rich() && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) swimTo(true);   // (the swim re-evaluates three layers every frame: only in the richer mode)
       } else {
+        for (const [id, [a, b]] of zr) if (map.getLayer(id)) map.setLayerZoomRange(id, a || 0, b || 24);
+        zr.clear();
         map.off('styledata', onStyle);
         try { swimTo(false); } catch (e) { console.warn(e); }
         try { inkLines(false); } catch (e) { console.warn(e); }   // (whatever fails here, the colours below are still put back)

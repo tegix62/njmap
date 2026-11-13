@@ -57,7 +57,7 @@ export function createLooks(ctx) {
     retro.apply(wantHolo ? (needs.crisp ? 2 : 3) : 0);
     // text as DOM: Paper sets the map's words in Gill Sans (canvas text cannot use a system font); PS1 keeps text crisp over a coarse map (unless the game
     // draws its own); every look draws route numbers as shields, in its own style
-    mapText.show(true, wantPaper || (wantHolo && !needs.crisp) ? 'all' : 'shields');
+    mapText.show(true, wantPaper || (wantHolo && !needs.crisp) ? 'all' : 'shields', !!needs.crisp);   // (a game that supplies its own labels wants the rest of the map quiet)
   }
   const safe = () => { try { apply(); } catch (e) { console.warn('look failed', e); } };
   // apply as soon as the style has its layers (the map may have loaded already, or not yet)

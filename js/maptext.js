@@ -27,7 +27,7 @@ function shieldOf(lab) {
   if ((m = lab.match(/^I-(\d+)/))) return { kind: 'sh-interstate', text: m[1] };
   if ((m = lab.match(/^Route (.+)$/))) return { kind: 'sh-route', text: m[1] };
   if ((m = lab.match(/^CR[ -]?(\w+)/))) return { kind: 'sh-county', text: m[1] };
-  return { kind: 'sh-plate', text: lab.toUpperCase() };
+  return { kind: 'sh-plate', text: lab };           // (a named road: its name as ordinary text, no box, no capitals)
 }
 
 export function createMapText(map) {
@@ -37,13 +37,14 @@ export function createMapText(map) {
   map.getContainer().appendChild(box);
   box.hidden = true;
 
+  let sparse = false;                 // a game that wants the map quiet: only the bigger towns, water and a handful of shields
   let on = false, mode = 'all', last = 0, raf = 0, layers = [];   // mode: 'all' (every text layer) or 'shields' (route numbers only)
   const saved = new Map();
   const placed = [];                 // what is on screen now: { el, ll (ground position), rot }
   const pool = [];                     // elements reused between updates
 
   const textLayers = () =>
-    map.getStyle().layers.filter((l) => l.type === 'symbol' && !SKIP(l.id) && l.layout && l.layout['text-field'] && (mode === 'all' || l.id.startsWith('road-ref')) && map.getLayoutProperty(l.id, 'visibility') !== 'none');
+    map.getStyle().layers.filter((l) => l.type === 'symbol' && !SKIP(l.id) && l.layout && l.layout['text-field'] && (mode === 'all' || l.id.startsWith('road-ref')) && !(sparse && (l.id === 'road-name' || l.id.startsWith('section-label') || l.id === 'county-label' || l.id === 'landmark-label')) && map.getLayoutProperty(l.id, 'visibility') !== 'none');
 
   function hideNative() {
     layers = textLayers();
@@ -121,6 +122,15 @@ export function createMapText(map) {
         out.unshift({ text: sh.text, x: s.x, y: s.y, ll: s.ll, lid: 'hwy-color', shield: sh.kind, line: true });   // (first: they win ties over other labels)
       }
     }
+    // declutter: county-route shields only when zoomed in; at most a dozen shields; in a quiet game only the larger towns
+    const z = map.getZoom();
+    let nShield = 0;
+    for (let i = out.length - 1; i >= 0; i--) {
+      const it = out[i];
+      if (it.shield && it.shield === 'sh-county' && z < 12) out.splice(i, 1);
+      else if (sparse && !it.shield && it.lid === 'muni-label' && z < 11.5) out.splice(i, 1);
+    }
+    for (let i = 0; i < out.length; i++) if (out[i].shield && ++nShield > (sparse ? 8 : 14)) { out.splice(i, 1); i--; }
     // greedy: first come (the style lists the more important layers late, so later ones win ties by being drawn after) keep a few pixels apart
     const taken = [];
     let n = 0;
@@ -166,8 +176,9 @@ export function createMapText(map) {
   const onIdle = () => { camKey = ''; schedule(); };
 
   return {
-    show(want, how = 'all') {
+    show(want, how = 'all', quiet = false) {
       want = !!want;
+      if (quiet !== sparse) { sparse = quiet; if (on) { showNative(); } }
       if (want && how !== mode) { if (on) showNative(); mode = how; }
       if (want === on) { if (want) { hideNative(); schedule(); } return; }
       on = want;
