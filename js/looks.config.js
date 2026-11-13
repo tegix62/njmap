@@ -58,6 +58,7 @@ export const TUNE = {
     plateOffsetA: [4, 3],
     plateOffsetB: [-3, -3],
     roughenMetres: 55,       // how far hand-pulled edges wander (answer outlines)
+    boil: { metres: 16, fps: 4.5, frames: 4 },   // the outline re-drawn by hand a few times a second (animated line boil): how far each drawing differs, how often, how many drawings
     creaseOpacity: 0.3,
     pinholes: 60,            // pinholes visible on a typical screen (the count over the region is scaled to the region's size)
     blotSize: [0.004, 0.034],// blotch radius as a fraction of the region's diagonal: [smallest, largest]

@@ -6,7 +6,7 @@
 import { buildingFeatures, applySurveyTowers, applyParts, loadParts, loadSurveyTowers, groundFeatures, GROUND_PAINT } from './city3d.js';
 import { createMeshLayer, meshInfo } from './meshes.js';
 import { choicesHtml, hintsHtml, whereHtml } from './ui.js';
-import { PAPER } from './looks.config.js';
+import { PAPER, TUNE } from './looks.config.js';
 import { roughen, snapGeom } from './world.js';
 import { createLabels } from './retro.js';
 
@@ -153,12 +153,17 @@ export function initOrbit(ctx) {
     jitterT = 0;
     const src = map.getSource('orb-geom');
     if (!src) return;
+    const still = ctx.reduceMotion || !gameOn || !baseFeats.length;
+    const paperFrames = [];                                      // Paper: a few hand-drawn versions of the outline, built once, played in turn
+    const frameOf = (k) => paperFrames[k] || (paperFrames[k] = { type: 'FeatureCollection', features: baseFeats.map((x) => ({ ...x, geometry: roughen(x.geometry, undefined, k) })) });
     const draw = (seed) => {
-      const f = baseFeats.map((x) => ({ ...x, geometry: looks.paperOn ? roughen(x.geometry) : looks.ps1On ? snapGeom(x.geometry, 0.0012, seed) : x.geometry }));
+      if (looks.paperOn) return src.setData(frameOf(seed));
+      const f = baseFeats.map((x) => ({ ...x, geometry: looks.ps1On ? snapGeom(x.geometry, 0.0012, seed) : x.geometry }));
       src.setData({ type: 'FeatureCollection', features: f });
     };
-    draw(looks.ps1On ? 0 : -1);
-    if (looks.ps1On && gameOn && baseFeats.length && !ctx.reduceMotion) jitterT = setInterval(() => { if (!run || !gameOn) return; draw(++jitterN % 7); }, 170);
+    draw(looks.ps1On || looks.paperOn ? 0 : -1);
+    if (looks.ps1On && !still) jitterT = setInterval(() => { if (!run || !gameOn) return; draw(++jitterN % 7); }, 170);
+    if (looks.paperOn && !still) jitterT = setInterval(() => { if (!run || !gameOn) return; draw(++jitterN % TUNE.paper.boil.frames); }, 1000 / TUNE.paper.boil.fps);
   }
   function setGeom(items, labelled = false) {     // items: [{ name, role }]; the pins and names are drawn only once the question is answered (they would give it away)
     const feats = [], walls = [];

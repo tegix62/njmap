@@ -119,7 +119,7 @@ function vnoise(x, y) {
  * Hand-pulled edges: every line and ring is cut into short pieces and each point pushed sideways by noise that depends only on where it is
  * on the Earth (so the wobble is part of the land and does not swim as the map moves). amp in metres.
  */
-export function roughen(geom, amp = TUNE.paper.roughenMetres) {
+export function roughen(geom, amp = TUNE.paper.roughenMetres, phase = -1) {
   const rough = (coords) => {
     const out = [];
     for (let i = 0; i < coords.length; i++) {
@@ -139,7 +139,13 @@ export function roughen(geom, amp = TUNE.paper.roughenMetres) {
     const fx = p[0] * 900, fy = p[1] * 900;                              // ~120 m features
     const a = (vnoise(fx, fy) - 0.5) + 0.5 * (vnoise(fx * 3.1 + 9, fy * 3.1 + 4) - 0.5);
     const b = (vnoise(fx + 31, fy - 17) - 0.5) + 0.5 * (vnoise(fx * 3.1 - 5, fy * 3.1 + 12) - 0.5);
-    return [p[0] + (a * amp * k.lng) / 1000, p[1] + (b * amp * k.lat) / 1000];
+    let dx = a * amp, dy = b * amp;
+    if (phase >= 0) {                                                    // 'boil': each phase is a slightly different hand-drawing of the same line
+      const bm = TUNE.paper.boil.metres;
+      dx += (vnoise(fx * 2.3 + phase * 7.7, fy * 2.3 - phase * 3.1) - 0.5) * 2 * bm;
+      dy += (vnoise(fx * 2.3 - phase * 5.3, fy * 2.3 + phase * 9.1) - 0.5) * 2 * bm;
+    }
+    return [p[0] + (dx * k.lng) / 1000, p[1] + (dy * k.lat) / 1000];
   };
   const walk = (c, depth) => (depth === 0 ? rough(c) : c.map((x) => walk(x, depth - 1)));
   const depth = { Point: -1, LineString: 0, MultiPoint: -1, Polygon: 1, MultiLineString: 1, MultiPolygon: 2 }[geom.type];
