@@ -3385,3 +3385,10 @@ body.holo #inset .me path { fill: #ffd54a; stroke: #02101a; }
 #perfDlg { border: 0; border-radius: 14px; padding: 16px; max-width: min(92vw, 460px); }
 #perfDlg::backdrop { background: rgba(0, 0, 0, 0.3); }
 #perfDlg pre { font: 11.5px/1.5 ui-monospace, Menlo, monospace; overflow-x: auto; margin: 8px 0; }
+
+/* result card: the line first, the town list on demand */
+.rev-more { margin-top: 3px; }
+.rev-more > summary { cursor: pointer; font-size: 12.5px; opacity: 0.75; list-style: none; }
+.rev-more > summary::-webkit-details-marker { display: none; }
+.rev-more > summary::before { content: '▸ '; }
+.rev-more[open] > summary::before { content: '▾ '; }

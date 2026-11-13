@@ -511,3 +511,7 @@ Settings → "Run performance test (about 40 s)": turns the map for 6 s in each 
 ### Governor (adaptive resolution, `js/looks.js`)
 
 While the camera moves, the real frame times are measured (24 frames at a time). Under about 26 fps the render resolution drops a notch (×0.88, never below 1×); over about 45 fps it rises again (×1.06, up to the normal ratio). The level is remembered between sessions (`perf.quality`), so a phone that struggles starts already adapted and a fast one stays sharp. It applies in every look, in saver and in Full; PS1 keeps its own fixed low ratio. In my software-rendered test a 30 s turn took it from 1.0 to 0.68 and the setting was saved; on a fast phone it should stay at 1. The aim is that the effects can stay on without a battery option; the performance test (Settings) shows how your phone does.
+
+### Declutter: result card and Settings wording
+
+The result card in "Name that place" shows the result, the legend and the one-line description; the town/elevation line is behind a "▸ Where exactly" tap. In Settings the two confusingly similar choices are now "Colour theme" (Ink / Classic) and "Map look" (Default / Paper / PS1), in a section called "Look, effects & map".
