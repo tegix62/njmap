@@ -3339,3 +3339,7 @@ body.paper .gamebar { text-transform: none; letter-spacing: -0.01em; }
 body.paper .gamebar b { font-size: 14px; }
 body.paper .qkind { letter-spacing: 0.08em; font-size: 11px; }
 body.paper .q { letter-spacing: -0.01em; }
+
+/* the header row: game name (takes the free space), then the game's chips, then the look chip */
+.gamerow { flex-wrap: nowrap; }
+.gamerow .chip.tb { padding: 3px 8px; }

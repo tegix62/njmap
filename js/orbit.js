@@ -820,6 +820,7 @@ export function initOrbit(ctx) {
     cancelAnimationFrame(raf);
     cancelAnimationFrame(arcRaf);
     clearTimeout(compareTimer);
+    ctx.toolbar.clear();
     clearPins();
     clearInterval(jitterT);
     endFlash();
@@ -1004,19 +1005,14 @@ export function initOrbit(ctx) {
     const hints = hintsHtml(HINTS.slice(0, q.hints).map((h) => h(q.t)));
     const where = q.t.k === 'nat' ? (q.towns && q.towns.shown.length ? whereHtml(q.towns.shown.slice(0, 4).map((m) => m.n).join(' · ') + (q.towns.shown.length + q.towns.more > 4 ? ` · +${q.towns.shown.length + q.towns.more - 4} more` : '')) : '') : whereHtml(q.hood || '');
     ctx.hud(`<div class="qkind">${ICON} ${TITLE} · ${run.n + (q.done ? 0 : 1)}/${ROUND} · ${run.pts} pts${run.streak >= 3 ? ` · 🔥${run.streak}` : ''}</div><div class="q">${q.done ? (q.ok ? 'Yes.' : 'Not quite.') : q.flying ? 'Swinging over…' : (cfg ? `Which ${NOUN[q.t.kind] || 'place'} is this?` : q.t.k === 'lm' ? 'Which landmark is this?' : 'Which tower is this?')}</div>${q.flying ? '' : where}${q.flying ? '' : hints}`);
+    ctx.toolbar.set([{ id: 'spin', label: spinOn ? '↻ Orbit' : '✋ Drag', pressed: spinOn, title: 'Camera circles by itself, or holds still so you can turn it', onClick: () => { spinOn = !spinOn; ctx.store.set('orbit.spin', spinOn); render(); } }]);
     ctx.sheet(`${run.opts.header()}<div id="qbody">
-      <div class="score row"><button type="button" id="orbSpin" class="chip toggle" aria-pressed="${spinOn}">${spinOn ? '↻ Orbit' : '✋ Drag'}</button></div>
       ${choicesHtml(q.choices, { attr: 'n', data: (c) => c.n, label: (c) => c.n, off: q.done || q.flying, state: (c) => (q.done ? (c.n === q.t.n ? 'right' : c.n === q.picked ? 'wrong' : '') : '') })}
       ${q.done ? `${reveal()}<div class="stickybar"><button class="primary" id="orbNext">${run.n >= ROUND ? 'Finish' : cfg || q.t.k === 'lm' ? 'Next' : 'Next tower'}</button></div>` : `<button id="orbHint" class="chip"${q.hints >= HINTS.length || q.flying ? ' disabled' : ''}>💡 Hint (−1 point)</button>`}
     </div>`);
     run.opts.bindHeader();
     for (const b of document.querySelectorAll('#sheet .choice')) b.addEventListener('click', () => answer(b.dataset.n));
     document.getElementById('orbNext')?.addEventListener('click', next);
-    document.getElementById('orbSpin')?.addEventListener('click', () => {
-      spinOn = !spinOn;
-      ctx.store.set('orbit.spin', spinOn);
-      render();
-    });
     document.querySelector('.orb-thumb')?.addEventListener('click', () => openPhoto(q.t));
     document.getElementById('orbHint')?.addEventListener('click', hint);
   }

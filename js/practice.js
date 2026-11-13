@@ -874,7 +874,7 @@ export function initPractice(ctx) {
   /** While a game is running: one line saying which, with the way to another. (The quick tiles come back on the other screens.) */
   function gameBar() {
     const name = TYPES[cfg.type] || (TILE_LABEL[cfg.type] ? TILE_LABEL[cfg.type][0] : cfg.type);
-    return `<div class="gamerow"><button id="qType" class="gamebar" aria-haspopup="dialog" aria-label="Change what you practice"><b>${esc(name)}</b><span>change ▾</span></button><button id="lookChip" class="chip toggle" aria-label="Map look">${ctx.looks ? ctx.looks.label : ''}</button></div>`;
+    return `<div class="gamerow"><button id="qType" class="gamebar" aria-haspopup="dialog" aria-label="Change what you practice"><b>${esc(name)}</b><span>change ▾</span></button>${ctx.toolbar ? ctx.toolbar.html() : ''}<button id="lookChip" class="chip toggle" aria-label="Map look">${ctx.looks ? ctx.looks.label : ''}</button></div>`;
   }
   function typeBtn() {
     const tiles = (R.gridAngle ? ['gridmid', 'today', 'mix'] : ['today', 'mix']).filter((k) => allowed.includes(k));
@@ -931,6 +931,7 @@ export function initPractice(ctx) {
   let lookOff = null;
   function bindHeader() {
     document.getElementById('qType').addEventListener('click', openPicker);
+    ctx.toolbar && ctx.toolbar.bind();
     const lc = document.getElementById('lookChip');                                       // the look: one switch for every game
     if (lc && ctx.looks) {
       lc.addEventListener('click', () => ctx.looks.cycle());

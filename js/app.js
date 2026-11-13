@@ -17,6 +17,7 @@ import { initGridClassic } from './gridclassic.js';
 import { initFrames } from './frames.js';
 import { initOrbit } from './orbit.js';
 import { createLooks } from './looks.js';
+import { createToolbar } from './toolbar.js';
 
 /** Map filter for one road, by the label people use ("I-287", "Columbia Turnpike"). */
 const roadFilter = (label) => (label ? ['==', LABEL_EXPR, label] : ['==', ['get', 'ref'], '__none__']);
@@ -563,6 +564,7 @@ async function main() {
   ctx.gridup = initGridGame(ctx, 'uptown');
   ctx.gridclassic = initGridClassic(ctx);
   ctx.frames = initFrames(ctx);
+  ctx.toolbar = createToolbar();   // chips a running game puts beside its name in the shared header
   ctx.looks = createLooks(ctx);   // before the games, so each can ask it for what it needs
   ctx.orbit = initOrbit(ctx);
   for (const m of munis) ctx.setKnow(m);

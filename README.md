@@ -465,3 +465,7 @@ Fix: route shields (and every DOM map label) lagged the camera and "blinked arou
 - **Paper map:** ordinary towns are navy; only the larger ones are red with a star; minor streets start at zoom 13.5 and secondary roads at 11.5 (a printed map shows them only at large scale; also far fewer lines to draw).
 - **Paper panel type:** Gill Sans in ordinary case, tracking -0.02em on buttons and the question (capitals only on the tiny kicker).
 - Fern Text (from your Drive folder) is not bundled: it is licensed for up to 15,000 monthly visitors, and the files are too large for me to move through the connector; to try it, drop `FernText-Regular.woff2` and `FernText-Bold.woff2` into `fonts/` and tell me.
+
+### Game toolbar (`js/toolbar.js`)
+
+A running game's controls live in the shared header row, beside the game name and the look chip, instead of in a row of their own: `ctx.toolbar.set([{ id, label, pressed, title, onClick }])` while the game runs, `ctx.toolbar.clear()` when it stops. "Name that place" uses it for Orbit/Drag, saving a row of the answer sheet; any other game can add its own chips the same way (they appear in every region and every look).
