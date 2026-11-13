@@ -166,7 +166,7 @@ export function createPaper(map, bounds, rich = () => false) {
         src.setData({ ...src._data, features: src._data.features.map((f) => ({ ...f, geometry: roughen(f.geometry, TUNE.paper.edgeRoughMetres, -1, 110) })) });
       }
     } else {
-      for (const id of GLOW) if (map.getLayer(id)) map.setPaintProperty(id, 'line-pattern', null);
+      for (const id of GLOW) { const ly = map.getLayer(id); if (ly && ly.type === 'line') map.setPaintProperty(id, 'line-pattern', null); }   // (water-pplate is a fill layer: it has no line-pattern)
       for (const [sid, data] of origEdges) { const s = map.getSource(sid); if (s) s.setData(data); }
       origEdges.clear();
     }
@@ -283,8 +283,8 @@ export function createPaper(map, bounds, rich = () => false) {
         if (rich() && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) swimTo(true);   // (the swim re-evaluates three layers every frame: only in the richer mode)
       } else {
         map.off('styledata', onStyle);
-        swimTo(false);
-        inkLines(false);
+        try { swimTo(false); } catch (e) { console.warn(e); }
+        try { inkLines(false); } catch (e) { console.warn(e); }   // (whatever fails here, the colours below are still put back)
         for (const id of ['orb-paper-a', 'orb-paper-b', ...WORLD, ...GLOW]) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
         restore();
       }
