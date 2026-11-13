@@ -3369,3 +3369,15 @@ body.holo #lookFab { border: 1px solid #5ff3ff; border-radius: 2px; background: 
 .expl-more { margin-top: 6px; }
 .expl-more > summary { cursor: pointer; font-size: 13px; opacity: 0.8; padding: 4px 0; }
 .expl-more[open] { max-height: 34vh; overflow-y: auto; }
+
+/* the Drive overview circle follows the look */
+body.paper #inset { --panel: #f2ea9c; --panel-ink: #14235e; filter: drop-shadow(2px 2px 0 rgba(20, 35, 94, 0.35)); font-family: var(--font-paper); }
+body.paper #inset .rim { stroke: #14235e; stroke-opacity: 1; stroke-width: 2.4; }
+body.paper #inset .towns .other { stroke: #2438a8; stroke-opacity: 0.8; fill-opacity: 0; }
+body.paper #inset .towns .cur { fill: #e8452a; fill-opacity: 0.22; stroke: #e8452a; }
+body.paper #inset .county { stroke: #14235e; stroke-opacity: 1; stroke-width: 2.2; }
+body.paper #inset .me path { fill: #e8452a; stroke: #14235e; }
+body.holo #inset { --panel: #04202c; --panel-ink: #bff7ff; font-family: var(--font-ps1); }
+body.holo #inset .rim, body.holo #inset .county { stroke: #3cc3e0; stroke-opacity: 0.9; }
+body.holo #inset .towns .cur { fill: #ffd54a; fill-opacity: 0.25; stroke: #ffd54a; }
+body.holo #inset .me path { fill: #ffd54a; stroke: #02101a; }

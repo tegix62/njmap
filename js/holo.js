@@ -100,6 +100,7 @@ export function createHolo(map, bounds) {
     for (const [k, v] of Object.entries(HL.ps1)) hl.push(k, v);
     hl.push('rgba(0,0,0,0)');
     set('muni-hl', 'fill-color', hl);
+    set('muni-hl', 'fill-opacity', 0.2);
     set('muni-hl-line', 'line-color', hl);
     set('muni-hl-line', 'line-width', ['interpolate', ['linear'], ['zoom'], 7, 2.5, 12, 4, 16, 5.5]);
     set('road-focus', 'line-color', HL.ps1.sel);

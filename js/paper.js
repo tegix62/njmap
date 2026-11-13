@@ -223,6 +223,7 @@ export function createPaper(map, bounds, rich = () => false) {
     for (const [k, v] of Object.entries(HL.paper)) hl.push(k, v);
     hl.push('rgba(0,0,0,0)');
     set('muni-hl', 'fill-color', hl);
+    set('muni-hl', 'fill-opacity', 0.1);                         // (the town you are in / the quiz subject: a light tint, not a wash, so the map under it still reads)
     set('muni-hl-line', 'line-color', hl);
     set('road-focus', 'line-color', HL.paper.sel);
     set('road-focus-bad', 'line-color', HL.paper.bad);

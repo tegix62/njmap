@@ -489,3 +489,5 @@ Still to do: collapse Drive's intro card and Explore's search panel; game names 
 - **Drive:** after the first run, "Where am I?" is one line (title and Start); the explanation sits behind an ⓘ and returns if there is an error. First run still shows the full card.
 - **Explore:** the search card starts with the search box, the one-line help, and a collapsed "Highways, lakes & mountains" (opens to a scrollable list capped at a third of the screen; it stays as you left it).
 - **Game name on any card:** a running game can set `ctx.hudKicker`; the top card then starts with a small tappable line ("DRIVE MIDTOWN · change ▾") that opens the picker (`ctx.openPicker`). The Manhattan grid games (Downtown, Midtown, Uptown) use it, so you can change game from inside one.
+
+Running Drive, checked with a simulated GPS fix: the overview circle now follows the look (it is drawn with the panel colours, which only the cards had been given), and the town you are in is a light tint (Paper 0.1, PS1 0.2) instead of a wash that hid the map. Not checked: heading, speed, and the road line while actually moving.
