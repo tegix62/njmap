@@ -3343,3 +3343,10 @@ body.paper .q { letter-spacing: -0.01em; }
 /* the header row: game name (takes the free space), then the game's chips, then the look chip */
 .gamerow { flex-wrap: nowrap; }
 .gamerow .chip.tb { padding: 3px 8px; }
+
+/* the one header: the area menu is a chip like the others (the native menu opens on tap), kept short so the line never wraps */
+.chip.areasel { max-width: 34%; min-width: 0; flex: 0 1 auto; padding: 3px 6px; font-size: 12px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; border: 0; appearance: none; -webkit-appearance: none; background-image: none; }
+.gamerow .gamebar { flex: 1 1 auto; min-width: 0; }
+.gamerow .gamebar b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gamerow { flex-wrap: nowrap; gap: 6px; }
+body.paper .chip.areasel, body.holo .chip.areasel { border: 1.5px solid currentColor; }

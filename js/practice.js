@@ -846,35 +846,28 @@ export function initPractice(ctx) {
       `<optgroup label="${R.groupPlural}">${ctx.counties.map((c) => areaOpt('county:' + c, ctx.groupName(c))).join('')}</optgroup>`;
     const pct = score.total ? Math.round((100 * score.right) / score.total) : 0;
     const due = dueCount(pool());
-    if (cfg.type === 'today') {
-      const t = todayState();
-      const dots = t.items.map((_, k) => `<span class="${k < t.i ? 'd done' : k === t.i && !t.done ? 'd now' : 'd'}"></span>`).join('');
-      return `${typeBtn()}<div class="prow">
-        <select id="qArea" aria-label="Area">${area}</select>
-      </div><div class="score todaybar"><span class="dots">${dots}</span>${streak() ? `<span>🔥 ${streak()} day${streak() === 1 ? '' : 's'}</span>` : ''}</div>`;
-    }
+    // One header for every type: the game's name, its area (a compact menu), the game's chips and the look chip on a single line; the score only when
+    // there is one. (The Today / Mixed tiles live in the picker's "Start here" group now.)
+    const areaSel = `<select id="qArea" class="chip areasel" aria-label="Area">${area}</select>`;
     if (cfg.type === 'gridgame' || cfg.type === 'gridmid' || cfg.type === 'gridup' || cfg.type === 'gridclassic' || cfg.type === 'orbit' || cfg.type === 'frames')
       // these have no use for the neighborhood/town list
       return `${gameBar()}<div class="score"></div>`;
-    if (cfg.type === 'rapid' && !rapid.on)
-      return `${typeBtn()}<div class="prow">
-        <select id="qArea" aria-label="Area">${area}</select>
-      </div><div class="score"></div>`;
-    if (cfg.type === 'rapid' && rapid.on)
-      return `${typeBtn()}<div class="prow">
-        <select id="qArea" aria-label="Area">${area}</select>
-      </div><div class="score"><span class="lives">${'♥'.repeat(Math.max(0, rapid.lives))}${'♡'.repeat(Math.max(0, 3 - rapid.lives))}</span> · ${rapid.score} right · round ${rapid.round}</div>`;
-    return `${typeBtn()}<div class="prow">
-        <select id="qArea" aria-label="Area">${area}</select>
-      </div>
-      <div class="score">${due ? `<span class="due">${due} due for review</span> · ` : ''}${score.right}/${score.total}${score.total ? ` · ${pct}%` : ''}${score.streak > 1 ? ` · streak ${score.streak}` : ''}</div>`;
+    if (cfg.type === 'today') {
+      const t = todayState();
+      const dots = t.items.map((_, k) => `<span class="${k < t.i ? 'd done' : k === t.i && !t.done ? 'd now' : 'd'}"></span>`).join('');
+      return `${gameBar(areaSel)}<div class="score todaybar"><span class="dots">${dots}</span>${streak() ? `<span>🔥 ${streak()} day${streak() === 1 ? '' : 's'}</span>` : ''}</div>`;
+    }
+    if (cfg.type === 'rapid')
+      return `${gameBar(areaSel)}${rapid.on ? `<div class="score"><span class="lives">${'♥'.repeat(Math.max(0, rapid.lives))}${'♡'.repeat(Math.max(0, 3 - rapid.lives))}</span> · ${rapid.score} right · round ${rapid.round}</div>` : ''}`;
+    const bits = [due ? `<span class="due">${due} due for review</span>` : '', score.total ? `${score.right}/${score.total} · ${pct}%` : '', score.streak > 1 ? `streak ${score.streak}` : ''].filter(Boolean);
+    return `${gameBar(areaSel)}${bits.length ? `<div class="score">${bits.join(' · ')}</div>` : ''}`;
   }
 
   /** The main modes as tiles (New York: Drive Midtown first), and a "More" button for everything else. */
   /** While a game is running: one line saying which, with the way to another. (The quick tiles come back on the other screens.) */
-  function gameBar() {
+  function gameBar(areaSel = '') {
     const name = TYPES[cfg.type] || (TILE_LABEL[cfg.type] ? TILE_LABEL[cfg.type][0] : cfg.type);
-    return `<div class="gamerow"><button id="qType" class="gamebar" aria-haspopup="dialog" aria-label="Change what you practice"><b>${esc(name)}</b><span>change ▾</span></button>${ctx.toolbar ? ctx.toolbar.html() : ''}<button id="lookChip" class="chip toggle" aria-label="Map look">${ctx.looks ? ctx.looks.label : ''}</button></div>`;
+    return `<div class="gamerow"><button id="qType" class="gamebar" aria-haspopup="dialog" aria-label="Change what you practice"><b>${esc(name)}</b><span>change ▾</span></button>${areaSel}${ctx.toolbar ? ctx.toolbar.html() : ''}<button id="lookChip" class="chip toggle" aria-label="Map look">${ctx.looks ? ctx.looks.label : ''}</button></div>`;
   }
   function typeBtn() {
     const tiles = (R.gridAngle ? ['gridmid', 'today', 'mix'] : ['today', 'mix']).filter((k) => allowed.includes(k));
@@ -907,7 +900,9 @@ export function initPractice(ctx) {
     groups.push(['Quizzes', allowed.filter((k) => !used.has(k))]);
     const quizChip = (k) => `<button class="pchip${k === cfg.type ? ' on' : ''}" data-type="${k}">${esc(TYPES[k])}</button>`;
     const recent = store.get('practice.recent', []).filter((k) => allowed.includes(k) && k !== cfg.type).slice(0, 3);
-    dlg.innerHTML = `<div class="pscroll"><h2>More ways to practice</h2>
+    const start = ['today', 'mix', ...(R.gridAngle ? ['gridmid'] : [])].filter((k) => allowed.includes(k));
+    dlg.innerHTML = `<div class="pscroll"><h2>Practice</h2>
+      ${start.length ? `<div class="pgroup"><div class="pname">Start here</div><div class="pcards">${start.map(card).join('')}</div></div>` : ''}
       ${recent.length ? `<div class="pgroup"><div class="pname">Recently</div><div class="precent">${recent.map((k) => `<button class="pchip" data-type="${k}">${esc(TYPES[k])}</button>`).join('')}</div></div>` : ''}
       ${groups
         .filter(([, ks]) => ks.length)

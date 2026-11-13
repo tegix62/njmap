@@ -473,3 +473,7 @@ A running game's controls live in the shared header row, beside the game name an
 ### Paper: misregistration everywhere (`TUNE.paper.misreg`)
 
 The red plate prints off the blue one on every printed area: the red cores of main roads and highways sit off-centre in their blue casings (blue shows on one side), and highlight fills slip off their outlines. Offsets are screen pixels (1.5/1.1 for roads, 2/1.4 for fills). Together with the existing plates behind answer masses and the off-register water dots, it now covers roads, highlights, water and answers. Checked on test streets at zoom 15; not on real road tiles.
+
+### One header for every practice type
+
+The 18 older practice types used a three-row header (Today / Mixed / More tiles, the area menu, the score). They now share the one-line bar the newer games use: game name with "change ▾", the area as a compact menu chip (the phone's own picker opens on tap), the game's toolbar chips, and the look chip, so the look can be switched in every game. The score line only shows once there is a score (or a review count / streak). Today and Mixed moved into a "Start here" group at the top of the picker (with Drive Midtown in New York). About 90 px less header per game. Checked in New Jersey (Today, Mixed, Point to it, Rapid) and Manhattan (Mixed, the grid game); the Manhattan grid games and Drive still have their own panels.
