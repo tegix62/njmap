@@ -527,3 +527,9 @@ Not done yet: a single adaptive "Play" session that hides the quiz types entirel
 ### Play is adaptive
 
 Opening Play now starts the adaptive mix ("Mixed for you") unless you pinned a type by hand (picked from the picker; it stays until you pick Mixed or Today). Games (the Manhattan grid drives, Name that place, Rapid, Left/right & compass) are left as they were. The mix keeps its old rules (due and missed places first, never the same kind of question twice running) and now also leans on the kinds you get wrong most: per-kind accuracy is kept (`kindStats`) and weights the draw, with unseen kinds counting as average. Checked: a saved "find" type moves to the mix on opening Play in both regions, and a hand-picked type is kept (pinned). The effect of the kind weighting needs real play to judge.
+
+### Name that place: north stays roughly up, more context round the place
+
+- **Bearing:** natural places now open with north roughly at the top. Looking along a river from either end shows the same thing, so the camera takes whichever end puts north nearer the top and never turns more than 40° from north; lakes, parks and ranges open exactly north-up. The orbit no longer turns the map all the way round: for a place on the map the camera sways ±16° round that bearing (a 14 s sway; in saver it stops after 10 s or your first touch). Checked on a river (bearing −39° to −36°) and on a lake and a ridge (0° to 5°).
+- **Context:** the camera is no longer allowed closer than zoom 12 and the outline fills about half the width, leaving room for the surroundings; up to six more towns within 14 km are named round the place (not the answer, just where it sits).
+Limit: my test browser has no road or town tiles, so I could see the extra town names only partly; roads and highway shields round a lake need a look on a phone.

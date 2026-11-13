@@ -201,7 +201,10 @@ export function initOrbit(ctx) {
     const all = townsOf(t).map((full) => (ctx.munis || []).find((m) => m.full === full)).filter(Boolean);
     const close = t.kind === 'lake' || t.kind === 'park' ? all : all.filter((m) => mDist(m.pt, t.p) < 28000);
     const shown = (close.length ? close : all).slice(0, 9);
-    return { shown, more: Math.max(0, townsOf(t).length - shown.length) };
+    // the places around it too (not the answer, just where it sits): up to six more towns within 14 km, nearest first
+    const have = new Set(shown.map((m) => m.full));
+    const near = (ctx.munis || []).filter((m) => !have.has(m.full) && mDist(m.pt, t.p) < 14000).sort((a, b) => mDist(a.pt, t.p) - mDist(b.pt, t.p)).slice(0, 6);
+    return { shown, near, more: Math.max(0, townsOf(t).length - shown.length) };
   }
   function setTowns(list) {
     const src = map.getSource('orb-towns');
@@ -606,7 +609,7 @@ export function initOrbit(ctx) {
       q.hood = null;
       setGeom([{ name: t.n, role: 'target' }]);
       q.towns = townsFor(t);
-      setTowns(q.towns.shown);
+      setTowns(q.towns.shown.concat(q.towns.near || []));
       return;
     }
     const p = t.p;
@@ -688,17 +691,21 @@ export function initOrbit(ctx) {
     let center = t.p;
     if (t.k === 'nat') {                                  // a mountain, lake, river or park: high and steep over the terrain, centred in the free area
       zoom = t.z; top = pad.top;
-      if (t.bearing != null) bearing = t.bearing;         // (a river: looking along it)
+      // Mostly north at the top, with some give so a river or ridge still fits: looking along a river from either end shows the same thing, so take
+      // whichever end puts north nearer the top, and never turn more than 40° from north.
+      const wrap = (x) => ((((x + 180) % 360) + 360) % 360) - 180;
+      bearing = 0;
+      if (t.bearing != null) { const a = wrap(t.bearing), c = wrap(t.bearing + 180); bearing = Math.max(-40, Math.min(40, Math.abs(a) <= Math.abs(c) ? a : c)); }
       const g = city.geoms && city.geoms[t.n];
       if (g) {                                            // fit its outline (a long river: the 22 km of it round the point)
         const b = boundsOf(g, t.kind === 'river' ? t.p : null, t.kind === 'river' ? 22 : 0);
         const ext = Math.max((b[2] - b[0]) * 84200, (b[3] - b[1]) * 111000, 1500);
-        zoom = Math.max(9.4, Math.min(13, Math.log2((0.6 * (map.getContainer().clientWidth || 400) * mpp0) / ext)));
+        zoom = Math.max(9.4, Math.min(12, Math.log2((0.5 * (map.getContainer().clientWidth || 400) * mpp0) / ext)));   // (not closer than 12, and the outline fills about half the width: room for the places round it)
         if (t.kind !== 'river') center = [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
       }
     }
     const cam = { center, zoom, pitch: t.k === 'nat' ? t.pitch : PITCH, bearing, padding: { top, bottom: pad.bottom, left: 0, right: 0 } };
-    let spinT0 = performance.now(), lastSpin = spinT0, touched = false;
+    let spinT0 = performance.now(), lastSpin = spinT0, touched = false, swayT = 0;
     const tick = (now) => {
       if (!run || q.t !== t) return;
       const dt = Math.min(0.1, (now - last) / 1000);
@@ -712,7 +719,10 @@ export function initOrbit(ctx) {
         if (spinning && (!saver || now - lastSpin >= 33)) {
           const sdt = saver ? Math.min(0.1, (now - lastSpin) / 1000) : dt;
           lastSpin = now;
-          bearing = (bearing + SPIN * sdt * (ctx.reduceMotion ? 0.3 : 1)) % 360;
+          if (cfg && t.k === 'nat') {                           // a place on the map: sway a little round its north-ish bearing, never a full turn
+            swayT += sdt * (ctx.reduceMotion ? 0.3 : 1);
+            bearing = cam.bearing + 16 * Math.sin((swayT * 2 * Math.PI) / 14);
+          } else bearing = (bearing + SPIN * sdt * (ctx.reduceMotion ? 0.3 : 1)) % 360;
           map.setBearing(bearing);
         }
         if (now - lastOcc > 90) {
