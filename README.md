@@ -491,3 +491,7 @@ Still to do: collapse Drive's intro card and Explore's search panel; game names 
 - **Game name on any card:** a running game can set `ctx.hudKicker`; the top card then starts with a small tappable line ("DRIVE MIDTOWN · change ▾") that opens the picker (`ctx.openPicker`). The Manhattan grid games (Downtown, Midtown, Uptown) use it, so you can change game from inside one.
 
 Running Drive, checked with a simulated GPS fix: the overview circle now follows the look (it is drawn with the panel colours, which only the cards had been given), and the town you are in is a light tint (Paper 0.1, PS1 0.2) instead of a wash that hid the map. Not checked: heading, speed, and the road line while actually moving.
+
+### Dynamic resolution (battery saver)
+
+By default the map rendered every device pixel on every frame: 3× on a recent iPhone is nine fragments per CSS pixel, in every look, even Default. In battery saver the map now renders at most 2× at rest (0.44 of the pixels of 3×) and at most 1.5× while the camera moves (0.25), and sharpens 600 ms after it stops (`res` in `js/looks.js`; Full effects keeps the device ratio; PS1 keeps its own). Checked: at a simulated 3× the ratio is 2 at rest, 1.5 during an ease, back to 2 after; the map makes no move events and no renders while idle. (A first version flipped the ratio back and forth forever, because resizing fires move events; it is guarded and was caught before release.)

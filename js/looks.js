@@ -45,6 +45,27 @@ export function createLooks(ctx) {
   if (!LOOKS.includes(look)) look = 'plain';
 
   const isSaver = () => (ctx.settings.effects || 'saver') !== 'full';
+  /**
+   * Dynamic resolution. A phone's screen is 2-3 device pixels per CSS pixel, and by default the map renders every one of them, on every frame: at 3x that is
+   * nine fragments per CSS pixel. In battery saver the map renders at most 2x at rest (about 0.44 of the pixels of 3x) and at most 1.5x while the camera
+   * is moving (about 0.25), then sharpens a moment after it stops. PS1 sets its own, much lower, ratio.
+   */
+  const dpr = () => window.devicePixelRatio || 1;
+  const res = {
+    moving: false, timer: 0, lastSet: 0,
+    target() { return isSaver() ? Math.min(dpr(), this.moving ? 1.5 : 2) : dpr(); },
+    refresh() {
+      if (look === 'ps1' || !map.setPixelRatio) return;
+      const t = this.target();
+      if (Math.abs(map.getPixelRatio() - t) > 0.01) { this.busy = true; try { map.setPixelRatio(t); } catch { /* older MapLibre */ } this.busy = false; }   // (resizing fires move events; they must not count as the camera moving, or the ratio would flip back and forth forever)
+    },
+    start() { if (!this.moving) { this.moving = true; this.refresh(); } this.end(); },
+    end() { clearTimeout(this.timer); this.timer = setTimeout(() => { if (map.isMoving()) return this.end(); this.moving = false; this.refresh(); }, 600); },
+  };
+  map.on('movestart', () => { if (!res.busy) res.start(); });
+  map.on('move', () => { if (res.moving && !res.busy) res.end(); });   // (every move event renews the 600 ms timer, so a lost moveend cannot leave the map coarse)
+  map.on('moveend', () => { if (!res.busy) res.end(); });
+  map.on('idle', () => { if (res.moving) res.end(); });   // (a move that never reports its end must not leave the map coarse)
   function apply() {
     const wantHolo = look === 'ps1', wantPaper = look === 'paper';
     // the look going away is switched OFF before the new one goes ON: each saves the paint it finds and puts it back, so one that saved
@@ -59,6 +80,7 @@ export function createLooks(ctx) {
     // text as DOM: Paper sets the map's words in Gill Sans (canvas text cannot use a system font); PS1 keeps text crisp over a coarse map (unless the game
     // draws its own); every look draws route numbers as shields, in its own style
     mapText.setSaver && mapText.setSaver(isSaver());
+    res.refresh();
     mapText.show(true, wantPaper || (wantHolo && !needs.crisp) ? 'all' : 'shields', !!needs.crisp);   // (a game that supplies its own labels wants the rest of the map quiet)
   }
   const safe = () => { try { apply(); } catch (e) { console.warn('look failed', e); } };
@@ -73,6 +95,7 @@ export function createLooks(ctx) {
     get paperOn() { return paper.on; },
     get ps1On() { return holo.on; },
     get label() { return LOOK_LABEL[look]; },
+    _res: res,
     /** Battery saver (the default): no full-screen filters, no per-frame extras, 30 fps orbit. Set in Settings → Effects. */
     get saver() { return isSaver(); },
     refresh() { safe(); for (const f of listeners) f(look); },
