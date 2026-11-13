@@ -26,6 +26,7 @@ const TYPE_ABBR = { Township: 'Twp', Borough: 'Boro', City: 'City', Town: 'Town'
 
 const DEFAULT_SETTINGS = {
   voice: true,
+  sayRoads: true, // Drive: say the road you are on ("Route 17 north.")
   voiceHints: true,
   voiceGuess: false,
   rememberPlaces: false, // opt-in: visited towns + drive routes, on this phone only

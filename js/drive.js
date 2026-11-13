@@ -426,23 +426,41 @@ export function initDrive(ctx) {
     const steady = st.onCount >= 2 ? st.onCand : on === null ? null : st.onRoad;
     if (steady !== st.onRoad) {
       st.onRoad = steady;
-      if (steady) firstTimeOn(st.roads[0]);
+      if (steady && !firstTimeOn(st.roads[0])) announceRoad(st.roads[0]);   // (a road with a note says its name inside the note)
     }
   }
-  const sayRoad = (label) => label.replace(/&/g, ' and ');
+  // How a road is said aloud: "I-287" → "Interstate 287", "Route 1&9" → "Route 1 and 9", the named roads with "the".
+  const sayRoad = (label) => {
+    let m;
+    if ((m = label.match(/^I-(\d+)/))) return `Interstate ${m[1]}`;
+    if (/^(Turnpike|Parkway|AC Expressway|Palisades Pkwy)$/.test(label)) return 'the ' + label.replace('Pkwy', 'Parkway');
+    return label.replace(/&/g, ' and ');
+  };
+  let lastRoadSaid = 0, lastRoadLabel = null;
+  /** Say which road you are on, when you have been on it steadily for a few seconds: "Route 17 north." Not while other speech is going, and not more often than every 25 s. */
+  function announceRoad(r) {
+    if (!settings.voice || settings.sayRoads === false || !r || r.label === lastRoadLabel && Date.now() - lastRoadSaid < 120000) return false;
+    if (Date.now() - lastRoadSaid < 25000 || ('speechSynthesis' in window && speechSynthesis.speaking)) return false;
+    const h = st.heading;
+    lastRoadSaid = Date.now();
+    lastRoadLabel = r.label;
+    ctx.speak(`${sayRoad(r.label)}${h != null ? ' ' + { N: 'north', E: 'east', S: 'south', W: 'west' }[travelDir(h)] : ''}.`);
+    return true;
+  }
   /** The first time you drive a road that has a note, read the note out once. */
   // Which notes were read: kept on the phone only with "Remember where I've
   // been" on (it says which roads you drove); otherwise just for this session.
   const spokenNow = {};
   function firstTimeOn(r) {
     const spoken = settings.rememberPlaces ? store.get('spokenRoads', {}) : spokenNow;
-    if (spoken[r.label]) return;
+    if (spoken[r.label]) return false;
     const mine = ctx.notes.list('road', r.label);
     const note = mine.length ? mine[mine.length - 1].text : draftNote(r.label, r.name, ctx.region.roadNotes);
-    if (!note) return;
+    if (!note) return false;
     spoken[r.label] = Date.now();
     if (settings.rememberPlaces) store.set('spokenRoads', spoken);
     ctx.speak(`On ${sayRoad(r.label)}. ${note}`);
+    return true;
   }
 
   /** Closest named village/section of the current town within 1.5 mi. */
