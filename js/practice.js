@@ -32,6 +32,7 @@ const TYPES = {
   gridmid: '🚕 Drive Midtown (new)',
   gridup: '🚕 Drive Uptown (new)',
   orbit: '🏙 Name that tower (new)',
+  highways: '🛣 Name that highway',
   gridgame: '🚕 Drive Downtown (new)',
   gridclassic: '🚕 Drive Midtown (classic grid)',
   frames: '🧭 Left, right & compass',
@@ -47,6 +48,7 @@ const DESC = {
   gridgame: 'Drive Downtown: plan the route through the tangle below 14th St, then ride it. Tunnels and bridges in.',
   gridclassic: 'The original: a straightened grid, 14th to 110th St.',
   frames: 'Left, right and compass: face every direction.',
+  highways: 'The camera flies along a New Jersey highway: which one is it? Interstates, routes, the Turnpike and the Parkway, with the ones that meet it as the wrong answers.',
   orbit: 'The camera circles a skyscraper, alone in a ghost of the city: which one is it? Ten a round, hints cost a point.',
   trip: 'Quiz yourself on your last drive.',
 };
@@ -55,6 +57,7 @@ const GROUPS = [
   ['Timed', ['rapid']],
   ['Driving practice', ['gridup', 'gridgame', 'gridclassic', 'frames']],
   ['Landmarks', ['orbit']],
+  ['Roads', ['highways']],
 ];
 // The modes that get a tile at the top of Practice (the rest are under "More")
 const TILE_LABEL = {
@@ -82,7 +85,7 @@ export function initPractice(ctx) {
     TYPES.orbit = `${R.orbit.icon || '🏙'} ${R.orbit.title} (new)`;
     DESC.orbit = R.orbit.desc;
   }
-  const allowed = ['today', 'mix', 'rapid', ...(R.gridAngle ? ['gridmid', 'gridup', 'gridgame', 'gridclassic', 'orbit'] : R.orbit ? ['orbit'] : []), 'frames', ...R.quizTypes, 'trip'];
+  const allowed = ['today', 'mix', 'rapid', ...(R.gridAngle ? ['gridmid', 'gridup', 'gridgame', 'gridclassic', 'orbit'] : R.orbit ? ['orbit', 'highways'] : []), 'frames', ...R.quizTypes, 'trip'];
   if (cfg.type === 'dropin') cfg.type = 'today'; // (the county puzzle is gone)
   if (!allowed.includes(cfg.type)) cfg.type = 'mix';
   // the whole-island game isn't reliable yet: anyone on it moves to the classic once
@@ -590,7 +593,7 @@ export function initPractice(ctx) {
   }
   function next() {
     stopRapidTimer();
-    if (cfg.type !== 'orbit') ctx.orbit?.stop();
+    if (cfg.type !== 'orbit' && cfg.type !== 'highways') ctx.orbit?.stop();
     if (cfg.type === 'today') return nextToday();
     if (cfg.type === 'rapid') return nextRapid();
     if (cfg.type !== 'gridgame') ctx.gridgame.stop();
@@ -601,6 +604,7 @@ export function initPractice(ctx) {
     if (cfg.type === 'gridmid') return startGridGame(ctx.gridmid);
     if (cfg.type === 'gridup') return startGridGame(ctx.gridup);
     if (cfg.type === 'orbit') return startOrbit();
+    if (cfg.type === 'highways') return startOrbit({ only: ['highway'], title: 'Name that highway', icon: '🛣' });
     if (cfg.type === 'gridclassic') return startGridClassic();
     if (cfg.type === 'frames') {
       q = { kind: 'frames', m: null, answered: false };
@@ -820,12 +824,12 @@ export function initPractice(ctx) {
     game.start({ header: () => header(), bindHeader: () => bindHeader() });
   }
 
-  function startOrbit() {
+  function startOrbit(extra = {}) {
     q = { kind: 'gridgame', m: null, answered: false };
     ctx.clearHighlights();
     ctx.reveal([]);
     ctx.line(null);
-    ctx.orbit.start({ header: () => header(), bindHeader: () => bindHeader() });
+    ctx.orbit.start({ header: () => header(), bindHeader: () => bindHeader(), ...extra });
   }
 
   function startGridClassic() {
@@ -858,7 +862,7 @@ export function initPractice(ctx) {
     // One header for every type: the game's name, its area (a compact menu), the game's chips and the look chip on a single line; the score only when
     // there is one. (The Today / Mixed tiles live in the picker's "Start here" group now.)
     const areaSel = `<select id="qArea" class="chip areasel" aria-label="Area">${area}</select>`;
-    if (cfg.type === 'gridgame' || cfg.type === 'gridmid' || cfg.type === 'gridup' || cfg.type === 'gridclassic' || cfg.type === 'orbit' || cfg.type === 'frames')
+    if (cfg.type === 'gridgame' || cfg.type === 'gridmid' || cfg.type === 'gridup' || cfg.type === 'gridclassic' || cfg.type === 'orbit' || cfg.type === 'highways' || cfg.type === 'frames')
       // these have no use for the neighborhood/town list
       return `${gameBar()}<div class="score"></div>`;
     if (cfg.type === 'today') {
@@ -1694,7 +1698,7 @@ export function initPractice(ctx) {
         q = null;
         return next();
       }
-      const GAMES = ['gridgame', 'gridmid', 'gridup', 'gridclassic', 'orbit', 'frames', 'rapid'];
+      const GAMES = ['gridgame', 'gridmid', 'gridup', 'gridclassic', 'orbit', 'highways', 'frames', 'rapid'];
       if (!cfg.pinned && !GAMES.includes(cfg.type) && cfg.type !== 'today' && cfg.type !== 'mix') { cfg.type = 'mix'; store.set(CFG_KEY, cfg); q = null; return next(); }   // Play opens on the adaptive mix, not on whatever you played last
       if (q && !q.answered && !q.rapid && q.kind !== 'gridgame' && q.kind !== 'frames' && q.kind !== 'rapidend') show();
       else next();

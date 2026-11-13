@@ -74,7 +74,10 @@ export function initOrbit(ctx) {
   const cfg = ctx.region.orbit || null;                        // a region with its own landmark game (New Jersey), else Manhattan's towers
   const TITLE = cfg ? cfg.title : 'Name that tower';
   const ICON = cfg && cfg.icon ? cfg.icon : '🏙';
-  const NOUN = { mountain: 'mountain or ridge', lake: 'lake or reservoir', river: 'river', park: 'park or forest', landmark: 'landmark' };
+  const ttl = () => (run && run.opts && run.opts.title) || TITLE;     // (a game on the same engine can name itself: "Name that highway")
+  const ico = () => (run && run.opts && run.opts.icon) || ICON;
+  const lineKind = (k) => k === 'river' || k === 'highway';       // places drawn as a line with a direction (the water, the road): outlined, flown along, glowed
+  const NOUN = { highway: 'highway', mountain: 'mountain or ridge', lake: 'lake or reservoir', river: 'river', park: 'park or forest', landmark: 'landmark' };
   let run = null; // the session
   let q = null; // the question
   let raf = 0;
@@ -200,8 +203,8 @@ export function initOrbit(ctx) {
         feats.push({ type: 'Feature', properties: { role, name }, geometry: g });
         (g.bands || []).forEach((ring, i) => feats.push({ type: 'Feature', properties: { role, name, band: i }, geometry: { type: 'Polygon', coordinates: [ring] } }));
         if (g.type === 'Polygon' || g.type === 'MultiPolygon') for (const w of wallFeatures(g, 3)) walls.push({ ...w, properties: { role, h: place && place.kind === 'lake' ? 70 : 160 } });
-        const b = boundsOf(g, place && place.kind === 'river' ? place.p : null, place && place.kind === 'river' ? 22 : 0);
-        at = place && place.kind === 'river' ? place.p : [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
+        const b = boundsOf(g, lineKind(place && place.kind) ? place.p : null, lineKind(place && place.kind) ? 22 : 0);
+        at = lineKind(place && place.kind) ? place.p : [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
       }
       if (labelled && at) addPin(name, role, at);
     }
@@ -331,7 +334,7 @@ export function initOrbit(ctx) {
   }
   function flashPlace(t) {
     endFlash();
-    if (!cfg || t.k !== 'nat' || !['river', 'lake'].includes(t.kind) && !(t.kind === 'mountain' && city.geoms && city.geoms[t.n] && (city.geoms[t.n].ridge || city.geoms[t.n].bands))) return;
+    if (!cfg || t.k !== 'nat' || !['river', 'highway', 'lake'].includes(t.kind) && !(t.kind === 'mountain' && city.geoms && city.geoms[t.n] && (city.geoms[t.n].ridge || city.geoms[t.n].bands))) return;
     const f = flowOf(t);
     if (!f) return;
     const dur = FLASH_MS * (ctx.reduceMotion ? 0.5 : 1);
@@ -540,6 +543,7 @@ export function initOrbit(ctx) {
     const st = stats();
     const w = city.list.map((t) => {
       if (run.seen.includes(t.n)) return 0;
+      if (run.opts.only ? !run.opts.only.includes(t.kind) : t.kind === 'highway') return 0;     // (highways have their own game)
       const s = st[t.n] || { r: 0, w: 0 };
       const n = s.r + s.w;
       return (n === 0 ? 3 : 1 + 4 * (s.w / n)) * (t.kind === 'landmark' ? 0.3 : 1);   // (a building landmark comes up now and then)
@@ -551,7 +555,13 @@ export function initOrbit(ctx) {
   function choicesFor(t) {
     const same = (o) => (cfg ? o.kind === t.kind : (o.k || 't') === (t.k || 't'));   // (mountains against mountains, lakes against lakes; landmarks against landmarks, towers against towers)
     const others = city.list.filter((o) => o.n !== t.n && same(o));
-    const near = shuffle(others.filter((o) => (t.h ? Math.abs(o.h - t.h) / t.h < 0.3 : mDist(o.p, t.p) < 60000)));   // (the near ones: of a similar height, or within 60 km)
+    let near = shuffle(others.filter((o) => (t.h ? Math.abs(o.h - t.h) / t.h < 0.3 : mDist(o.p, t.p) < 60000)));   // (the near ones: of a similar height, or within 60 km)
+    if (t.kind === 'highway') {                                       // the tricky ones: a road it meets, and one of its own kind (interstate vs interstate, route vs route)
+      const fam = (n) => (n.startsWith('I-') ? 'I' : n.startsWith('Route') ? 'R' : n);
+      const meets = shuffle(others.filter((o) => (t.meets || []).includes(o.n)));
+      const kin = shuffle(others.filter((o) => fam(o.n) === fam(t.n) && !meets.includes(o)));
+      near = [meets[0], kin[0], ...near].filter(Boolean);
+    }
     const far = shuffle(others);
     const out = [];
     for (const o of [...near.slice(0, 2), ...far]) if (out.length < 3 && !out.includes(o)) out.push(o);
@@ -744,14 +754,14 @@ export function initOrbit(ctx) {
       if (t.bearing != null) { const a = wrap(t.bearing), c = wrap(t.bearing + 180); bearing = Math.max(-40, Math.min(40, Math.abs(a) <= Math.abs(c) ? a : c)); }
       const g = city.geoms && city.geoms[t.n];
       if (g) {                                            // fit its outline (a long river: the 22 km of it round the point)
-        const b = boundsOf(g, t.kind === 'river' ? t.p : null, t.kind === 'river' ? 22 : 0);
+        const b = boundsOf(g, lineKind(t.kind) ? t.p : null, lineKind(t.kind) ? 22 : 0);
         const ext = Math.max((b[2] - b[0]) * 84200, (b[3] - b[1]) * 111000, 1500);
         zoom = Math.max(9.4, Math.min(12, Math.log2((0.5 * (map.getContainer().clientWidth || 400) * mpp0) / ext)));   // (not closer than 12, and the outline fills about half the width: room for the places round it)
-        if (t.kind !== 'river') center = [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
+        if (!lineKind(t.kind)) center = [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
         // A river too long to fill the screen at a readable zoom: fly down it instead (zoom 11, the camera follows the water, north stays near the top)
         const zFit = Math.log2((0.5 * (map.getContainer().clientWidth || 400) * mpp0) / ext);
         t.flyF = null;
-        if (t.kind === 'river' && zFit < 10.6 && !ctx.reduceMotion) {
+        if (lineKind(t.kind) && zFit < 10.6 && !ctx.reduceMotion) {
           const ff = flowOf(t, 45000);
           if (ff && ff.total > 8000) { t.flyF = ff; center = ff.coords[0]; zoom = 11; }
         }
@@ -866,11 +876,11 @@ export function initOrbit(ctx) {
     ctx.clearHighlights();
     ctx.reveal([]);
     ctx.line(null);
-    ctx.hud(`<div class="qkind">${ICON} ${TITLE}</div><div class="q">Loading the ${cfg ? 'map' : 'skyline'}…</div>`);
+    ctx.hud(`<div class="qkind">${ico()} ${ttl()}</div><div class="q">Loading the ${cfg ? 'map' : 'skyline'}…</div>`);
     try {
       await load();
     } catch {
-      if (run) ctx.hud(`<div class="qkind">${ICON} ${TITLE}</div><div class="q">Couldn’t load the buildings.</div>`);
+      if (run) ctx.hud(`<div class="qkind">${ico()} ${ttl()}</div><div class="q">Couldn’t load the buildings.</div>`);
       return;
     }
     if (!run) return;
@@ -941,7 +951,7 @@ export function initOrbit(ctx) {
   const HINTS = [
     (t) => (t.k === 'nat' ? (countiesOf(t).length > 1 ? `It spans <b>${esc(listOf(countiesOf(t), 8))}</b> counties.` : `It's in <b>${esc(countiesOf(t)[0])} County</b>.`) : t.k === 'lm' ? `Opened in <b>${t.y}</b>.` : `<b>${t.h} m</b> (${ft(t.h)} ft), finished in <b>${t.y}</b>.`),
     (t) => (t.k === 'nat' ? `${esc(t.line)}.` : cfg ? `It's in <b>${esc(t.at)}</b>.` : `You'd find it at <b>${esc(t.at)}</b>.`),
-    (t) => (t.k === 'nat' ? (t.elev ? `It stands <b>${t.elev.toLocaleString()} ft</b> high.` : townsOf(t).length > 1 && (t.kind === 'river' || t.kind === 'mountain') ? `From <b>${esc(townsOf(t)[0])}</b> to <b>${esc(townsOf(t)[townsOf(t).length - 1])}</b>.` : `Mostly in <b>${esc(t.at)}</b>.`) : `${esc(t.line)}.`),
+    (t) => (t.k === 'nat' ? (t.elev ? `It stands <b>${t.elev.toLocaleString()} ft</b> high.` : townsOf(t).length > 1 && (lineKind(t.kind) || t.kind === 'mountain') ? `From <b>${esc(townsOf(t)[0])}</b> to <b>${esc(townsOf(t)[townsOf(t).length - 1])}</b>.` : `Mostly in <b>${esc(t.at)}</b>.`) : `${esc(t.line)}.`),
   ];
   function hint() {
     if (!q || q.done || q.hints >= HINTS.length) return;
@@ -1018,22 +1028,22 @@ export function initOrbit(ctx) {
       compareTimer = setTimeout(() => {
         if (!run || !q || !q.done || q.t !== t) return;
         const g = city.geoms && city.geoms[t.n];
-        const b = g ? boundsOf(g, t.kind === 'river' ? t.p : null, t.kind === 'river' ? 22 : 0) : [t.p[0], t.p[1], t.p[0], t.p[1]];
+        const b = g ? boundsOf(g, lineKind(t.kind) ? t.p : null, lineKind(t.kind) ? 22 : 0) : [t.p[0], t.p[1], t.p[0], t.p[1]];
         const ext = Math.max((b[2] - b[0]) * 84200, (b[3] - b[1]) * 111000, 1800);
         const z2 = Math.max(9.4, Math.min(12.2, Math.log2((0.55 * W * mpp0) / ext)));
-        map.easeTo({ center: t.kind === 'river' ? t.p : [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], zoom: z2, pitch: 40, bearing: 0, padding: { top, bottom, left: 36, right: 36 }, duration: ctx.dur ? ctx.dur(1300) : 1300, essential: true });
+        map.easeTo({ center: lineKind(t.kind) ? t.p : [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], zoom: z2, pitch: 40, bearing: 0, padding: { top, bottom, left: 36, right: 36 }, duration: ctx.dur ? ctx.dur(1300) : 1300, essential: true });
       }, ctx.dur ? ctx.dur(2300) : 2300);
     }
   }
 
   /** "Flows from near A to near B": the towns at the two ends of a river's line (the line is oriented downstream). Null if there is no usable line. */
   function flowEnds(t) {
-    if (t.kind !== 'river' || !ctx.locate) return null;
+    if (!lineKind(t.kind) || !ctx.locate) return null;
     const f = flowOf(t, 1e9);
     if (!f || f.total < 3000) return null;
     const a = ctx.locate(f.coords[0]), z = ctx.locate(f.coords[f.coords.length - 1]);
     if (!a || !z || a === z) return null;
-    return { from: a.n, to: z.n };
+    return { from: a.n, to: z.n, verb: t.kind === 'river' ? 'Flows' : 'Runs' };
   }
   function reveal() {
     const t = q.t;
@@ -1042,7 +1052,7 @@ export function initOrbit(ctx) {
     return `<div class="fb ${q.ok ? 'ok' : 'no'} orb-reveal">
       ${pic ? `<img class="orb-thumb" src="${esc(pic.img)}" alt="Photo of ${esc(t.n)}: tap to enlarge" data-n="${esc(t.n)}" tabindex="0" />` : ''}
       <div><b>${q.ok ? '✓' : '✗'} ${esc(t.n)}</b> <span class="muted">${q.ok ? `+${q.pts}` : ''}</span>${cfg && t.k === 'nat' && !q.ok && q.picked ? `<div class="orb-legend"><span style="display:inline-block;width:.8em;height:.8em;border-radius:2px;background:${roleColor('target')};margin-right:.35em"></span>${esc(t.n)}<br><span style="display:inline-block;width:.8em;height:.8em;border-radius:2px;background:${roleColor('wrong')};margin-right:.35em"></span>${esc(q.picked)} <span class="muted">(your pick)</span>${q.rel ? `<br><span class="muted">${esc(q.rel)}</span>` : ''}</div>` : ''}<br>
-      ${fe ? `<div class="orb-flow">Flows from near <b>${esc(fe.from)}</b> to near <b>${esc(fe.to)}</b>.</div>` : ''}${esc(t.line)}.<details class="rev-more"><summary>Where exactly</summary><span class="muted">${t.k === 'nat' ? `${t.elev ? `${t.elev.toLocaleString()} ft · ` : ''}${townsOf(t).length > 1 ? `${t.kind === 'river' ? 'Through ' : t.kind === 'mountain' ? 'Across ' : 'In '}${esc(listOf(townsOf(t), 14))} (${townsOf(t).length} towns, ${countiesOf(t).length > 1 ? `${esc(listOf(countiesOf(t), 8))} counties` : `${esc(countiesOf(t)[0])} County`})` : `${esc(t.at)}, ${esc(t.c)} County`}` : `${t.k === 'lm' ? '' : `${t.h} m (${ft(t.h)} ft) · `}${t.y} · ${esc(t.at)}`}</span></details></div>
+      ${fe ? `<div class="orb-flow">${fe.verb} from near <b>${esc(fe.from)}</b> to near <b>${esc(fe.to)}</b>.</div>` : ''}${t.meets && t.meets.length ? `<div class="orb-flow">Meets <b>${esc(t.meets.slice(0, 8).join(' · '))}</b>.</div>` : ''}${esc(t.line)}.<details class="rev-more"><summary>Where exactly</summary><span class="muted">${t.k === 'nat' ? `${t.elev ? `${t.elev.toLocaleString()} ft · ` : ''}${townsOf(t).length > 1 ? `${lineKind(t.kind) ? 'Through ' : t.kind === 'mountain' ? 'Across ' : 'In '}${esc(listOf(townsOf(t), 14))} (${townsOf(t).length} towns, ${countiesOf(t).length > 1 ? `${esc(listOf(countiesOf(t), 8))} counties` : `${esc(countiesOf(t)[0])} County`})` : `${esc(t.at)}, ${esc(t.c)} County`}` : `${t.k === 'lm' ? '' : `${t.h} m (${ft(t.h)} ft) · `}${t.y} · ${esc(t.at)}`}</span></details></div>
     </div>`;
   }
   /** The photo large, over everything, with its credit; a tap anywhere (or Escape) closes it. */
@@ -1074,7 +1084,7 @@ export function initOrbit(ctx) {
     if (!run || run.loading) return;
     if (run.done) {
       const best = run.pts + '/' + ROUND * 3;
-      ctx.hud(`<div class="qkind">${ICON} ${TITLE}</div><div class="q">Round done: <b>${best}</b></div>`);
+      ctx.hud(`<div class="qkind">${ico()} ${ttl()}</div><div class="q">Round done: <b>${best}</b></div>`);
       ctx.sheet(`${run.opts.header()}<div id="qbody">
         <div class="score">${run.right}/${ROUND} named · ${run.pts} points</div>
         ${run.misses.length ? `<div class="fb no">To look at again: ${run.misses.map(esc).join(', ')}</div>` : '<div class="fb ok">Every one named.</div>'}
@@ -1085,7 +1095,7 @@ export function initOrbit(ctx) {
     }
     const hints = hintsHtml(HINTS.slice(0, q.hints).map((h) => h(q.t)));
     const where = q.t.k === 'nat' ? (q.towns && q.towns.shown.length ? whereHtml(q.towns.shown.slice(0, 4).map((m) => m.n).join(' · ') + (q.towns.shown.length + q.towns.more > 4 ? ` · +${q.towns.shown.length + q.towns.more - 4} more` : '')) : '') : whereHtml(q.hood || '');
-    ctx.hud(`<div class="qkind">${ICON} ${TITLE} · ${run.n + (q.done ? 0 : 1)}/${ROUND} · ${run.pts} pts${run.streak >= 3 ? ` · 🔥${run.streak}` : ''}</div><div class="q">${q.done ? (q.ok ? 'Yes.' : 'Not quite.') : q.flying ? 'Swinging over…' : (cfg ? `Which ${NOUN[q.t.kind] || 'place'} is this?` : q.t.k === 'lm' ? 'Which landmark is this?' : 'Which tower is this?')}</div>${q.flying ? '' : where}${q.flying ? '' : hints}`);
+    ctx.hud(`<div class="qkind">${ico()} ${ttl()} · ${run.n + (q.done ? 0 : 1)}/${ROUND} · ${run.pts} pts${run.streak >= 3 ? ` · 🔥${run.streak}` : ''}</div><div class="q">${q.done ? (q.ok ? 'Yes.' : 'Not quite.') : q.flying ? 'Swinging over…' : (cfg ? `Which ${NOUN[q.t.kind] || 'place'} is this?` : q.t.k === 'lm' ? 'Which landmark is this?' : 'Which tower is this?')}</div>${q.flying ? '' : where}${q.flying ? '' : hints}`);
     ctx.toolbar.set([...(q.t.flyF ? [{ id: 'flow', label: '↻ Flow', pressed: false, title: 'Fly down the river again', onClick: () => { if (q && !q.flying) flyDown(q.t); } }] : []), { id: 'spin', label: spinOn ? '↻ Orbit' : '✋ Drag', pressed: spinOn, title: 'Camera circles by itself, or holds still so you can turn it', onClick: () => { spinOn = !spinOn; ctx.store.set('orbit.spin', spinOn); render(); } }]);
     ctx.sheet(`${run.opts.header()}<div id="qbody">
       ${choicesHtml(q.choices, { attr: 'n', data: (c) => c.n, label: (c) => c.n, off: q.done || q.flying, state: (c) => (q.done ? (c.n === q.t.n ? 'right' : c.n === q.picked ? 'wrong' : '') : '') })}
