@@ -431,10 +431,8 @@ export function initDrive(ctx) {
   }
   // How a road is said aloud: "I-287" → "Interstate 287", "Route 1&9" → "Route 1 and 9", the named roads with "the".
   const sayRoad = (label) => {
-    let m;
-    if ((m = label.match(/^I-(\d+)/))) return `Interstate ${m[1]}`;
     if (/^(Turnpike|Parkway|AC Expressway|Palisades Pkwy)$/.test(label)) return 'the ' + label.replace('Pkwy', 'Parkway');
-    return label.replace(/&/g, ' and ');
+    return label.replace(/I-(\d+)/g, 'Interstate $1').replace(/ \/ /g, ' and ').replace(/&/g, ' and ');
   };
   let lastRoadSaid = 0, lastRoadLabel = null;
   /** Say which road you are on, when you have been on it steadily for a few seconds: "Route 17 north." Not while other speech is going, and not more often than every 25 s. */
