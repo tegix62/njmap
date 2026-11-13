@@ -62,6 +62,7 @@ export const TUNE = {
     roughenMetres: 55,       // how far hand-pulled edges wander (answer outlines)
     boil: { metres: 16, fps: 4.5, frames: 4 },   // the outline re-drawn by hand a few times a second (animated line boil): how far each drawing differs, how often, how many drawings
     creaseOpacity: 0.3,
+    swim: { grain: 0.16, blots: 0.07, ink: 0.24 },   // texture swim: how far each texture layer slides against the map as the camera moves (fraction of the camera's screen movement; 0 = locked to the map)
     pinholes: 60,            // pinholes visible on a typical screen (the count over the region is scaled to the region's size)
     blotSize: [0.004, 0.034],// blotch radius as a fraction of the region's diagonal: [smallest, largest]
   },

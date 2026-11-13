@@ -81,12 +81,38 @@ export function createPaper(map, bounds) {
     map.addSource('orb-paper-blots', { type: 'geojson', data: blots(bounds) });
     map.addSource('orb-paper-creases', { type: 'geojson', data: creases(bounds) });
     map.addSource('orb-paper-specks', { type: 'geojson', data: specks(bounds) });
-    map.addLayer({ id: 'orb-paper-grain', type: 'fill', source: 'orb-paper-sheet', layout: hide, paint: { 'fill-pattern': 'paper-grain', 'fill-opacity': TUNE.paper.grain } }, under);
-    map.addLayer({ id: 'orb-paper-blots', type: 'fill', source: 'orb-paper-blots', layout: hide, paint: { 'fill-color': ['case', ['==', ['get', 'w'], 1], '#8a6a2c', '#1d2a5b'], 'fill-opacity': TUNE.paper.blots } }, under);
+    map.addLayer({ id: 'orb-paper-grain', type: 'fill', source: 'orb-paper-sheet', layout: hide, paint: { 'fill-pattern': 'paper-grain', 'fill-opacity': TUNE.paper.grain, 'fill-translate-anchor': 'viewport' } }, under);
+    map.addLayer({ id: 'orb-paper-blots', type: 'fill', source: 'orb-paper-blots', layout: hide, paint: { 'fill-color': ['case', ['==', ['get', 'w'], 1], '#8a6a2c', '#1d2a5b'], 'fill-opacity': TUNE.paper.blots, 'fill-translate-anchor': 'viewport' } }, under);
     map.addLayer({ id: 'orb-paper-crease-dark', type: 'line', source: 'orb-paper-creases', layout: hide, paint: { 'line-color': '#6e5a28', 'line-opacity': TUNE.paper.creaseOpacity, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.8, 12, 1.6], 'line-blur': 0.6 } }, under);
     map.addLayer({ id: 'orb-paper-crease-pale', type: 'line', source: 'orb-paper-creases', layout: hide, paint: { 'line-color': '#fffff0', 'line-opacity': 0.6, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.8, 12, 1.5], 'line-translate': [1.6, 1], 'line-blur': 0.5 } }, under);
     map.addLayer({ id: 'orb-paper-specks', type: 'circle', source: 'orb-paper-specks', layout: hide, paint: { 'circle-color': PAPER.halo, 'circle-opacity': 0.9, 'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, ['*', 0.45, ['+', 0.6, ['get', 's']]], 14, ['*', 1.2, ['+', 0.6, ['get', 's']]]], 'circle-pitch-alignment': 'map' } }, over);
   }
+  /**
+   * Texture swim (the PS1 artifact, where a texture slid against the surface it was painted on): the paper fibre, blotches and ink texture are
+   * translated a little against the map as the camera moves, each at its own rate, so they drift over the land instead of being glued to it.
+   */
+  let swimAnchor = null, swimOn = false;
+  const SWIM = [['orb-paper-grain', 'grain', 128], ['orb-paper-blots', 'blots', 100000], ['orb-paper-inktex', 'ink', 128]];
+  function swim() {
+    if (!swimOn) return;
+    const a = swimAnchor || (swimAnchor = { ll: map.getCenter().toArray(), p0: map.project(map.getCenter()) });
+    const s = map.project(a.ll);
+    const dx = s.x - a.p0.x, dy = s.y - a.p0.y;
+    for (const [id, key, wrap] of SWIM) {
+      if (!map.getLayer(id)) continue;
+      const k = TUNE.paper.swim[key];
+      map.setPaintProperty(id, 'fill-translate', [(dx * k) % wrap, (dy * k) % wrap]);
+    }
+  }
+  const swimTo = (on) => {
+    if (on === swimOn) return;
+    swimOn = on;
+    if (on) { swimAnchor = null; map.on('move', swim); swim(); }
+    else {
+      map.off('move', swim);
+      for (const [id] of SWIM) if (map.getLayer(id)) map.setPaintProperty(id, 'fill-translate', [0, 0]);
+    }
+  };
   const WORLD = ['orb-paper-inktex', 'orb-paper-grain', 'orb-paper-blots', 'orb-paper-crease-dark', 'orb-paper-crease-pale', 'orb-paper-specks'];
 
   /**
@@ -115,7 +141,7 @@ export function createPaper(map, bounds) {
     const before = 'orb-geom-band';
     const f = ['any', ['has', 'band'], ['==', ['geometry-type'], 'Polygon'], ['==', ['geometry-type'], 'MultiPolygon']];
     if (!map.hasImage('paper-ink')) map.addImage('paper-ink', inkImage(), { pixelRatio: 2 });
-    map.addLayer({ id: 'orb-paper-inktex', type: 'fill', source: 'orb-geom', filter: f, layout: { visibility: 'none' }, paint: { 'fill-pattern': 'paper-ink', 'fill-opacity': TUNE.paper.inkTexture } }, map.getLayer('orb-geom-fill') ? 'orb-geom-fill' : undefined);
+    map.addLayer({ id: 'orb-paper-inktex', type: 'fill', source: 'orb-geom', filter: f, layout: { visibility: 'none' }, paint: { 'fill-pattern': 'paper-ink', 'fill-opacity': TUNE.paper.inkTexture, 'fill-translate-anchor': 'viewport' } }, map.getLayer('orb-geom-fill') ? 'orb-geom-fill' : undefined);
     for (const [id, col, tr] of [['orb-paper-a', PAPER.fringeA, TUNE.paper.plateOffsetA], ['orb-paper-b', PAPER.fringeB, TUNE.paper.plateOffsetB]])
       map.addLayer({ id, type: 'fill', source: 'orb-geom', filter: f, layout: { visibility: 'none' }, paint: { 'fill-color': col, 'fill-opacity': TUNE.paper.plateOpacity, 'fill-translate': tr, 'fill-translate-anchor': 'viewport' } }, before);
   }
@@ -179,7 +205,9 @@ export function createPaper(map, bounds) {
         for (const [id, b] of Object.entries(BLEED)) set(id, 'line-blur', b);
         game();
         for (const id of ['orb-paper-a', 'orb-paper-b', ...WORLD, ...GLOW]) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
+        if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) swimTo(true);
       } else {
+        swimTo(false);
         for (const id of ['orb-paper-a', 'orb-paper-b', ...WORLD, ...GLOW]) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
         restore();
       }

@@ -422,3 +422,8 @@ Wobble switched off by default (`wobble: null` in `RETRO`): the displacement fil
 ### PS1 facets (vertex snapping, LOD "resets")
 
 Two parts, neither a filter: the answer outline is snapped to a coarse grid and a few vertices hop to a neighbouring grid point several times a second (`snapGeom`); and under PS1 the terrain is built from a coarse copy of the elevation data (`orb-dem-ps1`, declared as 1024-px tiles, so it loads tiles two zoom levels lower and MapLibre's fixed-size mesh covers four times the ground per triangle). The terrain's facets are bigger and re-form as the zoom crosses a level, like PS1 level-of-detail. Not yet looked at on a steep area or on a device.
+
+### Paper: route shields and texture swim
+
+- **Route shields** (`shieldOf` in `js/maptext.js`, `.px-shield` in `css/app.css`): under Paper the base map's route labels are drawn as printed shields instead of plain text — interstates a shield with an orange head, US and state routes a circled number (a pill for "1&9"), county routes a small square, the Turnpike/Parkway/AC Expressway a name plate — in Gill Sans, each with a plate a pixel off in orange. They come from the same label rules as the rest of the app (`labelOf` in `js/roadlabel.js`). Checked with test features (circle, pill, plate, county); the interstate shield has not been seen yet.
+- **Texture swim** (`swim` in `js/paper.js`, `TUNE.paper.swim`): the paper fibre, ink blotches and the ink texture over coloured masses slide a little against the map as the camera moves, each at its own rate (0.16, 0.07 and 0.24 of the camera's screen movement), so the texture drifts over the land instead of being glued to it. Off under reduced motion.

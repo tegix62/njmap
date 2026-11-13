@@ -7,6 +7,7 @@
 // Games that draw their own crisp labels (Name that place) keep their `orb-*` layers out of this.
 
 import { tilt } from './world.js';
+import { labelOf } from './roadlabel.js';
 
 const SKIP = (id) => id.startsWith('orb-');
 const MAX = 70;
@@ -18,6 +19,15 @@ function fieldOf(layout) {
   const s = JSON.stringify(f);
   const m = s.match(/\["get","([^"]+)"\]/);
   return { key: m ? m[1] : null, up: s.includes('"upcase"') };
+}
+
+/** How a route label is drawn as a shield: interstates a shield, US and state routes a circled number, county routes a square, named roads a plate. */
+function shieldOf(lab) {
+  let m;
+  if ((m = lab.match(/^I-(\d+)/))) return { kind: 'sh-interstate', text: m[1] };
+  if ((m = lab.match(/^Route (.+)$/))) return { kind: 'sh-route', text: m[1] };
+  if ((m = lab.match(/^CR[ -]?(\w+)/))) return { kind: 'sh-county', text: m[1] };
+  return { kind: 'sh-plate', text: lab.toUpperCase() };
 }
 
 export function createMapText(map) {
@@ -77,14 +87,21 @@ export function createMapText(map) {
         let text = fld && fld.key ? p[fld.key] : null;
         text = text || p.name || p.label || p.ref || p.c;
         if (!text) continue;
-        text = String(text);
-        if (fld && fld.up) text = text.toUpperCase();
+        let shield = null;
+        if (paperOn && l.id.startsWith('road-ref')) {                  // Paper: route numbers as printed shields, not plain text
+          const lab = labelOf(p) || String(text);
+          shield = shieldOf(lab);
+          text = shield.text;
+        } else {
+          text = String(text);
+          if (fld && fld.up) text = text.toUpperCase();
+        }
         const s = anchor(f.geometry);
         if (!s) continue;
         const key = text + '|' + Math.round(s.x / 24) + '|' + Math.round(s.y / 24);
         if (seen.has(key)) continue;
         seen.add(key);
-        out.push({ text, x: s.x, y: s.y, line: f.geometry.type !== 'Point' && f.geometry.type !== 'MultiPoint' });
+        out.push({ text, x: s.x, y: s.y, shield: shield && shield.kind, line: f.geometry.type !== 'Point' && f.geometry.type !== 'MultiPoint' });
         if (out.length >= MAX * 3) break;
       }
     }
@@ -93,15 +110,16 @@ export function createMapText(map) {
     let n = 0;
     for (const it of out) {
       if (n >= MAX) break;
-      const w = it.text.length * 7 + 8, h = 15;
+      const w = it.shield ? Math.max(24, it.text.length * 8 + 14) : it.text.length * 7 + 8, h = it.shield ? 24 : 15;
       const r = { x: it.x - w / 2, y: it.y - h / 2, w, h };
       if (taken.some((t) => r.x < t.x + t.w + 3 && r.x + r.w + 3 > t.x && r.y < t.y + t.h + 2 && r.y + r.h + 2 > t.y)) continue;
       taken.push(r);
       let el = pool[n];
-      if (!el) { el = document.createElement('div'); el.className = 'px-label px-map'; box.appendChild(el); pool[n] = el; }
+      if (!el) { el = document.createElement('div'); box.appendChild(el); pool[n] = el; }
+      el.className = it.shield ? `px-label px-map px-shield ${it.shield}` : 'px-label px-map';
       if (el.textContent !== it.text) el.textContent = it.text;
       el.style.display = '';
-      el.style.transform = `translate(${it.x}px, ${it.y}px) translate(-50%, -50%)${paperOn ? ` rotate(${tilt(it.text, 1.6).toFixed(2)}deg)` : ''}`;
+      el.style.transform = `translate(${it.x}px, ${it.y}px) translate(-50%, -50%)${paperOn && !it.shield ? ` rotate(${tilt(it.text, 1.6).toFixed(2)}deg)` : ''}`;
       n++;
     }
     for (let i = n; i < pool.length; i++) pool[i].style.display = 'none';
