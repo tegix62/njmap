@@ -619,11 +619,15 @@ export function initDrive(ctx) {
     const tracking = st.watchId != null;
     if (!tracking) {
       ctx.hud(
-        `<div class="town">Where am I?</div>
+        // after the first run the intro is one line (name and Start); the explanation returns on an error, or behind the ⓘ
+        ctx.store.get('drive.intro', false) && !st.error
+          ? `<div class="driverow"><div class="town">Where am I?</div><button class="primary" id="startBtn">Start</button></div>
+             <details class="drive-info"><summary>ⓘ</summary><div class="meta">Shows the ${region.unit} you are in, which way you are heading, and the main road nearby. Your location never leaves this phone.</div></details>`
+          : `<div class="town">Where am I?</div>
          <div class="meta">${st.error ? esc(st.error) : `Shows the ${region.unit} you are in, which way you are heading, and the main road nearby. Your location never leaves this phone.`}</div>
          <button class="primary" id="startBtn">Start</button>`
       );
-      document.getElementById('startBtn').addEventListener('click', start);
+      document.getElementById('startBtn').addEventListener('click', () => { ctx.store.set('drive.intro', true); start(); });
       return;
     }
     if (!ctx.pos) {

@@ -3356,3 +3356,16 @@ body.paper .chip.areasel, body.holo .chip.areasel { border: 1.5px solid currentC
 #lookFab[hidden] { display: none; }
 body.paper #lookFab { border: 2px solid #14235e; border-radius: 0; background: #f6f1c9; color: #14235e; box-shadow: 2px 2px 0 rgba(20, 35, 94, 0.35); }
 body.holo #lookFab { border: 1px solid #5ff3ff; border-radius: 2px; background: rgba(2, 18, 28, 0.85); color: #d4fbff; }
+
+/* layout: collapsed intros (Drive, Explore) and the game name on a card's first line */
+.hudkick { display: flex; align-items: baseline; justify-content: space-between; width: 100%; border: 0; background: transparent; color: var(--panel-muted); font: inherit; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; padding: 0 0 3px; cursor: pointer; text-align: left; }
+.hudkick span { opacity: 0.7; text-transform: none; letter-spacing: 0; }
+.driverow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.driverow .town { margin: 0; }
+.driverow .primary { width: auto; padding: 8px 22px; margin: 0; flex: none; }
+.drive-info { margin-top: 2px; }
+.drive-info summary { cursor: pointer; opacity: 0.7; font-size: 13px; list-style: none; display: inline-block; padding: 2px 6px 2px 0; }
+.drive-info summary::-webkit-details-marker { display: none; }
+.expl-more { margin-top: 6px; }
+.expl-more > summary { cursor: pointer; font-size: 13px; opacity: 0.8; padding: 4px 0; }
+.expl-more[open] { max-height: 34vh; overflow-y: auto; }

@@ -483,3 +483,9 @@ The 18 older practice types used a three-row header (Today / Mixed / More tiles,
 - **Settings → Look & map → Effects: Battery saver (default) / Full.** Saver keeps the looks' colours, shapes and the coarse PS1 canvas (which is cheaper than a full-resolution one) and leaves out what the phone has to redo every frame: the full-screen SVG colour-snapping filter and wobble, the blend-mode dither overlay, the line boil and PS1 outline shimmer (they re-upload the outline several times a second), and per-frame label re-projection (labels follow at ~25 fps). The "Name that place" orbit runs at ~30 fps and stops turning by itself after 25 s on a question (the toggle turns it back on). Full restores all of it. Not measured on a phone (my test browser renders in software); the costs removed are the ones that were running on every frame.
 - **One floating look button** (right edge, about a third down) in every mode that doesn't already have the look chip in its header: Drive, Explore, the Manhattan grid games. It cycles Default → Paper → PS1 and follows the same setting.
 Still to do: collapse Drive's intro card and Explore's search panel; game names on the grid games' cards.
+
+### Layout pass: Drive, Explore, grid games
+
+- **Drive:** after the first run, "Where am I?" is one line (title and Start); the explanation sits behind an ⓘ and returns if there is an error. First run still shows the full card.
+- **Explore:** the search card starts with the search box, the one-line help, and a collapsed "Highways, lakes & mountains" (opens to a scrollable list capped at a third of the screen; it stays as you left it).
+- **Game name on any card:** a running game can set `ctx.hudKicker`; the top card then starts with a small tappable line ("DRIVE MIDTOWN · change ▾") that opens the picker (`ctx.openPicker`). The Manhattan grid games (Downtown, Midtown, Uptown) use it, so you can change game from inside one.

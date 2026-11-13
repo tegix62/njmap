@@ -1796,6 +1796,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
     lockMap(true);
     declutter(true);
     document.body.classList.add('gridding');
+    ctx.hudKicker = AREA.title;          // (the card says which game this is, and tapping it opens the picker)
     ctx.clearHighlights();
     ctx.reveal([]);
     ctx.line(null);
@@ -1849,6 +1850,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   }
 
   function stop() {
+    ctx.hudKicker = null;
     clearHood();
     hideLmTag();
     document.body.classList.remove('gg-end');

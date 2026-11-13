@@ -885,6 +885,7 @@ export function initPractice(ctx) {
     next();
   }
   /** A grouped list of everything there is to practice, with a line on each. */
+  ctx.openPicker = () => openPicker();
   function openPicker() {
     let dlg = document.getElementById('pickDlg');
     if (!dlg) {

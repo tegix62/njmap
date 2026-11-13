@@ -378,6 +378,8 @@ export function initExplore(ctx) {
     return `<button class="star" id="starBtn" aria-pressed="${on}" title="${on ? 'On your list' : 'Add to your list to practice'}">${on ? '★ My list' : '☆ My list'}</button>`;
   }
 
+  let exploreMore = false;
+  document.getElementById('hud').addEventListener('toggle', (ev) => { if (ev.target.classList && ev.target.classList.contains('expl-more')) exploreMore = ev.target.open; }, true);
   function render() {
     const R = ctx.region;
     const search = `<input id="search" type="search" list="townlist" placeholder="${R.sections ? 'Search a town, village or landmark…' : `Search a ${R.unit} or landmark…`}" autocomplete="off" enterkeyhint="go">`;
@@ -389,7 +391,7 @@ export function initExplore(ctx) {
       ctx.hud(
         `${search}<div class="meta">Tap anywhere on the map to see which ${R.unit} it is and what surrounds it. ${
           R.sections ? 'Search also finds villages ("Towaco") and landmarks ("Willowbrook").' : 'Search also finds landmarks ("Penn Station").'
-        }</div>${highwayChips()}${natureChips()}`
+        }</div><details class="expl-more"${exploreMore ? ' open' : ''}><summary>Highways, lakes &amp; mountains</summary>${highwayChips()}${natureChips()}</details>`
       );
     } else {
       const m = sel;

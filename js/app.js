@@ -268,6 +268,7 @@ async function main() {
   let tinted = [];
   let toastTimer = 0;
 
+  hudEl.addEventListener('click', (e) => { if (e.target.closest('.hudkick') && ctx.openPicker) ctx.openPicker(); });
   const ctx = {
     map,
     munis,
@@ -296,7 +297,8 @@ async function main() {
       store.set('settings', settings);
     },
     hud(html) {
-      hudEl.innerHTML = html;
+      // a running game can name itself: a small tappable line above whatever the card says (ctx.hudKicker), so every game says which it is and offers the way to another
+      hudEl.innerHTML = html && ctx.hudKicker ? `<button type="button" class="hudkick" data-act="picker">${ctx.hudKicker} <span>change ▾</span></button>${html}` : html;
       hudEl.hidden = !html;
       requestAnimationFrame(updateEdges);
     },
