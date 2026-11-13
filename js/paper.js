@@ -275,6 +275,9 @@ export function createPaper(map, bounds, rich = () => false) {
         inkLines(true);
         recolor();
         map.on('styledata', onStyle);
+        // misregistration: the red plate prints a little off the blue one, so the red cores of main roads sit off-centre in their casings, and highlight fills slip off their outlines
+        for (const id of ['road-major', 'hwy-color']) { set(id, 'line-translate', TUNE.paper.misreg.red); set(id, 'line-translate-anchor', 'viewport'); }
+        for (const id of ['muni-hl']) { set(id, 'fill-translate', TUNE.paper.misreg.fill); set(id, 'fill-translate-anchor', 'viewport'); }
         // a printed map shows minor streets only at large scale: they start later than in the plain look (less clutter, and far fewer lines to draw)
         for (const [id, z] of [['road-minor', 13.5], ['road-minor-pcase', 13.5], ['road-mid', 11.5], ['road-mid-pcase', 11.5]]) {
           const ly = map.getLayer(id);

@@ -78,6 +78,7 @@ export const TUNE = {
     border: { width: [[8, 2.2], [12, 4.2]], shadow: [2.2, 2.2], shadowOpacity: 0.35 },   // county borders: heavy navy with a hard offset shadow
     grid: { cells: 9, opacity: 0.5, width: 0.9 },   // the red index grid: about this many cells across the region
     halftone: { dot: [0.8, 1.2, 1.7], plate: 0.6, plateOffset: [2.2, 1.6] },   // dot radius (px) for the three mountain bands; the water's offset red plate
+    misreg: { red: [1.5, 1.1], fill: [2, 1.4] },   // plates printed off-register on every printed area: the red ink of roads shifts against the blue casing (px, on screen), highlight fills shift against their outline
     swim: { grain: 0.16, blots: 0.07, ink: 0.24 },   // texture swim: how far each texture layer slides against the map as the camera moves (fraction of the camera's screen movement; 0 = locked to the map)
     pinholes: 60,            // pinholes visible on a typical screen (the count over the region is scaled to the region's size)
     blotSize: [0.004, 0.034],// blotch radius as a fraction of the region's diagonal: [smallest, largest]

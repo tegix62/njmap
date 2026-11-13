@@ -469,3 +469,7 @@ Fix: route shields (and every DOM map label) lagged the camera and "blinked arou
 ### Game toolbar (`js/toolbar.js`)
 
 A running game's controls live in the shared header row, beside the game name and the look chip, instead of in a row of their own: `ctx.toolbar.set([{ id, label, pressed, title, onClick }])` while the game runs, `ctx.toolbar.clear()` when it stops. "Name that place" uses it for Orbit/Drag, saving a row of the answer sheet; any other game can add its own chips the same way (they appear in every region and every look).
+
+### Paper: misregistration everywhere (`TUNE.paper.misreg`)
+
+The red plate prints off the blue one on every printed area: the red cores of main roads and highways sit off-centre in their blue casings (blue shows on one side), and highlight fills slip off their outlines. Offsets are screen pixels (1.5/1.1 for roads, 2/1.4 for fills). Together with the existing plates behind answer masses and the off-register water dots, it now covers roads, highlights, water and answers. Checked on test streets at zoom 15; not on real road tiles.
