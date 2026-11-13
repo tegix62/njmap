@@ -19,6 +19,7 @@ import { initOrbit } from './orbit.js';
 import { createLooks } from './looks.js';
 import { createToolbar } from './toolbar.js';
 import { createPerfTest } from './perftest.js';
+import { initProgress } from './progress.js';
 
 /** Map filter for one road, by the label people use ("I-287", "Columbia Turnpike"). */
 const roadFilter = (label) => (label ? ['==', LABEL_EXPR, label] : ['==', ['get', 'ref'], '__none__']);
@@ -580,6 +581,7 @@ async function main() {
     drive: initDrive(ctx),
     explore: initExplore(ctx),
     practice: initPractice(ctx),
+    progress: initProgress(ctx),
   };
   ctx.modes = modes;
 
@@ -589,6 +591,7 @@ async function main() {
     ctx.mode = m;
     document.body.dataset.mode = m;
     map.setGlobalStateProperty('quiet', m === 'practice');
+    document.body.classList.toggle('on-progress', m === 'progress');
     for (const b of document.querySelectorAll('#tabs [data-mode]')) b.setAttribute('aria-selected', b.dataset.mode === m);
     store.set('mode', m);
     // Study modes are north-up; Drive re-applies its own orientation.
@@ -723,7 +726,7 @@ async function main() {
     dlg.close();
   });
 
-  setMode(store.get('mode', 'drive'));
+  setMode(store.get('mode', 'practice'));
   document.body.classList.add('ready');
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {

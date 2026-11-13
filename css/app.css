@@ -433,7 +433,7 @@ body[data-mode='drive'].unfollowed #recenter {
   height: calc(var(--tabs-h) + var(--safe-b));
   padding-bottom: var(--safe-b);
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr) 1.45fr 0.7fr;
   background: var(--ink);
   z-index: 6;
 }
@@ -3196,7 +3196,7 @@ body.ink .where { color: #166534; }
 
 /* ---- Hologram look (js/holo.js): a dark projection table, thin cyan lines, scan overlay ---------------- */
 
-body.holo #hud, body.holo #sheet {
+body.holo #hud, body.holo #sheet, body.holo #progress {
   --panel-ink: #d4fbff; --panel-muted: #78b6c4; --accent: #5ff3ff; --good: #4dffb0; --bad: #ff7a5e; --ink: #d4fbff;
   background:
     linear-gradient(#5ff3ff, #5ff3ff) left top / 14px 2px no-repeat, linear-gradient(#5ff3ff, #5ff3ff) left top / 2px 14px no-repeat,
@@ -3247,7 +3247,7 @@ body[data-retro='2']:not(.paper) .orb-pin span:last-child { font-family: ui-mono
 
 /* ---- Paper look (js/paper.js): a printed road map ------------------------------------------------------ */
 
-body.paper #hud, body.paper #sheet {
+body.paper #hud, body.paper #sheet, body.paper #progress {
   --panel: #f6f1c9; --panel-ink: #1d2a5b; --panel-muted: #5a5f86; --accent: #c8451f; --good: #2e7d46; --bad: #b8321c; --ink: #1d2a5b;
   background: #f6f1c9; color: #1d2a5b; border: 2px solid #1d2a5b; border-radius: 0;
   box-shadow: 3px 3px 0 rgba(29, 42, 91, 0.35), inset 0 0 0 3px #f6f1c9, inset 0 0 0 4px rgba(29, 42, 91, 0.55);
@@ -3392,3 +3392,32 @@ body.holo #inset .me path { fill: #ffd54a; stroke: #02101a; }
 .rev-more > summary::-webkit-details-marker { display: none; }
 .rev-more > summary::before { content: '▸ '; }
 .rev-more[open] > summary::before { content: '▾ '; }
+
+/* ---- Progress ---------------------------------------------------------------------------------------------- */
+#progress { position: fixed; left: 8px; right: 8px; top: calc(8px + var(--safe-t)); bottom: calc(var(--tabs-h) + var(--safe-b) + 6px); max-width: 560px; margin: 0 auto; z-index: 6; overflow-y: auto; background: var(--panel); color: var(--panel-ink); border-radius: 16px; padding: 14px 14px 18px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25); }
+#progress[hidden] { display: none; }
+#progress h2 { margin: 0; font-size: 22px; }
+#progress h3 { margin: 18px 0 8px; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.7; }
+.pg-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.pg-empty { font-size: 14px; opacity: 0.85; margin: 6px 0 12px; }
+.pg-bar, .pg-mini { display: flex; height: 16px; border-radius: 8px; overflow: hidden; background: rgba(127, 127, 127, 0.18); gap: 2px; }
+.pg-bar i, .pg-mini i { display: block; min-width: 0; }
+.pg-learned { background: var(--good); }
+.pg-getting { background: var(--accent); }
+.pg-missed { background: var(--bad); }
+.pg-new { background: rgba(127, 127, 127, 0.35); }
+.pg-key { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 14px; font-size: 12.5px; }
+.pg-key i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.pg-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 14px; text-align: center; }
+.pg-stats b { display: block; font-size: 22px; line-height: 1.1; }
+.pg-stats span { font-size: 11.5px; opacity: 0.7; }
+.pg-work { display: flex; flex-wrap: wrap; gap: 6px; }
+.pg-chip { border-radius: 999px; padding: 5px 10px; background: rgba(127, 127, 127, 0.16); font-size: 13.5px; }
+.pg-chip small { margin-left: 6px; opacity: 0.65; }
+.pg-areas { display: grid; gap: 7px; }
+.pg-area { display: grid; grid-template-columns: 38% 1fr; align-items: center; gap: 10px; font-size: 13.5px; }
+.pg-mini { height: 10px; border-radius: 5px; }
+body.paper .pg-bar, body.paper .pg-mini { border-radius: 0; }
+#tabs { gap: 0; }
+#tabs button { min-width: 0; }
+body.on-progress #lookFab, body.on-progress #compass, body.on-progress #x3d, body.on-progress #recenter { display: none; }

@@ -62,16 +62,18 @@
     <div id="toast" role="status" hidden></div>
 
     <section id="sheet" hidden></section>
+    <section id="progress" hidden aria-label="Your progress"></section>
 
     <nav id="tabs" role="tablist">
+      <button role="tab" data-mode="practice"><span class="ti">▶</span>Play</button>
       <button role="tab" data-mode="drive"><span class="ti">◉</span>Drive</button>
-      <button role="tab" data-mode="explore"><span class="ti">⌕</span>Explore</button>
-      <button role="tab" data-mode="practice"><span class="ti">✎</span>Practice</button>
+      <button role="tab" data-mode="explore"><span class="ti">⌕</span>Map</button>
+      <button role="tab" data-mode="progress"><span class="ti">◔</span>Progress</button>
       <div id="regionTog" role="group" aria-label="Map">
         <button data-region="nj" aria-label="New Jersey">NJ</button>
         <button data-region="manhattan" aria-label="New York City">NYC</button>
       </div>
-      <button id="settingsBtn" aria-label="Settings"><span class="ti">⚙</span>Settings</button>
+      <button id="settingsBtn" aria-label="Settings"><span class="ti">⚙</span></button>
     </nav>
 
     <dialog id="settings">
@@ -82,6 +84,13 @@
           <button data-region="manhattan">New York City</button>
         </div>
       </div>
+      <label class="row">Map look
+        <select data-setting="look">
+          <option value="plain">Default</option>
+          <option value="paper">Paper: a printed road map</option>
+          <option value="ps1">PS1: projection table, PlayStation-1 resolution</option>
+        </select>
+      </label>
       <label class="row"><input type="checkbox" data-setting="voice" /> Speak when I cross into a new town</label>
       <label class="row sub"><input type="checkbox" data-setting="sayRoads" /> …and say the road I am on (“Route 17 north.”)</label>
       <label class="row"><input type="checkbox" data-setting="northUp" /> North-up map while driving (off = map turns with you)</label>
@@ -123,19 +132,20 @@
         </div>
       </details>
 
+
       <details class="sect">
-        <summary>Look, effects &amp; map</summary>
+        <summary>Advanced &amp; performance</summary>
         <label class="row">Colour theme
           <select data-setting="mapStyle">
             <option value="ink">Ink: paper and ink; places darken as you learn them</option>
             <option value="classic">Classic: soft county colors</option>
           </select>
         </label>
-        <label class="row">Map look
-          <select data-setting="look">
-            <option value="plain">Default: your colour theme</option>
-            <option value="paper">Paper: a printed road map</option>
-            <option value="ps1">PS1: projection table at PlayStation resolution</option>
+        <label class="row">Background map
+          <select data-setting="basemap">
+            <option value="streets">Streets + road numbers</option>
+            <option value="light">Highways + water only</option>
+            <option value="none">None (works offline)</option>
           </select>
         </label>
         <label class="row">Effects
@@ -144,15 +154,8 @@
             <option value="full">Full: dither, boil, wobble, 60 fps orbit (drains the battery)</option>
           </select>
         </label>
-        <button type="button" id="perfRun" class="row">Run performance test (about 40 s)</button>
         <label class="row"><input type="checkbox" data-setting="richTexture" /> Richer paper texture (full-screen fibre and drift; uses more battery)</label>
-        <label class="row">Background map
-          <select data-setting="basemap">
-            <option value="streets">Streets + road numbers</option>
-            <option value="light">Highways + water only</option>
-            <option value="none">None (works offline)</option>
-          </select>
-        </label>
+        <button type="button" id="perfRun" class="row">Run performance test (about 40 s)</button>
       </details>
 
       <details class="sect">

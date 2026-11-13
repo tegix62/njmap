@@ -515,3 +515,11 @@ While the camera moves, the real frame times are measured (24 frames at a time).
 ### Declutter: result card and Settings wording
 
 The result card in "Name that place" shows the result, the legend and the one-line description; the town/elevation line is behind a "▸ Where exactly" tap. In Settings the two confusingly similar choices are now "Colour theme" (Ink / Classic) and "Map look" (Default / Paper / PS1), in a section called "Look, effects & map".
+
+### The new shape of the app
+
+One loop: look at a place, get asked about it, see the answer, and let the app remember what you missed.
+- **Bottom bar: Play · Drive · Map · Progress · region · ⚙.** Play is the old Practice (it still opens on Today once a day, and "change ▾" in its header reaches every quiz type); Map is the old Explore; Settings is a gear in the corner. The app now opens on Play for new users.
+- **Progress** (`js/progress.js`): one screen for both regions, from the spaced-review data Practice already keeps (nothing new is tracked): a bar of learned / getting there / missed lately / new, percent learned, percent right overall, day streak, how many are due, a "Review N due" button, the places that need work, and learned-by-county (or by area in New York). Checked with seeded data in both regions and in Default and Paper; with real, long-term data untested.
+- **Settings** is shorter: region, map look, voice and driving switches at the top; the colour theme, background map, effects, richer texture and the performance test moved under "Advanced & performance".
+Not done yet: a single adaptive "Play" session that hides the quiz types entirely (Play still opens a specific type), and retiring the effects setting once the performance test says it is safe.
