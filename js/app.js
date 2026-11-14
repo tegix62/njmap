@@ -31,6 +31,9 @@ const DEFAULT_SETTINGS = {
   sayRoads: true, // Drive: say the road you are on ("Route 17 north.")
   voiceHints: true,
   voiceGuess: false,
+  voiceURI: '', // which of the phone's text-to-speech voices to use ('' = the phone's default); see Settings → More voice
+  voiceRate: 1,
+  voicePitch: 1,
   rememberPlaces: false, // opt-in: visited towns + drive routes, on this phone only
   driveQuiz: false, // spoken questions while driving (no tapping)
   driveQuizMin: 4, // minutes between them
@@ -398,9 +401,19 @@ async function main() {
     speak(text) {
       if (!settings.voice || !('speechSynthesis' in window)) return;
       const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'en-US';
+      ctx.applyVoice(u);
       ctx.lastSpokenAt = Date.now();
       speechSynthesis.speak(u);
+    },
+    /** Give an utterance the voice, speed and pitch chosen in Settings (the phone's own voice list; nothing is downloaded by the app). */
+    applyVoice(u) {
+      u.lang = 'en-US';
+      try {
+        const v = settings.voiceURI && speechSynthesis.getVoices().find((x) => x.voiceURI === settings.voiceURI);
+        if (v) { u.voice = v; u.lang = v.lang; }
+      } catch { /* no voice list: the default voice */ }
+      u.rate = +settings.voiceRate || 1;
+      u.pitch = +settings.voicePitch || 1;
     },
     setBasemap(key) {
       settings.basemap = key;
@@ -660,9 +673,26 @@ async function main() {
     b.addEventListener('click', () => b.dataset.region !== region.id && switchRegion(b.dataset.region));
   $('#closeRegion').addEventListener('click', () => regionDlg.close());
   regionDlg.addEventListener('click', (e) => e.target === regionDlg && regionDlg.close());
+  /** The voice list is the phone's own (it can arrive a moment after the page loads), English first, with the current choice always kept. */
+  function fillVoices() {
+    const sel = $('#voicePick');
+    if (!sel || !('speechSynthesis' in window)) return;
+    let list = [];
+    try { list = speechSynthesis.getVoices(); } catch { /* none */ }
+    const en = list.filter((v) => /^en\b/i.test(v.lang.replace('_', '-')) || v.voiceURI === settings.voiceURI);
+    sel.textContent = '';
+    sel.add(new Option('Phone default', ''));
+    for (const v of en.sort((a, b) => a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name))) sel.add(new Option(`${v.name} (${v.lang.replace('_', '-')})`, v.voiceURI));
+    sel.value = settings.voiceURI || '';
+    $('#voiceNote').textContent = en.length
+      ? `${en.length} English voices on this phone. iPhone: more, and better ones, can be downloaded in Settings → Accessibility → Spoken Content → Voices.`
+      : 'This browser did not list any voices, so the phone default is used.';
+  }
+  if ('speechSynthesis' in window) speechSynthesis.addEventListener && speechSynthesis.addEventListener('voiceschanged', fillVoices);
   $('#settingsBtn').addEventListener('click', () => {
     markRegion();
     renderAnchors();
+    fillVoices();
     for (const el of dlg.querySelectorAll('[data-setting]')) {
       const k = el.dataset.setting;
       if (el.type === 'checkbox') el.checked = !!settings[k];
@@ -670,12 +700,20 @@ async function main() {
     }
     dlg.showModal();
   });
-  dlg.addEventListener('click', (e) => { if (e.target.id === 'perfRun') ctx.perfTest.run(); });
+  dlg.addEventListener('click', (e) => {
+    if (e.target.id === 'perfRun') ctx.perfTest.run();
+    if (e.target.id === 'voiceTest' && 'speechSynthesis' in window) {   // (plays even when spoken announcements are off, so a voice can be tried first)
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance('Route 17 north. Now entering Paramus.');
+      ctx.applyVoice(u);
+      speechSynthesis.speak(u);
+    }
+  });
   dlg.addEventListener('change', (e) => {
     const el = e.target;
     const k = el.dataset.setting;
     if (!k) return;
-    settings[k] = el.type === 'checkbox' ? el.checked : k === 'driveQuizMin' ? +el.value : el.value;
+    settings[k] = el.type === 'checkbox' ? el.checked : k === 'driveQuizMin' || k === 'voiceRate' || k === 'voicePitch' ? +el.value : el.value;
     ctx.saveSettings();
     if (k === 'basemap') ctx.setBasemap(el.value);
     if (k === 'mapStyle') location.reload();

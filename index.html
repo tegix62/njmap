@@ -98,6 +98,29 @@
 
       <details class="sect">
         <summary>More voice</summary>
+        <label class="row">Voice
+          <select data-setting="voiceURI" id="voicePick"><option value="">Phone default</option></select>
+        </label>
+        <label class="row sub">Speed
+          <select data-setting="voiceRate">
+            <option value="0.8">slower</option>
+            <option value="0.9">a little slower</option>
+            <option value="1">normal</option>
+            <option value="1.1">a little faster</option>
+            <option value="1.25">faster</option>
+          </select>
+        </label>
+        <label class="row sub">Pitch
+          <select data-setting="voicePitch">
+            <option value="0.6">much lower</option>
+            <option value="0.8">lower</option>
+            <option value="1">normal</option>
+            <option value="1.2">higher</option>
+            <option value="1.5">much higher</option>
+          </select>
+        </label>
+        <div class="row sub"><button type="button" id="voiceTest">▶ Test this voice</button></div>
+        <p class="hint" id="voiceNote"></p>
         <label class="row sub"><input type="checkbox" data-setting="voiceGuess" /> …but ask me first (“New town. Which one?”), pause, then say it</label>
         <label class="row sub"><input type="checkbox" data-setting="voiceHints" /> …and name its sound-alike (“Not Rockaway — that's 19 miles west-northwest”)</label>
         <label class="row"><input type="checkbox" data-setting="driveQuiz" /> Quiz me while I drive: a spoken question every few minutes ("Paterson: left, right, ahead or behind?"), a pause, then the answer. Nothing to tap.</label>

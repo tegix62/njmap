@@ -143,6 +143,7 @@ export function initDrive(ctx) {
     // iOS needs a user gesture to unlock speech and the compass.
     if (settings.voice && 'speechSynthesis' in window) {
       const u = new SpeechSynthesisUtterance('Location on.');
+      ctx.applyVoice(u);
       u.volume = 0.6;
       speechSynthesis.speak(u);
     }
