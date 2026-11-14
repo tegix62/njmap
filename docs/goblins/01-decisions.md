@@ -208,9 +208,11 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | ID | Status | Decision | Notes |
 |---|---|---|---|
 | D124 | DECIDED | The hidden state of a character has five groups. **Identity:** name, clan, tier, dynasty number, home town. **Body:** injuries and missing limbs, scars. **Mind:** a hidden confidence stat, fears tied to places or terrain, personality traits. **History:** who they have beaten or lost to, titles, terrain mastery. **Bonds:** allies, rivals, grudges. The surface shows only three to five of these | User: "that's all great". Style 3 (D102) resolves outcomes from this state |
-| D125 | DECIDED | **Personality traits come in a gradient: 3 per goblin, 4 higher up, 5 at the highest** | My reading, to confirm: 3 at tier 1, 4 at tier 2, 5 at tier 3 |
-| D126 | PROPOSED | Promotion opens a trait slot, and the new trait is earned from what the character did (history), not rolled | Nemesis-style storytelling. Makes rising feel like gaining depth |
+| D125 | DECIDED (revised 2026-11-14) | **Personality traits come in a gradient: 3 per goblin, 4 higher up, 5 at the highest. Only some are notable: 1 notable trait for the lowest, 2 for higher up, 3 at most for the highest.** The rest are minor and "not that big a deal". The notable trait is the accessible headline | My reading, to confirm: the 3, 4 and 5 map to tiers 1, 2 and 3 |
+| D126 | DECIDED 2026-11-14 ("earned slots yes") | Promotion opens a trait slot, and the new trait is earned from what the character did (history), not rolled | Nemesis-style storytelling. Makes rising feel like gaining depth |
 | D127 | PROPOSED | A nameless tier-1 grunt carries no individual traits until it is named and promoted. Traits are written as a word bank by the user (D68) | Keeps the data and the content small |
+| D128 | DECIDED | Traits can change, but it is hard to change them | How hard, and what it takes, is OPEN (H40) |
+| D129 | DECIDED | A closeup trait (D103) takes a slot | Which kind of slot is OPEN. My suggestion: a notable one, since it is radical |
 
 ## Facts to verify before use
 
