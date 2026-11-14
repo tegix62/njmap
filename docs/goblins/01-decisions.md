@@ -43,7 +43,7 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D14 | DECIDED | A Director (Left 4 Dead style) manages pacing: build up, peak, relax. A drama budget limits how many big events land per day away | Source not read: Valve GDC 2009 slides |
 | D15 | DECIDED | Fog of war is your own knowledge, as a gradient so the state stays readable: Known, Familiar, Rumoured, Unknown. Never lose all state-wide visibility | Restored 2026-11-14 by the full link (D81) |
 | D16 | DECIDED (leaning) | Rumours are free and passive; a paid scout can confirm or sharpen. Rumours can be wrong | User unsure on cost |
-| D17 | DECIDED | Daily report (a newspaper-style Ledger), weather and seasons on the map, alliances and bonds | |
+| D17 | DECIDED | Daily report (a newspaper-style Ledger), weather and seasons on the map, alliances and bonds | The newspaper style is relaxed: the Ledger can simply be an event log (D94) |
 | D18 | OPEN | Win condition. Candidates: unify New Jersey, with Civilization-style mini-objectives (hold a crossing for N days, survive a storm) | |
 | D19 | OPEN | Seasons with legacy, reset timing | User wants quick replayability, unsure about resets |
 
@@ -154,19 +154,22 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D74 | PROPOSED (restored) | The goblin Today shares the Today quiz's shell and the Play hub | The full link (D81) makes this plausible again |
 | D80 | DECIDED | **Two clocks.** Real time runs while the player is away (orders take real time, catch-up is capped). An **Advance** button fast-forwards time while the player is sitting down, so a long session works like a Tecmo turn | Refined by D82 and D83 |
 | D81 | DECIDED | **Full link** between the quiz data and goblin mode: Progress knowledge sets the fog (D15), and quiz knowledge gives real advantages (D53, D54 in direction) | The user's own worry: "it would just be hard to make it fun" (H24). Specific mechanics of D54 are still OPEN |
-| D82 | DECIDED | **A separate world clock.** The world advances in **hourly ticks, with significant events every 8 hours, starting at 9 am to start the day** (user, 2026-11-14). **No single player can move the world clock.** A player's actions can intensify the Director's pacing | My reading, to confirm: major ticks at 9:00, 17:00 and 01:00 in the region's own time zone (Eastern). Solves the shared-world problem with Advance (H25) |
+| D82 | DECIDED | **A separate world clock.** The world advances in **hourly ticks, with significant events around morning, noon and evening Eastern time, daily** (user, 2026-11-14, replacing the first idea of every 8 hours from 9 am). **No single player can move the world clock.** A player's actions can intensify the Director's pacing | Exact times OPEN (suggestion: about 9:00, 12:00 and 18:00, in the region's own time zone). Nothing major overnight. Solves the shared-world problem with Advance (H25) |
 | D83 | DECIDED (direction) | **Advance** moves only the player's own time within the current window: their own orders and encounters. It never moves the world clock or affects other players | What fills a long sitting is still OPEN (H19) |
 | D84 | DECIDED | Players who are offline are treated and preserved, not punished. The user expects bursts: a week of play, a week away, then back, or deep engagement if it is fun and cooperative. Design for both | Specifics OPEN (H7) |
 | D85 | DECIDED (direction) | Allies largely share knowledge, and every shared item names who shared it. Uneven knowledge is acceptable and can be fun. The feeling to design for is gratitude toward the ally who shared | Mechanics OPEN (H28) |
 | D86 | DECIDED | The full link (D81) must be paced. The user covers only part of the map on their own, so the game cannot wait on quiz coverage or it would "take forever" | Opens H27 |
 | D87 | DECIDED 2026-11-14 ("works all around") | **Drop-in clans.** Every player slot starts as an AI lord and a human can claim it at any time, and give it back. The world is complete with one human and four players is a bonus | Removes the dependence on friends playing |
 | D88 | DECIDED 2026-11-14 ("works all around") | Allies cover an absent player's fief and are credited for it ("held Totowa for you"). The same gratitude loop as D85 | |
-| D89 | PROPOSED | The Director's pressure estimate counts active players, not enrolled ones | |
+| D89 | DECIDED 2026-11-14 ("definitely") | The Director's pressure estimate counts active players, not enrolled ones | |
 | D90 | DECIDED 2026-11-14 ("works all around") | Knowledge also rises through play (a fight, a scout, a march through a town), so the fog is not gated by the quiz alone | One way to meet D86 |
 | D91 | DECIDED 2026-11-14 ("works all around") | A starting theatre: begin with the towns around the player's home and the north-east (the depth plan in H5), and widen the playable map as knowledge or conquest grows | Another way to meet D86 |
 | D92 | DECIDED 2026-11-14 ("sure") | **Encounters as sit-down play.** The macro game runs on the world clock; the player's own sitting is spent on personal encounters (a duel, a parley, an insult, a scouting run) that resolve in minutes and feed the next world tick. This is the Shadow of Mordor part | Answers H19 |
 | D93 | DECIDED (direction) | In turn-based sit-down play a player can **take territory by doing something well enough or trying hard enough** (user, 2026-11-14) | What counts as "well enough" and "hard enough", and how to stop grinding from beating cleverness, is OPEN (H29) |
-| D94 | PROPOSED | The Ledger publishes at the 9 am major tick, as the morning edition. Hourly ticks are small (marches, rumours, weather); major ticks carry the significant events, the Director's peaks, dwarf arrivals and sieges | |
+| D94 | DECIDED (revised 2026-11-14) | The Ledger is an event log: a running list of what happened. It does not need a newspaper voice or a daily edition. Hourly ticks are small (marches, rumours, weather); major ticks carry the significant events, the Director's peaks, dwarf arrivals and sieges | |
+| D95 | DECIDED | **The foothold model.** An encounter win places a foothold on a town, and the next world tick decides whether it holds. Repeated attempts have diminishing returns | Protects the world clock (D82) from grinding |
+| D96 | DECIDED | "Doing it well enough" for a foothold is measured by: (1) a win by a large margin, (2) a clever choice that is unconventional or high risk, (3) quiz questions, which can "charge" it | The quiz is a boost and never a requirement (D53) |
+| D97 | PROPOSED | The quiz charge is optional, capped per encounter, and can only add to a foothold, never decide it. "Unconventional" is recognised by the game when a choice uses a discovered lever (a fear, a trait, terrain) instead of the default strongest-force option | Both rules need testing (H29, H30) |
 
 ## Facts to verify before use
 
