@@ -213,6 +213,7 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D127 | PROPOSED | A nameless tier-1 grunt carries no individual traits until it is named and promoted. Traits are written as a word bank by the user (D68) | Keeps the data and the content small |
 | D128 | DECIDED | Traits can change, but it is hard to change them | How hard, and what it takes, is OPEN (H40) |
 | D129 | DECIDED | A closeup trait (D103) takes a slot | Which kind of slot is OPEN. My suggestion: a notable one, since it is radical |
+| D131 | DECIDED | State names are the user's words. After R's break the user calls him **Humiliated**, not my placeholder "Shaken". The real list of visible states is written by the user (D68) | Paper test 01, beat 4 |
 | D130 | PROPOSED | A closeup (D103) is triggered when a character's own notable traits conflict under pressure, for example Proud (cannot retreat in front of his rats) against Cautious (wants to). It ends in a break (a new fear tied to a place, a cracked confidence, a grudge) or, rarely, a radical persistence. A break does not rewrite a notable trait at once (D128) | Seen in paper test 01, beat 3. The conflict is the reason for the drama |
 
 ## Facts to verify before use
