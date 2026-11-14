@@ -12,6 +12,9 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 6. **Authored skeleton, procedural flesh.** Authored: what the world is (clans, towns, facts, rules). Procedural: what happens in it (names, trait combinations, injuries, rumours, timing, weather).
 7. **Own characters and art only.** Mechanics may be inspired by other games; characters, names and art are not borrowed.
 8. **Switch it off.** The strategy layer is a toggle. Quiz, Drive and Progress work without it.
+9. **The two-minute door.** Opening the game must be as easy and quick as the Today quiz: one tap to something playable, done in about two minutes, no menu to cross first. (User, 2026-11-14: the Today quiz is the feel to match.)
+10. **Depth by discovery.** The big conventions, storylines and stats exist below the surface and show up when you go looking, the way map labels appear only once you zoom in. The "wow, that exists" moment is a goal. The surface stays small.
+11. **Novelty over format.** Keep the player slightly off balance, as the cardinal and relative orientation training does: vary the kind of beat so the brain can't settle into the format of the session. Constantly surprising, and quick.
 
 ## Decisions
 
@@ -128,6 +131,17 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D67 | DECIDED | Clans get regional flavour, loosely | |
 | D68 | DECIDED | **The user writes the comedic content**: name banks (prefixes and so on), insult lines, clan flavour. Claude builds the structures, slots and tools and does not author lines for shipping | Replaces the earlier plan for Claude to draft insult lines |
 | D69 | DECIDED | The primary model is the Tecmo style (many characters, a map of fiefs, a long campaign, delegation), not XCOM, which is too singularly turn-based. XCOM supplies supporting pieces only: covert actions, telegraphed threats, shown odds, bonds | |
+
+### Session feel (2026-11-14)
+
+| ID | Status | Decision | Notes |
+|---|---|---|---|
+| D70 | DECIDED | The measure of the game's ease is the Today quiz: the user has tapped it countless times because it is fun and quick. The goblin game must open as easily | Pillar 9 |
+| D71 | DECIDED | Hidden depth is revealed progressively, by exploring, not by menus. Zooming in already works this way on the map | Pillar 10 |
+| D72 | DECIDED | Each session mixes different kinds of beats, so the format never becomes predictable | Pillar 11. The Today quiz already does this |
+| D73 | DECIDED | The most valued thing from Shadow of Mordor is personalised storytelling for each enemy | |
+| D74 | PROPOSED | A goblin Today: a two-minute session of three to five beats, each a different verb (a raid, a scout, an insult, a rumour, a decision). It shares the Today quiz's shell and the Play hub | Not yet discussed |
+| D75 | NOTE | The Today quiz itself could use more work. The user is not focused on that now | |
 
 ## Facts to verify before use
 
