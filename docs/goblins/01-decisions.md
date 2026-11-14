@@ -45,8 +45,8 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D15 | DECIDED | Fog of war is your own knowledge, as a gradient so the state stays readable: Known, Familiar, Rumoured, Unknown. Never lose all state-wide visibility | Restored 2026-11-14 by the full link (D81) |
 | D16 | DECIDED (leaning) | Rumours are free and passive; a paid scout can confirm or sharpen. Rumours can be wrong | User unsure on cost |
 | D17 | DECIDED | Daily report (a newspaper-style Ledger), weather and seasons on the map, alliances and bonds | The newspaper style is relaxed: the Ledger can simply be an event log (D94) |
-| D18 | OPEN | Win condition. Candidates: unify New Jersey, with Civilization-style mini-objectives (hold a crossing for N days, survive a storm) | See D157: a final challenge that is a culmination of known skills, taken when the player chooses |
-| D19 | OPEN | Seasons with legacy, reset timing | User wants quick replayability, unsure about resets |
+| D18 | DECIDED in direction 2026-11-14 (D175) | Win condition. Candidates: unify New Jersey, with Civilization-style mini-objectives (hold a crossing for N days, survive a storm) | See D157: a final challenge that is a culmination of known skills, taken when the player chooses |
+| D19 | OPEN | Seasons with legacy, reset timing | User wants quick replayability, unsure about resets. No hard reset (D175); whether a legacy carries over is still open (D174) |
 
 ### Clans and factions
 
@@ -265,15 +265,26 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D168 | DECIDED 2026-11-14 ("no changes") | **The catch-up report.** Missed hourly ticks are processed in order up to a cap of 72 hours (about nine major events); beyond that the world settles. The messenger gives a headline and up to three items, and the rest goes to the Ledger event log (D94). After a week or more, a short welcome back covering your own area only | Cap and counts are starting values |
 | D169 | DECIDED 2026-11-14 ("no changes") | **Travel pace.** A march takes about one tick per three miles of real distance, so a neighbouring township is one to two ticks away and a skirmish is immediate | A starting value |
 
-### Long-term hook (2026-11-14, proposed, awaiting the user)
+### Long-term hook (2026-11-14, decided)
 
 | ID | Status | Decision | Notes |
 |---|---|---|---|
-| D171 | PROPOSED | **Regions are the unit of authored content.** About eight to ten region kits (for example the Highlands, the Palisades and Hudson waterfront, the Meadowlands, the Watchungs and Piedmont, the Raritan and central New Jersey, the Pine Barrens, the Shore, the Delaware Valley). Each kit has a terrain rule, a hazard, a trade flavour and a handful of verified facts. Towns inherit their region's kit; only the starting theatre's towns get town-level facts | Answers the content scale in H5. The kits are the user's to write or approve (D68) |
-| D172 | PROPOSED | **Three engines of novelty for week three:** new places (moving into a new region), new people (dynasties, nemeses and grudges that grow), new rules (seasons, weather and terrain) | The answer to H2 |
-| D173 | PROPOSED | **Your knowledge is the progression bar.** The more of New Jersey you learn, the further the fog clears (D15, D81), so learning is also the long-term reason to open the quiz | |
-| D174 | PROPOSED | **Replay.** Each new war draws different clans from the pool and places them randomly on matching habitat (D23), so a second campaign differs from the first. Whether a legacy carries over (D19) stays open | |
-| D175 | PROPOSED | **The win condition as region chapters.** "Unify New Jersey" is the long game, taken a region at a time. Each region is a chapter with its own mini-objectives and a final challenge made of skills already used, taken when you choose (D157). No hard reset | Answers D18 in direction |
+| D171 | DECIDED 2026-11-14 ("all good") | **Regions are the unit of authored content.** About eight to ten region kits (for example the Highlands, the Palisades and Hudson waterfront, the Meadowlands, the Watchungs and Piedmont, the Raritan and central New Jersey, the Pine Barrens, the Shore, the Delaware Valley). Each kit has a terrain rule, a hazard, a trade flavour and a handful of verified facts. Towns inherit their region's kit; only the starting theatre's towns get town-level facts | Answers the content scale in H5. The kits are the user's to write or approve (D68) |
+| D172 | DECIDED 2026-11-14 ("all good") | **Three engines of novelty for week three:** new places (moving into a new region), new people (dynasties, nemeses and grudges that grow), new rules (seasons, weather and terrain) | The answer to H2 |
+| D173 | DECIDED 2026-11-14 ("all good") | **Your knowledge is the progression bar.** The more of New Jersey you learn, the further the fog clears (D15, D81), so learning is also the long-term reason to open the quiz | |
+| D174 | DECIDED 2026-11-14 ("all good") | **Replay.** Each new war draws different clans from the pool and places them randomly on matching habitat (D23), so a second campaign differs from the first. Whether a legacy carries over (D19) stays open | |
+| D175 | DECIDED 2026-11-14 ("all good") | **The win condition as region chapters.** "Unify New Jersey" is the long game, taken a region at a time. Each region is a chapter with its own mini-objectives and a final challenge made of skills already used, taken when you choose (D157). No hard reset | Answers D18 in direction |
+
+### Learning integration (2026-11-14, proposed, awaiting the user)
+
+| ID | Status | Decision | Notes |
+|---|---|---|---|
+| D176 | PROPOSED | **Fog levels come from the existing spaced-review data** (store `srs`: a box 0 to 5 per town, and `stats`). **Known** is box 3 or more (learned). **Familiar** is box 1 to 2, or missed lately. **Rumoured** is a town not yet asked about that lies along a border or a road from something Known or Familiar. **Unknown** is the rest | Nothing new is tracked. Read from js/progress.js: a town is "learned" at box 3 and above |
+| D177 | PROPOSED | **Rumours travel along roads you know.** Learning a highway extends how far rumours reach | Makes the highway quiz matter to the map |
+| D178 | PROPOSED | **In-game familiarity is separate from learning.** Fighting, scouting or marching through a township can raise it to **Familiar** at most. **Known** needs real learning (box 3 or more). In-game familiarity is never written into the spaced-review data | The game can show you things; only learning makes it Known (H27) |
+| D179 | PROPOSED | **The quiz charge is a real review.** A charge question is drawn from the places involved and counts as a spaced-review answer, so playing the game also reviews you. It is optional, at most one per beat and three per sitting, a wrong answer never blocks, and a Settings switch turns charges off | Keeps the link from feeling like homework (H24) |
+| D180 | PROPOSED | **A floor for new players.** The player's home township and its neighbours start as Familiar, and the starting theatre is at least 12 townships, otherwise sized from the player's own data (D91). A friend with no quiz history still sees a readable map | Answers H14 and H26's empty-data case |
+| D181 | PROPOSED | **Sharing among allies is automatic and shares levels only.** The Known or Familiar level of a township crosses the network, with credit to who shared it (D85). Scores, answers and history never do | Settles H28 |
 
 ## Facts to verify before use
 
