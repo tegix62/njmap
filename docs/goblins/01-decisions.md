@@ -62,7 +62,7 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D27 | REJECTED / OPEN | "Highlands gnomes" as the gnomes' identity: too generic (user, 2026-11-14). What gnomes are is OPEN. Toads (wetlands, hard to insult) remain a suggestion | |
 | D28 | OPEN | What the goobers are: look, temperament, turf | User's call |
 | D29 | DECIDED | Dwarves: rare relief faction, full Tolkien/Warcraft style (not hard hats). They emerge from tunnels in geologically fitting rock or mining towns, are reliable (never betray), do a job and leave the game | Town list is hand-curated; to be verified |
-| D30 | PROPOSED | The Director raises dwarf appearance chance quietly when the player is losing | |
+| D30 | DECIDED 2026-11-14 ("hidden helping hand") | The Director raises dwarf appearance chance quietly when the player is losing | |
 | D31 | DECIDED | A lone rogue in the Chosen/Omar style: belongs to no clan, can't be beaten by armies | Avoid anything past season 4 of The Wire |
 | D32 | OPEN | Jersey Devil as a roaming wildcard | Suggested by Claude, not yet commented on |
 
@@ -246,6 +246,8 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D155 | PROPOSED | **No wasted motion.** No confirmation dialogs, no loading exposition, instant return to play, in line with the two-minute door (pillar 9) | FTL went from game over to the menu in seconds |
 | D156 | PROPOSED | **A test for choices:** if it is a decision, it should not be the same choice every time (Ma). Every option should be best in some situation. Use it on H41 | |
 | D157 | PROPOSED | For the win condition (D18): a final challenge should be a culmination of skills the player has already used, not new mechanics, and the player could choose when to take it, which gives a dynamic play length | From the Into the Breach interview. Feeds D18 and D19 |
+| D158 | DECIDED | **The dwarves are a hidden helping hand in *timing*, and a rule of the world in *place and reason*.** The Director quietly makes them more likely when the player is struggling (D30), and the player never sees that. Where and why they appear follows rules that can be learned: they come only from geologically fitting rock and mining towns (D29) | User: "hidden helping hand. But I kind of like the rule of the world thing." Settles H49 in direction |
+| D159 | PROPOSED | The Director only adjusts *when*, never *where*: it cannot conjure dwarves in a town the rules say has none. A learnable tell comes first, such as rumours of hammering from a mine. One option is that dwarves are possible only from a rock town the player holds or has befriended (the earlier idea that they come when you have treated a town well) | Exact rule OPEN |
 
 ## Facts to verify before use
 
