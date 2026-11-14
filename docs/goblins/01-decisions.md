@@ -84,7 +84,7 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | ID | Status | Decision | Notes |
 |---|---|---|---|
 | D41 | DECIDED | Besides violence, a player can hurt characters with insults. It depends on the target's stats | |
-| D42 | DECIDED | Insults are player actions using authored lines. They can be non sequiturs | Not tied to geography knowledge |
+| D42 | DECIDED | Insults are player actions using authored lines. They can be non sequiturs | Not tied to geography knowledge. Under review 2026-11-14: in paper test 01 the user said they might not write insult lines at all, because the action alone works (a taunt that exploits a trait they discovered). If so, the authoring load in H6 drops |
 | D43 | DECIDED | Effects include lowered self-confidence, questioning their beliefs, a fragile sense of self-worth. Recovery is a support group (about a day) | |
 | D44 | DECIDED | Your own characters can be hit by insults and need support | |
 | D45 | DECIDED | Insults between other clans don't need to matter much | |
