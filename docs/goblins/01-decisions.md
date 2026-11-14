@@ -215,6 +215,8 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D129 | DECIDED | A closeup trait (D103) takes a slot | Which kind of slot is OPEN. My suggestion: a notable one, since it is radical |
 | D131 | DECIDED | State names are the user's words. After R's break the user calls him **Humiliated**, not my placeholder "Shaken". The real list of visible states is written by the user (D68) | Paper test 01, beat 4 |
 | D130 | PROPOSED | A closeup (D103) is triggered when a character's own notable traits conflict under pressure, for example Proud (cannot retreat in front of his rats) against Cautious (wants to). It ends in a break (a new fear tied to a place, a cracked confidence, a grudge) or, rarely, a radical persistence. A break does not rewrite a notable trait at once (D128) | Seen in paper test 01, beat 3. The conflict is the reason for the drama |
+| D132 | DECIDED | **Conflicts end decisively.** The player either wrests the land from the enemy or loses the battle and is allowed to focus elsewhere. Having to find traits to exploit was "one too many" when it was the only way forward. Trait levers (D97, D104) are optional shortcuts, never a requirement for winning | User, after paper test 01 |
+| D133 | DECIDED (direction) | A lost battle closes the front and frees the player's attention. There is always a way to disengage. Losing is not a spiral | Feeds H44 and the Director (domain 7) |
 
 ## Facts to verify before use
 
