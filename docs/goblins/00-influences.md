@@ -22,6 +22,7 @@ Logged 2026-11-14. The user has said this list is incomplete. Add what is missin
 | Civilization 5, 6 and 7 | Short mini-objectives inside a long game ("hold this for N days", "survive the storm") | | From the user's description |
 | Super Smash Bros | Recoloured duplicates when players pick the same clan (D5) | | The user's reference |
 | World of Warcraft | The look of the dwarves, with Tolkien (D29) | | The user's reference |
+| Strategery (a phone game) | The user's favourite, still played on long trips. As the user describes it: dots on a randomly generated map, dice rolls and attrition, played against bots. Take: the simplicity; fortifying the front while expanding the back; opponents who lose their units attacking a fortified border; the feeling that a smart player can roll people; numbers and dice, not percentages | Anything more complicated than that at the macro level | The description is the user's. I have not checked it, so details are unverified |
 | Disco Elysium | User-named for chance: dice that are shown rolling, with a result that still feels charged with purpose either way (D100). As I remember it, it has visible dice, named difficulties, one-shot and retryable checks, and failures written as strongly as successes. **Unverified**, including whether it also shows percentages | | From memory. Not verified |
 
 ## Outside games

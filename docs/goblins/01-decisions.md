@@ -228,6 +228,16 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D142 | DECIDED 2026-11-14 ("let's go with that") | **Fronts run on player time.** A front is a local scene of about 4 to 6 beats, and its clock advances with the player's own actions, not with real hours. Pausing is then automatic, nothing moves while the player is away, and no player touches the world clock (D82). The user's "half a day" (D135) is read as about half a day's worth of visits. Real time (the hourly ticks) still governs convoys, travel and the world's own events | The user said "I don't know what to do with the clock". This is a recommendation, not a decision |
 | D143 | DECIDED 2026-11-14 ("let's go with that") | A paused front pins the enemy captain to it, so one captain can be at only one player's front at a time. The world continues elsewhere (other clans, weather, dwarves, convoys), so coming back to significant changes still happens | Answers what the enemy does at a paused front (H46) |
 
+### Macro layer and the shape of a front (2026-11-14)
+
+| ID | Status | Decision | Notes |
+|---|---|---|---|
+| D144 | PROPOSED | The macro layer is a **Strategery-style attrition game on the township graph.** Each township holds a force number; an attack along a shared border resolves with dice, with losses on both sides, shown rolling; skill is concentrating force, fortifying the front while expanding the back, and rolling over thin defences. Captains attach to forces and shift the results | Inspired by the user's favourite phone game (see 00). Reconciles the Tecmo map layer with the Shadow of Mordor character layer |
+| D145 | PROPOSED | **Two speeds of conflict.** A quick dice skirmish against a nameless garrison (one beat, force numbers and shown dice), and a front (maneuvers, a decision beat, a tally) when a named captain defends. Most conquest is quick; the drama is reserved for named characters | May also fill a long sitting (H19) |
+| D146 | PROPOSED | **Fortify before you leave.** Your border townships carry garrisons and fortification you set in advance, so enemy attacks bleed against them. This protects you while a front is paused or you are away, and fits "losing ground is very rare" (D137) | Replaces standing orders as the away-protection |
+| D147 | DECIDED (for now) | A front has a shape: contact, two or three maneuver beats that move a standing up or down a ladder in words (Behind, Even, Ahead, Commanding), a decision beat, and a closing tally. Trait levers jump the ladder two steps; direct force can go to the decision beat at any time | User: "I think your front's shape suits me for now" |
+| D148 | DECIDED | **Maneuvering can win on its own.** A front can end early at Commanding, with the enemy yielding or fleeing and no decision beat | The beaver-dam flood is the example |
+
 ## Facts to verify before use
 
 Everything below came from memory and is `unverified`.
