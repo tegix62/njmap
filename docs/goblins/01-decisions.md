@@ -252,6 +252,18 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D161 | DECIDED | **Sought dwarves.** The player can make their way to them | User: "or you could make your way to them" |
 | D162 | PROPOSED | The Director's hidden hand works by **steering enemy aggression toward a rock town** when the player is struggling; the dwarves' response then follows their own rule. The help is in the world's logic, not conjured | Fits D158 and D159 |
 
+### Director v0 (2026-11-14, all proposed, awaiting the user)
+
+| ID | Status | Decision | Notes |
+|---|---|---|---|
+| D163 | PROPOSED | **Pressure, in words.** For each active player the Director estimates pressure from open fronts, losses in the last day, unread news and time since a quiet stretch, and names it **Calm, Steady, Heated or Overwhelmed**. The number stays hidden; the messenger's mood mirrors the word (D121) | Counts active players only (D89) |
+| D164 | PROPOSED | **A daily rhythm that follows the three major ticks:** morning builds (a new front opens), noon peaks (the day's big event), evening relaxes (quiet, good news). The Director bends it: no peak when pressure is Heated, an extra peak after two Calm days | Could later learn when each player usually opens the game |
+| D165 | PROPOSED | **The drama budget, per player per day:** at most one peak and two minor events; at most one unwarned loss every two days, only minor assets such as convoys (D115), none in the first three days, none under Gentle. The budget shows only through the messenger's mood ("a lean week", D120) | Numbers are starting values to tune in the simulator |
+| D166 | PROPOSED | **The empty day.** Opening the game always shows at least one thing to decide on the first screen: an open border, a rumour of trouble, a quiet skirmish chance, or a trade or travel event | Keeps the two-minute door (pillar 9) |
+| D167 | PROPOSED | **Reveal and discovery cadence.** A reveal (a result you waited for) on about half of opens; a discovery (a new fact on an enemy or a town) on most opens, with at most one big one per sitting | Starting rates to tune (H20) |
+| D168 | PROPOSED | **The catch-up report.** Missed hourly ticks are processed in order up to a cap of 72 hours (about nine major events); beyond that the world settles. The messenger gives a headline and up to three items, and the rest goes to the Ledger event log (D94). After a week or more, a short welcome back covering your own area only | Cap and counts are starting values |
+| D169 | PROPOSED | **Travel pace.** A march takes about one tick per three miles of real distance, so a neighbouring township is one to two ticks away and a skirmish is immediate | A starting value |
+
 ## Facts to verify before use
 
 Everything below came from memory and is `unverified`.
