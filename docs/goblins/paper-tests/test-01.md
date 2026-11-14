@@ -4,7 +4,7 @@ Run 2026-11-14 in text, with Claude as the engine and the user as the lord of a 
 
 ## Setting
 
-Goblins hold Paterson. Rats hold Totowa under Rat Captain R. Clifton and Woodland Park are nearby. Geography was first written from memory and was wrong (a river between Paterson and Totowa); it was corrected against the app's own data (H42): Totowa lies 4.0 miles west-southwest of Paterson and they share a border; Clifton and Totowa do not touch.
+Goblins hold Paterson. Rats hold Totowa under Rat Captain R. Clifton and Woodland Park are nearby. Geography was first written from memory and unchecked. During the test it was "corrected" against the app's data to say there is no river between Paterson and Totowa. That correction was wrong: a later check against the border line itself shows the Passaic runs along about half of the 1.5-mile Paterson–Totowa border (H42). What did hold: Totowa lies 4.0 miles west-southwest of Paterson, they share a border, and Clifton and Totowa do not touch.
 
 ## Hidden state (revealed at the end)
 
