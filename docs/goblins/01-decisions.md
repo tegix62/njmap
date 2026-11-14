@@ -40,7 +40,7 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D10 | DECIDED | Time away is liked, provided changes are not too drastic. Occasional dramatic surprises are wanted | |
 | D11 | SUPERSEDED 2026-11-14 by D82 | (First proposed) catch-up while away: about one game day per real hour, capped near eight game days. Speeds: Live, Daily rate, Skip to next event | Replaced by the world clock in D82. The idea of a cap on catch-up survives: missed ticks are processed up to a cap |
 | D12 | DECIDED | A town or named character is not lost while away without a warning window (e.g. a siege countdown) | |
-| D13 | DECIDED (partly) | The user sometimes wants a loss with no warning | Proposal: only tier 1 and minor assets, or Brutal setting. Not accepted yet |
+| D13 | DECIDED (partly) | The user sometimes wants a loss with no warning | Accepted in form 2026-11-14: convoys are the home for unwarned losses (D115). The Brutal setting idea is still only a proposal |
 | D14 | DECIDED | A Director (Left 4 Dead style) manages pacing: build up, peak, relax. A drama budget limits how many big events land per day away | Source not read: Valve GDC 2009 slides |
 | D15 | DECIDED | Fog of war is your own knowledge, as a gradient so the state stays readable: Known, Familiar, Rumoured, Unknown. Never lose all state-wide visibility | Restored 2026-11-14 by the full link (D81) |
 | D16 | DECIDED (leaning) | Rumours are free and passive; a paid scout can confirm or sharpen. Rumours can be wrong | User unsure on cost |
@@ -190,10 +190,12 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 |---|---|---|---|
 | D110 | DECIDED | **Three resources: Food, Build and Coin** (working names, simpler than the first "provisions, materials, wealth"). Everything else stays hidden state | |
 | D111 | DECIDED (leaning) | Convoys: goods visibly move on the map and can be raided. The user said "convoys could be cool" | Cost: complexity and drawing (H35) |
-| D112 | PROPOSED | Holding a town gives four things: a trade from its real history (checked before use), recruits, vision, and levers | The purpose of territory. Needs per-town trade data (H34) |
-| D113 | PROPOSED | Economy rules: goods move automatically by real road, river and rail and the player decides only when to guard or cut a route; marches cost Food by distance; healing, building and gifts cost Build, Coin or time; a shortage is a story event and never a penalty to a named character without warning; time is a cost for building, marching and healing | |
-| D114 | PROPOSED | A convoy is data, not a simulated entity: a start, an end, a route and a time of departure. Its position is worked out from the time, so nothing runs per frame and it fits the pure-function simulation (D7) | Keeps the battery cost near zero |
-| D115 | PROPOSED | Convoys are where unwarned losses happen (the wish in D13): minor assets only, never named characters or the home | |
+| D112 | DECIDED (the trade part) | Holding a town gives four things: a trade from its real history (checked before use), recruits, vision, and levers. The user likes the trade from real history. **The trade must not add resource types**: a town's real industry maps onto Food, Build or Coin, and its real name (zinc, silk, bog iron) is flavour. Varying what you spend is tedious | Recruits, vision and levers are still PROPOSED. Needs per-town trade data (H34) |
+| D113 | DECIDED for "goods move automatically" (user: "I agree"); the other rules are still PROPOSED | Economy rules: goods move automatically by real road, river and rail and the player decides only when to guard or cut a route; marches cost Food by distance; healing, building and gifts cost Build, Coin or time; a shortage is a story event and never a penalty to a named character without warning; time is a cost for building, marching and healing | |
+| D114 | DECIDED 2026-11-14 ("data, not a simulated entity") | A convoy is data, not a simulated entity: a start, an end, a route and a time of departure. Its position is worked out from the time, so nothing runs per frame and it fits the pure-function simulation (D7) | Keeps the battery cost near zero |
+| D115 | DECIDED, with a caution | Convoys are where unwarned losses happen (the wish in D13): minor assets only, never named characters or the home | The user: "just be careful with that" (D116, H38) |
+| D116 | PROPOSED | Guardrails for unwarned losses: a cap per day inside the Director's drama budget; none in a player's first days; each leaves a trail and a way to answer it (a recovery or reprisal encounter); the Gentle mortality setting turns them off; a lost convoy never costs more than a small part of a stockpile | The user's own caution, turned into rules |
+| D117 | DECIDED | Stockpiles are separate per clan, with gifts between allies and the giver credited (D85, D88) | Settles H37 |
 
 ## Facts to verify before use
 
