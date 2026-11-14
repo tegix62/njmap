@@ -29,3 +29,17 @@ Run 2026-11-14 with `python3 -I tools/sim_skirmish.py` (20,000 trials per line, 
 ## Open
 
 Whether fortification should be this strong; whether a captain should be one die or something smaller; how a river or ridge across the border adds one modifier per attack (geography as physics); and whether the player should ever see these numbers (the rule is counts and shown dice, never percentages, D99).
+
+## Update: fortification tuning (2026-11-14)
+
+The user wanted fortification "somewhere in between" nearly impassable and a mild edge. `tools/sim_skirmish.py` part 2 compares five variants (attacker win rate, 20,000 trials each):
+
+| Variant | 8 vs 8 | 10 vs 10 | 12 vs 8 (1.5 to 1) | 12 vs 6 (2 to 1) |
+|---|---|---|---|---|
+| Plain (no fortification) | 44% | 48% | 79% | 90% |
+| A: defender rolls one extra die | 16% | 14% | 40% | 62% |
+| B: attacker limited to 2 dice | 17% | 15% | 44% | 65% |
+| **C: defender's best die +1** | **20%** | **20%** | **53%** | **74%** |
+| D: defender's best die +2 | 6% | 6% | 28% | 51% |
+
+**Chosen default: C.** It makes an even attack unlikely, a 1.5 to 1 attack about a coin flip, and a 2 to 1 attack likely: between a wall and a speed bump. Variant A (an extra die) is kept as a possible stronger "fortress" tier, for example an upgrade bought with Build. The captain effect is still large and should be tuned.
