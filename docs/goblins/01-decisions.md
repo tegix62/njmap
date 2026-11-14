@@ -15,6 +15,7 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 9. **The two-minute door.** Opening the game must be as easy and quick as the Today quiz: one tap to something playable, done in about two minutes, no menu to cross first. (User, 2026-11-14: the Today quiz is the feel to match.)
 10. **Depth by discovery.** The big conventions, storylines and stats exist below the surface and show up when you go looking, the way map labels appear only once you zoom in. The "wow, that exists" moment is a goal. The surface stays small.
 11. **Novelty over format.** Keep the player slightly off balance, as the cardinal and relative orientation training does: vary the kind of beat so the brain can't settle into the format of the session. Constantly surprising, and quick.
+12. **Chance is theatre, not the rule.** Probability must not govern everything. A choice that reduces to "I picked a percentage and it failed" drains the interest out of the game. Where chance appears it is shown as a performance, and every outcome is charged with purpose, whichever way it goes. (User, 2026-11-14.)
 
 ## Decisions
 
@@ -106,7 +107,7 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 |---|---|---|
 | D53 | DECIDED in direction (D81) | Knowledge is a bonus, never a gate: correct answers give advantages, wrong ones never block |
 | D54 | PROPOSED (direction decided by D81; mechanics open, H24) | Orders cost knowledge (plot the route); scouting reuses the fly-over; quiz answers give extra orders |
-| D55 | PROPOSED | Show the odds and the reason before a battle ("ridge, plus Ridge-hardened") |
+| D55 | PROPOSED, odds part under review (D99, H31) | Show the odds and the reason before a battle ("ridge, plus Ridge-hardened") |
 | D56 | PROPOSED | Delegate by county; the player intervenes for events. Few verbs per turn |
 
 ### Art and technology
@@ -125,7 +126,7 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D61 | DECIDED (direction) | A narrator is wanted, but it must be cheap. It uses the device's built-in text-to-speech, as Drive mode does, not recorded audio | Voice choice and per-clan voices OPEN. Must be tried on real phones |
 | D62 | DECIDED | Titles earned from places, and terrain mastery | |
 | D63 | DECIDED | Bonds between characters who fight together | |
-| D64 | DECIDED | Covert actions, with odds shown up front | |
+| D64 | DECIDED, odds part under review (D99, H31) | Covert actions, with odds shown up front | The user later said percentage-style choices put them on edge |
 | D65 | DECIDED | Raids visible on the map with timers | |
 | D66 | DECIDED | A home base. The support group is either a building there or a separate non-main fortress, as in Nobunaga's Ambition | Which one is OPEN |
 | D67 | DECIDED | Clans get regional flavour, loosely | |
@@ -170,6 +171,10 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D95 | DECIDED | **The foothold model.** An encounter win places a foothold on a town, and the next world tick decides whether it holds. Repeated attempts have diminishing returns | Protects the world clock (D82) from grinding |
 | D96 | DECIDED | "Doing it well enough" for a foothold is measured by: (1) a win by a large margin, (2) a clever choice that is unconventional or high risk, (3) quiz questions, which can "charge" it | The quiz is a boost and never a requirement (D53) |
 | D97 | PROPOSED | The quiz charge is optional, capped per encounter, and can only add to a foothold, never decide it. "Unconventional" is recognised by the game when a choice uses a discovered lever (a fear, a trait, terrain) instead of the default strongest-force option | Both rules need testing (H29, H30) |
+| D98 | DECIDED | One encounter takes about 30 seconds | So complexity must live in hidden state, not in many decisions per encounter |
+| D99 | DECIDED | Percentage-style choices must not be the core of the game. "Games of chance quickly become a soul-sucking gimmick." Probability should not feel like it governs everything | Puts the odds part of D55 and D64 under review (H31) |
+| D100 | DECIDED (direction) | Where chance appears, still show it: dice rolling, in the manner of Disco Elysium, so the player feels charged with purpose whichever way it goes | The reveal (D76) is the natural place for the roll |
+| D101 | PROPOSED | Resolution principles: (a) fail forward, every outcome produces something (a scar, a grudge, a discovery); (b) outcomes in bands (clean win, win with a cost, setback with a gain, disaster with a lesson), not win or lose; (c) prefer hidden information to dice, so a loss means "I did not know" and not "I was unlucky"; (d) difficulty shown as words plus the reasons, not as a percentage; (e) the optional quiz charge (D97) can nudge a roll after it lands | To be paper-tested against a plain percentage version (H31) |
 
 ## Facts to verify before use
 
