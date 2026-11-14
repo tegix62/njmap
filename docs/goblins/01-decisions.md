@@ -55,7 +55,7 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D24 | PROPOSED | Rats are the second full-depth clan. First playable is goblins and rats only | |
 | D25 | DECIDED | Rats are tier-1 heavy and funny "in a chaos sense". Rat King is one named rat | No plague tone (agreed) |
 | D26 | PROPOSED | Chaos mechanic: a chaotic captain occasionally does something not ordered, within a cap, reported in the Ledger | |
-| D27 | PROPOSED | Gnomes: Highlands mining. Toads: wetlands, hard to insult. Both are suggestions | |
+| D27 | REJECTED / OPEN | "Highlands gnomes" as the gnomes' identity: too generic (user, 2026-11-14). What gnomes are is OPEN. Toads (wetlands, hard to insult) remain a suggestion | |
 | D28 | OPEN | What the goobers are: look, temperament, turf | User's call |
 | D29 | DECIDED | Dwarves: rare relief faction, full Tolkien/Warcraft style (not hard hats). They emerge from tunnels in geologically fitting rock or mining towns, are reliable (never betray), do a job and leave the game | Town list is hand-curated; to be verified |
 | D30 | PROPOSED | The Director raises dwarf appearance chance quietly when the player is losing | |
@@ -114,6 +114,20 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D58 | DECIDED | The user wants to learn Blender for low-poly goblins | |
 | D59 | PROPOSED | Blender to toon-shaded pre-rendered sprites in layered parts (heads, hats, weapons, injuries) combined in the app. No live 3D on the map. Placeholders generated in code until the user's art is ready | |
 | D60 | PROPOSED | Tone is comic with true facts underneath. Never gory | Not yet answered as a whole |
+
+### Answers to the parked proposals (2026-11-14)
+
+| ID | Status | Decision | Notes |
+|---|---|---|---|
+| D61 | DECIDED (direction) | A narrator is wanted, but it must be cheap. It uses the device's built-in text-to-speech, as Drive mode does, not recorded audio | Voice choice and per-clan voices OPEN. Must be tried on real phones |
+| D62 | DECIDED | Titles earned from places, and terrain mastery | |
+| D63 | DECIDED | Bonds between characters who fight together | |
+| D64 | DECIDED | Covert actions, with odds shown up front | |
+| D65 | DECIDED | Raids visible on the map with timers | |
+| D66 | DECIDED | A home base. The support group is either a building there or a separate non-main fortress, as in Nobunaga's Ambition | Which one is OPEN |
+| D67 | DECIDED | Clans get regional flavour, loosely | |
+| D68 | DECIDED | **The user writes the comedic content**: name banks (prefixes and so on), insult lines, clan flavour. Claude builds the structures, slots and tools and does not author lines for shipping | Replaces the earlier plan for Claude to draft insult lines |
+| D69 | DECIDED | The primary model is the Tecmo style (many characters, a map of fiefs, a long campaign, delegation), not XCOM, which is too singularly turn-based. XCOM supplies supporting pieces only: covert actions, telegraphed threats, shown odds, bonds | |
 
 ## Facts to verify before use
 

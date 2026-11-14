@@ -8,6 +8,7 @@ The strategy layer is optional. Turned off, the app is exactly the quiz, Drive a
 
 | # | Document | Status |
 |---|---|---|
+| 00 | [Influences and sources](00-influences.md): everything the design draws on, what we take and leave, and which sources have actually been read | written, awaiting additions |
 | 01 | [Pillars and decisions log](01-decisions.md): what we are building, what we refuse, and every decision, with who made it | written, awaiting corrections |
 | 02 | Systems spec: character data model, tiers, injuries and fears, confidence and insults, orders and time, fog, combat | to write |
 | 03 | Director spec: pressure estimate, drama budget, relief valve | to write |
