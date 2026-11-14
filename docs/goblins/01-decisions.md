@@ -107,7 +107,7 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 |---|---|---|
 | D53 | DECIDED in direction (D81) | Knowledge is a bonus, never a gate: correct answers give advantages, wrong ones never block |
 | D54 | PROPOSED (direction decided by D81; mechanics open, H24) | Orders cost knowledge (plot the route); scouting reuses the fly-over; quiz answers give extra orders |
-| D55 | PROPOSED, odds part under review (D99, H31) | Show the odds and the reason before a battle ("ridge, plus Ridge-hardened") |
+| D55 | PROPOSED; odds shown as words with reasons, not percentages (D102) | Show the odds and the reason before a battle ("ridge, plus Ridge-hardened") |
 | D56 | PROPOSED | Delegate by county; the player intervenes for events. Few verbs per turn |
 
 ### Art and technology
@@ -126,7 +126,7 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D61 | DECIDED (direction) | A narrator is wanted, but it must be cheap. It uses the device's built-in text-to-speech, as Drive mode does, not recorded audio | Voice choice and per-clan voices OPEN. Must be tried on real phones |
 | D62 | DECIDED | Titles earned from places, and terrain mastery | |
 | D63 | DECIDED | Bonds between characters who fight together | |
-| D64 | DECIDED, odds part under review (D99, H31) | Covert actions, with odds shown up front | The user later said percentage-style choices put them on edge |
+| D64 | DECIDED; odds shown as words with reasons, not percentages (D102) | Covert actions, with odds shown up front | The user later said percentage-style choices put them on edge |
 | D65 | DECIDED | Raids visible on the map with timers | |
 | D66 | DECIDED | A home base. The support group is either a building there or a separate non-main fortress, as in Nobunaga's Ambition | Which one is OPEN |
 | D67 | DECIDED | Clans get regional flavour, loosely | |
@@ -174,7 +174,11 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D98 | DECIDED | One encounter takes about 30 seconds | So complexity must live in hidden state, not in many decisions per encounter |
 | D99 | DECIDED | Percentage-style choices must not be the core of the game. "Games of chance quickly become a soul-sucking gimmick." Probability should not feel like it governs everything | Puts the odds part of D55 and D64 under review (H31) |
 | D100 | DECIDED (direction) | Where chance appears, still show it: dice rolling, in the manner of Disco Elysium, so the player feels charged with purpose whichever way it goes | The reveal (D76) is the natural place for the roll |
-| D101 | PROPOSED | Resolution principles: (a) fail forward, every outcome produces something (a scar, a grudge, a discovery); (b) outcomes in bands (clean win, win with a cost, setback with a gain, disaster with a lesson), not win or lose; (c) prefer hidden information to dice, so a loss means "I did not know" and not "I was unlucky"; (d) difficulty shown as words plus the reasons, not as a percentage; (e) the optional quiz charge (D97) can nudge a roll after it lands | To be paper-tested against a plain percentage version (H31) |
+| D101 | DECIDED in direction 2026-11-14 (style 2 with 3), except (e), which is still PROPOSED | Resolution principles: (a) fail forward, every outcome produces something (a scar, a grudge, a discovery); (b) outcomes in bands (clean win, win with a cost, setback with a gain, disaster with a lesson), not win or lose; (c) prefer hidden information to dice, so a loss means "I did not know" and not "I was unlucky"; (d) difficulty shown as words plus the reasons, not as a percentage; (e) the optional quiz charge (D97) can nudge a roll after it lands | To be paper-tested against a plain percentage version (H31) |
+| D102 | DECIDED | **Resolution style: named difficulty with reasons and shown dice (style 2), combined with outcomes mostly decided by hidden information (style 3).** Difficulty is shown in words, never as a percentage | User: "2 probably works best with 3." Settles H31 in direction |
+| D103 | DECIDED (direction) | **The breaking-point closeup.** A rare, high-drama closeup of a character's internal conflict, before they react and make a permanent choice, as in Darkest Dungeon and Shadow of Mordor. Outcomes: they break (and gain a fear or flaw); rarely they persist and gain a radical, courageous trait; or they hold on at the cost of further madness | Caused only by an event, never ambient stress (pillar 4). Rates and triggers OPEN (H33) |
+| D104 | DECIDED (direction) | Encounter levers are discoverable features of the real map. The user's example: gobs discover a beaver dam upstream of a river, stall an enemy until it is broken, and the flood scares him off the bridge. Show, do not tell. A plan can span several 30-second encounters across ticks | Content and truth rules OPEN (H32) |
+| D105 | PROPOSED | Lever templates are authored (perhaps ten to fifteen, for example a dam, a rockfall, a blockade, a tide, a canal lock); the map decides where each can apply; the time an effect takes to arrive follows real distance and flow direction | Keeps the content authored and the placement true to the map |
 
 ## Facts to verify before use
 
