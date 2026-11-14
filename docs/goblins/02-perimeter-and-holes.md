@@ -29,7 +29,7 @@ Rules:
 | 1 | Core loop: what one beat of play is, and why it is fun the hundredth time | walked 2026-11-14; open items H19, H24, H27, H28, H29, H30 (H18, H25, H26 resolved in direction) |
 | 2 | Long-term hook: the reason to open it in week three | next |
 | 3 | Resolution: how a raid or battle is settled, and how odds are shown | in progress 2026-11-14 (H31 resolved in direction; H32, H33 open) |
-| 4 | Economy: what you spend and earn | no |
+| 4 | Economy: what you spend and earn | started 2026-11-14 |
 | 5 | Characters: names, traits, injuries, dynasties, tiers | no |
 | 6 | Map and data: what each town must carry for the rules to work | no |
 | 7 | Time and Director: catch-up, pacing, drama budget | no |
