@@ -184,6 +184,17 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D108 | PROPOSED | An "aftermath portrait": a changed character gets an automatic changed-portrait variant (a marked expression plus the injury or scar layers already planned), so the closeup animation is needed only for enemies | Keeps the art cost down |
 | D109 | DECIDED | Goblins can **construct their own bridge to cross certain rivers**, and it takes them time. By and large they use real bridges. Keep the game as close to real life as possible | A construction mechanic whose main cost is time. Whether a built bridge persists is OPEN. It must be drawn as a goblin structure, not as a real bridge |
 
+### Economy (2026-11-14)
+
+| ID | Status | Decision | Notes |
+|---|---|---|---|
+| D110 | DECIDED | **Three resources: Food, Build and Coin** (working names, simpler than the first "provisions, materials, wealth"). Everything else stays hidden state | |
+| D111 | DECIDED (leaning) | Convoys: goods visibly move on the map and can be raided. The user said "convoys could be cool" | Cost: complexity and drawing (H35) |
+| D112 | PROPOSED | Holding a town gives four things: a trade from its real history (checked before use), recruits, vision, and levers | The purpose of territory. Needs per-town trade data (H34) |
+| D113 | PROPOSED | Economy rules: goods move automatically by real road, river and rail and the player decides only when to guard or cut a route; marches cost Food by distance; healing, building and gifts cost Build, Coin or time; a shortage is a story event and never a penalty to a named character without warning; time is a cost for building, marching and healing | |
+| D114 | PROPOSED | A convoy is data, not a simulated entity: a start, an end, a route and a time of departure. Its position is worked out from the time, so nothing runs per frame and it fits the pure-function simulation (D7) | Keeps the battery cost near zero |
+| D115 | PROPOSED | Convoys are where unwarned losses happen (the wish in D13): minor assets only, never named characters or the home | |
+
 ## Facts to verify before use
 
 Everything below came from memory and is `unverified`.
