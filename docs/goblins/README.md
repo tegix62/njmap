@@ -12,6 +12,7 @@ The strategy layer is optional. Turned off, the app is exactly the quiz, Drive a
 | 01 | [Pillars and decisions log](01-decisions.md): what we are building, what we refuse, and every decision, with who made it | written, awaiting corrections |
 | 02 | [Perimeter walk and hole register](02-perimeter-and-holes.md): the method for finding gaps before building, the 14 domains, and the open holes | written; domains 1, 3, 4 and 5 walked in part |
 | 02a | [Paper test 01](paper-tests/test-01.md): the core loop and resolution, played in text, with the hidden state revealed and the findings | run 2026-11-14 |
+| 02c | [Paper test 02](paper-tests/test-02.md): the redesign played on real map data; the user's verdict was "That felt great" | run 2026-11-14 |
 | 02b | [Simulation 01](sims/skirmish-01.md): a first skirmish dice rule, simulated (script: `tools/sim_skirmish.py`) | run 2026-11-14 |
 | 03 | [The game as it stands](03-design-summary.md): a one-page plain-language summary, to read as a check that this is the game the user wants | draft for correction |
 | 04 | Systems spec: character data model, tiers, injuries and fears, confidence and insults, orders and time, fog, combat | to write |

@@ -318,6 +318,13 @@ Counts, sizes and budgets below are Claude's starting estimates, not measurement
 | D198 | DECIDED 2026-11-14 ("all good") | **The first two minutes.** Pick a clan in one tap. The messenger gives the short opening statement. You see your home township and its neighbours. One guided skirmish against a weak nameless garrison, a near-certain win. Then your first front is offered. No walls of tutorial text: everything else is taught when first met (pillar 10). A friend's invite link leads to the same steps | Addresses H13 |
 | D199 | DECIDED 2026-11-14 ("all good") | **Build order, each stage gated by the user playing it.** M0: the headless simulation (skirmish, front, Director), its Ledger read as stories. M1: the skirmish layer on the map in the starting theatre, solo, with placeholders. M2: fronts, characters and the tally. M3: economy and convoys. M4: the Director and messenger. M5: shared mode | Follows D153: each piece fun before the next |
 
+### From paper test 02 (2026-11-14, proposed)
+
+| ID | Status | Decision | Notes |
+|---|---|---|---|
+| D200 | PROPOSED | **Adopt the front rules from paper test 02.** A maneuver rolls 2d6 plus modifiers: 11 and over moves up two steps, 8 to 10 up one, 5 to 7 no move but a discovery, 4 or less down one. A discovered weakness used well moves up two on 8 and over. Some maneuvers are certain, with no roll (a goblin bridge: Behind to Even). The decision beat is a skirmish (D149) adjusted by standing: Behind, the defender is fortified and has a captain's die; Even, fortified; Ahead, neither; Commanding, the enemy yields (D148) | Worked in the test: "That felt great" |
+| D201 | PROPOSED | **Captured captains.** A captain who holds to the end in a closeup and loses can be captured. A captive can be ransomed for Coin, released (which may earn a debt or a grudge), or kept as a bargaining piece. Your own captured captains can be rescued | Details are H51 |
+
 ## Facts to verify before use
 
 Everything below came from memory and is `unverified`.
