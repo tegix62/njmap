@@ -41,7 +41,7 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D12 | DECIDED | A town or named character is not lost while away without a warning window (e.g. a siege countdown) | |
 | D13 | DECIDED (partly) | The user sometimes wants a loss with no warning | Proposal: only tier 1 and minor assets, or Brutal setting. Not accepted yet |
 | D14 | DECIDED | A Director (Left 4 Dead style) manages pacing: build up, peak, relax. A drama budget limits how many big events land per day away | Source not read: Valve GDC 2009 slides |
-| D15 | DECIDED | Fog of war is your own knowledge, as a gradient so the state stays readable: Known, Familiar, Rumoured, Unknown. Never lose all state-wide visibility | |
+| D15 | DECIDED | Fog of war is your own knowledge, as a gradient so the state stays readable: Known, Familiar, Rumoured, Unknown. Never lose all state-wide visibility | Under review: if goblin mode is separate from the quiz (D79), where does "your knowledge" come from? See H18 |
 | D16 | DECIDED (leaning) | Rumours are free and passive; a paid scout can confirm or sharpen. Rumours can be wrong | User unsure on cost |
 | D17 | DECIDED | Daily report (a newspaper-style Ledger), weather and seasons on the map, alliances and bonds | |
 | D18 | OPEN | Win condition. Candidates: unify New Jersey, with Civilization-style mini-objectives (hold a crossing for N days, survive a storm) | |
@@ -104,8 +104,8 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 
 | ID | Status | Decision |
 |---|---|---|
-| D53 | PROPOSED | Knowledge is a bonus, never a gate: correct answers give advantages, wrong ones never block |
-| D54 | PROPOSED | Orders cost knowledge (plot the route); scouting reuses the fly-over; quiz answers give extra orders |
+| D53 | PROPOSED, under review (H18) | Knowledge is a bonus, never a gate: correct answers give advantages, wrong ones never block |
+| D54 | PROPOSED, under review (H18) | Orders cost knowledge (plot the route); scouting reuses the fly-over; quiz answers give extra orders |
 | D55 | PROPOSED | Show the odds and the reason before a battle ("ridge, plus Ridge-hardened") |
 | D56 | PROPOSED | Delegate by county; the player intervenes for events. Few verbs per turn |
 
@@ -142,6 +142,16 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D73 | DECIDED | The most valued thing from Shadow of Mordor is personalised storytelling for each enemy | |
 | D74 | PROPOSED | A goblin Today: a two-minute session of three to five beats, each a different verb (a raid, a scout, an insult, a rumour, a decision). It shares the Today quiz's shell and the Play hub | Not yet discussed |
 | D75 | NOTE | The Today quiz itself could use more work. The user is not focused on that now | |
+
+### Core loop (2026-11-14)
+
+| ID | Status | Decision | Notes |
+|---|---|---|---|
+| D76 | DECIDED | The two moments the user most wants are the **reveal** (what happened) and the **choice** (what to do) | |
+| D77 | DECIDED | Not every turn needs a reveal. Discovery ("wow, that exists") should happen often, but not every turn | The Director sets the rates (H20) |
+| D78 | DECIDED | There must be a way to keep playing past two minutes. The user routinely does with the quiz | The two minutes are a door, not a ceiling (H19) |
+| D79 | DECIDED (leaning) | Quiz questions stay in the basic game mode. Goblin mode is completely different and probably has none inside it | User said "probably". Puts D15, D53, D54, D74 in question (H18) |
+| D74 | revisit | The goblin Today shares the Today quiz's shell. With D79 this may no longer hold. It may share only the Play hub | |
 
 ## Facts to verify before use
 

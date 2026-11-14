@@ -26,7 +26,7 @@ Rules:
 
 | # | Domain | Walked? |
 |---|---|---|
-| 1 | Core loop: what one beat of play is, and why it is fun the hundredth time | next |
+| 1 | Core loop: what one beat of play is, and why it is fun the hundredth time | walked 2026-11-14; open items H18 to H23 |
 | 2 | Long-term hook: the reason to open it in week three | next |
 | 3 | Resolution: how a raid or battle is settled, and how odds are shown | next |
 | 4 | Economy: what you spend and earn | no |
@@ -42,6 +42,20 @@ Rules:
 | 14 | Operations: hosting cost, accounts, privacy, backups | no |
 
 Order is by risk. Domains 1 to 3 first, because everything else depends on them.
+
+## Domain walks
+
+### 1. Core loop (walked 2026-11-14)
+
+**For:** one beat of play, repeated three to five times in a session, still worth doing on the hundredth day.
+
+**Decided:** a session is a two-minute door that opens in one tap (pillars 9 to 11). The reveal and the choice are what the user most wants (D76). Reveals are not every turn and discovery is frequent but not every turn (D77). There is a way to keep playing (D78). Goblin mode is a different mode from the basic game and probably has no quiz questions inside it (D79).
+
+**Draft anatomy of a beat (PROPOSED).** Situation (one line, a real place), Choice (two or three options with their odds shown), Commit (one tap), Reveal (later, in the Ledger, with its story). A session is about one reveal, two commits and one surprise. The Director picks the verbs. The loop is order, wait, reveal, as in the Tecmo games.
+
+**Not known:** see H18 to H23 in the register.
+
+**Cheapest experiment:** a paper playthrough of a short beat sequence.
 
 ## Hole register
 
@@ -66,6 +80,12 @@ Severity: **A** blocks the whole project if wrong; **B** blocks a stage; **C** c
 | H15 | C | Art pipeline: learning Blender takes time and the sprite plan assumes the output exists. Placeholders must carry the game until then | 10 | Decide placeholder style; time the user's first model; keep the art swappable | OPEN |
 | H16 | C | Narrator voice quality varies by phone (device text-to-speech). The user's iPhone voice is plain and older-sounding | 10 | The voice picker already shipped (Settings, More voice); the user to try voices on their phone and a friend's | OPEN |
 | H17 | C | Performance claims are untested for this game: a sprite atlas and a realtime map with faction fills have not been measured | 11 | A throwaway page with 100 sprites and fill changes, measured with the existing performance test | OPEN |
+| H18 | A | Relationship to the quiz mode. If goblin mode is separate (D79), where does "your knowledge" come from? Fog of war (D15), knowledge bonuses (D53), orders that cost knowledge (D54) and a shared Today shell (D74) all assumed a link. Options: no link at all; read-only link (Progress data sets fog and nothing else); or a full link | 6, 12 | The user decides between the three. Then rewrite the four affected entries | OPEN |
+| H19 | A | Keeping playing past two minutes. Orders take real time (D9), so a player who sits down for twenty minutes may have nothing to do. A "two clocks" idea: real time while away, and an Advance button that fast-forwards in a sitting, as a Tecmo turn does. Not yet accepted | 1, 7 | The user confirms or rejects two clocks. Then paper-test whether twenty minutes of Advance stays fun | OPEN |
+| H20 | B | Reveal and discovery cadence. Reveals are not every turn and discoveries are often but not every turn. What are the rates, and who sets them (the Director)? | 1, 7 | Set starting rates; read simulated sessions and count how many have no reveal in a row | OPEN |
+| H21 | B | The empty queue. When nothing is pending, what is there to do? The Director would have to guarantee at least one decision per open | 1, 7 | Count content cost of the guarantee; paper-test a quiet day | OPEN |
+| H22 | B | The length of the wait between an order and its reveal. Too short and there is no anticipation; too long and the game feels dead between visits | 1, 7 | Try three wait lengths in the paper playthrough and note which feels right | OPEN |
+| H23 | B | Verb count. Raids, scouting, insults, rumours, bonds, covert actions and support groups are all on the list. The user's rule is a small surface and the Tecmo games lost people to menus | 1 | List every verb; pick the few that appear in the first week; hide the rest until found (pillar 10) | OPEN |
 
 ## Experiments, cheapest first
 
