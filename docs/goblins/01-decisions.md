@@ -37,7 +37,7 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 |---|---|---|---|
 | D9 | DECIDED | Semi-real-time with skips. Orders take real time based on real distance | |
 | D10 | DECIDED | Time away is liked, provided changes are not too drastic. Occasional dramatic surprises are wanted | |
-| D11 | PROPOSED | Catch-up while away: about one game day per real hour, capped near eight game days. Speeds: Live, Daily rate, Skip to next event | Numbers are placeholders for tuning |
+| D11 | SUPERSEDED 2026-11-14 by D82 | (First proposed) catch-up while away: about one game day per real hour, capped near eight game days. Speeds: Live, Daily rate, Skip to next event | Replaced by the world clock in D82. The idea of a cap on catch-up survives: missed ticks are processed up to a cap |
 | D12 | DECIDED | A town or named character is not lost while away without a warning window (e.g. a siege countdown) | |
 | D13 | DECIDED (partly) | The user sometimes wants a loss with no warning | Proposal: only tier 1 and minor assets, or Brutal setting. Not accepted yet |
 | D14 | DECIDED | A Director (Left 4 Dead style) manages pacing: build up, peak, relax. A drama budget limits how many big events land per day away | Source not read: Valve GDC 2009 slides |
@@ -152,8 +152,19 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D78 | DECIDED | There must be a way to keep playing past two minutes. The user routinely does with the quiz | The two minutes are a door, not a ceiling (H19) |
 | D79 | SUPERSEDED 2026-11-14 | (First said) quiz questions stay in the basic game mode and goblin mode probably has none inside it | Replaced by D81 the same day. History kept |
 | D74 | PROPOSED (restored) | The goblin Today shares the Today quiz's shell and the Play hub | The full link (D81) makes this plausible again |
-| D80 | DECIDED | **Two clocks.** Real time runs while the player is away (orders take real time, catch-up is capped). An **Advance** button fast-forwards time while the player is sitting down, so a long session works like a Tecmo turn | Open: Advance against the shared world (H25) |
+| D80 | DECIDED | **Two clocks.** Real time runs while the player is away (orders take real time, catch-up is capped). An **Advance** button fast-forwards time while the player is sitting down, so a long session works like a Tecmo turn | Refined by D82 and D83 |
 | D81 | DECIDED | **Full link** between the quiz data and goblin mode: Progress knowledge sets the fog (D15), and quiz knowledge gives real advantages (D53, D54 in direction) | The user's own worry: "it would just be hard to make it fun" (H24). Specific mechanics of D54 are still OPEN |
+| D82 | DECIDED | **A separate world clock.** The world advances in fixed ticks, for example every 4, 6 or 8 hours (to tune), independent of every player. **No single player can move the world clock.** A player's actions can intensify the Director's pacing | Solves the shared-world problem with Advance (H25) |
+| D83 | DECIDED (direction) | **Advance** moves only the player's own time within the current window: their own orders and encounters. It never moves the world clock or affects other players | What fills a long sitting is still OPEN (H19) |
+| D84 | DECIDED | Players who are offline are treated and preserved, not punished. The user expects bursts: a week of play, a week away, then back, or deep engagement if it is fun and cooperative. Design for both | Specifics OPEN (H7) |
+| D85 | DECIDED (direction) | Allies largely share knowledge, and every shared item names who shared it. Uneven knowledge is acceptable and can be fun. The feeling to design for is gratitude toward the ally who shared | Mechanics OPEN (H28) |
+| D86 | DECIDED | The full link (D81) must be paced. The user covers only part of the map on their own, so the game cannot wait on quiz coverage or it would "take forever" | Opens H27 |
+| D87 | PROPOSED | **Drop-in clans.** Every player slot starts as an AI lord and a human can claim it at any time, and give it back. The world is complete with one human and four players is a bonus | Removes the dependence on friends playing |
+| D88 | PROPOSED | Allies cover an absent player's fief and are credited for it ("held Totowa for you"). The same gratitude loop as D85 | |
+| D89 | PROPOSED | The Director's pressure estimate counts active players, not enrolled ones | |
+| D90 | PROPOSED | Knowledge also rises through play (a fight, a scout, a march through a town), so the fog is not gated by the quiz alone | One way to meet D86 |
+| D91 | PROPOSED | A starting theatre: begin with the towns around the player's home and the north-east (the depth plan in H5), and widen the playable map as knowledge or conquest grows | Another way to meet D86 |
+| D92 | PROPOSED | **Encounters as sit-down play.** The macro game runs on the world clock; the player's own sitting is spent on personal encounters (a duel, a parley, an insult, a scouting run) that resolve in minutes and feed the next world tick. This is the Shadow of Mordor part | Answers H19 |
 
 ## Facts to verify before use
 
