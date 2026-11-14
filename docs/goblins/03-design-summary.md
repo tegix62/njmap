@@ -26,7 +26,7 @@ Three tiers in every clan (grunts, captains, legends). Named characters carry 3,
 
 ## Resources
 
-Food, Build and Coin, with a town's real trade as flavour only. Goods move by real road on their own, as data and not simulated entities. Convoys are visible and can be raided. A convoy is where a small unwarned loss may happen, introduced by a scared little messenger and never taking a named character or your home.
+Food, Build and Coin, with a town's real trade as flavour only. Goods move by real road on their own, as data and not simulated entities. Convoys are visible and can be raided. A convoy is where a small unwarned loss may happen, introduced by a scared little messenger and almost never taking a named character or your home.
 
 ## Time
 
