@@ -15,7 +15,8 @@ The strategy layer is optional. Turned off, the app is exactly the quiz, Drive a
 | 02c | [Paper test 02](paper-tests/test-02.md): the redesign played on real map data; the user's verdict was "That felt great" | run 2026-11-14 |
 | 02b | [Simulation 01](sims/skirmish-01.md): a first skirmish dice rule, simulated (script: `tools/sim_skirmish.py`) | run 2026-11-14 |
 | 03 | [The game as it stands](03-design-summary.md): a one-page plain-language summary, to read as a check that this is the game the user wants | draft for correction |
-| 04 | Systems spec: character data model, tiers, injuries and fears, confidence and insults, orders and time, fog, combat | to write |
+| 04 | [Systems spec, version 0](04-systems-spec.md): the rules as a builder needs them, with the data model, constants, and where it fills or departs from the log | written 2026-11-15; five new working rules await the user (D202 to D206) |
+| M0 | [M0 build plan](M0-build-plan.md): the headless simulation in eight small steps, each with a check, ending in three Ledgers for the user to read | written 2026-11-15; not started |
 | 05 | Director spec: pressure estimate, drama budget, relief valve | to write |
 | 06 | Content bible: clans, dwarf towns, every real fact with its source and a verified flag | to write |
 | 07 | Screen map and flows | to write |

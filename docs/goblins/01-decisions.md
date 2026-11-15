@@ -29,7 +29,7 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 | D4 | DECIDED | Solo mode stays separate and fully offline. A separate "goblin mode" is online and shared | |
 | D5 | DECIDED | Shared mode is **cooperative**, about four players, each leading a faction. Duplicate clans are fine (recoloured, like Smash Bros). Players together fight AI-run clans | Small backend accepted |
 | D6 | DECIDED | Player is "lord of yourself" commanding a clan; picks a faction | Original framing: goblins vs gnomes. Rats are playable (D22) |
-| D7 | DECIDED 2026-11-14 (confirmed with D190) | The simulation is a pure function: (world state, seed, elapsed time) to new world state. Same code runs on device (solo) and on a server (shared) | Needs the user's confirmation |
+| D7 | DECIDED 2026-11-14 (confirmed with D190) | The simulation is a pure function: (world state, seed, elapsed time) to new world state. Same code runs on device (solo) and on a server (shared) | Confirmed 2026-11-14 |
 | D8 | DECIDED 2026-11-14 (confirmed with D190) | Solo first, shared later, no rewrite | Follows from D7 |
 
 ### Time and the world
@@ -279,13 +279,13 @@ Logged 2026-11-14, transcribed from the design conversation (recovered from the 
 
 | ID | Status | Decision | Notes |
 |---|---|---|---|
-| D176 | DECIDED 2026-11-14 ("all good") | **Fog levels come from the existing spaced-review data** (store `srs`: a box 0 to 5 per town, and `stats`). **Known** is box 3 or more (learned). **Familiar** is box 1 to 2, or missed lately. **Rumoured** is a town not yet asked about that lies along a border or a road from something Known or Familiar. **Unknown** is the rest | Nothing new is tracked. Read from js/progress.js: a town is "learned" at box 3 and above. **Threshold under review (D182):** the user's real data has only 3 towns at box 3 or more |
+| D176 | DECIDED 2026-11-14 ("all good") | **Fog levels come from the existing spaced-review data** (store `srs`: a box 0 to 5 per town, and `stats`). **Known** was first box 3 or more and is now **box 1 or more** (D182). **Familiar** is asked but missed lately, or familiar through play, or the starting floor. **Rumoured** is a town not yet asked about that lies along a border or a road from something Known or Familiar. **Unknown** is the rest | Nothing new is tracked. Read from js/progress.js: a town is "learned" at box 3 and above. Threshold amended by D182 after the user's real data showed only 3 towns at box 3 or more |
 | D177 | DECIDED 2026-11-14 ("all good") | **Rumours travel along roads you know.** Learning a highway extends how far rumours reach | Makes the highway quiz matter to the map |
-| D178 | DECIDED 2026-11-14 ("all good") | **In-game familiarity is separate from learning.** Fighting, scouting or marching through a township can raise it to **Familiar** at most. **Known** needs real learning (box 3 or more). In-game familiarity is never written into the spaced-review data | The game can show you things; only learning makes it Known (H27) |
+| D178 | DECIDED 2026-11-14 ("all good") | **In-game familiarity is separate from learning.** Fighting, scouting or marching through a township can raise it to **Familiar** at most. **Known** needs real learning (box 1 or more, D182). In-game familiarity is never written into the spaced-review data | The game can show you things; only learning makes it Known (H27) |
 | D179 | DECIDED 2026-11-14 ("all good") | **The quiz charge is a real review.** A charge question is drawn from the places involved and counts as a spaced-review answer, so playing the game also reviews you. It is optional, at most one per beat and three per sitting, a wrong answer never blocks, and a Settings switch turns charges off | Keeps the link from feeling like homework (H24) |
 | D180 | DECIDED 2026-11-14 ("all good") | **A floor for new players.** The player's home township and its neighbours start as Familiar, and the starting theatre is at least 12 townships, otherwise sized from the player's own data (D91). A friend with no quiz history still sees a readable map | Answers H14 and H26's empty-data case |
 | D181 | DECIDED 2026-11-14 ("all good") | **Sharing among allies is automatic and shares levels only.** The Known or Familiar level of a township crosses the network, with credit to who shared it (D85). Scores, answers and history never do | Settles H28 |
-| D182 | DECIDED 2026-11-14 ("yeah") | **Amend the Known threshold (D176).** The user's Progress screen (2026-11-14, 186 well-known towns) shows 3 learned, 44 getting there, 65 missed lately and 74 new. With Known at box 3 or more, only 3 townships would ever show full detail. Proposed: **Known is box 1 or more** (learned plus getting there, 47 of 186 now), **Familiar** is asked but missed lately (65), or familiar through play (D178), or the starting floor (D180). The full 4-level fog is otherwise unchanged. Box 3 ("learned") could later unlock one extra layer of detail | Needs the user's yes. Without it the fog is nearly blind (H27) |
+| D182 | DECIDED 2026-11-14 ("yeah") | **Amend the Known threshold (D176).** The user's Progress screen (2026-11-14, 186 well-known towns) shows 3 learned, 44 getting there, 65 missed lately and 74 new. With Known at box 3 or more, only 3 townships would ever show full detail. Proposed: **Known is box 1 or more** (learned plus getting there, 47 of 186 now), **Familiar** is asked but missed lately (65), or familiar through play (D178), or the starting floor (D180). The full 4-level fog is otherwise unchanged. Box 3 ("learned") could later unlock one extra layer of detail | Accepted. Without it the fog would be nearly blind (H27) |
 | D183 | DECIDED 2026-11-14 ("all good") | **The starting theatre is the home township plus its neighbours out to two or three border steps,** between 12 and about 60 townships. From the map's own borders (illustration only, centred on two Passaic County towns): within 2 steps 25 and 21 townships, within 3 steps 58 and 48, within 4 steps 102 and 83 | The player's real home is not assumed. Counts computed from data/nj.topo.json |
 
 ### Map and data (2026-11-14, decided)
@@ -325,6 +325,18 @@ Counts, sizes and budgets below are Claude's starting estimates, not measurement
 | D200 | PROPOSED | **Adopt the front rules from paper test 02.** A maneuver rolls 2d6 plus modifiers: 11 and over moves up two steps, 8 to 10 up one, 5 to 7 no move but a discovery, 4 or less down one. A discovered weakness used well moves up two on 8 and over. Some maneuvers are certain, with no roll (a goblin bridge: Behind to Even). The decision beat is a skirmish (D149) adjusted by standing: Behind, the defender is fortified and has a captain's die; Even, fortified; Ahead, neither; Commanding, the enemy yields (D148) | Worked in the test: "That felt great" |
 | D201 | PROPOSED | **Captured captains.** A captain who holds to the end in a closeup and loses can be captured. A captive can be ransomed for Coin, released (which may earn a debt or a grudge), or kept as a bargaining piece. Your own captured captains can be rescued | Details are H51 |
 
+### Working rules introduced by the systems spec (2026-11-15, proposed)
+
+Written while turning the log into a buildable spec (04). Each fills a gap or resolves a contradiction. All need the user's yes.
+
+| ID | Status | Decision | Notes |
+|---|---|---|---|
+| D202 | PROPOSED | **Conquest pace.** In a sitting a player may attack as often as they like. The limits are attrition, the one unit that must stay behind, and recruits arriving only at major ticks. Moving units between your own bordering townships is immediate | The Strategery feel (D138, D144). It leaves the Advance button (D80, D83) and the foothold's diminishing returns (D95, D96) with no job, so they are parked. Travel time (D9, D169) then applies to AI raids and convoys only |
+| D203 | PROPOSED | **Recruits.** At each major tick a clan gains one unit per three townships, rounded up, placed on its weakest border by default | Fills the "recruits" part of D112 |
+| D204 | PROPOSED | **Dig in.** A township with 3 or more units that has not attacked since the last major tick becomes fortified. Attacking out of it ends that. Later it costs Build | Makes "fortify before you leave" (D146) a rule |
+| D205 | PROPOSED | **AI behaviour and warnings.** An AI clan makes at most one attack per major tick, only at 2 to 1 or better. Against another AI it attacks at once. Against a human it declares a raid that is visible on the map and lands no sooner than six hours later. It never attacks a paused front's township, an absent player's home, or a player in their first three days | Makes D12, D65, D137 and D143 concrete |
+| D206 | PROPOSED | **Geography and standing in the dice.** Attacking across a river or ridge border costs the attacker 1 on their best die, unless a highway runs through both towns. In a front, the captain's defence replaces fortification: Behind gives the defender +1 on the best die and an extra die, Even gives +1, Ahead gives nothing | Defines D149's "one modifier" and tidies D200 |
+
 ## Facts to verify before use
 
 Everything below came from memory and is `unverified`.
@@ -338,9 +350,9 @@ Everything below came from memory and is `unverified`.
 
 ## Open questions, in priority order
 
-1. Confirm D7 (the pure-function simulation).
+1. Confirm the new working rules D202 to D206, and D149, D200 and D201 (see 04, section 14).
 2. What the goobers are (D28).
-3. Win condition and seasons (D18, D19).
+3. Whether a legacy carries between wars (D19, D174). The win condition is settled in direction (D175).
 4. Tone for the whole game (D60).
 5. Insult lines: a first batch of authored lines, and a voice note for each clan.
 6. Whether the rogue and the Jersey Devil are separate (D31, D32).
