@@ -116,6 +116,15 @@ The user's reactions, in order, and what each changes:
 6. **"Why did the rats roll more dice than me?"** The attacker rolls up to 3 dice and 4 with a captain; the defender 2 (D149). Invisible rules are the same clutter as invisible arithmetic. **Change (the user's choice):** make the rule visible, **graphically, not as more text**: each side's dice are drawn as a row of faces before the roll, so the player sees 4 against 2; the extra die is drawn in a different colour with the captain's face on it, and a wall adds a visible bar over the defender's best die. Whether the rule itself becomes more even is still open (option 2 in the chat).
 7. **Two real fights, two losses, both on better-than-even odds** (a 60 percent hold and a 64 percent attack: about 1 in 7 together). The dice scene needs to make a bad streak feel like drama, not an error, and the game needs a way back after a loss (a counter the player can see).
 
+### R0, continued: the standing bar is a picture of the ground (2026-11-15)
+
+Asked "where is he? are we near each other? hearing about coin is enough to make him exposed?", the user showed that a standing bar and a bonus are not believable unless they are *places and acts*. Rules from that:
+
+- **Every position on the bar is a drawn scene of where the captains and the wall stand.** Behind: you far back, he sits behind his wall with a second die. Even: you at the edge, wall counts. Ahead: he has been drawn forward **out past his wall**, so the wall stops counting. Commanding: your goblins on several sides, nowhere to go, he yields.
+- **Every move is an act you can watch.** Use his greed = a goblin walks to the edge of bowshot with a coin bag on a pole, and V's portrait slides out from behind the shield. Probe = a scout creeps up and a trait word is stamped on his face. Pressure = banners and drums, his guards look back.
+- **A lever needs a visible cause before it works**, and a bonus is never explained by a sentence the player was not shown. If the game cannot draw why a move works, the move does not exist.
+- **The same applies to a trait's payoff off the battlefield** (the coin cart): the trait is a rule on his portrait ("goes out for loose coin"), the cart is visible on the road beforehand, and his squad is seen walking to meet it.
+
 ## 10. What stays true
 
 The pure simulation and its tests. Real New Jersey geography, computed and never recalled. No percentages. The user writes the comedy; everything else is a flagged placeholder. A loss is framed. The quiz is a help and never a gate.
