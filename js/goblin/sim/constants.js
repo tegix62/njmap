@@ -61,3 +61,15 @@ export const K4 = Object.freeze({
   maneuverNeedUnits: 3,       // Probe and Pressure need a leading captain or at least this many committed units
   closeupBreakMax: 6, closeupHoldMax: 10,   // 2d6: up to 6 he breaks, 7-10 he holds and is captured, 11+ he persists
 });
+
+// Added in S6 (docs/goblins/04-systems-spec.md section 9): the Director.
+export const K5 = Object.freeze({
+  wCalmBelow: 3, wSteadyBelow: 7, wHeatedBelow: 12,    // pressure score to word
+  perFront: 2, perRaid: 3, perFiveUnitsLost: 1, perTownLost: 4, quietPerTicks: 12, quietMax: 3,
+  unitsWindow: 24, townsWindow: 72,
+  peakPerDay: 1, minorPerDay: 2,
+  calmDaysForExtra: 2,        // two consecutive Calm days allow one extra hostile action
+  extraRatio: 1.0,            // the extra action needs only this ratio (a lower bar than the AI's 2.0)
+  emptyDayRatio: 2.0,         // a bordering enemy weaker than this ratio is "a chance"
+  hourMinor: 9, hourPeak: 12, hourRelax: 18,
+});

@@ -8,9 +8,10 @@
 // S3 covers the territory game: recruits, dig-in, AI attacks, declared raids and human attack and move orders. Characters, fronts and the
 // Director are added in S4 to S6; their hooks are marked.
 
-import { K, K2, K4 } from './constants.js';
+import { K, K2, K4, K5 } from './constants.js';
 import { makeRng, seedState } from './rng.js';
 import { skirmish, modsFor } from './skirmish.js';
+import * as Dir from './director.js';
 import { openFront, actFront, settleFronts, pinnedTowns, openFronts } from './front.js';
 import { placeInitialCaptains, captainsOf, capture, place, promote, succeed } from './chars.js';
 
@@ -222,22 +223,28 @@ function aiTurn(w, board, rng, emit, clan) {
       const U = w.towns[u];
       if (!U || !U.owner || U.owner === clan.id) continue;
       if (shielded(w, U.owner) || protectedHome(w, u) || pinned.has(u)) continue;
+      if (isHuman(w, U.owner) && !Dir.allowsHostile(w, U.owner)) continue;   // the Director: rhythm, budget, pressure
       const ratio = n / Math.max(1, U.force);
       if (ratio >= need && (!best || ratio > best.ratio)) best = { from: t, to: u, n, ratio };
     }
   }
   if (!best) return;
   if (isHuman(w, w.towns[best.to].owner)) {   // against a human: a visible raid with a warning (D12, D205)
-    const F = w.towns[best.from];
-    F.force -= best.n; F.attackedTick = w.tick; F.dugIn = false;
-    let lead = null;
-    if (board.content && F.captain && w.chars[F.captain] && w.chars[F.captain].status === 'active') { lead = F.captain; F.captain = null; w.chars[lead].at = null; }   // the captain rides with the raid
-    const raid = { id: w.nextId++, by: clan.id, from: best.from, target: best.to, force: best.n, lead, declaredAt: w.tick, landsAt: w.tick + K.raidWarningTicks };
-    w.raids.push(raid);
-    emit('raid_declared', { by: clan.id, from: best.from, to: best.to, n: best.n, landsAt: raid.landsAt, raid: raid.id });
+    declareRaid(w, board, emit, clan, best);
+    Dir.spend(w, w.towns[best.to].owner);
   } else {
     fight(w, board, rng, emit, { by: clan.id, from: best.from, to: best.to, n: best.n });
   }
+}
+
+function declareRaid(w, board, emit, clan, best) {
+  const F = w.towns[best.from];
+  F.force -= best.n; F.attackedTick = w.tick; F.dugIn = false;
+  let lead = null;
+  if (board.content && F.captain && w.chars[F.captain] && w.chars[F.captain].status === 'active') { lead = F.captain; F.captain = null; w.chars[lead].at = null; }   // the captain rides with the raid
+  const raid = { id: w.nextId++, by: clan.id, from: best.from, target: best.to, force: best.n, lead, declaredAt: w.tick, landsAt: w.tick + K.raidWarningTicks };
+  w.raids.push(raid);
+  emit('raid_declared', { by: clan.id, from: best.from, to: best.to, n: best.n, landsAt: raid.landsAt, raid: raid.id });
 }
 
 function landRaids(w, board, rng, emit) {
@@ -247,6 +254,34 @@ function landRaids(w, board, rng, emit) {
     const T = w.towns[r.target];
     if (!T) continue;
     fight(w, board, rng, emit, { by: r.by, from: r.from, to: r.target, n: r.force, inTransit: true, raid: r });
+  }
+}
+
+/** The Director's part of a major tick (spec 9): an extra hostile action after two Calm days, the empty-day rule, then the words. */
+function directorTurn(w, board, emit) {
+  for (const id of Object.keys(w.clans).sort(byId)) {
+    const c = w.clans[id];
+    if (c.lord !== 'human' || c.out || c.absentSince !== null) continue;
+    if (Dir.extraDue(w, id)) {
+      // the best bordering AI township against this player at the lowered ratio
+      let best = null;
+      for (const t of ownedBy(w, id)) for (const e of board.neighbours(t)) {
+        const E = w.towns[e];
+        if (!E || !E.owner || E.owner === id || w.clans[E.owner].lord !== 'ai' || shielded(w, id) || protectedHome(w, t) || pinnedTowns(w).has(e) || E.force - 1 < 2) continue;
+        const n = Math.max(2, Math.floor((E.force - 1) * R(w).aiCommitFraction));
+        const ratio = n / Math.max(1, w.towns[t].force);
+        if (ratio >= K5.extraRatio && (!best || ratio > best.ratio)) best = { from: e, to: t, n, ratio, by: E.owner };
+      }
+      if (best) { declareRaid(w, board, emit, w.clans[best.by], best); Dir.spendExtra(w, id); emit('director_extra', { clan: id, from: best.from, to: best.to }); }
+    }
+    const plan = Dir.emptyDay(w, board, id);
+    const d = Dir.dstate(w, id);
+    if (plan && d.nudgeDay !== Dir.dayOf(w)) {
+      w.towns[plan.enemy].force -= plan.move; w.towns[plan.to].force += plan.move; d.nudgeDay = Dir.dayOf(w);
+      emit('director_nudge', { clan: id, enemy: plan.enemy, to: plan.to, n: plan.move });
+    }
+    const was = d.word, word = Dir.closeDay(w, id);
+    emit('director_word', { clan: id, word, changed: was !== word });
   }
 }
 
@@ -263,7 +298,7 @@ function majorTick(w, board, rng, emit) {
     aiTurn(w, board, rng, emit, clan);
   }
   settleFronts(w, board, rng, emit);
-  // hook for S6: the Director adjusts here
+  directorTurn(w, board, emit);
   for (const c of Object.values(w.clans)) {
     if (!c.out && !ownedBy(w, c.id).length) { c.out = true; emit('clan_out', { clan: c.id }); }
   }
@@ -276,7 +311,7 @@ export function step(board, state, orders = [], ticks = 0, opts = {}) {
   const w = structuredClone(state);
   const rng = opts.rng || makeRng(w.rng);   // opts.rng lets tests script the dice
   const events = [];
-  const emit = (type, data = {}) => events.push({ tick: w.tick, type, ...data });
+  const emit = (type, data = {}) => { const e = { tick: w.tick, type, ...data }; events.push(e); Dir.observe(w, [e]); };
   for (const o of orders) (o.type === 'front_open' || o.type === 'front' ? applyFrontOrder : applyOrder)(w, board, rng, emit, o);
   const n = Math.min(ticks, K.catchUpCapTicks);
   for (let i = 0; i < n; i++) {
