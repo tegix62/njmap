@@ -185,6 +185,32 @@ test('with a force cap in the rules, no township ever exceeds it over 100 days',
   assert.ok(Math.max(...Object.values(w.towns).map((t) => t.force)) <= 12);
 });
 
+test('conquest tempo: after an AI captures a township it waits 72 ticks before attacking again', () => {
+  // a six-township line A-F: x owns A and B (80 each); y owns C to F (3 each). x takes C at the first major tick (3 of 6: not yet a leader), then must wait.
+  const j6 = { towns: {}, borders: {} };
+  const L = ['A', 'B', 'C', 'D', 'E', 'F'];
+  L.forEach((t, i) => { j6.towns[t] = { name: t, pop: 1, nb: [L[i - 1], L[i + 1]].filter(Boolean) }; });
+  for (let i = 0; i < 5; i++) j6.borders[`${L[i]}~${L[i + 1]}`] = { mi: 1, river: null, ridge: null, highways: [] };
+  const b6 = makeBoard(j6);
+  const w = mk({ A: ['x', 80], B: ['x', 80], C: ['y', 3], D: ['y', 3], E: ['y', 3], F: ['y', 3] }, [clanOf('x', 'ai'), clanOf('y', 'ai')]);
+  const first = step(b6, w, [], 1);
+  assert.ok(types(first.events, 'skirmish_result').find((e) => e.by === 'x' && e.won), 'x captures C');
+  assert.equal(first.state.clans.x.coolUntil, 1 + 72);
+  const during = step(b6, first.state, [], 71);
+  assert.equal(types(during.events, 'skirmish_result').filter((e) => e.by === 'x').length, 0, 'no attack during the wait');
+  const after = step(b6, during.state, [], 3);   // ticks 73 to 75 include the 09:00 major tick at 73
+  assert.ok(types(after.events, 'skirmish_result').some((e) => e.by === 'x'), 'attacks again once the wait is over');
+});
+
+test("a leader (more than half the theatre) needs 3 to 1 to attack; the same odds are enough for a smaller clan", () => {
+  const leader = mk({ A: ['x', 21], B: ['x', 21], C: ['x', 21], D: ['y', 6] }, [clanOf('x', 'ai'), clanOf('y', 'ai')]);
+  assert.equal(types(step(tiny, leader, [], 1).events, 'skirmish_result').length, 0, '3 of 4 townships: needs 3 to 1');
+  const off = { ...leader, rules: { townForceCap: 99999, recruitFullTowns: 999, recruitDivisorBeyond: 6, aiAttackRatio: 2, aiCommitFraction: 0.75, aiCaptureCooldownTicks: 72, leaderShare: 1.01, leaderAttackRatio: 3 } };
+  assert.ok(types(step(tiny, off, [], 1).events, 'skirmish_result').length >= 1, 'with the handicap off the same odds attack');
+  const smaller = mk({ A: ['x', 21], B: ['x', 21], C: ['y', 6], D: ['y', 6] }, [clanOf('x', 'ai'), clanOf('y', 'ai')]);
+  assert.ok(types(step(tiny, smaller, [], 1).events, 'skirmish_result').length >= 1, 'half the theatre is not a leader');
+});
+
 // ---- the long run on the real board ----
 test('invariants hold for 1,000 simulated days on each of 20 seeds, and the shield and warning rules are never broken', () => {
   let raids = 0, aiFights = 0;

@@ -14,7 +14,10 @@ import { skirmish, modsFor } from './skirmish.js';
 
 /** The world-level tunables, kept in each world (w.rules) so a saved or simulated war records the rules it ran under, and tuning can vary them per run. */
 export const DEFAULT_RULES = Object.freeze({ townForceCap: K2.townForceCap, recruitFullTowns: K2.recruitFullTowns, recruitDivisorBeyond: K2.recruitDivisorBeyond,
-  aiAttackRatio: K.aiAttackRatio, aiCommitFraction: K2.aiCommitFraction });
+  aiAttackRatio: K.aiAttackRatio, aiCommitFraction: K2.aiCommitFraction,
+  aiCaptureCooldownTicks: 72,  // conquest tempo (D209): after taking a township an AI clan waits this many ticks before attacking again (0 = off)
+  leaderShare: 0.5,            // (D209) a clan holding more than this share of the theatre needs leaderAttackRatio to attack (1.01 = never)
+  leaderAttackRatio: 3.0 });
 const R = (w) => w.rules || DEFAULT_RULES;
 
 export const hourOf = (w) => (w.startHour + w.tick) % 24;
@@ -93,7 +96,7 @@ function fight(w, board, rng, emit, { by, from, to, n, inTransit = false, raid =
   if (against === by) { T.force = Math.min(R(w).townForceCap, T.force + n); emit('units_arrived', { clan: by, from, to, n }); return; }
   const r = skirmish({ attackers: n, defenders: T.force, ...borderMods(board, from, to, T.dugIn) }, rng);
   const detail = isHuman(w, by) || isHuman(w, against);
-  if (r.won) { T.owner = by; T.force = r.attackersLeft; T.dugIn = false; T.captain = null; T.attackedTick = -1; }
+  if (r.won) { T.owner = by; T.force = r.attackersLeft; T.dugIn = false; T.captain = null; T.attackedTick = -1; if (w.clans[by].lord === 'ai') w.clans[by].coolUntil = w.tick + R(w).aiCaptureCooldownTicks; }
   else { T.force = r.defendersLeft; if (F.owner === by) F.force += r.attackersLeft; }
   emit(raid ? 'raid_landed' : 'skirmish_result', { by, against, from, to, n, won: r.won, lost: r.lost, left: { a: r.attackersLeft, d: r.defendersLeft },
         ...(detail ? { rounds: r.rounds } : {}) });
@@ -162,6 +165,9 @@ function protectedHome(w, to) {
 }
 
 function aiTurn(w, board, rng, emit, clan) {
+  if (w.tick < (clan.coolUntil || 0)) return;                                  // conquest tempo
+  const share = ownedBy(w, clan.id).length / Object.keys(w.towns).length;
+  const need = share > R(w).leaderShare ? R(w).leaderAttackRatio : R(w).aiAttackRatio;   // a leader needs better odds
   let best = null;
   for (const t of ownedBy(w, clan.id)) {
     const avail = w.towns[t].force - 1;
@@ -173,7 +179,7 @@ function aiTurn(w, board, rng, emit, clan) {
       if (shielded(w, U.owner) || protectedHome(w, u)) continue;
       // hook for S5: a township whose captain is pinned to a player's front is never attacked
       const ratio = n / Math.max(1, U.force);
-      if (ratio >= R(w).aiAttackRatio && (!best || ratio > best.ratio)) best = { from: t, to: u, n, ratio };
+      if (ratio >= need && (!best || ratio > best.ratio)) best = { from: t, to: u, n, ratio };
     }
   }
   if (!best) return;
