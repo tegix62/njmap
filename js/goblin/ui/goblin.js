@@ -6,6 +6,8 @@ import { newWorld, step } from '../sim/world.js';
 import { entriesOf, renderLedger, placePhrase } from '../sim/ledger.js';
 import { frontActions, openFronts } from '../sim/front.js';
 import { captainsOf } from '../sim/chars.js';
+import { K6 } from '../sim/constants.js';
+import { scoutMods, isNight, hasAp } from '../sim/sitting.js';
 import { digestOf } from '../sim/digest.js';
 import { MUNI_LABEL_IDS } from '../../style.js';
 
@@ -131,8 +133,8 @@ export function initGoblin(ctx) {
     const fr = openFronts(world, ME).length;
     const nx = nextMajor();
     ctx.hud(`<div class="town">${mine.length} townships · ${units} units${fr ? ` · ${fr} front${fr === 1 ? '' : 's'}` : ''}</div>
-      <div class="meta">Goblins · ${clock()}</div>
-      <div class="meta">${nx ? `Next: ${nx.hour} (in ${nx.left}): recruits arrive and the other clans move` : ''}</div>`);
+      <div class="meta">Goblins · ${clock()} · actions ${world.clans[ME].ap} of ${K6.apCap}</div>
+      <div class="meta">${nx ? `Next: ${nx.hour} (in ${nx.left}): +${K6.apPerMajor} actions, recruits, the other clans move` : ''}</div>`);
   }
   const panel = (html) => ctx.sheet(html);
   const closeBtn = '<button class="primary" data-g="close">Close</button>';
@@ -145,13 +147,20 @@ export function initGoblin(ctx) {
     const known = (c.known[ME] || []).map(factWord);
     return `<p>★ <b>${esc(c.name)}</b> of ${cap(c.clan)} commands here${c.injuries.length ? ` (hurt: ${c.injuries.map(esc).join(', ')})` : ''}. ${c.clan === ME ? '' : known.length ? `You know: ${known.map(esc).join(', ')}.` : 'You know nothing about them yet.'}</p>`;
   }
+  const ap = () => w().clans[ME].ap;
+  const touchesMine = (id) => G.board.neighbours(id).some((n) => w().towns[n] && w().towns[n].owner === ME);
   function townCard(id) {
     const T = w().towns[id], b = G.board.town(id);
     const mine = T.owner === ME;
+    const cptn = T.captain && w().chars[T.captain];
+    const near = cptn && !mine && touchesMine(id);
+    const knownSome = cptn && (cptn.known[ME] || []).length;
     const fr = openFronts(w(), ME).find((f) => f.target === id);
     panel(`<div class="gob"><h3>${esc(b.name)} <small>${esc(b.county)} County</small></h3>
       <p>${ownerName(T.owner)} hold it with <b>${T.force}</b>${T.dugIn ? ', dug in' : ''}.</p>${captainBlock(T)}
       ${fr ? `<button class="primary" data-g="front" data-id="${fr.id}">Continue the front here</button>` : ''}
+      ${near ? `<button data-g="scout" data-town="${esc(id)}">Scout the captain <span class="fine">1 action</span></button>${knownSome ? `<button data-g="taunt" data-town="${esc(id)}">Taunt the captain <span class="fine">1 action; the next front here starts a step higher</span></button>` : ''}` : ''}
+      ${mine && T.force >= 3 && !T.dugIn ? `<button data-g="fortify" data-town="${esc(id)}">Dig in now <span class="fine">1 action; defenders fight better</span></button>` : ''}
       ${mine && T.force >= 2 ? '<p class="fine">Tap a township next to it to send units, or:</p><button class="primary" data-g="pick" data-id="' + esc(id) + '">Send units from here</button>' : mine ? '<p class="fine">One unit alone has to stay home.</p>' : ''}
       ${closeBtn}</div>`);
   }
@@ -165,12 +174,13 @@ export function initGoblin(ctx) {
     const notes = [];
     if (attack && (bd.river || bd.ridge)) notes.push(hw ? `The ${bd.river ? 'river' : 'ridge'} is no obstacle: ${hw}.` : `Crossing ${bd.river ? 'the river' : 'the ridge'} makes the attackers' best roll worse.`);
     if (attack && T.dugIn) notes.push('They are dug in: their best roll is better.');
+    if (attack && !hasAp(w().clans[ME], 1)) notes.push('You have no actions left. They refill at the next 09:00, 12:00 or 18:00.');
     if (front) notes.push('A captain defends it, so this is a front: a slow fight where you probe, press and look for a weakness before you decide. Nothing is lost until you decide, and you can pull back.');
     panel(`<div class="gob"><h3>${front ? 'Open a front at' : attack ? 'Attack' : 'Move to'} ${esc(G.board.town(to).name)}</h3>
       <p>${esc(placePhrase(G.board, from, to))}${water && !placePhrase(G.board, from, to).includes('over') ? ', ' + water : ''}. ${attack ? `${ownerName(T.owner)} hold it with <b>${T.force}</b>.` : `You hold it with <b>${T.force}</b>.`} You send from ${esc(G.board.town(from).name)} (<b>${F.force}</b>; one stays).</p>
       ${front ? captainBlock(T) : ''}${notes.map((n) => `<p class="fine">${n}</p>`).join('')}
       <label class="gobn">Send <b id="gobN">${max}</b><input id="gobRange" type="range" min="1" max="${max}" value="${max}"></label>
-      <div class="gobrow"><button class="primary" data-g="send" data-from="${esc(from)}" data-to="${esc(to)}">${front ? 'Open the front' : attack ? 'Attack' : 'Move'}</button><button data-g="close">Cancel</button></div></div>`);
+      <div class="gobrow"><button class="primary" data-g="send" data-from="${esc(from)}" data-to="${esc(to)}">${front ? 'Open the front' : attack ? 'Attack' : 'Move'}${attack ? ' <span class="fine">1 action</span>' : ''}</button><button data-g="close">Cancel</button></div></div>`);
     const r = $('#gobRange'); r.addEventListener('input', () => { $('#gobN').textContent = r.value; });
   }
   function resultPanel(events) {
@@ -217,6 +227,32 @@ export function initGoblin(ctx) {
     doPanel();
   }
 
+
+  // ---------------------------------------------------------------- sitting actions
+  function scoutPanel(town) {
+    const hour = (w().startHour + w().tick) % 24;
+    const c = w().chars[w().towns[town].captain];
+    const hint = {
+      sneak: isNight(hour) ? 'Night is on your side.' : 'Easier after dark (from 21:00 to 05:00).',
+      ask: G.board.town(town).pop >= K6.scoutBigTownPop ? 'A busy town: plenty of traders to ask.' : 'A quiet town: few traders.',
+      watch: 'The water between lets you see in.',
+    };
+    const methods = ['sneak', 'ask'];
+    if (scoutMods(w(), G.board, ME, town, 'watch').total > 0) methods.push('watch');
+    const name = { sneak: 'Sneak in', ask: 'Ask around', watch: 'Watch from across the water' };
+    panel(`<div class="gob"><h3>Scout ${esc(c.name)} at ${esc(G.board.town(town).name)}</h3>
+      <p class="fine">One action. A good roll learns something about the captain; a bad one learns nothing, and a very bad one loses the scout.</p>
+      ${methods.map((m) => `<button data-g="scoutdo" data-town="${esc(town)}" data-m="${m}"><b>${name[m]}</b> <span class="fine">${hint[m]}</span></button>`).join('')}
+      <button data-g="close">Cancel</button></div>`);
+  }
+  function sittingResult(events) {
+    const en = entriesOf(events, ctxFor());
+    const rej = events.find((e) => e.type === 'order_rejected');
+    const sc = events.find((e) => e.type === 'scouted' || e.type === 'taunted');
+    panel(`<div class="gob"><h3>${rej ? 'That did not work' : sc && sc.type === 'scouted' ? (sc.lost ? 'The scout is gone' : sc.learned.length ? 'Something learned' : 'Nothing new') : sc ? (sc.ok ? 'It worked' : 'It backfired') : 'Done'}</h3>
+      ${rej ? `<p>${esc(rej.reason)}</p>` : en.map((e) => `<p>${esc(e.text)}</p>`).join('')}
+      ${sc ? `<p class="fine">Dice: ${sc.dice.join(' + ')}</p>` : ''}${closeBtn}</div>`);
+  }
 
   // ---------------------------------------------------------------- fronts
   const LABEL = {
@@ -273,6 +309,10 @@ export function initGoblin(ctx) {
     cands.sort((a, b) => (b.ratio - a.ratio) || (a.to < b.to ? -1 : 1));
     const seen = new Set();
     for (const c of cands) {
+      const cp = c.captain && world.chars[c.T.captain];
+      if (cp && !seen.has('s' + c.to) && out.length < 4) { seen.add('s' + c.to); out.push({ rank: 1, label: `Scout ${cp.name} at ${G.board.town(c.to).name}`, sub: (cp.known[ME] || []).length ? `You know ${(cp.known[ME] || []).length} thing${(cp.known[ME] || []).length === 1 ? '' : 's'} about them. 1 action` : 'You know nothing about them yet. 1 action', data: `data-g="scout" data-town="${esc(c.to)}"` }); }
+    }
+    for (const c of cands) {
       if (seen.has(c.to) || out.length >= 5) continue;
       seen.add(c.to);
       const how = c.ratio >= 2 ? 'a good chance' : c.ratio >= 1 ? 'an even fight' : 'risky';
@@ -283,7 +323,7 @@ export function initGoblin(ctx) {
   function doPanel() {
     const list = suggestions(), nx = nextMajor();
     panel(`<div class="gob"><h3>What can I do?</h3>
-      <p class="fine">There is no end-turn button. The world moves by itself on the hour: at 09:00, 12:00 and 18:00 everyone gets recruits and the other clans act${nx ? `. Next: ${nx.hour}, in ${nx.left}` : ''}. In between you can act whenever you like.</p>
+      <p class="fine">There is no end-turn button. You have <b>${ap()}</b> action${ap() === 1 ? '' : 's'} (attacks, fronts, scouting, digging in and taunts cost one; moving is free). The world moves by itself on the hour: at 09:00, 12:00 and 18:00 you get ${K6.apPerMajor} more (up to ${K6.apCap}), everyone gets recruits and the other clans act${nx ? `. Next: ${nx.hour}, in ${nx.left}` : ''}.</p>
       ${list.length ? list.map((o) => `<button ${o.data}><b>${esc(o.label)}</b><br><span class="fine">${esc(o.sub)}</span></button>`).join('') : '<p>Nothing worth doing right now. Your townships next to enemies are too thin to attack. Wait for recruits.</p>'}
       ${closeBtn}</div>`);
   }
@@ -318,6 +358,12 @@ export function initGoblin(ctx) {
       resultPanel(ev);
     }
     else if (a === 'front') frontPanel(b.dataset.id);
+    else if (a === 'scout') scoutPanel(b.dataset.town);
+    else if (a === 'scoutdo' || a === 'taunt' || a === 'fortify') {
+      const o = a === 'scoutdo' ? { type: 'scout', clan: ME, town: b.dataset.town, method: b.dataset.m } : { type: a, clan: ME, town: b.dataset.town };
+      const ev = run([{ type: 'present', clan: ME }, o], 0);
+      paint(); hud(); sittingResult(ev);
+    }
     else if (a === 'fact') { const ev = run([{ type: 'present', clan: ME }, { type: 'front', clan: ME, front: b.dataset.front, action: b.dataset.a, ...(b.dataset.a === 'decision' ? { n: (w().fronts[b.dataset.front] || {}).units } : {}) }], 0); afterFrontOrder(ev, b.dataset.front); }
     else if (a === 'go') { sel = b.dataset.from; paint(); orderPanel(b.dataset.from, b.dataset.to); }
     else if (a === 'ledger') ledgerPanel();

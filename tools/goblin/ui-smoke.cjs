@@ -49,6 +49,18 @@ const { chromium } = require('playwright');
   await page.click('[data-g=close]');
   // 2) a front against a captain
   const fr = await pairFor(true); console.log('front pair', fr);
+  await page.evaluate((id) => window.njtf.map.easeTo({ center: window.njtf.byKey.get(id).pt, zoom: 10, duration: 0 }), fr[1]);
+  await page.waitForTimeout(400);
+  const pe = await proj(fr[1]); await page.mouse.click(pe[0], pe[1]);
+  await page.waitForSelector('[data-g=scout]');
+  console.log('enemy card:', (await page.locator('#sheet').innerText()).replace(/\n/g, ' | ').slice(0, 260));
+  await page.click('[data-g=scout]'); await page.waitForSelector('[data-g=scoutdo]');
+  console.log('scout panel:', (await page.locator('#sheet').innerText()).replace(/\n/g, ' | ').slice(0, 300));
+  await page.click('[data-g=scoutdo]'); await page.waitForTimeout(200);
+  console.log('scout result:', (await page.locator('#sheet').innerText()).replace(/\n/g, ' | ').slice(0, 260));
+  console.log('hud after scout:', (await page.locator('#hud').innerText()).replace(/\n/g, ' | '));
+  await page.screenshot({ path: 'scratch-scout.png' });
+  await page.click('[data-g=close]');
   await tapPair(fr);
   console.log('front order:', (await page.locator('#sheet').innerText()).replace(/\n/g, ' | ').slice(0, 330));
   await page.screenshot({ path: 'scratch-frontorder.png' });
