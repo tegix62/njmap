@@ -10,6 +10,8 @@ import { K6, K7 } from '../sim/constants.js';
 import { progress } from '../sim/war.js';
 import { skirmish, modsFor } from '../sim/skirmish.js';
 import { makeRng, seedState } from '../sim/rng.js';
+import { fogMap, forceWord, rank } from './fog.js';
+import { recordReview } from './review.js';
 import { scoutMods, isNight, hasAp } from '../sim/sitting.js';
 import { digestOf } from '../sim/digest.js';
 import { MUNI_LABEL_IDS } from '../../style.js';
@@ -32,6 +34,7 @@ export function initGoblin(ctx) {
   let G = null;            // { board, content } once loaded
   let save = null;         // { v, world, lastReal, events, seenTick }
   let sel = null;          // the township you have picked to send units from
+  let charge = null;       // a quiz charge earned and not yet used: { front, beat }
   let timer = 0, bound = false, layersReady = false, mode = 'idle', pendingHome = null;
 
   // ---------------------------------------------------------------- loading and saving
@@ -42,6 +45,11 @@ export function initGoblin(ctx) {
     G = { board: makeBoard(bj, content), content };   // content attached: townships can have captains, and so fronts
   }
   const persist = () => store.set(SAVE, save);
+  const fw = () => G.content.json.force_words.map((x) => [x.min, x.max, x.word]);   // placeholder words, the user's to write (D68)
+  /** What the player has learned decides what is shown (D173). Computed fresh each time from the review data and this war's play; nothing is written back. */
+  const fog = () => fogMap(G.board, { srs: store.get('srs', {}), played: save.played || [], own: Object.keys(w().towns).filter((t) => w().towns[t].owner === ME), home: w().clans[ME].home });
+  const levelOf = (id) => fog().get(id) || 'unknown';
+  const markPlayed = (...ids) => { save.played = [...new Set([...(save.played || []), ...ids.filter(Boolean)])]; persist(); };
   const w = () => save.world;
   const run = (orders, ticks) => {
     const r = step(G.board, save.world, orders, ticks);
@@ -68,6 +76,7 @@ export function initGoblin(ctx) {
     for (const [k, v] of Object.entries(COLOUR)) colour.push(+k, v);
     colour.push('rgba(0,0,0,0)');
     map.addLayer({ id: 'gob-fill', type: 'fill', source: 'munis', layout: { visibility: 'none' }, paint: { 'fill-color': colour, 'fill-opacity': 0.5 } }, before);
+    map.addLayer({ id: 'gob-fog', type: 'fill', source: 'munis', layout: { visibility: 'none' }, paint: { 'fill-color': '#4b5563', 'fill-opacity': ['match', ['coalesce', ['feature-state', 'gf'], 0], 1, 0.55, 0] } }, before);
     map.addLayer({ id: 'gob-target', type: 'fill', source: 'munis', layout: { visibility: 'none' },
       paint: { 'fill-color': ['match', ['coalesce', ['feature-state', 'gt'], 0], 1, '#dc2626', 2, '#2563eb', 'rgba(0,0,0,0)'], 'fill-opacity': ['match', ['coalesce', ['feature-state', 'gt'], 0], 0, 0, 0.28] } }, before);
     map.addLayer({ id: 'gob-line', type: 'line', source: 'munis', layout: { visibility: 'none' },
@@ -79,7 +88,7 @@ export function initGoblin(ctx) {
   }
   const hiddenLabels = new Map();
   const showLayers = (on) => {
-    for (const id of ['gob-fill', 'gob-target', 'gob-line', 'gob-force']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+    for (const id of ['gob-fill', 'gob-fog', 'gob-target', 'gob-line', 'gob-force']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
     // the township names move into the force labels, so the map's own names step aside while the war is on
     for (const id of MUNI_LABEL_IDS) {
       if (!map.getLayer(id)) continue;
@@ -94,18 +103,21 @@ export function initGoblin(ctx) {
     const raidTargets = new Set(world.raids.filter((r) => world.towns[r.target] && world.towns[r.target].owner === ME).map((r) => r.target));
     const nbs = sel ? new Set(G.board.neighbours(sel)) : new Set();
     const feats = [];
+    const lv = fog();
     for (const id of Object.keys(world.towns)) {
       const m = muniOf(id); if (!m) continue;
       const T = world.towns[id];
+      const L = lv.get(id) || 'unknown';
       const gt = sel && nbs.has(id) ? (T.owner === ME ? 2 : T.owner ? 1 : 0) : 0;
-      map.setFeatureState({ source: 'munis', id: m.id }, { gc: NO[T.owner] || 0, gs: sel === id ? 1 : 0, gt, gr: raidTargets.has(id) ? 1 : 0 });
-      feats.push({ type: 'Feature', properties: { f: String(T.force), n: (T.captain ? '★ ' : '') + m.n }, geometry: { type: 'Point', coordinates: m.pt } });
+      map.setFeatureState({ source: 'munis', id: m.id }, { gc: L === 'unknown' ? 0 : NO[T.owner] || 0, gf: L === 'unknown' ? 1 : 0, gs: sel === id ? 1 : 0, gt, gr: raidTargets.has(id) ? 1 : 0 });
+      const label = L === 'unknown' ? { n: '', f: '' } : L === 'rumoured' ? { n: m.n, f: '?' } : L === 'familiar' ? { n: (T.captain ? '★ ' : '') + m.n, f: forceWord(T.force, fw()) } : { n: (T.captain ? '★ ' : '') + m.n, f: String(T.force) };
+      feats.push({ type: 'Feature', properties: label, geometry: { type: 'Point', coordinates: m.pt } });
     }
     map.getSource('gobforce').setData({ type: 'FeatureCollection', features: feats });
   }
   function clearPaint() {
     if (!save) return;
-    for (const id of Object.keys(w().towns)) { const m = muniOf(id); if (m) map.setFeatureState({ source: 'munis', id: m.id }, { gc: 0, gs: 0, gt: 0, gr: 0 }); }
+    for (const id of Object.keys(w().towns)) { const m = muniOf(id); if (m) map.setFeatureState({ source: 'munis', id: m.id }, { gc: 0, gf: 0, gs: 0, gt: 0, gr: 0 }); }
   }
   function fitTheatre() {
     const pts = Object.keys(w().towns).map((id) => muniOf(id)).filter(Boolean).map((m) => m.pt);
@@ -153,11 +165,21 @@ export function initGoblin(ctx) {
 
   function ownerName(o) { return o ? cap(o) : 'Nobody'; }
   const factWord = (f) => { const [kind, ref] = f.split(':'); return kind === 'trait' ? G.content.traits.get(ref).word : kind === 'fear' ? `afraid of ${ref}` : f; };
-  function captainBlock(T) {
+  function captainBlock(T, L = 'known') {
     const c = T.captain && w().chars[T.captain];
-    if (!c) return '';
+    if (!c || rank(L) < rank('familiar')) return '';
+    if (c.clan !== ME && L === 'familiar') return '<p>★ A captain commands here.</p>';
     const known = (c.known[ME] || []).map(factWord);
     return `<p>★ <b>${esc(c.name)}</b> of ${cap(c.clan)} commands here${c.injuries.length ? ` (hurt: ${c.injuries.map(esc).join(', ')})` : ''}. ${c.clan === ME ? '' : known.length ? `You know: ${known.map(esc).join(', ')}.` : 'You know nothing about them yet.'}</p>`;
+  }
+  /** What the player may be told about a township's owner and strength, by how well they know the place (D173, F1). */
+  function whatYouKnow(id, L) {
+    const T = w().towns[id];
+    if (T.owner === ME) return `You hold it with <b>${T.force}</b>${T.dugIn ? ', dug in' : ''}.`;
+    if (L === 'unknown') return 'You know nothing of this place. Learn it in the quiz and it will show.';
+    if (L === 'rumoured') return `${ownerName(T.owner)} are said to hold it. You do not know how strongly.`;
+    if (L === 'familiar') return `${ownerName(T.owner)} hold it with ${forceWord(T.force, fw())}${T.dugIn ? ', dug in' : ''}.`;
+    return `${ownerName(T.owner)} hold it with <b>${T.force}</b>${T.dugIn ? ', dug in' : ''}.`;
   }
   const ap = () => w().clans[ME].ap;
   const touchesMine = (id) => G.board.neighbours(id).some((n) => w().towns[n] && w().towns[n].owner === ME);
@@ -165,11 +187,12 @@ export function initGoblin(ctx) {
     const T = w().towns[id], b = G.board.town(id);
     const mine = T.owner === ME;
     const cptn = T.captain && w().chars[T.captain];
-    const near = cptn && !mine && touchesMine(id);
+    const L = levelOf(id);
+    const near = cptn && !mine && touchesMine(id) && rank(L) >= rank('familiar');
     const knownSome = cptn && (cptn.known[ME] || []).length;
     const fr = openFronts(w(), ME).find((f) => f.target === id);
     panel(`<div class="gob"><h3>${esc(b.name)} <small>${esc(b.county)} County</small></h3>
-      <p>${ownerName(T.owner)} hold it with <b>${T.force}</b>${T.dugIn ? ', dug in' : ''}.</p>${captainBlock(T)}
+      <p>${whatYouKnow(id, L)}</p>${captainBlock(T, L)}
       ${fr ? `<button class="primary" data-g="front" data-id="${fr.id}">Continue the front here</button>` : ''}
       ${near ? `<button data-g="scout" data-town="${esc(id)}">Scout the captain <span class="fine">1 action</span></button>${knownSome ? `<button data-g="taunt" data-town="${esc(id)}">Taunt the captain <span class="fine">1 action; the next front here starts a step higher</span></button>` : ''}` : ''}
       ${mine && T.force >= 3 && !T.dugIn ? `<button data-g="fortify" data-town="${esc(id)}">Dig in now <span class="fine">1 action; defenders fight better</span></button>` : ''}
@@ -179,7 +202,9 @@ export function initGoblin(ctx) {
   function orderPanel(from, to) {
     const F = w().towns[from], T = w().towns[to], bd = G.board.border(from, to) || {};
     const attack = T.owner !== ME;
+    const L = levelOf(to);
     const front = attack && !!T.captain;
+    const blind = attack && rank(L) < rank('familiar');
     const max = F.force - 1;
     const water = bd.river ? `across the ${typeof bd.river === 'string' ? esc(bd.river) : 'river'}` : bd.ridge ? 'over a ridge' : '';
     const hw = bd.highways && bd.highways.length ? `${esc(bd.highways[0])} runs through both` : '';
@@ -189,8 +214,8 @@ export function initGoblin(ctx) {
     if (attack && !hasAp(w().clans[ME], 1)) notes.push('You have no actions left. They refill at the next 09:00, 12:00 or 18:00.');
     if (front) notes.push('A captain defends it, so this is a front: a slow fight where you probe, press and look for a weakness before you decide. Nothing is lost until you decide, and you can pull back.');
     panel(`<div class="gob"><h3>${front ? 'Open a front at' : attack ? 'Attack' : 'Move to'} ${esc(G.board.town(to).name)}</h3>
-      <p>${esc(placePhrase(G.board, from, to))}${water && !placePhrase(G.board, from, to).includes('over') ? ', ' + water : ''}. ${attack ? `${ownerName(T.owner)} hold it with <b>${T.force}</b>.` : `You hold it with <b>${T.force}</b>.`} You send from ${esc(G.board.town(from).name)} (<b>${F.force}</b>; one stays).</p>
-      ${front ? captainBlock(T) : ''}${notes.map((n) => `<p class="fine">${n}</p>`).join('')}
+      <p>${esc(placePhrase(G.board, from, to))}${water && !placePhrase(G.board, from, to).includes('over') ? ', ' + water : ''}. ${attack ? whatYouKnow(to, L) : `You hold it with <b>${T.force}</b>.`}${blind ? ' You would attack blind.' : ''} You send from ${esc(G.board.town(from).name)} (<b>${F.force}</b>; one stays).</p>
+      ${front ? captainBlock(T, L) : ''}${notes.map((n) => `<p class="fine">${n}</p>`).join('')}
       <label class="gobn">Send <b id="gobN">${max}</b><input id="gobRange" type="range" min="1" max="${max}" value="${max}"></label>
       <div class="gobrow"><button class="primary" data-g="send" data-from="${esc(from)}" data-to="${esc(to)}">${front ? 'Open the front' : attack ? 'Attack' : 'Move'}${attack ? ' <span class="fine">1 action</span>' : ''}</button><button data-g="close">Cancel</button></div></div>`);
     const r = $('#gobRange'); r.addEventListener('input', () => { $('#gobN').textContent = r.value; });
@@ -268,7 +293,7 @@ export function initGoblin(ctx) {
   function beginWar(home) {
     const now = Date.now(), lastReal = now - (now % HOUR);
     const world = newWorld(G.board, { seed: 'm1-' + lastReal, home, clans: CLANS, startHour: easternHour(lastReal), guidedStart: true });
-    save = { v: SAVE_V, world, lastReal, events: [], total: 0, seenTotal: 0, overShown: false };
+    save = { v: SAVE_V, world, lastReal, events: [], total: 0, seenTotal: 0, overShown: false, played: [] };
     persist(); mode = 'play'; sel = null;
     paint(); hud(); fitTheatre();
     firstMove();
@@ -301,6 +326,39 @@ export function initGoblin(ctx) {
       ${sc ? `<p class="fine">Dice: ${sc.dice.join(' + ')}</p>` : ''}${closeBtn}</div>`);
   }
 
+  // ---------------------------------------------------------------- the quiz charge (D179)
+  const prefs = () => ({ charges: true, ...store.get('goblin.prefs', {}) });
+  const dayNo = () => Math.floor(Date.now() / 864e5);
+  const chargesToday = () => (save.charges && save.charges.day === dayNo() ? save.charges.n : 0);
+  const MAXC = 3;
+  function chargeBlock(f) {
+    if (!prefs().charges) return '';
+    if (charge && charge.front === f.id && charge.beat === f.beat) return '<p class="fine">Charged: +1 on your next move.</p>';
+    if (chargesToday() >= MAXC) return '';
+    return `<button data-g="chargeq" data-front="${esc(f.id)}">Charge it with a question <span class="fine">optional: +1 on your next move; it also counts as a review</span></button>`;
+  }
+  function chargeQuestion(fid) {
+    const f = w().fronts[fid]; if (!f) return panel('');
+    const m = ctx.byKey.get(f.target); if (!m) return frontPanel(fid);
+    const others = ctx.counties.filter((c) => c !== m.c).sort(() => Math.random() - 0.5).slice(0, 3);
+    const opts = [m.c, ...others].sort(() => Math.random() - 0.5);
+    panel(`<div class="gob"><h3>Which county is ${esc(m.n)} in?</h3>
+      <p class="fine">A right answer charges your next move. A wrong one costs nothing.</p>
+      ${opts.map((c) => `<button data-g="chargea" data-front="${esc(fid)}" data-ans="${esc(c)}" data-right="${esc(m.c)}">${esc(c)}</button>`).join('')}
+      <button data-g="front" data-id="${esc(fid)}">Skip</button></div>`);
+  }
+  function chargeAnswer(fid, ans, right) {
+    const f = w().fronts[fid]; if (!f) return panel('');
+    const m = ctx.byKey.get(f.target), ok = ans === right;
+    recordReview(store, m.key, ok);
+    ctx.setKnow && ctx.setKnow(m);
+    save.charges = { day: dayNo(), n: chargesToday() + 1 }; persist();
+    if (ok) charge = { front: fid, beat: f.beat };
+    panel(`<div class="gob"><h3>${ok ? 'Right' : `It is ${esc(right)} County`}</h3>
+      <p>${ok ? 'Your next move is charged: +1.' : 'No charge this time, and the town will come back in your practice.'}</p>
+      <button class="primary" data-g="front" data-id="${esc(fid)}">Back to the front</button></div>`);
+  }
+
   // ---------------------------------------------------------------- fronts
   const LABEL = {
     probe: ['Probe', 'scout them; may reveal a trait'],
@@ -321,6 +379,7 @@ export function initGoblin(ctx) {
     panel(`<div class="gob"><h3>Front at ${esc(G.board.town(f.target).name)}</h3>
       <p>Standing: <b>${STAND[f.standing]}</b> · beat ${f.beat + 1} · ${f.units} committed against <b>${T.force}</b>${f.lead ? ' · your captain leads' : ''}</p>
       <p>★ ${esc(c.name)}: ${known.length ? esc(known.join(', ')) : 'nothing known yet'}</p>${en}${dec ? '' : ''}
+      ${acts.some((a) => ['probe', 'pressure', 'lever'].includes(a)) ? chargeBlock(f) : ''}
       ${acts.map((a) => `<button class="${a === 'decision' ? 'primary' : ''}" data-g="fact" data-front="${esc(fid)}" data-a="${a}"><b>${LABEL[a][0]}</b> <span class="fine">${LABEL[a][1]}</span></button>`).join('')}
       <button data-g="close">Close (the front waits)</button></div>`);
   }
@@ -341,7 +400,8 @@ export function initGoblin(ctx) {
 
   // ---------------------------------------------------------------- what can I do?
   function suggestions() {
-    const world = w(), out = [];
+    const world = w(), out = [], lv = fog();
+    let hidden = 0;
     for (const f of openFronts(world, ME)) out.push({ rank: 0, label: `Continue the front at ${G.board.town(f.target).name}`, sub: `${STAND[f.standing]}, beat ${f.beat + 1}`, data: `data-g="front" data-id="${f.id}"` });
     const cands = [];
     for (const id of Object.keys(world.towns)) {
@@ -350,6 +410,7 @@ export function initGoblin(ctx) {
       for (const n of G.board.neighbours(id)) {
         const T = world.towns[n];
         if (!T || !T.owner || T.owner === ME) continue;
+        if (rank(lv.get(n) || 'unknown') < rank('familiar')) { hidden++; continue; }   // you cannot weigh what you have not learned
         const ratio = (F.force - 1) / Math.max(1, T.force);
         cands.push({ from: id, to: n, ratio, captain: !!T.captain, F, T });
       }
@@ -358,14 +419,17 @@ export function initGoblin(ctx) {
     const seen = new Set();
     for (const c of cands) {
       const cp = c.captain && world.chars[c.T.captain];
-      if (cp && !seen.has('s' + c.to) && out.length < 4) { seen.add('s' + c.to); out.push({ rank: 1, label: `Scout ${cp.name} at ${G.board.town(c.to).name}`, sub: (cp.known[ME] || []).length ? `You know ${(cp.known[ME] || []).length} thing${(cp.known[ME] || []).length === 1 ? '' : 's'} about them. 1 action` : 'You know nothing about them yet. 1 action', data: `data-g="scout" data-town="${esc(c.to)}"` }); }
+      const Lc = lv.get(c.to);
+      if (cp && !seen.has('s' + c.to) && out.length < 4) { seen.add('s' + c.to); out.push({ rank: 1, label: Lc === 'known' ? `Scout ${cp.name} at ${G.board.town(c.to).name}` : `Scout the captain at ${G.board.town(c.to).name}`, sub: (cp.known[ME] || []).length ? `You know ${(cp.known[ME] || []).length} thing${(cp.known[ME] || []).length === 1 ? '' : 's'} about them. 1 action` : 'You know nothing about them yet. 1 action', data: `data-g="scout" data-town="${esc(c.to)}"` }); }
     }
     for (const c of cands) {
       if (seen.has(c.to) || out.length >= 5) continue;
       seen.add(c.to);
       const how = c.ratio >= 2 ? 'a good chance' : c.ratio >= 1 ? 'an even fight' : 'risky';
-      out.push({ rank: 1, label: `${c.captain ? 'Front' : 'Attack'}: ${G.board.town(c.to).name}`, sub: `${c.T.force} there (${cap(c.T.owner)}${c.captain ? ', a captain' : ''}) against your ${c.F.force - 1} from ${G.board.town(c.from).name}: ${how}`, data: `data-g="go" data-from="${esc(c.from)}" data-to="${esc(c.to)}"` });
+      const known = lv.get(c.to) === 'known';
+      out.push({ rank: 1, label: `${c.captain ? 'Front' : 'Attack'}: ${G.board.town(c.to).name}`, sub: known ? `${c.T.force} there (${cap(c.T.owner)}${c.captain ? ', a captain' : ''}) against your ${c.F.force - 1} from ${G.board.town(c.from).name}: ${how}` : `${cap(c.T.owner)} hold it with ${forceWord(c.T.force, fw())}${c.captain ? ', and a captain' : ''}. You can send ${c.F.force - 1} from ${G.board.town(c.from).name}.`, data: `data-g="go" data-from="${esc(c.from)}" data-to="${esc(c.to)}"` });
     }
+    if (hidden) out.push({ rank: 9, label: 'Learn the map', sub: `${hidden} neighbouring township${hidden === 1 ? ' is' : 's are'} hidden in fog. Learn them in the quiz and they will show.`, data: 'data-g="close"' });
     return out;
   }
   function doPanel() {
@@ -373,6 +437,7 @@ export function initGoblin(ctx) {
     panel(`<div class="gob"><h3>What can I do?</h3>
       <p class="fine">There is no end-turn button. You have <b>${ap()}</b> action${ap() === 1 ? '' : 's'} (attacks, fronts, scouting, digging in and taunts cost one; moving is free). The world moves by itself on the hour: at 09:00, 12:00 and 18:00 you get ${K6.apPerMajor} more (up to ${K6.apCap}), everyone gets recruits and the other clans act${nx ? `. Next: ${nx.hour}, in ${nx.left}` : ''}.</p>
       ${list.length ? list.map((o) => `<button ${o.data}><b>${esc(o.label)}</b><br><span class="fine">${esc(o.sub)}</span></button>`).join('') : '<p>Nothing worth doing right now. Your townships next to enemies are too thin to attack. Wait for recruits.</p>'}
+      <button data-g="chargetoggle">Quiz charges: ${prefs().charges ? 'on' : 'off'} <span class="fine">tap to switch</span></button>
       ${closeBtn}</div>`);
   }
 
@@ -402,6 +467,7 @@ export function initGoblin(ctx) {
       const T = w().towns[to];
       const type = T.owner === ME ? 'move' : T.captain ? 'front_open' : 'attack';
       const ev = run([{ type: 'present', clan: ME }, { type, clan: ME, from, to, n }], 0);
+      markPlayed(to);
       sel = null; paint(); hud();
       if (checkOver()) return;
       if (type === 'front_open') { const o = ev.find((e) => e.type === 'front_opened'); return o ? frontPanel(o.front, ev.filter((e) => e.type === 'front_opened')) : afterFrontOrder(ev, null); }
@@ -409,6 +475,7 @@ export function initGoblin(ctx) {
     }
     else if (a === 'first') {
       const ev = run([{ type: 'present', clan: ME }, { type: 'attack', clan: ME, from: b.dataset.from, to: b.dataset.to, n: +b.dataset.n }], 0);
+      markPlayed(b.dataset.to);
       sel = null; paint(); hud(); resultPanel(ev);
     }
     else if (a === 'front') frontPanel(b.dataset.id);
@@ -416,9 +483,20 @@ export function initGoblin(ctx) {
     else if (a === 'scoutdo' || a === 'taunt' || a === 'fortify') {
       const o = a === 'scoutdo' ? { type: 'scout', clan: ME, town: b.dataset.town, method: b.dataset.m } : { type: a, clan: ME, town: b.dataset.town };
       const ev = run([{ type: 'present', clan: ME }, o], 0);
+      markPlayed(b.dataset.town);
       paint(); hud(); if (checkOver()) return; sittingResult(ev);
     }
-    else if (a === 'fact') { const ev = run([{ type: 'present', clan: ME }, { type: 'front', clan: ME, front: b.dataset.front, action: b.dataset.a, ...(b.dataset.a === 'decision' ? { n: (w().fronts[b.dataset.front] || {}).units } : {}) }], 0); afterFrontOrder(ev, b.dataset.front); }
+    else if (a === 'chargeq') chargeQuestion(b.dataset.front);
+    else if (a === 'chargea') chargeAnswer(b.dataset.front, b.dataset.ans, b.dataset.right);
+    else if (a === 'chargetoggle') { const p = prefs(); store.set('goblin.prefs', { ...p, charges: !p.charges }); doPanel(); }
+    else if (a === 'fact') {
+      const fr0 = w().fronts[b.dataset.front] || {};
+      const maneuver = ['probe', 'pressure', 'lever'].includes(b.dataset.a);
+      const useCharge = maneuver && charge && charge.front === b.dataset.front && charge.beat === fr0.beat;
+      if (maneuver) charge = null;
+      const ev = run([{ type: 'present', clan: ME }, { type: 'front', clan: ME, front: b.dataset.front, action: b.dataset.a, ...(b.dataset.a === 'decision' ? { n: fr0.units } : {}), ...(useCharge ? { charge: true } : {}) }], 0);
+      afterFrontOrder(ev, b.dataset.front);
+    }
     else if (a === 'go') { sel = b.dataset.from; paint(); orderPanel(b.dataset.from, b.dataset.to); }
     else if (a === 'ledger') ledgerPanel();
     else if (a === 'copy') { navigator.clipboard && navigator.clipboard.writeText(renderLedger(save.events, ctxFor())).then(() => ctx.toast('Copied'), () => ctx.toast('Could not copy')); }

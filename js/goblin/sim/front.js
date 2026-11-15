@@ -102,20 +102,21 @@ export function actFront(w, board, rng, emit, o) {
   const d = w.chars[f.captain];
   const dice = [rng.d6(), rng.d6()];
   const m = rollMods(w, board, f, act);
-  const roll = dice[0] + dice[1] + m.total;
+  const charged = !!o.charge;   // an optional quiz answer (D179): +1 to this roll, never required
+  const roll = dice[0] + dice[1] + m.total + (charged ? 1 : 0);
   const delta = Math.min(bandOf(act, roll), R(w).frontMaxGain ?? K4.frontMaxGain);   // D210: capped at one step by default
   const learned = [];
   // a hidden trait that changed the band becomes known: the player learns why
   for (const p of m.parts) {
     if (!p.trait || knows(d, f.attacker, 'trait:' + p.trait)) continue;
     const without = rollMods(w, board, f, act, p.trait).total;
-    if (bandOf(act, dice[0] + dice[1] + without) !== delta) { discover(d, f.attacker, 'trait:' + p.trait); learned.push('trait:' + p.trait); }
+    if (bandOf(act, dice[0] + dice[1] + without + (charged ? 1 : 0)) !== delta) { discover(d, f.attacker, 'trait:' + p.trait); learned.push('trait:' + p.trait); }
   }
   if (act !== 'lever' && delta === 0) { const x = discoverOne(d, f.attacker); if (x) learned.push(x); }
   f.learned.push(...learned);
   f.beat++; f.maneuvers++;
   f.standing = clamp(f.standing + delta, 0, 3);
-  emit('front_beat', { front: f.id, clan: f.attacker, captain: f.captain, to: f.target, maneuver: act, dice, mods: m.parts.map((p) => ({ why: p.why.startsWith('trait:') ? 'hidden' : p.why, v: p.v })), total: m.total, roll, change: delta, standing: STANDING[f.standing], learned });
+  emit('front_beat', { front: f.id, clan: f.attacker, captain: f.captain, to: f.target, maneuver: act, dice, charged, mods: [...m.parts.map((p) => ({ why: p.why.startsWith('trait:') ? 'hidden' : p.why, v: p.v })), ...(charged ? [{ why: 'quiz charge', v: 1 }] : [])], total: m.total, roll, change: delta, standing: STANDING[f.standing], learned });
   if (f.standing === 3) close(w, board, rng, emit, f, 'Yielded');
   return true;
 }

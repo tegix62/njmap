@@ -35,7 +35,7 @@ export function placeholdersIn(content) {
   const j = content.json;
   for (const t of j.traits) if (t.placeholder) out.push(['trait', t.id]);
   for (const [k, v] of Object.entries(j.clans)) if (v.placeholder) out.push(['names', k]);
-  for (const sec of ['fears', 'injuries', 'states', 'verdicts', 'templates']) for (const x of j[sec] || []) if (x.placeholder) out.push([sec, x.id]);
+  for (const sec of ['fears', 'injuries', 'states', 'verdicts', 'templates', 'force_words']) for (const x of j[sec] || []) if (x.placeholder) out.push([sec, x.id]);
   return out;
 }
 

@@ -329,3 +329,12 @@ test('play at random over a real board: 20 seeds x 60 days, invariants every sit
   assert.ok(fronts > 20, `fronts opened: ${fronts}`);
   for (const v of ['Won', 'Lost', 'Withdrew', 'Yielded']) assert.ok(seen[v] > 0, `no front closed as ${v}: ${JSON.stringify(seen)}`);
 });
+
+test('a quiz charge adds one to a maneuver roll, shows as a modifier, and is never required', () => {
+  const run1 = (charge) => { const { board, w } = setup(); const st = open(board, w).state; const id = fid(st);
+    return step(board, st, [{ type: 'front', clan: 'z', front: id, action: 'probe', ...(charge ? { charge: true } : {}) }], 0, { rng: scripted([3, 3]) }); };
+  const plain = ev(run1(false).events, 'front_beat')[0], charged = ev(run1(true).events, 'front_beat')[0];
+  assert.equal(charged.roll, plain.roll + 1); assert.equal(charged.charged, true); assert.equal(plain.charged, false);
+  assert.deepEqual(charged.mods.at(-1), { why: 'quiz charge', v: 1 });
+  assert.equal(plain.mods.some((m) => m.why === 'quiz charge'), false);
+});

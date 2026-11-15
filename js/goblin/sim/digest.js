@@ -16,6 +16,7 @@ function weight(e, clan) {
     case 'front_closed': return e.clan === clan ? 75 : 20;
     case 'clan_out': return 60;
     case 'player_absent': return 5;
+    case 'ai_peace': return 50;
     case 'war_over': return 200;
     case 'war_hold': return 95;
     case 'milestone': return e.clan === clan ? 85 : 0;

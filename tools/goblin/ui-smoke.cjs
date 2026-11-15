@@ -7,6 +7,9 @@ const { chromium } = require('playwright');
   const errs = [];
   page.on('pageerror', (e) => errs.push('pageerror ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error' && !/tiles|openfreemap|Failed to load resource|net::/.test(m.text())) errs.push('console ' + m.text()); });
+  // the smoke test plays with the whole map learned, so fog does not hide its targets (tools/goblin/ui-fog.cjs tests the fog itself)
+  const keys = Object.keys(JSON.parse(require('fs').readFileSync(require('path').join(process.cwd().includes('scratchpad') ? '/home/user/njmap' : process.cwd(), 'data/goblin-board.json'), 'utf8')).towns);
+  await page.addInitScript((ks) => localStorage.setItem('njtf.srs', JSON.stringify(Object.fromEntries(ks.map((k) => [k, { b: 2, due: 0 }])))), keys);
   await page.goto('http://localhost:8077/index.html?debug=1&region=nj');
   await page.waitForSelector('#welcome:not([hidden]) [data-entry]');
   console.log('home shown:', await page.locator('#welcome [data-entry]').allInnerTexts());

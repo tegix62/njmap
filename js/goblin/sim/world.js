@@ -25,7 +25,7 @@ export const DEFAULT_RULES = Object.freeze({ townForceCap: K2.townForceCap, recr
   leaderAttackRatio: 3.0,
   aiRecruitSplit: 0.5,           // 0 to 1: this fraction of an AI's recruits go to its weakest border township (a human's rule), the rest to its best attack position (F0)
   aiCounterRatio: 0,           // if above 0: an AI clan may retake a township it lost in the last 24 ticks at this ratio instead of aiAttackRatio (F0)
-  aiPeaceShare: 0,             // if above 0: while a human holds more than this share of the theatre the AI clans do not attack each other (F0, announced in the Ledger)
+  aiPeaceShare: 0.4,             // if above 0: while a human holds more than this share of the theatre the AI clans do not attack each other (F0, announced in the Ledger)
   aiRecruitSpread: 0,          // 1: an AI reinforces its weakest border township like a human instead of massing at its best attack position (experiment, H52)
   frontMaxGain: K4.frontMaxGain });   // the most a single front maneuver may raise standing (D210: 1)
 const R = (w) => w.rules || DEFAULT_RULES;
@@ -252,10 +252,17 @@ function protectedHome(w, to) {
   return !!c && c.lord === 'human' && c.absentSince !== null && c.home === to;   // an absent player's home is never attacked (D205)
 }
 
+/** Is the peace between the AI clans on? (a human holds more than aiPeaceShare of the theatre) */
+function peaceOn(w) {
+  const share = R(w).aiPeaceShare || 0;
+  if (!(share > 0)) return false;
+  const total = Object.keys(w.towns).length;
+  return Object.values(w.clans).some((c) => c.lord === 'human' && !c.out && ownedBy(w, c.id).length / total > share);
+}
+
 function aiTurn(w, board, rng, emit, clan) {
   if (w.tick < (clan.coolUntil || 0)) return;
-  const humanShare = Math.max(0, ...Object.values(w.clans).filter((c) => c.lord === 'human' && !c.out).map((c) => ownedBy(w, c.id).length / Object.keys(w.towns).length));
-  const peace = (R(w).aiPeaceShare || 0) > 0 && humanShare > R(w).aiPeaceShare;
+  const peace = peaceOn(w);
   const pinned = pinnedTowns(w);                                               // a captain pinned to a player's front: his township neither attacks nor is attacked                                  // conquest tempo
   const share = ownedBy(w, clan.id).length / Object.keys(w.towns).length;
   const need = share > R(w).leaderShare ? R(w).leaderAttackRatio : R(w).aiAttackRatio;   // a leader needs better odds
@@ -342,6 +349,8 @@ function majorTick(w, board, rng, emit) {
   digIn(w, emit);
   if (board.content) for (const m of succeed(w, rng, board.content)) emit('succeeded', { clan: m.char.clan, char: m.char.id, town: m.char.at, dynasty: m.char.dynasty });
   for (const c of Object.values(w.clans)) c.peakTowns = Math.max(c.peakTowns || 0, ownedBy(w, c.id).length);
+  const peace = peaceOn(w);
+  if (peace !== !!w.peace) { w.peace = peace; emit('ai_peace', { started: peace }); }   // a rule of the world, said out loud (H49)
   for (const clan of Object.values(w.clans).sort((a, b) => byId(a.id, b.id))) {
     if (clan.out || clan.lord === 'human') continue;            // AI lords only; a human's clan is theirs (an absent one sits defensively)
     aiTurn(w, board, rng, emit, clan);

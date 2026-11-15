@@ -288,7 +288,8 @@ Nothing here blocks building: every item has a flagged placeholder until it arri
 | Stage | Status |
 |---|---|
 | F0 | built 2026-11-15; gate pending (the user plays three days). Rival recruit split adopted (0.5), guided first move (four taps from the home page), targets script and tuning plan written. 5 of 9 targets pass; Bold's win rate, the passive player's losses and Careful's lost fronts still fail (see 11-tuning-plan.md) |
-| F1 to F9 | not started |
+| F1 | built 2026-11-15; gate pending (the user plays a week with their real Progress data). Fog: `js/goblin/ui/fog.js` (pure; Known box 1+, Familiar, Rumoured by border or highway, Unknown), grey fog on the map, cards and the Do panel respect levels, force words from the content file, play raises to Familiar only and never writes `srs`. Quiz charge: optional which-county question on a front, +1 to the next maneuver, writes one real review, at most 3 a day, can be switched off in the Do panel. Browser checks: `ui-fog.cjs`, `ui-charge.cjs`. P3 to P5 built as proposed (P5: attacking blind is allowed) |
+| F2 to F9 | not started |
 
 ## 10. Kickoff prompt for a build session
 

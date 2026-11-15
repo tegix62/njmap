@@ -36,3 +36,7 @@ A 12-way sweep (split 0.3, 0.5, 0.7 against counter 0, 1.5 against peace 0, 0.4)
 ## How to use this
 
 After any rule or constant change, run `targets.mjs` and compare to this table; the plan's rule is that a stage ends with the table no worse than it began. Add a row when a stage adds something measurable (F2: stockpile bounds, units per Food; F4: unwarned losses per two days).
+
+## After the peace rule went on (D216b, the user's yes to P2)
+
+With `aiPeaceShare` 0.4: Careful wins 55 percent (pass), won chapters last 26.3 days (pass), the biggest stack is 5.2 times the median (fails by 0.2), Bold still wins 100 percent. Four of nine targets pass. The stack figure is the price of the rivals not fighting each other; the economy (F2) is the remedy.
