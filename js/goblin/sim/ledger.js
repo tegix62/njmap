@@ -34,6 +34,14 @@ function nameOf(board, id) {
   return dupNames.get(board).get(t.name) > 1 ? `${t.name} (${t.county})` : t.name;
 }
 
+/** Reasons as a few words, never arithmetic (H45, D102): what helped, what hurt. A hidden trait is "something you had not seen". */
+const WHY = { 'captain suits it': 'your captain\'s skill', 'known weakness': 'a weakness you found', 'quiz charge': 'your answer', hidden: 'something you had not seen', night: 'the dark', 'busy town': 'a busy town', 'across the water': 'the water between', numbers: 'your numbers', 'been tried today': 'it was tried already today', 'your scouts are tired': 'tired scouts' };
+export function reasonsText(mods) {
+  const word = (m) => WHY[m.why] || m.why;
+  const up = mods.filter((m) => m.v > 0).map(word), down = mods.filter((m) => m.v < 0).map(word);
+  if (!up.length && !down.length) return 'nothing for or against';
+  return [up.length ? `helped by ${up.join(' and ')}` : '', down.length ? `hurt by ${down.join(' and ')}` : ''].filter(Boolean).join('; ');
+}
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const poss = (s) => (s.endsWith('s') ? s + "'" : s + "'s");
 const fill = (tpl, v) => tpl.replace(/\{(\w+)\}/g, (_, k) => (k in v ? v[k] : `{${k}}`));
@@ -92,7 +100,7 @@ export function entriesOf(events, { board, state, content, clan }) {
         else if (e.maneuver === 'decision') say(e.tick, cap(fill(T.beat_decision, { to: town(f.to), rounds: (e.rounds || []).length })) + ` ${e.won ? 'The attackers won.' : 'The attackers lost.'}`);
         else if (e.maneuver === 'disengage') { /* the closing line says it */ }
         else {
-          const mods = e.mods.length ? e.mods.map((m) => `${m.v > 0 ? '+' : ''}${m.v} ${m.why}`).join(', ') : 'no modifiers';
+          const mods = reasonsText(e.mods);
           const ct = e.change >= 2 ? 'A strong move: up two.' : e.change === 1 ? 'It worked: up one.' : e.change === 0 ? 'No movement.' : 'It went badly: down one.';
           say(e.tick, cap(fill(T.beat_move, { clan: clanName(f.clan || ''), maneuver: e.maneuver, captain: char(f.captain), roll: e.roll, mods, change_text: ct, standing: e.standing.toLowerCase(), learned_text: learned(e.learned) })));
         }
@@ -114,7 +122,7 @@ export function entriesOf(events, { board, state, content, clan }) {
       }
       case 'scouted': {
         const how = { sneak: 'sneaking in', ask: 'asking around', watch: 'watching from across the water' }[e.method];
-        const mods = e.mods.length ? ` (${e.mods.map((m) => `${m.v > 0 ? '+' : ''}${m.v} ${m.why}`).join(', ')})` : '';
+        const mods = ` (${reasonsText(e.mods)})`;
         const id = e.lost ? 'scout_lost' : e.learned.length ? 'scout_ok' : 'scout_nothing';
         say(e.tick, cap(fill(T[id], { clan: clanName(e.clan), town: town(e.town), how, roll: e.roll, mods, captain: char(e.char), learned: e.learned.map((f) => factWord(content, f)).join(', ') })));
         break;
@@ -132,7 +140,7 @@ export function entriesOf(events, { board, state, content, clan }) {
       case 'bridge_built': say(e.tick, cap(fill(T.bridge_built, { clan: clanName(e.clan), a: town(e.a), b: town(e.b) }))); break;
       case 'foothold_run': {
         const how = { swarm: 'with numbers', night: 'by night', ford: 'across the water' }[e.method];
-        const mods = e.mods.length ? ` (${e.mods.map((m) => `${m.v > 0 ? '+' : ''}${m.v} ${m.why}`).join(', ')})` : '';
+        const mods = ` (${reasonsText(e.mods)})`;
         say(e.tick, cap(fill(T[e.placed ? 'foothold_placed' : e.lost ? 'foothold_lost_unit' : 'foothold_failed'], { clan: clanName(e.clan), town: town(e.town), how, roll: e.roll, mods, lost: e.lost === 1 ? 'a unit' : `${e.lost} units` })));
         break;
       }

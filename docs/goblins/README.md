@@ -25,11 +25,11 @@ The strategy layer is optional. Turned off, the app is exactly the quiz, Drive a
 | 13 | [The plan to finish the game](13-finish-plan.md): what finished means, ten stages with checks and gates, the decisions each needs, what only the user can write and when, tuning targets | written 2026-11-15; the build follows this |
 | 06 | [Content bible](06-content-bible.md) (started): the ten region kits, how each rule was computed, and the fact pipeline (no fact shipped yet) | started 2026-11-15 |
 | 05 | [The Director and the dwarves](05-director.md): the pressure words, rhythm and shared peak as built, the dwarf rules, the hidden hand in timing only | written 2026-11-15 |
-| 07 | Screen map and flows | to write |
-| 08 | Art spec and asset list | to write |
-| 09 | Writing guide and line inventory | to write |
-| 10 | Tech and performance budget (simulation as a pure function, save format, sync) | to write |
-| 11 | Tuning plan (headless simulator) | to write |
+| 07 | [Screens and flows](07-screens.md): the game as built | written 2026-11-15 |
+| 08 | [Art](08-art.md): placeholders drawn in code, against D196's list | written 2026-11-15 |
+| 09 | [Writing guide and line inventory](09-writing.md): what is still a placeholder (127 entries) | written 2026-11-15 |
+| 10 | [Tech and performance budget](10-tech.md): measured, met | written 2026-11-15 |
+| 11 | [Tuning plan](11-tuning-plan.md): targets, sweeps, what failed | in use |
 
 ## Rules for these documents
 

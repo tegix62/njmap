@@ -3477,3 +3477,12 @@ body[data-mode='goblin'] #gobbar {
 .gob h4 { margin: 10px 0 2px; font-size: 14px; }
 .messenger { display: flex; gap: 10px; align-items: center; margin: 0 0 6px; padding: 6px 8px; background: rgba(0, 0, 0, 0.05); border-radius: 12px; font-style: italic; }
 .messenger .mface { flex: none; }
+
+/* ---- portraits and dice (F7) ---- */
+.portrait { flex: none; border-radius: 12px; background: rgba(0, 0, 0, 0.06); }
+.capline { display: flex; gap: 10px; align-items: center; margin: 4px 0; }
+.dice { display: inline-flex; gap: 2px; font-size: 26px; line-height: 1; vertical-align: middle; }
+.dice i { font-style: normal; display: inline-block; animation: tumble 0.55s ease-out both; }
+.dice.them { color: #9a3412; }
+@keyframes tumble { 0% { transform: translateY(-14px) rotate(-220deg); opacity: 0; } 70% { transform: translateY(2px) rotate(15deg); opacity: 1; } 100% { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .dice i { animation: none; } }

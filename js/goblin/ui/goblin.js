@@ -19,6 +19,7 @@ import { positionAt, messengerMood, convoysOf } from '../sim/convoys.js';
 import { wordOf } from '../sim/director.js';
 import { legalOrders } from '../sim/front.js';
 import { messengerFace } from './messenger.js';
+import { portrait, dice, expressionFor } from './portrait.js';
 import { kitOf, kitById, kitName } from '../sim/regions.js';
 import { untouchable } from '../sim/dwarves.js';
 import { seasonOf, SEASONS } from '../sim/seasons.js';
@@ -208,7 +209,8 @@ export function initGoblin(ctx) {
     if (c.clan !== ME && L === 'familiar') return '<p>★ A captain commands here.</p>';
     const known = (c.known[ME] || []).map(factWord);
     const st = c.state && G.content.states.get(c.state) ? ` <b>${esc(G.content.states.get(c.state).word)}</b>.` : '';
-    return `<p>★ <b>${esc(c.name)}</b>${c.tier === 3 ? ' <i>(a legend)</i>' : ''} of ${cap(c.clan)} commands here${c.injuries.length ? ` (hurt: ${c.injuries.map(esc).join(', ')})` : ''}.${st} ${c.clan === ME ? '' : known.length ? `You know: ${known.map(esc).join(', ')}.` : 'You know nothing about them yet.'}</p>`;
+    const face = portrait(c, w().clans[c.clan].kind);
+    return `<div class="capline">${face}<p>★ <b>${esc(c.name)}</b>${c.tier === 3 ? ' <i>(a legend)</i>' : ''} of ${cap(c.clan)} commands here${c.injuries.length ? ` (hurt: ${c.injuries.map(esc).join(', ')})` : ''}.${st} ${c.clan === ME ? '' : known.length ? `You know: ${known.map(esc).join(', ')}.` : 'You know nothing about them yet.'}</p></div>`;
   }
   /** What the player may be told about a township's owner and strength, by how well they know the place (D173, F1). */
   function whatYouKnow(id, L) {
@@ -283,16 +285,33 @@ export function initGoblin(ctx) {
   function resultPanel(events) {
     const en = entriesOf(events, ctxFor());
     const sk = events.find((e) => e.type === 'skirmish_result' && e.rounds);
-    const dice = sk ? `<div class="gobdice">${sk.rounds.map((r, i) => `<div><span class="fine">Round ${i + 1}</span> you <b>${r.a.join(' ')}</b> · them <b>${r.d.join(' ')}</b> → ${r.dLost ? `${r.dLost} of theirs` : ''}${r.dLost && r.aLost ? ', ' : ''}${r.aLost ? `${r.aLost} of yours` : ''}</div>`).join('')}</div>` : '';
+    const diceRows = sk ? `<div class="gobdice">${sk.rounds.map((r, i) => `<div><span class="fine">Round ${i + 1}</span> ${dice(r.a)} <span class="fine">against</span> ${dice(r.d, 'them')} <span class="fine">${r.dLost ? `${r.dLost} of theirs fell` : ''}${r.dLost && r.aLost ? ', ' : ''}${r.aLost ? `${r.aLost} of yours` : ''}</span></div>`).join('')}</div>` : '';
     const rej = events.find((e) => e.type === 'order_rejected');
     panel(`<div class="gob"><h3>${rej ? 'That did not work' : sk ? (sk.won ? 'Taken' : 'Thrown back') : 'Done'}</h3>
-      ${rej ? `<p>${esc(rej.reason)}</p>` : en.map((e) => `<p>${esc(e.text)}</p>`).join('') || '<p>Done.</p>'}${dice}${closeBtn}</div>`);
+      ${rej ? `<p>${esc(rej.reason)}</p>` : en.map((e) => `<p>${esc(e.text)}</p>`).join('') || '<p>Done.</p>'}${diceRows}${closeBtn}</div>`);
   }
   const unseen = () => { const n = Math.max(0, (save.total || 0) - (save.seenTotal || 0)); return n ? save.events.slice(-n) : []; };
+  /** The aftermath of your own captains (D107, D108): who was hurt, fled or taken since you last looked, with a portrait showing it. */
+  function aftermath(events) {
+    const seen = new Map();
+    for (const e of events) {
+      if (e.type === 'front_closed') for (const x of e.changed || []) seen.set(x.char, x.what);
+      if (e.type === 'closeup') seen.set(e.char, e.what);
+      if (e.type === 'dueled' && e.loser) seen.set(e.loser, e.hurt === 'none' ? 'beaten' : e.hurt);
+    }
+    const out = [];
+    for (const [id, what] of seen) {
+      const c = w().chars[id]; if (!c || c.clan !== ME) continue;
+      const line = { injured: 'came back hurt', died: 'did not come back', captured: 'was taken prisoner', fled: 'fell back, shaken', persisted: 'came out of it changed', beaten: 'lost a duel', promoted: 'earned a name' }[what];
+      if (line) out.push(`<div class="capline">${portrait(c, w().clans[ME].kind, what === 'fled' || what === 'beaten' ? 'shaken' : expressionFor(c) === 'steady' ? 'grim' : expressionFor(c))}<p><b>${esc(c.name)}</b> ${line}.</p></div>`);
+    }
+    return out.slice(0, 2).join('');
+  }
   function digestPanel(note) {
-    const d = digestOf(unseen(), ctxFor());
+    const seenEvents = unseen(), d = digestOf(seenEvents, ctxFor());
     save.seenTotal = save.total || 0; persist();
     panel(`<div class="gob">${messengerBlock()}<h3>${esc(d.headline)}</h3>
+      ${aftermath(seenEvents)}
       ${d.incoming.map((i) => `<p class="warn">${esc(i.text)}</p>`).join('')}
       ${d.lines.map((l) => `<p><span class="fine">${esc(l.when)}</span> ${esc(l.text)}</p>`).join('')}
       ${d.hidden ? `<p class="fine">${d.hidden} more in the Ledger.</p>` : ''}
@@ -426,7 +445,7 @@ export function initGoblin(ctx) {
     const other = events.find((e) => ['foothold_run', 'dueled', 'parleyed', 'ransomed', 'released', 'convoy_raided', 'guarded', 'dwarves_sought'].includes(e.type));
     panel(`<div class="gob"><h3>${rej ? 'That did not work' : other ? ({ foothold_run: other.placed ? 'A foothold' : 'No foothold', dueled: other.won === null ? 'A standoff' : other.won ? 'You won the duel' : 'You lost the duel', parleyed: 'A truce', ransomed: 'Ransomed', released: 'Let go', convoy_raided: other.won ? 'The convoy is yours' : 'Beaten off', guarded: 'Guarded', dwarves_sought: other.ok ? 'The dwarves are friends' : 'Turned away' })[other.type] : sc && sc.type === 'scouted' ? (sc.lost ? 'The scout is gone' : sc.learned.length ? 'Something learned' : 'Nothing new') : sc ? (sc.ok ? 'It worked' : 'It backfired') : 'Done'}</h3>
       ${rej ? `<p>${esc(rej.reason)}</p>` : en.map((e) => `<p>${esc(e.text)}</p>`).join('')}
-      ${sc && sc.dice ? `<p class="fine">Dice: ${sc.dice.join(' + ')}</p>` : ''}${closeBtn}</div>`);
+      ${sc && sc.dice ? `<p>${dice(sc.dice)}</p>` : ''}${closeBtn}</div>`);
   }
 
   // ---------------------------------------------------------------- the quiz charge (D179)
@@ -481,7 +500,7 @@ export function initGoblin(ctx) {
     const known = c ? (c.known[ME] || []).map(factWord) : [];
     panel(`<div class="gob"><h3>Front at ${esc(G.board.town(f.target).name)}</h3>
       <p>Standing: <b>${STAND[f.standing]}</b> · beat ${f.beat + 1} · ${f.units} committed against <b>${T.force}</b>${f.lead ? ' · your captain leads' : ''}</p>
-      <p>★ ${esc(c.name)}: ${known.length ? esc(known.join(', ')) : 'nothing known yet'}</p>${en}${dec ? '' : ''}
+      <div class="capline">${portrait(c, w().clans[c.clan].kind)}<p>★ ${esc(c.name)}${c.state && G.content.states.get(c.state) ? ` <b>${esc(G.content.states.get(c.state).word)}</b>` : ''}: ${known.length ? esc(known.join(', ')) : 'nothing known yet'}</p></div>${en}
       ${acts.some((a) => ['probe', 'pressure', 'lever'].includes(a)) ? chargeBlock(f) : ''}
       ${acts.map((a) => `<button class="${a === 'decision' ? 'primary' : ''}" data-g="fact" data-front="${esc(fid)}" data-a="${a}"><b>${LABEL[a][0]}</b> <span class="fine">${LABEL[a][1]}</span></button>`).join('')}
       <button data-g="close">Close (the front waits)</button></div>`);
@@ -495,8 +514,8 @@ export function initGoblin(ctx) {
     if (closed) {
       const en = entriesOf(events, ctxFor()).map((e) => `<p>${esc(e.text)}</p>`).join('');
       const dec = events.find((e) => e.type === 'front_beat' && e.maneuver === 'decision' && e.rounds);
-      const dice = dec ? `<div class="gobdice">${dec.rounds.map((r, i) => `<div><span class="fine">Round ${i + 1}</span> you <b>${r.a.join(' ')}</b> · them <b>${r.d.join(' ')}</b></div>`).join('')}</div>` : '';
-      return panel(`<div class="gob"><h3>Front ${closed.verdict === 'Won' || closed.verdict === 'Yielded' ? 'won' : closed.verdict === 'Lost' ? 'lost' : 'closed'}</h3>${en}${dice}${closeBtn}</div>`);
+      const diceRows = dec ? `<div class="gobdice">${dec.rounds.map((r, i) => `<div><span class="fine">Round ${i + 1}</span> ${dice(r.a)} <span class="fine">against</span> ${dice(r.d, 'them')}</div>`).join('')}</div>` : '';
+      return panel(`<div class="gob"><h3>Front ${closed.verdict === 'Won' || closed.verdict === 'Yielded' ? 'won' : closed.verdict === 'Lost' ? 'lost' : 'closed'}</h3>${en}${diceRows}${closeBtn}</div>`);
     }
     frontPanel(fid, events.filter((e) => e.type === 'front_beat' || e.type === 'closeup'));
   }
