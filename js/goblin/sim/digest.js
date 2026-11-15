@@ -16,6 +16,7 @@ function weight(e, clan) {
     case 'front_closed': return e.clan === clan ? 75 : 20;
     case 'clan_out': return 60;
     case 'player_absent': return 5;
+    case 'season': return 45;
     case 'convoy_ambushed': return e.clan === clan ? 98 : 20;
     case 'sighting': return e.clan === clan ? 38 : 0;
     case 'ambush_foiled': return e.clan === clan ? 55 : 0;

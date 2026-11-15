@@ -7,6 +7,9 @@
 
 import { K8 } from './constants.js';
 import { splitIncome, spawnConvoy } from './convoys.js';
+import { ruleOf } from './regions.js';
+import { seasonOf } from './seasons.js';
+import { unitsPerFoodFor, bridgeDiscount } from './kinds.js';
 
 const byId = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 export const active = (clan) => !!clan && clan.res !== undefined;
@@ -24,12 +27,13 @@ export function initEconomy(w, board) {
   w.bridges = {}; w.bridging = [];
 }
 
-export const income = (w, clanId) => {
+export const income = (w, clanId, board = null) => {
   let food = 0, build = 0, coin = 0;
-  for (const T of Object.values(w.towns)) {
+  const autumn = seasonOf(w) === 'autumn';
+  for (const [id, T] of Object.entries(w.towns)) {
     if (T.owner !== clanId) continue;
     if (T.freshUntil && T.freshUntil > w.tick) continue;   // a township just taken yields nothing while it settles (K8.unrestTicks)
-    food += K8.foodPerTown + (T.trade === 'food' ? K8.foodTownBonus : 0);
+    food += K8.foodPerTown + (T.trade === 'food' ? K8.foodTownBonus + (autumn ? 1 : 0) + (board && ruleOf(board, id) === 'farm' ? 1 : 0) : 0);
     if (T.trade === 'build') build += K8.buildPerTown;
     if (T.trade === 'coin') coin += K8.coinPerTown;
   }
@@ -37,8 +41,9 @@ export const income = (w, clanId) => {
 };
 export const unitsOf = (w, clanId) => Object.values(w.towns).filter((t) => t.owner === clanId).reduce((n, t) => n + t.force, 0);
 /** Mouths to feed: every unit, and a second time for each unit packed into a township beyond K8.crowd. */
-export const mouths = (w, clanId) => Object.values(w.towns).filter((t) => t.owner === clanId).reduce((n, t) => n + t.force + Math.max(0, t.force - K8.crowd), 0);
-export const upkeep = (w, clanId) => Math.ceil(mouths(w, clanId) / K8.unitsPerFood);
+export const mouths = (w, clanId) => Object.values(w.towns).filter((t) => t.owner === clanId).reduce((n, t) => n + t.force + Math.max(0, t.force - K8.crowd), 0) * (seasonOf(w) === 'winter' ? 1.25 : 1);
+const perFood = (w, clanId) => unitsPerFoodFor(w.clans[clanId].kind, K8.unitsPerFood);
+export const upkeep = (w, clanId) => Math.ceil(mouths(w, clanId) / perFood(w, clanId));
 export const marchCost = (n) => Math.max(1, Math.ceil(n / K8.marchPerUnits));
 export const canMarch = (clan, n) => !active(clan) || clan.res.food >= marchCost(n);
 export const payMarch = (clan, n) => { if (active(clan)) clan.res.food -= marchCost(n); };
@@ -49,7 +54,7 @@ export const maxMarch = (clan, force) => (active(clan) ? Math.min(force - 1, cla
 export function economyTick(w, board, emit) {
   for (const c of Object.values(w.clans)) {
     if (!active(c) || c.out) continue;
-    const inc = income(w, c.id);
+    const inc = income(w, c.id, board);
     const noon = (w.startHour + w.tick) % 24 === 12;   // Build and Coin come once a day
     c.res.food = Math.min(K8.resCap, c.res.food + inc.food);
     if (noon) {   // Build and Coin: what far townships make travels as a convoy, the rest arrives at once (F4)
@@ -59,7 +64,7 @@ export function economyTick(w, board, emit) {
     }
     const need = upkeep(w, c.id);
     if (c.res.food >= need) { c.res.food -= need; c.short = 0; continue; }
-    const fed = c.res.food * K8.unitsPerFood, units = mouths(w, c.id), unfed = units - fed;
+    const fed = c.res.food * perFood(w, c.id), units = mouths(w, c.id), unfed = units - fed;
     c.res.food = 0; c.short++;
     if (c.short === 1) emit('hunger', { clan: c.id, unfed, warning: true });   // the warning: a day to put it right
     if (c.short > K8.graceMajors) {
@@ -77,6 +82,9 @@ export function economyTick(w, board, emit) {
 }
 
 // ---------------------------------------------------------------- bridges (D109)
+/** A bridge's price: cheaper in a river region and for gnomes, never below 1. */
+export const bridgeCostFor = (w, board, clanId, from) => Math.max(1, K8.bridgeCost - (ruleOf(board, from) === 'rivers' ? 2 : 0) - bridgeDiscount(w.clans[clanId].kind));
+export const hireUnitsFor = (board, town) => K8.hireUnits + (ruleOf(board, town) === 'coast' ? 2 : 0);
 export const bridgeKey = (a, b) => (a < b ? a + '~' + b : b + '~' + a);
 export const hasBridge = (w, clanId, a, b) => !!(w.bridges && (w.bridges[bridgeKey(a, b)] || []).includes(clanId));
 export function completeBridges(w, emit) {
@@ -102,8 +110,9 @@ export function applyEconomyOrder(w, board, emit, o) {
     if (!T || T.owner !== o.clan) return reject('not your township');
     if (clan.hireDay === dayOf(w)) return reject('you have already hired a band today');
     if (clan.res.coin < K8.hireCost) return reject(`a band costs ${K8.hireCost} Coin: you have ${clan.res.coin}`);
-    clan.res.coin -= K8.hireCost; clan.hireDay = dayOf(w); T.force = Math.min((w.rules && w.rules.townForceCap) ?? Infinity, T.force + K8.hireUnits);
-    return emit('hired', { clan: o.clan, town: o.town, n: K8.hireUnits });
+    const units = hireUnitsFor(board, o.town);
+    clan.res.coin -= K8.hireCost; clan.hireDay = dayOf(w); T.force = Math.min((w.rules && w.rules.townForceCap) ?? Infinity, T.force + units);
+    return emit('hired', { clan: o.clan, town: o.town, n: units });
   }
   if (o.type === 'bridge') {
     const F = w.towns[o.from], T = w.towns[o.to], b = board.border(o.from, o.to);
@@ -111,8 +120,9 @@ export function applyEconomyOrder(w, board, emit, o) {
     if (!b || !b.river) return reject('a bridge crosses a river border');
     if (hasBridge(w, o.clan, o.from, o.to)) return reject('you already have a bridge there');
     if (w.bridging.some((x) => x.clan === o.clan && bridgeKey(x.a, x.b) === bridgeKey(o.from, o.to))) return reject('that bridge is already being built');
-    if (clan.res.build < K8.bridgeCost) return reject(`a bridge costs ${K8.bridgeCost} Build: you have ${clan.res.build}`);
-    clan.res.build -= K8.bridgeCost; w.bridging.push({ clan: o.clan, a: o.from, b: o.to, majors: K8.bridgeMajors });
+    const price = bridgeCostFor(w, board, o.clan, o.from);
+    if (clan.res.build < price) return reject(`a bridge costs ${price} Build: you have ${clan.res.build}`);
+    clan.res.build -= price; w.bridging.push({ clan: o.clan, a: o.from, b: o.to, majors: K8.bridgeMajors });
     return emit('bridge_started', { clan: o.clan, a: o.from, b: o.to, majors: K8.bridgeMajors });
   }
   return reject('unknown order');

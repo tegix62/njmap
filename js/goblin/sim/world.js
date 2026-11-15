@@ -16,6 +16,10 @@ import { initWar, warTurn } from './war.js';
 import * as Eco from './economy.js';
 import { applyEncounter, encounterTick } from './encounters.js';
 import { convoyTick, ambushTurn, applyConvoyOrder } from './convoys.js';
+import { ruleOf } from './regions.js';
+import { seatCarried } from './chapters.js';
+import { seasonOf, SEASONS } from './seasons.js';
+import { digMinFor, recruitBonusFor, ignoresRiver, digCostFree } from './kinds.js';
 import { applySitting, hasAp, spend as spendAp, refill as refillAp } from './sitting.js';
 import { openFront, actFront, settleFronts, pinnedTowns, openFronts } from './front.js';
 import { placeInitialCaptains, captainsOf, capture, place, promote, succeed } from './chars.js';
@@ -91,11 +95,17 @@ export function newWorld(board, cfg) {
   });
   for (const c of Object.values(clans)) c.peakTowns = theatre.filter((t) => towns[t].owner === c.id).length;
   const w = { v: 1, seed: cfg.seed ?? 1, rng: 0, tick: 0, startHour: cfg.startHour ?? K2.startHour, lastMajor: 0,
-              theatre, towns, clans, chars: {}, heirs: [], fronts: {}, raids: [], director: {}, nextId: 1, footholds: {}, truces: {}, footDay: {}, convoys: [], guards: {}, ambushes: [], lossLog: {}, reprisal: {}, rules: { ...DEFAULT_RULES, ...(cfg.rules || {}) } };
+              theatre, towns, clans, chars: {}, heirs: [], fronts: {}, raids: [], director: {}, nextId: 1, startMs: cfg.startMs, campaign: cfg.campaign || { chapter: 1, kits: [] }, footholds: {}, truces: {}, footDay: {}, convoys: [], guards: {}, ambushes: [], lossLog: {}, reprisal: {}, rules: { ...DEFAULT_RULES, ...(cfg.rules || {}) } };
   const rng = makeRng(seedState(cfg.seed ?? 1));
   if (board.content) placeInitialCaptains(w, rng, board.content);
   initWar(w, board);
   if (w.rules.economy) Eco.initEconomy(w, board);
+  if (cfg.carry) {   // a later chapter: your clan travels with you (F5)
+    const h = cfg.clans.find((c) => c.lord === 'human').id;
+    if (cfg.carry.res && w.clans[h].res) w.clans[h].res = { ...cfg.carry.res };
+    if (cfg.carry.gentle) w.clans[h].gentle = true;
+    if (board.content) seatCarried(w, cfg.carry, h);
+  }
   if (cfg.guidedStart) guidedStart(w, board, cfg.clans.find((c) => c.lord === 'human').id);
   w.rng = rng.state;
   return w;
@@ -126,9 +136,11 @@ function guidedStart(w, board, humanId) {
 
 const ownedBy = (w, clanId) => Object.keys(w.towns).filter((t) => w.towns[t].owner === clanId).sort(byId);
 const isHuman = (w, id) => !!id && w.clans[id] && w.clans[id].lord === 'human';
-const borderMods = (board, from, to, dugIn, captainLeads = false, bridged = false) => {
+const borderMods = (board, from, to, dugIn, captainLeads = false, bridged = false, spring = false) => {
   const b = board.border(from, to) || {};
-  return modsFor({ dugIn, captainLeads, riverBorder: !!(b.river || b.ridge) && !bridged, highway: !!(b.highways && b.highways.length) });
+  const m = modsFor({ dugIn, captainLeads, riverBorder: !!(b.river || b.ridge) && !bridged, highway: !!(b.highways && b.highways.length) });
+  if (spring && b.river && m.atkBestPenalty) m.atkBestPenalty = 2;   // spring: the rivers run high
+  return m;
 };
 
 /** One skirmish: units from `from` (or already on the road, `inTransit`) attack `to`. Mutates w, emits events.
@@ -149,7 +161,7 @@ function fight(w, board, rng, emit, { by, from, to, n, inTransit = false, raid =
   }
   const defendersBefore = T.force;
   const bd = board.border(from, to) || {};
-  const r = skirmish({ attackers: n, defenders: T.force, ...borderMods(board, from, to, T.dugIn, !!leadId, Eco.hasBridge(w, by, from, to)) }, rng);
+  const r = skirmish({ attackers: n, defenders: T.force, ...borderMods(board, from, to, T.dugIn, !!leadId, Eco.hasBridge(w, by, from, to) || ignoresRiver(w.clans[by].kind), seasonOf(w) === 'spring') }, rng);
   const detail = isHuman(w, by) || isHuman(w, against);
   const extra = [];
   if (r.won) {
@@ -229,6 +241,7 @@ function recruits(w, board, emit) {
     const mine = ownedBy(w, clan.id);
     if (!mine.length) continue;
     let n = Math.ceil(Math.min(mine.length, R(w).recruitFullTowns) / K.recruitsDivisor + Math.max(0, mine.length - R(w).recruitFullTowns) / R(w).recruitDivisorBeyond);
+    n += recruitBonusFor(clan.kind) + (seasonOf(w) === 'summer' ? 1 : 0);   // rats breed fast; summer brings more hands
     if (Eco.active(clan)) { n = Math.min(n, Math.floor(clan.res.food / K8.recruitCost)); clan.res.food -= n * K8.recruitCost; }   // recruits eat Food (F2)
     const enemyNb = (t) => board.neighbours(t).filter((x) => w.towns[x] && w.towns[x].owner && w.towns[x].owner !== clan.id);
     const border = mine.filter((t) => enemyNb(t).length);
@@ -254,18 +267,19 @@ function recruits(w, board, emit) {
     if (split) { const weakest = border.slice().sort((a, b) => (w.towns[a].force - w.towns[b].force) || byId(a, b))[0]; left += fillFrom(weakest, split); }
     left += fillFrom(at, n - split);
     if (clan.lord === 'ai' && Eco.active(clan) && clan.res.coin >= K8.hireCost && clan.hireDay !== Eco.dayOf(w)) {   // an AI spends its Coin on a hired band at its best attack position
-      clan.res.coin -= K8.hireCost; clan.hireDay = Eco.dayOf(w); w.towns[at].force = Math.min(R(w).townForceCap, w.towns[at].force + K8.hireUnits); emit('hired', { clan: clan.id, town: at, n: K8.hireUnits });
+      clan.res.coin -= K8.hireCost; clan.hireDay = Eco.dayOf(w); const hu = Eco.hireUnitsFor(board, at); w.towns[at].force = Math.min(R(w).townForceCap, w.towns[at].force + hu); emit('hired', { clan: clan.id, town: at, n: hu });
     }
     emit('recruits', { clan: clan.id, town: at, n, lost: left });
   }
 }
 
-function digIn(w, emit) {
+function digIn(w, board, emit) {
   for (const t of Object.keys(w.towns).sort(byId)) {
     const T = w.towns[t];
-    if (T.owner && !T.dugIn && T.force >= K.digInMinForce && T.attackedTick <= w.lastMajor) {
+    if (T.owner && !T.dugIn && T.force >= digMinFor(w.clans[T.owner].kind, K.digInMinForce) && T.attackedTick <= w.lastMajor) {
       const c = w.clans[T.owner];
-      if (Eco.active(c)) { if (c.res.build < K8.digInCost) continue; c.res.build -= K8.digInCost; }   // digging in costs Build (D204)
+      const free = digCostFree(c.kind) || ruleOf(board, t) === 'hills';   // gnomes, and rough ground, dig in without paying Build
+      if (Eco.active(c) && !free) { if (c.res.build < K8.digInCost) continue; c.res.build -= K8.digInCost; }   // digging in costs Build (D204)
       T.dugIn = true; emit('dug_in', { town: t, clan: T.owner });
     }
   }
@@ -379,7 +393,7 @@ function majorTick(w, board, rng, emit) {
   encounterTick(w, board, rng, emit);
   recruits(w, board, emit);
   refillAp(w);
-  digIn(w, emit);
+  digIn(w, board, emit);
   if (board.content) for (const m of succeed(w, rng, board.content)) emit('succeeded', { clan: m.char.clan, char: m.char.id, town: m.char.at, dynasty: m.char.dynasty });
   for (const c of Object.values(w.clans)) c.peakTowns = Math.max(c.peakTowns || 0, ownedBy(w, c.id).length);
   const peace = peaceOn(w);
@@ -394,6 +408,8 @@ function majorTick(w, board, rng, emit) {
   for (const c of Object.values(w.clans)) {
     if (!c.out && !ownedBy(w, c.id).length) { c.out = true; emit('clan_out', { clan: c.id }); }
   }
+  const season = seasonOf(w);
+  if (season && season !== w.season) { w.season = season; emit('season', { season, name: SEASONS[season].name, text: SEASONS[season].text }); }
   warTurn(w, board, emit);
   w.lastMajor = w.tick;
 }

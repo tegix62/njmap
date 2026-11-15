@@ -85,9 +85,11 @@ test('recruit placement: an AI masses them at its best attack position, a human 
 
 test('dig in: 3 or more units that did not attack become fortified at a major tick; 2 does not', () => {
   // the recruit lands on the weakest township, B, taking it from 1 to 2: still under 3
-  const w = mk({ A: ['x', 3], B: ['x', 1] }, [clanOf('x', 'ai')]);
+  const w = mk({ A: ['x', 3], B: ['x', 1] }, [clanOf('x', 'ai', { kind: 'toad' })]);   // toads follow the common rule; goblins dig in at 2 (kinds.js)
   const { state } = step(tiny, w, [], 1);
   assert.equal(state.towns.A.dugIn, true); assert.equal(state.towns.B.dugIn, false);
+  const g = step(tiny, mk({ A: ['x', 3], B: ['x', 1] }, [clanOf('x', 'ai', { kind: 'goblin' })]), [], 1).state;
+  assert.equal(g.towns.B.dugIn, true, 'a goblin township of 2 digs in');
 });
 
 test('an AI attacks another AI at once, but only at 2 to 1 or better', () => {

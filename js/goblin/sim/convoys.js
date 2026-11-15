@@ -7,6 +7,7 @@
 import { K, K8, K10 } from './constants.js';
 import { skirmish } from './skirmish.js';
 import { bearingMiles } from './ledger.js';
+import { ruleOf } from './regions.js';
 
 const byId = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
@@ -19,7 +20,12 @@ function lanes(board) {
   }
   return laneMap.get(board);
 }
-export const legTicks = (board, a, b) => { const mi = bearingMiles(board, a, b).mi; const t = Math.max(1, Math.round(mi / K10.milesPerTick)); return lanes(board).has(a + '>' + b) ? Math.max(1, Math.ceil(t / 2)) : t; };
+export const legTicks = (board, a, b) => {
+  const mi = bearingMiles(board, a, b).mi; let t = Math.max(1, Math.round(mi / K10.milesPerTick));
+  if (lanes(board).has(a + '>' + b)) t = Math.max(1, Math.ceil(t / 2));
+  if (ruleOf(board, a) === 'roads' && ruleOf(board, b) === 'roads') t = Math.max(1, Math.ceil(t / 2));   // a roads region: twice as fast
+  return t;
+};
 
 /** The shortest route over the theatre's border graph from one township to another (ties by name). */
 export function routeBetween(w, board, from, to) {

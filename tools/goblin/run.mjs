@@ -6,6 +6,7 @@ import path from 'node:path';
 import { makeBoard } from '../../js/goblin/sim/board.js';
 import { loadContent } from '../../js/goblin/sim/chars.js';
 import { newWorld, step, checkInvariants } from '../../js/goblin/sim/world.js';
+import { nextChapterCfg, rivalsFor } from '../../js/goblin/sim/chapters.js';
 import { renderLedger } from '../../js/goblin/sim/ledger.js';
 import { makeBot } from './bots.mjs';
 
@@ -13,14 +14,17 @@ const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i < 0 ?
 const root = new URL('../../', import.meta.url);
 const read = (p) => JSON.parse(fs.readFileSync(new URL(p, root), 'utf8'));
 const content = loadContent(read('data/goblin-content.json'));
-const board = makeBoard(read('data/goblin-board.json'), content);
+const regions = read('data/goblin-regions.json');
+export const board = makeBoard(read('data/goblin-board.json'), content, regions);
+export const START_MS = Date.UTC(2026, 8, 15);   // a fixed real date, so runs are reproducible and begin in autumn
 
 const SITTING_LIMIT = 10;
 const RULES = Object.fromEntries((arg('set', '') || '').split(',').filter(Boolean).map((kv) => { const [k, v] = kv.split('='); return [k, +v]; }));   // --set frontMaxGain=1,aiAttackRatio=1.5
 
-export function runWar({ seed, days = 21, bot = 'careful', home = 'Paterson City|Passaic', rules = {} }) {
+export function runWar({ seed, days = 21, bot = 'careful', home = 'Paterson City|Passaic', rules = {}, world = null, rivals = 'fixed' }) {
   const lord = makeBot(bot);
-  let w = newWorld(board, { seed: 'war' + seed, home, clans: [{ id: 'goblins', kind: 'goblin', lord: 'human' }, { id: 'rats', kind: 'rat', lord: 'ai' }, { id: 'toads', kind: 'toad', lord: 'ai' }], rules });
+  const rivalCfg = rivals === 'pool' ? rivalsFor('war' + seed) : [{ id: 'rats', kind: 'rat', lord: 'ai' }, { id: 'toads', kind: 'toad', lord: 'ai' }];
+  let w = world || newWorld(board, { seed: 'war' + seed, home, clans: [{ id: 'goblins', kind: 'goblin', lord: 'human' }, ...rivalCfg], rules, startMs: START_MS });
   const startTowns = Object.values(w.towns).filter((t) => t.owner === 'goblins').length;
   const events = [], perDay = [];
   const rejected = [];
@@ -57,6 +61,23 @@ const shapeKey = (e) => {
   }
 };
 const QUIET = new Set(['recruits', 'dug_in', 'director_word', 'order_rejected']);
+
+/** Play chapters one after another: win and the next region opens with your clan; lose (or run out of days) and the region is played again with new rivals (D175). */
+export function runCampaign({ seed, bot = 'careful', chapters = 3, days = 40, home = 'Paterson City|Passaic', maxTries = 3 }) {
+  const log = [];
+  let cfg = { seed: `${seed}.1`, home, clans: [{ id: 'goblins', kind: 'goblin', lord: 'human' }, ...rivalsFor(`${seed}.1`)], startMs: START_MS, campaign: { chapter: 1, kits: [] } };
+  let chapter = 1, tries = 0;
+  while (chapter <= chapters && tries < chapters * maxTries) {
+    tries++;
+    const world = newWorld(board, cfg);
+    const r = runWar({ seed, days, bot, world });
+    const over = r.state.war.over, won = !!over && over.winner === 'goblins';
+    log.push({ chapter, kit: board.regions.townKit[cfg.home], won, day: over ? Math.floor(over.tick / 24) : null, captains: Object.values(r.state.chars).filter((c) => c.clan === 'goblins' && c.status === 'active').length, res: r.state.clans.goblins.res, state: r.state });
+    if (won) { cfg = nextChapterCfg(board, r.state); chapter++; }
+    else cfg = { ...cfg, seed: `${cfg.seed}r`, clans: [{ id: 'goblins', kind: 'goblin', lord: 'human' }, ...rivalsFor(`${cfg.seed}r`)] };   // the same region again, no hard reset
+  }
+  return log;
+}
 
 export function metricsOf(run, days) {
   const { events, perDay, state } = run;

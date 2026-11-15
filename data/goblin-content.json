@@ -840,6 +840,11 @@
    "id": "reprisal",
    "text": "{clan} answers the ambush: the {town} raid goes in without a pause.",
    "placeholder": true
+  },
+  {
+   "id": "season",
+   "text": "{name} begins. {text}",
+   "placeholder": true
   }
  ],
  "force_words": [

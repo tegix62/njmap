@@ -12,22 +12,25 @@ import { skirmish, modsFor } from '../sim/skirmish.js';
 import { makeRng, seedState } from '../sim/rng.js';
 import { fogMap, forceWord, rank } from './fog.js';
 import { recordReview } from './review.js';
-import { active as ecoActive, marchCost, maxMarch, income as ecoIncome, hasBridge } from '../sim/economy.js';
+import { active as ecoActive, marchCost, maxMarch, income as ecoIncome, hasBridge, bridgeCostFor } from '../sim/economy.js';
 import { K8, K9 } from '../sim/constants.js';
 import { footholdMods, ransomPrice, roomFor } from '../sim/encounters.js';
 import { positionAt, messengerMood, convoysOf } from '../sim/convoys.js';
 import { wordOf } from '../sim/director.js';
 import { legalOrders } from '../sim/front.js';
 import { messengerFace } from './messenger.js';
+import { kitOf, kitById, kitName } from '../sim/regions.js';
+import { seasonOf, SEASONS } from '../sim/seasons.js';
+import { nextChapterCfg, rivalsFor } from '../sim/chapters.js';
 import { scoutMods, isNight, hasAp } from '../sim/sitting.js';
 import { digestOf } from '../sim/digest.js';
 import { MUNI_LABEL_IDS } from '../../style.js';
 
 const ME = 'goblins';
 const CLANS = [{ id: 'goblins', kind: 'goblin', lord: 'human' }, { id: 'rats', kind: 'rat', lord: 'ai' }, { id: 'toads', kind: 'toad', lord: 'ai' }];
-const NO = { goblins: 1, rats: 2, toads: 3 };
-const COLOUR = { 1: '#3f9b5a', 2: '#b9712f', 3: '#3a86a8' };
-const HOUR = 3600000, KEEP_EVENTS = 600, SAVE = 'goblin.save', SAVE_V = 3;
+const NO = { goblins: 1, rats: 2, toads: 3, gnomes: 4 };
+const COLOUR = { 1: '#3f9b5a', 2: '#b9712f', 3: '#3a86a8', 4: '#8b5cf6' };
+const HOUR = 3600000, KEEP_EVENTS = 600, SAVE = 'goblin.save', SAVE_V = 4;
 const MAJORS = [9, 12, 18];
 const STAND = ['Behind', 'Even', 'Ahead', 'Commanding'];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -47,9 +50,9 @@ export function initGoblin(ctx) {
   // ---------------------------------------------------------------- loading and saving
   async function load() {
     if (G) return;
-    const [bj, cj] = await Promise.all([fetch('data/goblin-board.json').then((r) => r.json()), fetch('data/goblin-content.json').then((r) => r.json())]);
+    const [bj, cj, rj] = await Promise.all([fetch('data/goblin-board.json').then((r) => r.json()), fetch('data/goblin-content.json').then((r) => r.json()), fetch('data/goblin-regions.json').then((r) => r.json())]);
     const content = loadContent(cj);
-    G = { board: makeBoard(bj, content), content };   // content attached: townships can have captains, and so fronts
+    G = { board: makeBoard(bj, content, rj), content };   // content attached: townships can have captains, and so fronts
   }
   const persist = () => store.set(SAVE, save);
   const fw = () => G.content.json.force_words.map((x) => [x.min, x.max, x.word]);   // placeholder words, the user's to write (D68)
@@ -90,7 +93,7 @@ export function initGoblin(ctx) {
       paint: { 'line-color': ['case', ['==', ['coalesce', ['feature-state', 'gs'], 0], 1], '#111827', ['==', ['coalesce', ['feature-state', 'gr'], 0], 1], '#dc2626', 'rgba(0,0,0,0)'],
                'line-width': ['case', ['==', ['coalesce', ['feature-state', 'gs'], 0], 1], 4, 3] } }, before);
     map.addSource('gobconvoy', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-    map.addLayer({ id: 'gob-convoy', type: 'circle', source: 'gobconvoy', layout: { visibility: 'none' }, paint: { 'circle-radius': 7, 'circle-color': ['match', ['get', 'clan'], 'goblins', COLOUR[1], 'rats', COLOUR[2], 'toads', COLOUR[3], '#555'], 'circle-stroke-width': 2.5, 'circle-stroke-color': '#ffffff' } });
+    map.addLayer({ id: 'gob-convoy', type: 'circle', source: 'gobconvoy', layout: { visibility: 'none' }, paint: { 'circle-radius': 7, 'circle-color': ['match', ['get', 'clan'], 'goblins', COLOUR[1], 'rats', COLOUR[2], 'toads', COLOUR[3], 'gnomes', COLOUR[4], '#555'], 'circle-stroke-width': 2.5, 'circle-stroke-color': '#ffffff' } });
     map.addSource('gobforce', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({ id: 'gob-force', type: 'symbol', source: 'gobforce', layout: { visibility: 'none', 'text-field': ['format', ['get', 'n'], { 'font-scale': 0.62 }, '\n', {}, ['get', 'f'], { 'font-scale': 1.15 }], 'text-font': ['Noto Sans Medium'], 'text-size': 13, 'text-line-height': 1.0, 'text-allow-overlap': true, 'text-ignore-placement': true },
       paint: { 'text-color': '#111827', 'text-halo-color': '#ffffff', 'text-halo-width': 2 } });
@@ -172,9 +175,13 @@ export function initGoblin(ctx) {
   function resLine() {
     const c = w().clans[ME];
     if (!ecoActive(c)) return '';
-    const inc = ecoIncome(w(), ME);
+    const inc = ecoIncome(w(), ME, G.board);
     const warn = c.short > 0 ? `<div class="meta warnline">Short of Food: units will start drifting home ${c.short > K8.graceMajors ? 'now' : `if it lasts ${K8.graceMajors + 1 - c.short} more tick${K8.graceMajors + 1 - c.short === 1 ? '' : 's'}`}.</div>` : '';
     return `<div class="meta">Food ${c.res.food} (+${inc.food} a tick) · Build ${c.res.build} · Coin ${c.res.coin}</div>${warn}`;
+  }
+  function regionLine() {
+    const world = w(), k = kitById(G.board, kitOf(G.board, world.clans[ME].home)), se = seasonOf(world);
+    return `Chapter ${(world.campaign && world.campaign.chapter) || 1}${k ? ` · ${esc(k.name)}` : ''}${se ? ` · ${SEASONS[se].name}` : ''}`;
   }
   function hud() {
     const world = w();
@@ -183,6 +190,7 @@ export function initGoblin(ctx) {
     const fr = openFronts(world, ME).length;
     const nx = nextMajor();
     ctx.hud(`<div class="town">${mine.length} townships · ${units} units${fr ? ` · ${fr} front${fr === 1 ? '' : 's'}` : ''}</div>
+      <div class="meta">${regionLine()}</div>
       <div class="meta">Goblins · ${clock()} · actions ${world.clans[ME].ap} of ${K6.apCap}</div>
       ${resLine()}
       <div class="meta">${warLine()}</div>
@@ -259,7 +267,7 @@ export function initGoblin(ctx) {
       <p>${esc(placePhrase(G.board, from, to))}${water && !placePhrase(G.board, from, to).includes('over') ? ', ' + water : ''}. ${attack ? whatYouKnow(to, L) : `You hold it with <b>${T.force}</b>.`}${blind ? ' You would attack blind.' : ''} You send from ${esc(G.board.town(from).name)} (<b>${F.force}</b>; one stays).</p>
       ${front ? captainBlock(T, L) : ''}${notes.map((n) => `<p class="fine">${n}</p>`).join('')}
       <label class="gobn">Send <b id="gobN">${max}</b> <span class="fine" id="gobCost">${attack && ecoActive(w().clans[ME]) ? `costs ${marchCost(max)} Food` : ''}</span><input id="gobRange" type="range" min="1" max="${max}" value="${max}"></label>
-      ${attack && ecoActive(w().clans[ME]) && (bd.river) && !hasBridge(w(), ME, from, to) && w().clans[ME].res.build >= K8.bridgeCost ? `<button data-g="bridge" data-from="${esc(from)}" data-to="${esc(to)}">Build a goblin bridge here <span class="fine">${K8.bridgeCost} Build, ${K8.bridgeMajors} ticks: the river stops hurting you</span></button>` : ''}
+      ${attack && ecoActive(w().clans[ME]) && (bd.river) && !hasBridge(w(), ME, from, to) && w().clans[ME].res.build >= bridgeCostFor(w(), G.board, ME, from) ? `<button data-g="bridge" data-from="${esc(from)}" data-to="${esc(to)}">Build a goblin bridge here <span class="fine">${bridgeCostFor(w(), G.board, ME, from)} Build, ${K8.bridgeMajors} ticks: the river stops hurting you</span></button>` : ''}
       <div class="gobrow"><button class="primary" data-g="send" data-from="${esc(from)}" data-to="${esc(to)}">${front ? 'Open the front' : attack ? 'Attack' : 'Move'}${attack ? ' <span class="fine">1 action</span>' : ''}</button><button data-g="close">Cancel</button></div></div>`);
     const r = $('#gobRange'); r.addEventListener('input', () => { $('#gobN').textContent = r.value; const c = $('#gobCost'); if (c && attack && ecoActive(w().clans[ME])) c.textContent = `costs ${marchCost(+r.value)} Food`; });
   }
@@ -311,6 +319,15 @@ export function initGoblin(ctx) {
       <p class="fine">Your green townships are yours. Red and brown are the rivals. The war moves on its own on the hour, so you can stop whenever you like.</p>
       <div class="gobrow"><button class="primary" data-g="first" data-from="${esc(best.from)}" data-to="${esc(best.to)}" data-n="${n}">Send them</button><button data-g="close">I'll look around</button></div></div>`);
   }
+  function nextRegionName() { try { return kitName(G.board, kitOf(G.board, nextChapterCfg(G.board, w()).home)); } catch { return 'a new region'; } }
+  /** A won chapter opens the next region with your clan; a lost one repeats this region with new rivals (D175). */
+  function beginChapter(cfg) {
+    const now = Date.now(), lastReal = now - (now % HOUR);
+    const world = newWorld(G.board, { ...cfg, startHour: easternHour(lastReal), startMs: lastReal, guidedStart: true });
+    save = { v: SAVE_V, world, lastReal, events: [], total: 0, seenTotal: 0, overShown: false, played: save.played || [], charges: save.charges };
+    persist(); mode = 'play'; sel = null; charge = null;
+    paint(); hud(); fitTheatre(); firstMove();
+  }
   function warOverPanel() {
     const o = w().war.over, won = o.winner === ME;
     const days = Math.max(1, Math.round(o.tick / 24));
@@ -319,7 +336,8 @@ export function initGoblin(ctx) {
     panel(`<div class="gob"><h3>${won ? 'The war is won' : 'The war is lost'}</h3>
       <p>${won ? 'Your goblins held more than half the map for three days.' : o.how === 'wiped out' ? 'Your goblins have no townships left.' : `The ${cap(o.winner)} held more than half the map for three days.`}</p>
       <p class="fine">It lasted ${days} day${days === 1 ? '' : 's'}. You finished with ${mine} townships.</p>
-      <div class="gobrow"><button data-g="ledger">Ledger</button><button class="primary" data-g="newwar">New war</button></div></div>`);
+      ${won ? `<p>The next region is <b>${esc(nextRegionName())}</b>. Your clan, your captains and your stores go with you; new rivals wait there.</p>` : '<p>The same region waits, with new rivals. Your clan and your captains stay with you.</p>'}
+      <div class="gobrow"><button data-g="ledger">Ledger</button><button class="primary" data-g="${won ? 'nextchapter' : 'retry'}">${won ? 'On to the next region' : 'Try this region again'}</button></div><button data-g="newwar">Start over from scratch</button></div>`);
   }
   function checkOver() { if (w().war && w().war.over && !save.overShown) { warOverPanel(); return true; } return false; }
   function startPanel() {
@@ -335,7 +353,8 @@ export function initGoblin(ctx) {
   }
   function beginWar(home) {
     const now = Date.now(), lastReal = now - (now % HOUR);
-    const world = newWorld(G.board, { seed: 'm1-' + lastReal, home, clans: CLANS, startHour: easternHour(lastReal), guidedStart: true });
+    const seed = 'm1-' + lastReal;
+    const world = newWorld(G.board, { seed, home, clans: [CLANS[0], ...rivalsFor(seed)], startHour: easternHour(lastReal), startMs: lastReal, guidedStart: true });
     save = { v: SAVE_V, world, lastReal, events: [], total: 0, seenTotal: 0, overShown: false, played: [] };
     persist(); mode = 'play'; sel = null;
     paint(); hud(); fitTheatre();
@@ -528,7 +547,9 @@ export function initGoblin(ctx) {
   }
   function doPanel() {
     const list = suggestions(), nx = nextMajor();
+    const kit = kitById(G.board, kitOf(G.board, w().clans[ME].home)), se = seasonOf(w());
     panel(`<div class="gob">${messengerBlock()}<h3>What can I do?</h3>
+      ${kit || se ? `<p class="fine">${kit ? esc(kit.ruleText) : ''} ${se ? esc(SEASONS[se].name + ': ' + SEASONS[se].text) : ''}</p>` : ''}
       <p class="fine">There is no end-turn button. You have <b>${ap()}</b> action${ap() === 1 ? '' : 's'} (attacks, fronts, scouting, digging in and taunts cost one; moving is free). The world moves by itself on the hour: at 09:00, 12:00 and 18:00 you get ${K6.apPerMajor} more (up to ${K6.apCap}), everyone gets recruits and the other clans act${nx ? `. Next: ${nx.hour}, in ${nx.left}` : ''}.</p>
       ${list.length ? list.map((o) => `<button ${o.data}><b>${esc(o.label)}</b><br><span class="fine">${esc(o.sub)}</span></button>`).join('') : '<p>Nothing worth doing right now. Your townships next to enemies are too thin to attack. Wait for recruits.</p>'}
       ${prisoners()}
@@ -617,6 +638,12 @@ export function initGoblin(ctx) {
     else if (a === 'ledger') ledgerPanel();
     else if (a === 'copy') { navigator.clipboard && navigator.clipboard.writeText(renderLedger(save.events, ctxFor())).then(() => ctx.toast('Copied'), () => ctx.toast('Could not copy')); }
     else if (a === 'cancelstart') { if (save) { mode = 'play'; panel(''); hud(); } else ctx.setMode(store.get('mode', 'practice') === 'goblin' ? 'practice' : store.get('mode', 'practice')); }
+    else if (a === 'nextchapter') beginChapter(nextChapterCfg(G.board, w(), { guidedStart: true }));
+    else if (a === 'retry') {
+      const prev = w(), seed = `${prev.seed}r`;
+      const base = nextChapterCfg(G.board, prev);
+      beginChapter({ seed, home: prev.clans[ME].home, clans: [CLANS[0], ...rivalsFor(seed)], carry: base.carry, campaign: { chapter: prev.campaign ? prev.campaign.chapter : 1, kits: prev.campaign ? prev.campaign.kits : [] } });
+    }
     else if (a === 'startover') startPanel();
     else if (a === 'begin') beginWar(pendingHome);
     else if (a === 'newwar') { startPanel(); }
