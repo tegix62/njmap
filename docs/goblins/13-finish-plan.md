@@ -287,7 +287,7 @@ Nothing here blocks building: every item has a flagged placeholder until it arri
 
 | Stage | Status |
 |---|---|
-| F0 | not started |
+| F0 | built 2026-11-15; gate pending (the user plays three days). Rival recruit split adopted (0.5), guided first move (four taps from the home page), targets script and tuning plan written. 5 of 9 targets pass; Bold's win rate, the passive player's losses and Careful's lost fronts still fail (see 11-tuning-plan.md) |
 | F1 to F9 | not started |
 
 ## 10. Kickoff prompt for a build session

@@ -23,6 +23,9 @@ export const DEFAULT_RULES = Object.freeze({ townForceCap: K2.townForceCap, recr
   aiCaptureCooldownTicks: 72,  // conquest tempo (D209): after taking a township an AI clan waits this many ticks before attacking again (0 = off)
   leaderShare: 0.5,            // (D209) a clan holding more than this share of the theatre needs leaderAttackRatio to attack (1.01 = never)
   leaderAttackRatio: 3.0,
+  aiRecruitSplit: 0.5,           // 0 to 1: this fraction of an AI's recruits go to its weakest border township (a human's rule), the rest to its best attack position (F0)
+  aiCounterRatio: 0,           // if above 0: an AI clan may retake a township it lost in the last 24 ticks at this ratio instead of aiAttackRatio (F0)
+  aiPeaceShare: 0,             // if above 0: while a human holds more than this share of the theatre the AI clans do not attack each other (F0, announced in the Ledger)
   aiRecruitSpread: 0,          // 1: an AI reinforces its weakest border township like a human instead of massing at its best attack position (experiment, H52)
   frontMaxGain: K4.frontMaxGain });   // the most a single front maneuver may raise standing (D210: 1)
 const R = (w) => w.rules || DEFAULT_RULES;
@@ -88,8 +91,30 @@ export function newWorld(board, cfg) {
   const rng = makeRng(seedState(cfg.seed ?? 1));
   if (board.content) placeInitialCaptains(w, rng, board.content);
   initWar(w, board);
+  if (cfg.guidedStart) guidedStart(w, board, cfg.clans.find((c) => c.lord === 'human').id);
   w.rng = rng.state;
   return w;
+}
+
+/** The first two minutes (D198): make sure the player has one near-certain first move. The weakest rival garrison without a captain on the land border
+ *  of the player's strongest township is thinned to a third of what the player can send; its excess marches to another township of the same clan (units are moved, never created). */
+function guidedStart(w, board, humanId) {
+  const mine = Object.keys(w.towns).filter((t) => w.towns[t].owner === humanId).sort((a, b) => (w.towns[b].force - w.towns[a].force) || byId(a, b));
+  for (const from of mine) {
+    const F = w.towns[from], send = F.force - 1;
+    const cands = board.neighbours(from).filter((n) => w.towns[n] && w.towns[n].owner && w.towns[n].owner !== humanId && !w.towns[n].captain)
+      .filter((n) => { const b = board.border(from, n) || {}; return !(b.river || b.ridge) || (b.highways && b.highways.length); })
+      .sort((a, b) => (w.towns[a].force - w.towns[b].force) || byId(a, b));
+    if (!cands.length || send < 3) continue;
+    const T = w.towns[cands[0]], keep = Math.max(1, Math.floor(send / 3));
+    if (T.force > keep) {
+      const to = Object.keys(w.towns).filter((t) => w.towns[t].owner === T.owner && t !== cands[0] && !w.towns[t].captain).sort((a, b) => (w.towns[a].force - w.towns[b].force) || byId(a, b))[0];
+      if (!to) continue;
+      w.towns[to].force += T.force - keep; T.force = keep;
+    }
+    return cands[0];
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------- helpers
@@ -125,6 +150,7 @@ function fight(w, board, rng, emit, { by, from, to, n, inTransit = false, raid =
   if (r.won) {
     const dc = T.captain && w.chars[T.captain];
     if (dc && dc.status === 'active') { capture(w, dc, by); extra.push(['captured', { clan: against, by, char: dc.id, town: to }]); }
+    if (against) (w.revenge ||= {})[to] = { clan: against, until: w.tick + 24 };
     T.owner = by; T.force = r.attackersLeft; T.dugIn = false; T.captain = null; T.attackedTick = -1;
     if (w.clans[by].lord === 'ai') w.clans[by].coolUntil = w.tick + R(w).aiCaptureCooldownTicks;
     if (leadId) { w.chars[leadId].at = to; T.captain = leadId; }
@@ -198,9 +224,16 @@ function recruits(w, board, emit) {
       at = pool.slice().sort((a, b) => (w.towns[a].force - w.towns[b].force) || byId(a, b))[0];
     }
     // fill the chosen township up to the cap, then spill the rest to the clan's weakest townships; whatever fits nowhere is lost
-    let left = n;
-    const order = [at, ...mine.filter((t) => t !== at).sort((x, y) => (w.towns[x].force - w.towns[y].force) || byId(x, y))];
-    for (const t of order) { const put = Math.min(left, R(w).townForceCap - w.towns[t].force); if (put > 0) { w.towns[t].force += put; left -= put; } if (!left) break; }
+    const fillFrom = (first, count) => {
+      let left = count;
+      const order = [first, ...mine.filter((t) => t !== first).sort((x, y) => (w.towns[x].force - w.towns[y].force) || byId(x, y))];
+      for (const t of order) { const put = Math.min(left, R(w).townForceCap - w.towns[t].force); if (put > 0) { w.towns[t].force += put; left -= put; } if (!left) break; }
+      return left;
+    };
+    const split = clan.lord === 'ai' && border.length ? Math.floor(n * (R(w).aiRecruitSplit || 0)) : 0;
+    let left = 0;
+    if (split) { const weakest = border.slice().sort((a, b) => (w.towns[a].force - w.towns[b].force) || byId(a, b))[0]; left += fillFrom(weakest, split); }
+    left += fillFrom(at, n - split);
     emit('recruits', { clan: clan.id, town: at, n, lost: left });
   }
 }
@@ -221,6 +254,8 @@ function protectedHome(w, to) {
 
 function aiTurn(w, board, rng, emit, clan) {
   if (w.tick < (clan.coolUntil || 0)) return;
+  const humanShare = Math.max(0, ...Object.values(w.clans).filter((c) => c.lord === 'human' && !c.out).map((c) => ownedBy(w, c.id).length / Object.keys(w.towns).length));
+  const peace = (R(w).aiPeaceShare || 0) > 0 && humanShare > R(w).aiPeaceShare;
   const pinned = pinnedTowns(w);                                               // a captain pinned to a player's front: his township neither attacks nor is attacked                                  // conquest tempo
   const share = ownedBy(w, clan.id).length / Object.keys(w.towns).length;
   const need = share > R(w).leaderShare ? R(w).leaderAttackRatio : R(w).aiAttackRatio;   // a leader needs better odds
@@ -234,8 +269,11 @@ function aiTurn(w, board, rng, emit, clan) {
       if (!U || !U.owner || U.owner === clan.id) continue;
       if (shielded(w, U.owner) || protectedHome(w, u) || pinned.has(u)) continue;
       if (isHuman(w, U.owner) && !Dir.allowsHostile(w, U.owner)) { Dir.noteHeld(w, U.owner); continue; }   // the Director: rhythm, budget, pressure
+      if (peace && !isHuman(w, U.owner)) continue;   // the rivals stop fighting each other while a human is winning
       const ratio = n / Math.max(1, U.force);
-      if (ratio >= need && (!best || ratio > best.ratio)) best = { from: t, to: u, n, ratio };
+      const rv = w.revenge && w.revenge[u];
+      const needHere = rv && rv.clan === clan.id && w.tick <= rv.until && (R(w).aiCounterRatio || 0) > 0 ? Math.min(need, R(w).aiCounterRatio) : need;
+      if (ratio >= needHere && (!best || ratio > best.ratio)) best = { from: t, to: u, n, ratio };
     }
   }
   if (!best) return;

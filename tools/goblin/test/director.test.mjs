@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { makeBoard } from '../../../js/goblin/sim/board.js';
 import { newWorld, step, checkInvariants } from '../../../js/goblin/sim/world.js';
 import * as D from '../../../js/goblin/sim/director.js';
-import { openFronts } from '../../../js/goblin/sim/front.js';
+import { openFronts, legalOrders } from '../../../js/goblin/sim/front.js';
 
 const read = (p) => JSON.parse(fs.readFileSync(new URL(p, import.meta.url), 'utf8'));
 const bigBoard = makeBoard(read('../../../data/goblin-board.json'));
@@ -133,7 +133,8 @@ test('over a real board, a present passive player almost always has something to
       const mine = Object.keys(w.towns).filter((t) => w.towns[t].owner === 'goblins');
       if (!mine.length) break;
       days++;
-      const chance = openFronts(w, 'goblins').length > 0 || w.raids.some((x) => w.towns[x.target].owner === 'goblins') ||
+      // something to decide: a front or raid, a 2 to 1 border, or (since D214) any attack, front, scout or dig-in the clan can afford
+      const chance = legalOrders(bigBoard, w, 'goblins').some((o) => o.type !== 'move') || openFronts(w, 'goblins').length > 0 || w.raids.some((x) => w.towns[x.target].owner === 'goblins') ||
         mine.some((t) => bigBoard.neighbours(t).some((e) => w.towns[e] && w.towns[e].owner && w.towns[e].owner !== 'goblins' && (w.towns[t].force - 1) / Math.max(1, w.towns[e].force) >= 2)) ||
         mine.every((t) => bigBoard.neighbours(t).every((e) => !w.towns[e] || w.towns[e].owner === 'goblins' || !w.towns[e].owner));
       if (chance) withChoice++;

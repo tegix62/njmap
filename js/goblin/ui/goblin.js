@@ -8,6 +8,8 @@ import { frontActions, openFronts } from '../sim/front.js';
 import { captainsOf } from '../sim/chars.js';
 import { K6, K7 } from '../sim/constants.js';
 import { progress } from '../sim/war.js';
+import { skirmish, modsFor } from '../sim/skirmish.js';
+import { makeRng, seedState } from '../sim/rng.js';
 import { scoutMods, isNight, hasAp } from '../sim/sitting.js';
 import { digestOf } from '../sim/digest.js';
 import { MUNI_LABEL_IDS } from '../../style.js';
@@ -217,6 +219,30 @@ export function initGoblin(ctx) {
     panel(`<div class="gob"><h3>Ledger</h3>${en.length ? en.map((e) => `<p><span class="fine">Day ${e.day} ${e.hour}</span> ${esc(e.text)}</p>`).join('') : '<p class="fine">Nothing has happened yet.</p>'}
       <div class="gobrow"><button data-g="copy">Copy</button><button class="primary" data-g="close">Close</button></div></div>`);
   }
+  /** The first two minutes (D198): one obvious, near-certain first move against the weakest garrison with no captain, one tap to do it. */
+  function firstMove() {
+    const world = w(); let best = null;
+    const rng = makeRng(seedState('first-move'));
+    for (const id of Object.keys(world.towns)) {
+      const F = world.towns[id];
+      if (F.owner !== ME || F.force < 3) continue;
+      for (const n of G.board.neighbours(id)) {
+        const T = world.towns[n];
+        if (!T || !T.owner || T.owner === ME || T.captain) continue;
+        const b = G.board.border(id, n) || {};
+        const mods = modsFor({ dugIn: T.dugIn, captainLeads: !!F.captain, riverBorder: !!(b.river || b.ridge), highway: !!(b.highways && b.highways.length) });
+        let won = 0; for (let i = 0; i < 300; i++) if (skirmish({ attackers: F.force - 1, defenders: T.force, ...mods }, rng).won) won++;   // used only to choose the move; never shown
+        if (!best || won > best.won) best = { from: id, to: n, won, F, T };
+      }
+    }
+    if (best && best.won < 240) best = null;   // not near-certain (80 percent): leave the first move to the player
+    if (!best) return doPanel();
+    const n = best.F.force - 1;
+    panel(`<div class="gob"><h3>Your first move</h3>
+      <p>${esc(G.board.town(best.to).name)} is held by ${cap(best.T.owner)} with only <b>${best.T.force}</b>. You can send <b>${n}</b> from ${esc(G.board.town(best.from).name)}.</p>
+      <p class="fine">Your green townships are yours. Red and brown are the rivals. The war moves on its own on the hour, so you can stop whenever you like.</p>
+      <div class="gobrow"><button class="primary" data-g="first" data-from="${esc(best.from)}" data-to="${esc(best.to)}" data-n="${n}">Send them</button><button data-g="close">I'll look around</button></div></div>`);
+  }
   function warOverPanel() {
     const o = w().war.over, won = o.winner === ME;
     const days = Math.max(1, Math.round(o.tick / 24));
@@ -241,11 +267,11 @@ export function initGoblin(ctx) {
   }
   function beginWar(home) {
     const now = Date.now(), lastReal = now - (now % HOUR);
-    const world = newWorld(G.board, { seed: 'm1-' + lastReal, home, clans: CLANS, startHour: easternHour(lastReal) });
+    const world = newWorld(G.board, { seed: 'm1-' + lastReal, home, clans: CLANS, startHour: easternHour(lastReal), guidedStart: true });
     save = { v: SAVE_V, world, lastReal, events: [], total: 0, seenTotal: 0, overShown: false };
     persist(); mode = 'play'; sel = null;
     paint(); hud(); fitTheatre();
-    doPanel();
+    firstMove();
   }
 
 
@@ -380,6 +406,10 @@ export function initGoblin(ctx) {
       if (checkOver()) return;
       if (type === 'front_open') { const o = ev.find((e) => e.type === 'front_opened'); return o ? frontPanel(o.front, ev.filter((e) => e.type === 'front_opened')) : afterFrontOrder(ev, null); }
       resultPanel(ev);
+    }
+    else if (a === 'first') {
+      const ev = run([{ type: 'present', clan: ME }, { type: 'attack', clan: ME, from: b.dataset.from, to: b.dataset.to, n: +b.dataset.n }], 0);
+      sel = null; paint(); hud(); resultPanel(ev);
     }
     else if (a === 'front') frontPanel(b.dataset.id);
     else if (a === 'scout') scoutPanel(b.dataset.town);
