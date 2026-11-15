@@ -104,6 +104,18 @@ Rivals need memory for this to work, and they have it: grudges, bonds, confidenc
 
 The process rule this time, without exception: **one stage, then the user plays it, then the next.** The last plan's gates were written down and then walked past nine times in a row.
 
+## 9a. What paper test R0 taught (2026-11-15, played in chat with the user)
+
+The user's reactions, in order, and what each changes:
+
+1. **"Too much text to tell a story."** A messenger and three crew cards were dropped at once. They wanted "the camera flying in to this area and showing me Totowa under attack by Captain V" and "just strategy game". **Change:** no messenger, no dialogue to open. The first thing is a camera move to a threatened place.
+2. **"I truly wouldn't care which of these three goblins I send ... Pip, he would get me the least of a loss."** Choosing among three characters had no stakes, so it was a chore. **Change:** the crew-as-menu idea of R3 is withdrawn. Goblins are faces attached to fights, assigned for you; the choice is the strategy (what to reinforce, what to hit).
+3. **"These stats and texts are things best shown rather than listed."** A table of numbers was refused. **Change (a hard rule for every screen):** a number lives on the territory it belongs to, drawn on the map; an attack is an arrow from where it starts to where it lands, with its size on it and a small clock for when it arrives; the captain is a pill or small face beside the arrow; what stays home is a number on the home town. No list of facts ever stands in for a picture.
+4. **"Wait, do I have 5 units or 10? 15?"** Two townships' forces were read as one pool. **Change:** the units that matter right now are the ones on the threatened town and on the towns that can reach it, shown on the map, never added up in a sentence.
+5. **"What does lands in 6 hours mean?"** **Change:** a clock on the arrow, not a sentence.
+6. **"Why did the rats roll more dice than me?"** The attacker rolls up to 3 dice and 4 with a captain; the defender 2 (D149). Invisible rules are the same clutter as invisible arithmetic. **Change (the user's choice):** make the rule visible, **graphically, not as more text**: each side's dice are drawn as a row of faces before the roll, so the player sees 4 against 2; the extra die is drawn in a different colour with the captain's face on it, and a wall adds a visible bar over the defender's best die. Whether the rule itself becomes more even is still open (option 2 in the chat).
+7. **Two real fights, two losses, both on better-than-even odds** (a 60 percent hold and a 64 percent attack: about 1 in 7 together). The dice scene needs to make a bad streak feel like drama, not an error, and the game needs a way back after a loss (a counter the player can see).
+
 ## 10. What stays true
 
 The pure simulation and its tests. Real New Jersey geography, computed and never recalled. No percentages. The user writes the comedy; everything else is a flagged placeholder. A loss is framed. The quiz is a help and never a gate.
