@@ -27,6 +27,7 @@ import { nextChapterCfg, rivalsFor } from '../sim/chapters.js';
 import { scoutMods, isNight, hasAp } from '../sim/sitting.js';
 import { digestOf } from '../sim/digest.js';
 import { MUNI_LABEL_IDS } from '../../style.js';
+import { createFilm } from './film.js';
 
 const ME = 'goblins';
 const CLANS = [{ id: 'goblins', kind: 'goblin', lord: 'human' }, { id: 'rats', kind: 'rat', lord: 'ai' }, { id: 'toads', kind: 'toad', lord: 'ai' }];
@@ -58,6 +59,26 @@ export function initGoblin(ctx) {
     G = { board: makeBoard(bj, content, rj), content };   // content attached: townships can have captains, and so fronts
   }
   const persist = () => store.set(SAVE, save);
+  let film = null;
+  /** Play the fights in `events` as a film, then call `then`. The map's own paint is held back while it runs and redone after. */
+  async function showFilm(events, then) {
+    film = film || createFilm({ map, byKey: ctx.byKey, board: G.board, hooks: {
+      begin: (flips) => {
+        for (const mk of pins) mk.remove(); pins = [];
+        if (map.getLayer('gob-force')) map.setLayoutProperty('gob-force', 'visibility', 'none');
+        if (map.getLayer('gob-name')) map.setLayoutProperty('gob-name', 'visibility', 'none');
+        for (const f of flips) { const m = muniOf(f.town); if (m) map.setFeatureState({ source: 'munis', id: m.id }, { gc: f.no }); }
+      },
+      setOwner: (id, no) => { const m = muniOf(id); if (m) map.setFeatureState({ source: 'munis', id: m.id }, { gc: no }); },
+      end: () => {
+        if (map.getLayer('gob-force')) map.setLayoutProperty('gob-force', 'visibility', 'visible');
+        if (map.getLayer('gob-name')) map.setLayoutProperty('gob-name', 'visibility', 'visible');
+        paint();
+      },
+    } });
+    try { await film.play(events, w(), ME); } catch (err) { console.error('film', err); }
+    then();
+  }
   const fw = () => G.content.json.force_words.map((x) => [x.min, x.max, x.word]);   // placeholder words, the user's to write (D68)
   /** What the player has learned decides what is shown (D173). Computed fresh each time from the review data and this war's play; nothing is written back. */
   const fog = () => fogMap(G.board, { srs: store.get('srs', {}), played: save.played || [], own: Object.keys(w().towns).filter((t) => w().towns[t].owner === ME), home: w().clans[ME].home });
@@ -650,15 +671,17 @@ export function initGoblin(ctx) {
       const type = T.owner === ME ? 'move' : T.captain ? 'front_open' : 'attack';
       const ev = run([{ type: 'present', clan: ME }, { type, clan: ME, from, to, n }], 0);
       markPlayed(to);
-      sel = null; paint(); hud();
-      if (checkOver()) return;
-      if (type === 'front_open') { const o = ev.find((e) => e.type === 'front_opened'); return o ? frontPanel(o.front, ev.filter((e) => e.type === 'front_opened')) : afterFrontOrder(ev, null); }
-      resultPanel(ev);
+      sel = null; hud();
+      if (checkOver()) { paint(); return; }
+      if (type === 'front_open') { paint(); const o = ev.find((e) => e.type === 'front_opened'); return o ? frontPanel(o.front, ev.filter((e) => e.type === 'front_opened')) : afterFrontOrder(ev, null); }
+      panel(''); paint();
+      showFilm(ev, () => resultPanel(ev));
     }
     else if (a === 'first') {
       const ev = run([{ type: 'present', clan: ME }, { type: 'attack', clan: ME, from: b.dataset.from, to: b.dataset.to, n: +b.dataset.n }], 0);
       markPlayed(b.dataset.to);
-      sel = null; paint(); hud(); resultPanel(ev);
+      sel = null; hud(); panel(''); paint();
+      showFilm(ev, () => resultPanel(ev));
     }
     else if (a === 'front') frontPanel(b.dataset.id);
     else if (a === 'scout') scoutPanel(b.dataset.town);
@@ -705,6 +728,7 @@ export function initGoblin(ctx) {
     }
     else if (a === 'go') { sel = b.dataset.from; paint(); orderPanel(b.dataset.from, b.dataset.to); }
     else if (a === 'ledger') ledgerPanel();
+    else if (a === 'film') { const ev = save.events.slice(-80); panel(''); showFilm(ev, () => {}); }
     else if (a === 'copy') { navigator.clipboard && navigator.clipboard.writeText(renderLedger(save.events, ctxFor())).then(() => ctx.toast('Copied'), () => ctx.toast('Could not copy')); }
     else if (a === 'cancelstart') { if (save) { mode = 'play'; panel(''); hud(); } else ctx.setMode(store.get('mode', 'practice') === 'goblin' ? 'practice' : store.get('mode', 'practice')); }
     else if (a === 'nextchapter') beginChapter(nextChapterCfg(G.board, w(), { guidedStart: true }));
