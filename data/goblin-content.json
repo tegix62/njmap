@@ -810,6 +810,36 @@
    "id": "truce_broken",
    "text": "{clan} broke the truce at {town}.",
    "placeholder": true
+  },
+  {
+   "id": "sighting",
+   "text": "Scouts of the {by} were seen near {near}.",
+   "placeholder": true
+  },
+  {
+   "id": "ambushed",
+   "text": "The {by} fell on a convoy of {clan} near {at} and took its cargo ({cargo}). They came from {from}.",
+   "placeholder": true
+  },
+  {
+   "id": "ambush_foiled",
+   "text": "The {by} tried for a convoy of {clan} and were beaten off ({why}).",
+   "placeholder": true
+  },
+  {
+   "id": "convoy_raid_ok",
+   "text": "{clan} struck a convoy of the {against} near {at} and took {cargo}.",
+   "placeholder": true
+  },
+  {
+   "id": "convoy_raid_fail",
+   "text": "{clan} struck at a convoy of the {against} near {at} and were beaten off.",
+   "placeholder": true
+  },
+  {
+   "id": "reprisal",
+   "text": "{clan} answers the ambush: the {town} raid goes in without a pause.",
+   "placeholder": true
   }
  ],
  "force_words": [
@@ -832,6 +862,56 @@
    "min": 9,
    "max": 99999,
    "word": "a host",
+   "placeholder": true
+  }
+ ],
+ "messenger": [
+  {
+   "id": "m1",
+   "mood": "cheerful",
+   "text": "A quiet stretch, boss. Nothing to report!",
+   "placeholder": true
+  },
+  {
+   "id": "m2",
+   "mood": "cheerful",
+   "text": "Everything arrived and nobody is cross with us.",
+   "placeholder": true
+  },
+  {
+   "id": "m3",
+   "mood": "steady",
+   "text": "Messages from the border, boss. Nothing too bad.",
+   "placeholder": true
+  },
+  {
+   "id": "m4",
+   "mood": "steady",
+   "text": "Some news, some of it fine.",
+   "placeholder": true
+  },
+  {
+   "id": "m5",
+   "mood": "nervous",
+   "text": "Um. Boss. It might be a lean day.",
+   "placeholder": true
+  },
+  {
+   "id": "m6",
+   "mood": "nervous",
+   "text": "I heard things. Not good things. Maybe nothing.",
+   "placeholder": true
+  },
+  {
+   "id": "m7",
+   "mood": "frantic",
+   "text": "Boss! Boss! Everything at once!",
+   "placeholder": true
+  },
+  {
+   "id": "m8",
+   "mood": "frantic",
+   "text": "They are everywhere and I ran the whole way!",
    "placeholder": true
   }
  ]

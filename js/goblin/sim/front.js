@@ -14,6 +14,7 @@ import { takeTaunt, hasAp, scoutMods } from './sitting.js';
 import { frontConfidence, maybeLegend, FOOTHOLD_METHODS, footholdMods, roomFor, ransomPrice } from './encounters.js';
 import { K9 } from './constants.js';
 import { active, hasBridge, maxMarch, canMarch, marchCost } from './economy.js';
+import { convoysOf, positionAt } from './convoys.js';
 import { K8 } from './constants.js';
 import { discoverOne, discover, knows, undiscovered, suitBonus, counterMod, hasConflict, injuryRoll, applyInjury, kill, capture, place, promote } from './chars.js';
 
@@ -282,6 +283,13 @@ export function legalOrders(board, w, clanId) {
     out.push({ type: 'release', clan: clanId, char: c.id });
     const theirs = w.clans[c.clan];
     if (!active(theirs) || theirs.res.coin >= ransomPrice(c)) out.push({ type: 'ransom', clan: clanId, char: c.id });
+  }
+  if (canHit) {
+    for (const t of Object.keys(w.towns).sort(byId)) if (w.towns[t].owner === clanId && convoysOf(w, clanId).some((c) => c.route.includes(t))) out.push({ type: 'guard', clan: clanId, town: t });
+    for (const c of (w.convoys || []).filter((x) => x.clan !== clanId).sort((a, b) => byId(a.id, b.id))) {
+      const spot = positionAt(c, w.tick).at;
+      if (board.neighbours(spot).some((n) => w.towns[n] && w.towns[n].owner === clanId && w.towns[n].force >= 3) || (w.towns[spot] && w.towns[spot].owner === clanId && w.towns[spot].force >= 3)) out.push({ type: 'raidconvoy', clan: clanId, convoy: c.id });
+    }
   }
   if (board.content && canHit) {
     for (const town of Object.keys(w.towns).sort(byId)) {

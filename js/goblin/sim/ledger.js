@@ -146,6 +146,11 @@ export function entriesOf(events, { board, state, content, clan }) {
       case 'escaped': say(e.tick, cap(fill(T.escaped, { char: char(e.char), why: e.why }))); break;
       case 'legend': say(e.tick, cap(fill(T.legend, { char: char(e.char), clan: clanName(e.clan) }))); break;
       case 'truce_broken': say(e.tick, cap(fill(T.truce_broken, { clan: clanName(e.clan), town: town(e.town) }))); break;
+      case 'sighting': say(e.tick, cap(fill(T.sighting, { by: clanName(e.by), near: town(e.near) }))); break;
+      case 'convoy_ambushed': { const cg = [e.cargo.build ? `${e.cargo.build} Build` : '', e.cargo.coin ? `${e.cargo.coin} Coin` : ''].filter(Boolean).join(' and '); say(e.tick, cap(fill(T.ambushed, { by: clanName(e.by), clan: clanName(e.clan), at: town(e.at), cargo: cg, from: town(e.from) }))); break; }
+      case 'ambush_foiled': say(e.tick, cap(fill(T.ambush_foiled, { by: clanName(e.by), clan: clanName(e.clan), why: e.why }))); break;
+      case 'convoy_raided': { const cg = e.cargo ? [e.cargo.build ? `${e.cargo.build} Build` : '', e.cargo.coin ? `${e.cargo.coin} Coin` : ''].filter(Boolean).join(' and ') : ''; say(e.tick, cap(fill(T[e.won ? 'convoy_raid_ok' : 'convoy_raid_fail'], { clan: clanName(e.clan), against: clanName(e.against), at: town(e.at), cargo: cg }))); break; }
+      case 'reprisal': say(e.tick, cap(fill(T.reprisal, { clan: clanName(e.clan), town: town(e.town) }))); break;
       case 'promoted': say(e.tick, cap(fill(T.promoted, { clan: clanName(e.clan), char: char(e.char), town: town(e.town) }))); break;
       case 'succeeded': say(e.tick, cap(fill(T.succeeded, { char: char(e.char), town: town(e.town) }))); break;
       case 'captured': break;   // reported by the closing line or the skirmish line

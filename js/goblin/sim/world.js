@@ -15,6 +15,7 @@ import * as Dir from './director.js';
 import { initWar, warTurn } from './war.js';
 import * as Eco from './economy.js';
 import { applyEncounter, encounterTick } from './encounters.js';
+import { convoyTick, ambushTurn, applyConvoyOrder } from './convoys.js';
 import { applySitting, hasAp, spend as spendAp, refill as refillAp } from './sitting.js';
 import { openFront, actFront, settleFronts, pinnedTowns, openFronts } from './front.js';
 import { placeInitialCaptains, captainsOf, capture, place, promote, succeed } from './chars.js';
@@ -90,7 +91,7 @@ export function newWorld(board, cfg) {
   });
   for (const c of Object.values(clans)) c.peakTowns = theatre.filter((t) => towns[t].owner === c.id).length;
   const w = { v: 1, seed: cfg.seed ?? 1, rng: 0, tick: 0, startHour: cfg.startHour ?? K2.startHour, lastMajor: 0,
-              theatre, towns, clans, chars: {}, heirs: [], fronts: {}, raids: [], director: {}, nextId: 1, footholds: {}, truces: {}, footDay: {}, rules: { ...DEFAULT_RULES, ...(cfg.rules || {}) } };
+              theatre, towns, clans, chars: {}, heirs: [], fronts: {}, raids: [], director: {}, nextId: 1, footholds: {}, truces: {}, footDay: {}, convoys: [], guards: {}, ambushes: [], lossLog: {}, reprisal: {}, rules: { ...DEFAULT_RULES, ...(cfg.rules || {}) } };
   const rng = makeRng(seedState(cfg.seed ?? 1));
   if (board.content) placeInitialCaptains(w, rng, board.content);
   initWar(w, board);
@@ -176,6 +177,7 @@ function fight(w, board, rng, emit, { by, from, to, n, inTransit = false, raid =
 // ---------------------------------------------------------------- orders (a human's, applied before time passes)
 
 const ENCOUNTER = ['foothold', 'parley', 'insult', 'duel', 'ransom', 'release'];
+const CONVOY_ORDERS = ['guard', 'raidconvoy', 'setting'];
 
 function breakTruce(w, emit, clan, town) {
   const t = w.truces && w.truces[town];
@@ -196,9 +198,11 @@ function applyOrder(w, board, rng, emit, o) {
   if (o.type === 'attack') {
     if (T.owner === o.clan) return reject('that is your own township');
     if (T.captain) return reject('a captain defends it: open a front (front_open)');
-    if (!hasAp(clan, K6.costAttack)) return reject('no actions left: they refill at 09:00, 12:00 and 18:00');
+    const rp = w.reprisal && w.reprisal[o.clan], answer = !!rp && rp.target === o.to && w.tick <= rp.until;   // an answer to an ambush is free of an action (F4)
+    if (!answer && !hasAp(clan, K6.costAttack)) return reject('no actions left: they refill at 09:00, 12:00 and 18:00');
     if (!Eco.canMarch(clan, o.n)) return reject(`the march needs ${Eco.marchCost(o.n)} Food: you have ${clan.res.food}`);
-    spendAp(clan, K6.costAttack); Eco.payMarch(clan, o.n);
+    if (answer) { delete w.reprisal[o.clan]; emit('reprisal', { clan: o.clan, town: o.to }); } else spendAp(clan, K6.costAttack);
+    Eco.payMarch(clan, o.n);
     breakTruce(w, emit, o.clan, o.to);
     return fight(w, board, rng, emit, { by: o.clan, from: o.from, to: o.to, n: o.n });
   }
@@ -370,7 +374,7 @@ function majorTick(w, board, rng, emit) {
   for (const c of Object.values(w.clans)) {                    // who is absent (D189)
     if (c.lord === 'human' && !c.out && c.absentSince === null && w.tick - c.lastActive >= K2.absentAfterTicks) { c.absentSince = w.tick; emit('player_absent', { clan: c.id }); }
   }
-  Eco.economyTick(w, emit);
+  Eco.economyTick(w, board, emit);
   Eco.completeBridges(w, emit);
   encounterTick(w, board, rng, emit);
   recruits(w, board, emit);
@@ -386,6 +390,7 @@ function majorTick(w, board, rng, emit) {
   }
   settleFronts(w, board, rng, emit);
   directorTurn(w, board, emit);
+  ambushTurn(w, board, emit, Dir.wordOf);
   for (const c of Object.values(w.clans)) {
     if (!c.out && !ownedBy(w, c.id).length) { c.out = true; emit('clan_out', { clan: c.id }); }
   }
@@ -404,11 +409,12 @@ export function step(board, state, orders = [], ticks = 0, opts = {}) {
     for (const o of orders) emit('order_rejected', { clan: o.clan, order: o, reason: 'the war is over' });
     return { state: w, events };
   }
-  for (const o of orders) (o.type === 'front_open' || o.type === 'front' ? applyFrontOrder : (o.type === 'scout' || o.type === 'fortify' || o.type === 'taunt') ? applySitting : (o.type === 'hire' || o.type === 'bridge') ? (w_, b_, r_, e_, o_) => Eco.applyEconomyOrder(w_, b_, e_, o_) : ENCOUNTER.includes(o.type) ? applyEncounter : applyOrder)(w, board, rng, emit, o);
+  for (const o of orders) (o.type === 'front_open' || o.type === 'front' ? applyFrontOrder : (o.type === 'scout' || o.type === 'fortify' || o.type === 'taunt') ? applySitting : (o.type === 'hire' || o.type === 'bridge') ? (w_, b_, r_, e_, o_) => Eco.applyEconomyOrder(w_, b_, e_, o_) : ENCOUNTER.includes(o.type) ? applyEncounter : CONVOY_ORDERS.includes(o.type) ? (w_, b_, r_, e_, o_) => applyConvoyOrder(w_, b_, r_, e_, o_, hasAp, spendAp) : applyOrder)(w, board, rng, emit, o);
   const n = Math.min(ticks, K.catchUpCapTicks);
   for (let i = 0; i < n; i++) {
     w.tick++;
     landRaids(w, board, rng, emit);
+    convoyTick(w, board, rng, emit);
     if (isMajor(w)) majorTick(w, board, rng, emit);
   }
   if (ticks > n) { w.tick += ticks - n; emit('settled', { skipped: ticks - n }); }

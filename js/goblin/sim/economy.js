@@ -6,6 +6,7 @@
 //   Coin   : a Coin town yields 1 a day. Spent on a hired band (6 Coin, 4 units, once a day).
 
 import { K8 } from './constants.js';
+import { splitIncome, spawnConvoy } from './convoys.js';
 
 const byId = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 export const active = (clan) => !!clan && clan.res !== undefined;
@@ -45,13 +46,17 @@ export const payMarch = (clan, n) => { if (active(clan)) clan.res.food -= marchC
 export const maxMarch = (clan, force) => (active(clan) ? Math.min(force - 1, clan.res.food * K8.marchPerUnits) : force - 1);
 
 /** Once per major tick, before recruits: income, upkeep, and what happens to a clan that cannot feed its units. */
-export function economyTick(w, emit) {
+export function economyTick(w, board, emit) {
   for (const c of Object.values(w.clans)) {
     if (!active(c) || c.out) continue;
     const inc = income(w, c.id);
     const noon = (w.startHour + w.tick) % 24 === 12;   // Build and Coin come once a day
     c.res.food = Math.min(K8.resCap, c.res.food + inc.food);
-    if (noon) { c.res.build = Math.min(K8.resCap, c.res.build + inc.build); c.res.coin = Math.min(K8.resCap, c.res.coin + inc.coin); }
+    if (noon) {   // Build and Coin: what far townships make travels as a convoy, the rest arrives at once (F4)
+      const sp = splitIncome(w, board, c.id, inc);
+      c.res.build = Math.min(K8.resCap, c.res.build + sp.near.build); c.res.coin = Math.min(K8.resCap, c.res.coin + sp.near.coin);
+      if ((sp.far.build + sp.far.coin) > 0 && !spawnConvoy(w, board, emit, c.id, sp.farFrom, sp.far)) { c.res.build = Math.min(K8.resCap, c.res.build + sp.far.build); c.res.coin = Math.min(K8.resCap, c.res.coin + sp.far.coin); }
+    }
     const need = upkeep(w, c.id);
     if (c.res.food >= need) { c.res.food -= need; c.short = 0; continue; }
     const fed = c.res.food * K8.unitsPerFood, units = mouths(w, c.id), unfed = units - fed;

@@ -6,6 +6,7 @@ import { loadContent, makeCaptain } from '../../../js/goblin/sim/chars.js';
 import { newWorld, step, checkInvariants } from '../../../js/goblin/sim/world.js';
 import * as E from '../../../js/goblin/sim/economy.js';
 import { legalOrders } from '../../../js/goblin/sim/front.js';
+import { splitIncome } from '../../../js/goblin/sim/convoys.js';
 import { entriesOf } from '../../../js/goblin/sim/ledger.js';
 import { makeRng, seedState } from '../../../js/goblin/sim/rng.js';
 import { K8 } from '../../../js/goblin/sim/constants.js';
@@ -38,7 +39,10 @@ test('income: Food every tick (1 a township, plus the Food bonus), Build and Coi
   let r = step(board, w, [], 1);    // 09:00
   assert.equal(r.state.clans.goblins.res.build, 0); assert.equal(r.state.clans.goblins.res.coin, 0);
   r = step(board, r.state, [], 3);  // 12:00 is the fourth tick
-  assert.equal(r.state.clans.goblins.res.build, inc.build); assert.equal(r.state.clans.goblins.res.coin, inc.coin);
+  const sp = splitIncome(w, board, 'goblins', inc);   // F4: what far townships make travels as a convoy
+  assert.equal(r.state.clans.goblins.res.build, sp.near.build); assert.equal(r.state.clans.goblins.res.coin, sp.near.coin);
+  assert.equal(sp.near.build + sp.far.build, inc.build); assert.equal(sp.near.coin + sp.far.coin, inc.coin);
+  if (sp.far.build + sp.far.coin) assert.equal(r.state.convoys.filter((c) => c.clan === 'goblins').length, 1);
 });
 
 test('upkeep: every unit eats, and units packed into one township beyond the crowd limit eat twice', () => {

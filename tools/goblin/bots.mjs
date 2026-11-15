@@ -47,6 +47,8 @@ function policyBot(name, P) {
       const fo = frontOrder(w, clan, ctx, P);
       if (fo) return fo;
       const legal = legalOrders(board, w, clan);
+      const captive = legal.find((o) => o.type === 'ransom') || legal.find((o) => o.type === 'release');   // a prisoner eats Food every tick: sell him back, or let him go
+      if (captive) return captive;
       const home = (o) => w.towns[o.from].force;
       if (openFronts(w, clan).length < P.maxFronts && ctx.opens < P.maxFronts) {
         const cands = legal.filter((o) => o.type === 'front_open' && home(o) - P.keep >= 4)

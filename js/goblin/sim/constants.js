@@ -126,3 +126,16 @@ export const K9 = Object.freeze({
   ransomBase: 6, ransomPerGeneration: 3, keepFood: 1,           // Coin the other clan pays; Food a major tick to keep a captive
   legendWins: 3,
 });
+
+// Added in F4 (docs/goblins/13-finish-plan.md): convoys, framed losses and the messenger. All proposals until the user has played them.
+export const K10 = Object.freeze({
+  farSteps: 2,                // a township this many border steps or more from its clan's home sends its Build and Coin by convoy; nearer ones deliver at once
+  milesPerTick: 3,            // D169: about one tick per three miles; a stretch along a highway lane is twice as fast
+  escortBase: 2, guardBonus: 3, guardTicks: 24,   // units guarding a convoy; a Guard order adds this for a day at a township on its route
+  raidUnits: 4,               // the most a convoy raid sends
+  ambushFirstTicks: 72,       // no unwarned loss in a player's first three days (D116)
+  ambushGapTicks: 48,         // at most one every two days (D165)
+  ambushLead: 2,              // the clue comes this many ticks before the blow (convoys travel a few ticks, so it is short; a clue is never a required warning) (cryptic, not a warning: D119b, D122)
+  ambushUnits: 5, ambushMinForce: 4,
+  reprisalTicks: 48,          // an answer to an ambush: the first attack on the ambushers' township within this long costs no action
+});

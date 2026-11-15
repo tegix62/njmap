@@ -3475,3 +3475,5 @@ body[data-mode='goblin'] #gobbar {
 .warnline { color: #b42318; font-weight: 600; }
 
 .gob h4 { margin: 10px 0 2px; font-size: 14px; }
+.messenger { display: flex; gap: 10px; align-items: center; margin: 0 0 6px; padding: 6px 8px; background: rgba(0, 0, 0, 0.05); border-radius: 12px; font-style: italic; }
+.messenger .mface { flex: none; }

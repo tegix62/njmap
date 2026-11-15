@@ -15,6 +15,10 @@ import { recordReview } from './review.js';
 import { active as ecoActive, marchCost, maxMarch, income as ecoIncome, hasBridge } from '../sim/economy.js';
 import { K8, K9 } from '../sim/constants.js';
 import { footholdMods, ransomPrice, roomFor } from '../sim/encounters.js';
+import { positionAt, messengerMood, convoysOf } from '../sim/convoys.js';
+import { wordOf } from '../sim/director.js';
+import { legalOrders } from '../sim/front.js';
+import { messengerFace } from './messenger.js';
 import { scoutMods, isNight, hasAp } from '../sim/sitting.js';
 import { digestOf } from '../sim/digest.js';
 import { MUNI_LABEL_IDS } from '../../style.js';
@@ -85,13 +89,15 @@ export function initGoblin(ctx) {
     map.addLayer({ id: 'gob-line', type: 'line', source: 'munis', layout: { visibility: 'none' },
       paint: { 'line-color': ['case', ['==', ['coalesce', ['feature-state', 'gs'], 0], 1], '#111827', ['==', ['coalesce', ['feature-state', 'gr'], 0], 1], '#dc2626', 'rgba(0,0,0,0)'],
                'line-width': ['case', ['==', ['coalesce', ['feature-state', 'gs'], 0], 1], 4, 3] } }, before);
+    map.addSource('gobconvoy', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({ id: 'gob-convoy', type: 'circle', source: 'gobconvoy', layout: { visibility: 'none' }, paint: { 'circle-radius': 7, 'circle-color': ['match', ['get', 'clan'], 'goblins', COLOUR[1], 'rats', COLOUR[2], 'toads', COLOUR[3], '#555'], 'circle-stroke-width': 2.5, 'circle-stroke-color': '#ffffff' } });
     map.addSource('gobforce', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({ id: 'gob-force', type: 'symbol', source: 'gobforce', layout: { visibility: 'none', 'text-field': ['format', ['get', 'n'], { 'font-scale': 0.62 }, '\n', {}, ['get', 'f'], { 'font-scale': 1.15 }], 'text-font': ['Noto Sans Medium'], 'text-size': 13, 'text-line-height': 1.0, 'text-allow-overlap': true, 'text-ignore-placement': true },
       paint: { 'text-color': '#111827', 'text-halo-color': '#ffffff', 'text-halo-width': 2 } });
   }
   const hiddenLabels = new Map();
   const showLayers = (on) => {
-    for (const id of ['gob-fill', 'gob-fog', 'gob-target', 'gob-line', 'gob-force']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+    for (const id of ['gob-fill', 'gob-fog', 'gob-target', 'gob-line', 'gob-force', 'gob-convoy']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
     // the township names move into the force labels, so the map's own names step aside while the war is on
     for (const id of MUNI_LABEL_IDS) {
       if (!map.getLayer(id)) continue;
@@ -117,6 +123,16 @@ export function initGoblin(ctx) {
       feats.push({ type: 'Feature', properties: label, geometry: { type: 'Point', coordinates: m.pt } });
     }
     map.getSource('gobforce').setData({ type: 'FeatureCollection', features: feats });
+    // convoys: moved only when the tick changes, because their place is worked out from it (D114); a rival's is seen only through a township you know a little
+    const dots = [];
+    for (const c of (world.convoys || [])) {
+      const p = positionAt(c, world.tick), a = muniOf(p.at);
+      if (!a || (c.clan !== ME && rank(lv.get(p.at) || 'unknown') < rank('familiar'))) continue;
+      const b = p.next && muniOf(p.next);
+      const pt = b ? [a.pt[0] + (b.pt[0] - a.pt[0]) * p.frac, a.pt[1] + (b.pt[1] - a.pt[1]) * p.frac] : a.pt;
+      dots.push({ type: 'Feature', properties: { clan: c.clan }, geometry: { type: 'Point', coordinates: pt } });
+    }
+    map.getSource('gobconvoy').setData({ type: 'FeatureCollection', features: dots });
   }
   function clearPaint() {
     if (!save) return;
@@ -196,6 +212,14 @@ export function initGoblin(ctx) {
   }
   const ap = () => w().clans[ME].ap;
   const touchesMine = (id) => G.board.neighbours(id).some((n) => w().towns[n] && w().towns[n].owner === ME);
+  /** Convoys passing through a township you can see, with a Raid button when you could strike one. */
+  function convoyLines(id) {
+    const here = (w().convoys || []).filter((c) => positionAt(c, w().tick).at === id);
+    if (!here.length) return '';
+    const lv = levelOf(id);
+    const can = new Set(legalOrders(G.board, w(), ME).filter((o) => o.type === 'raidconvoy').map((o) => o.convoy));
+    return here.filter((c) => c.clan === ME || rank(lv) >= rank('familiar')).map((c) => `<p>${c.clan === ME ? 'Your convoy is here' : `A ${cap(c.clan)} convoy is passing`}: ${[c.cargo.build ? `${c.cargo.build} Build` : '', c.cargo.coin ? `${c.cargo.coin} Coin` : ''].filter(Boolean).join(' and ')}.</p>${can.has(c.id) ? `<button data-g="raidconvoy" data-convoy="${esc(c.id)}">Raid it <span class="fine">1 action</span></button>` : ''}`).join('');
+  }
   function townCard(id) {
     const T = w().towns[id], b = G.board.town(id);
     const mine = T.owner === ME;
@@ -206,6 +230,7 @@ export function initGoblin(ctx) {
     const fr = openFronts(w(), ME).find((f) => f.target === id);
     panel(`<div class="gob"><h3>${esc(b.name)} <small>${esc(b.county)} County</small></h3>
       <p>${whatYouKnow(id, L)}</p>${captainBlock(T, L)}
+      ${convoyLines(id)}
       ${fr ? `<button class="primary" data-g="front" data-id="${fr.id}">Continue the front here</button>` : ''}
       ${near ? `<button data-g="scout" data-town="${esc(id)}">Scout the captain <span class="fine">1 action</span></button>${knownSome ? `<button data-g="talk" data-town="${esc(id)}">Talk to the captain <span class="fine">taunt, insult, parley or duel</span></button>` : ''}` : ''}
       ${!cptn && !mine && T.owner && touchesMine(id) && rank(L) >= rank('familiar') && !(w().footholds || {})[id] ? `<button data-g="foothold" data-town="${esc(id)}">Try for a foothold <span class="fine">1 action; decided at the next tick</span></button>` : ''}
@@ -250,7 +275,7 @@ export function initGoblin(ctx) {
   function digestPanel(note) {
     const d = digestOf(unseen(), ctxFor());
     save.seenTotal = save.total || 0; persist();
-    panel(`<div class="gob"><h3>${esc(d.headline)}</h3>
+    panel(`<div class="gob">${messengerBlock()}<h3>${esc(d.headline)}</h3>
       ${d.incoming.map((i) => `<p class="warn">${esc(i.text)}</p>`).join('')}
       ${d.lines.map((l) => `<p><span class="fine">${esc(l.when)}</span> ${esc(l.text)}</p>`).join('')}
       ${d.hidden ? `<p class="fine">${d.hidden} more in the Ledger.</p>` : ''}
@@ -370,8 +395,8 @@ export function initGoblin(ctx) {
     const en = entriesOf(events, ctxFor());
     const rej = events.find((e) => e.type === 'order_rejected');
     const sc = events.find((e) => e.type === 'scouted' || e.type === 'taunted' || e.type === 'insulted');
-    const other = events.find((e) => ['foothold_run', 'dueled', 'parleyed', 'ransomed', 'released'].includes(e.type));
-    panel(`<div class="gob"><h3>${rej ? 'That did not work' : other ? ({ foothold_run: other.placed ? 'A foothold' : 'No foothold', dueled: other.won === null ? 'A standoff' : other.won ? 'You won the duel' : 'You lost the duel', parleyed: 'A truce', ransomed: 'Ransomed', released: 'Let go' })[other.type] : sc && sc.type === 'scouted' ? (sc.lost ? 'The scout is gone' : sc.learned.length ? 'Something learned' : 'Nothing new') : sc ? (sc.ok ? 'It worked' : 'It backfired') : 'Done'}</h3>
+    const other = events.find((e) => ['foothold_run', 'dueled', 'parleyed', 'ransomed', 'released', 'convoy_raided', 'guarded'].includes(e.type));
+    panel(`<div class="gob"><h3>${rej ? 'That did not work' : other ? ({ foothold_run: other.placed ? 'A foothold' : 'No foothold', dueled: other.won === null ? 'A standoff' : other.won ? 'You won the duel' : 'You lost the duel', parleyed: 'A truce', ransomed: 'Ransomed', released: 'Let go', convoy_raided: other.won ? 'The convoy is yours' : 'Beaten off', guarded: 'Guarded' })[other.type] : sc && sc.type === 'scouted' ? (sc.lost ? 'The scout is gone' : sc.learned.length ? 'Something learned' : 'Nothing new') : sc ? (sc.ok ? 'It worked' : 'It backfired') : 'Done'}</h3>
       ${rej ? `<p>${esc(rej.reason)}</p>` : en.map((e) => `<p>${esc(e.text)}</p>`).join('')}
       ${sc && sc.dice ? `<p class="fine">Dice: ${sc.dice.join(' + ')}</p>` : ''}${closeBtn}</div>`);
   }
@@ -479,6 +504,11 @@ export function initGoblin(ctx) {
       const known = lv.get(c.to) === 'known';
       out.push({ rank: 1, label: `${c.captain ? 'Front' : 'Attack'}: ${G.board.town(c.to).name}`, sub: known ? `${c.T.force} there (${cap(c.T.owner)}${c.captain ? ', a captain' : ''}) against your ${c.F.force - 1} from ${G.board.town(c.from).name}: ${how}` : `${cap(c.T.owner)} hold it with ${forceWord(c.T.force, fw())}${c.captain ? ', and a captain' : ''}. You can send ${c.F.force - 1} from ${G.board.town(c.from).name}.`, data: `data-g="go" data-from="${esc(c.from)}" data-to="${esc(c.to)}"` });
     }
+    const rp = world.reprisal && world.reprisal[ME];
+    if (rp && world.tick <= rp.until && world.towns[rp.target] && world.towns[rp.target].owner === rp.by) out.unshift({ rank: 0, label: `Answer the ambush at ${G.board.town(rp.target).name}`, sub: `The ${cap(rp.by)} struck your convoy from there. The first attack on it costs no action.`, data: `data-g="go" data-from="${esc(G.board.neighbours(rp.target).find((n) => world.towns[n] && world.towns[n].owner === ME) || '')}" data-to="${esc(rp.target)}"` });
+    for (const o of legalOrders(G.board, world, ME).filter((x) => x.type === 'raidconvoy').slice(0, 2)) { const c = world.convoys.find((x) => x.id === o.convoy); const at = positionAt(c, world.tick).at; if (rank(lv.get(at) || 'unknown') >= rank('familiar')) out.push({ rank: 1, label: `Raid a ${cap(c.clan)} convoy near ${G.board.town(at).name}`, sub: `1 action. It carries ${[c.cargo.build ? `${c.cargo.build} Build` : '', c.cargo.coin ? `${c.cargo.coin} Coin` : ''].filter(Boolean).join(' and ')}.`, data: `data-g="raidconvoy" data-convoy="${esc(c.id)}"` }); }
+    const mine1 = convoysOf(world, ME)[0];
+    if (mine1) { const gt = mine1.route.find((x) => world.towns[x].owner === ME); if (gt) out.push({ rank: 2, label: `Guard ${G.board.town(gt).name}`, sub: `1 action. Your convoy passes through; a guard makes it harder to take for a day.`, data: `data-g="guard" data-town="${esc(gt)}"` }); }
     const me = world.clans[ME];
     if (ecoActive(me)) {
       if (me.hireDay !== Math.floor((world.startHour + world.tick) / 24) && me.res.coin >= K8.hireCost) {
@@ -490,12 +520,19 @@ export function initGoblin(ctx) {
     if (hidden) out.push({ rank: 9, label: 'Learn the map', sub: `${hidden} neighbouring township${hidden === 1 ? ' is' : 's are'} hidden in fog. Learn them in the quiz and they will show.`, data: 'data-g="close"' });
     return out;
   }
+  function messengerBlock() {
+    const mood = messengerMood(w(), G.board, ME, wordOf(w(), ME));
+    const lines = G.content.json.messenger.filter((l) => l.mood === mood);
+    const line = lines.length ? lines[w().tick % lines.length].text : '';
+    return `<div class="messenger">${messengerFace(mood)}<span>${esc(line)}</span></div>`;
+  }
   function doPanel() {
     const list = suggestions(), nx = nextMajor();
-    panel(`<div class="gob"><h3>What can I do?</h3>
+    panel(`<div class="gob">${messengerBlock()}<h3>What can I do?</h3>
       <p class="fine">There is no end-turn button. You have <b>${ap()}</b> action${ap() === 1 ? '' : 's'} (attacks, fronts, scouting, digging in and taunts cost one; moving is free). The world moves by itself on the hour: at 09:00, 12:00 and 18:00 you get ${K6.apPerMajor} more (up to ${K6.apCap}), everyone gets recruits and the other clans act${nx ? `. Next: ${nx.hour}, in ${nx.left}` : ''}.</p>
       ${list.length ? list.map((o) => `<button ${o.data}><b>${esc(o.label)}</b><br><span class="fine">${esc(o.sub)}</span></button>`).join('') : '<p>Nothing worth doing right now. Your townships next to enemies are too thin to attack. Wait for recruits.</p>'}
       ${prisoners()}
+      <button data-g="gentle">Gentle mode: ${w().clans[ME].gentle ? 'on' : 'off'} <span class="fine">on means no unwarned convoy losses</span></button>
       <button data-g="chargetoggle">Quiz charges: ${prefs().charges ? 'on' : 'off'} <span class="fine">tap to switch</span></button>
       ${closeBtn}</div>`);
   }
@@ -539,6 +576,13 @@ export function initGoblin(ctx) {
     }
     else if (a === 'front') frontPanel(b.dataset.id);
     else if (a === 'scout') scoutPanel(b.dataset.town);
+    else if (a === 'raidconvoy' || a === 'guard' || a === 'gentle') {
+      const o = a === 'raidconvoy' ? { type: a, clan: ME, convoy: b.dataset.convoy } : a === 'guard' ? { type: a, clan: ME, town: b.dataset.town } : { type: 'setting', clan: ME, key: 'gentle', value: !w().clans[ME].gentle };
+      const ev = run([{ type: 'present', clan: ME }, o], 0);
+      paint(); hud();
+      if (a === 'gentle') return doPanel();
+      sittingResult(ev);
+    }
     else if (a === 'talk') talkPanel(b.dataset.town);
     else if (a === 'foothold') footholdPanel(b.dataset.town);
     else if (a === 'footdo' || a === 'insult' || a === 'parley' || a === 'duel' || a === 'ransom' || a === 'release') {
