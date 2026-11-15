@@ -20,7 +20,7 @@ import { createLooks } from './looks.js';
 import { createToolbar } from './toolbar.js';
 import { createPerfTest } from './perftest.js';
 import { initProgress } from './progress.js';
-import { initGoblin } from './goblin/ui/goblin.js';
+import { initCouncil } from './goblin/ui/council.js';
 import { askHome } from './goblin/ui/home.js';
 
 /** Map filter for one road, by the label people use ("I-287", "Columbia Turnpike"). */
@@ -602,7 +602,7 @@ async function main() {
     explore: initExplore(ctx),
     practice: initPractice(ctx),
     progress: initProgress(ctx),
-    goblin: initGoblin(ctx),
+    goblin: initCouncil(ctx),
   };
   ctx.modes = modes;
 

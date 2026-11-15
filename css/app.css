@@ -3570,3 +3570,89 @@ body:not([data-mode='goblin']) #rush { display: none; }
 .gfig i::after { content: ''; position: absolute; right: -4px; top: -6px; width: 1.5px; height: 17px; background: #7c5a2b; transform: rotate(8deg); }
 .gfig.big i { width: 11px; height: 15px; }
 @keyframes bob { from { transform: translateY(0); } to { transform: translateY(-3px); } }
+
+/* ---- redesign R3: Council (goblin mode as an old strategy game) ---- */
+@font-face { font-family: VT323; font-display: swap; src: url('../fonts/vt323-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Press Start 2P'; font-display: swap; src: url('../fonts/press-start-2p-latin-400-normal.woff2') format('woff2'); }
+body.council-on #gobbar, body.council-on #hud, body.council-on #sheet, body.council-on .maplibregl-ctrl-bottom-left, body.council-on #compass, body.council-on #edges, body.council-on .fab, body.council-on #fabs { display: none !important; }
+#council { position: fixed; inset: 0; z-index: 40; pointer-events: none; font-family: VT323, ui-monospace, monospace; color: #fff; --frame: #e2551d; --panel: #0d1250; }
+#council[hidden] { display: none; }
+#council > * { pointer-events: auto; }
+.cn-top { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 10px; padding: calc(env(safe-area-inset-top, 0px) + 6px) 8px 6px; background: var(--panel); border-bottom: 3px solid var(--frame); box-shadow: 0 3px 0 #000; font-size: 20px; letter-spacing: 0.04em; }
+.cn-date { color: #58d0ff; white-space: nowrap; }
+.cn-res { flex: 1; text-align: right; white-space: nowrap; color: #fff; }
+.cn-res i { font-style: normal; color: #f2c21a; margin: 0 3px 0 8px; }
+.cn-menu { font: 16px 'Press Start 2P', monospace; background: #000; color: #fff; border: 2px solid var(--frame); padding: 4px 8px; }
+.cn-info { position: absolute; right: 8px; top: calc(env(safe-area-inset-top, 0px) + 50px); width: 190px; background: var(--panel); border: 3px double var(--frame); box-shadow: 4px 4px 0 #000; padding: 8px 10px; font-size: 19px; line-height: 1.15; }
+.cn-info[hidden] { display: none; }
+.cn-info h4 { margin: 0 0 4px; font: 400 21px VT323, monospace; color: #58ff8a; display: flex; align-items: center; gap: 6px; }
+.cn-info h4 span { width: 14px; height: 14px; border: 2px solid #000; outline: 1px solid #fff; flex: none; }
+.cn-info div { display: flex; align-items: center; gap: 6px; color: #f2c21a; }
+.cn-info b { color: #fff; font-weight: 400; margin-left: auto; }
+.cn-bar { flex: 1; height: 8px; background: #000; border: 1px solid #5560c0; }
+.cn-bar i { display: block; height: 100%; }
+.cn-cap img { width: 44px; height: 44px; image-rendering: pixelated; border: 2px solid var(--frame); }
+.cn-bottom { position: absolute; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: 104px 1fr; grid-template-areas: 'port say' 'cmd cmd'; gap: 6px; padding: 6px 6px calc(env(safe-area-inset-bottom, 0px) + 8px); background: linear-gradient(rgba(0, 0, 0, 0), #000 14px); }
+.cn-port { grid-area: port; background: #000; border: 3px double var(--frame); box-shadow: 3px 3px 0 #000; padding: 4px; display: grid; justify-items: center; }
+.cn-port img { width: 88px; height: 88px; image-rendering: pixelated; display: block; }
+.cn-port span { font-size: 15px; color: #f2c21a; text-align: center; line-height: 1; margin-top: 3px; max-width: 92px; overflow: hidden; white-space: nowrap; text-overflow: clip; }
+.cn-say { grid-area: say; background: var(--panel); border: 3px double var(--frame); box-shadow: 3px 3px 0 #000; padding: 8px 10px; min-height: 108px; }
+.cn-say p { margin: 0; font-size: 23px; line-height: 1.05; letter-spacing: 0.02em; }
+.cn-cmd { grid-area: cmd; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; min-height: 44px; }
+.cn-cmd button { font: 12px 'Press Start 2P', monospace; padding: 13px 4px; color: #fff; background: #1b2a9a; border: 2px solid #fff; box-shadow: 3px 3px 0 #000; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
+.cn-cmd button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; background: #e2551d; }
+.cn-cmd button.dim { color: #6a72b0; border-color: #4a52a0; background: #10184a; }
+.cn-cmd button.wide { grid-column: 1 / -1; background: #e2551d; }
+/* township markers: a number plate, a castle or a captain's face, and the men under it */
+.cn-mk { display: grid; justify-items: center; pointer-events: none; line-height: 1; font-family: 'Press Start 2P', monospace; }
+.cn-mk b { font-size: 9px; font-weight: 400; color: #fff; background: #000; padding: 2px 3px 1px; border: 1px solid #fff; }
+.cn-mk.mine b { background: #0d5a25; }
+.cn-mk.tgt b { background: #fff; color: #c00; border-color: #c00; animation: cnblink 0.5s steps(2) infinite; }
+.cn-mk.cur b { background: #ffe11a; color: #000; }
+.cn-mk u { text-decoration: none; font-size: 8px; color: #ffe11a; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; margin-top: 1px; }
+.cn-face { width: 22px; height: 22px; image-rendering: pixelated; border: 1px solid #000; outline: 1px solid #fff; margin-top: 1px; }
+.cn-star { font-style: normal; color: #ffe11a; font-size: 10px; }
+.cn-far .cn-mk .cn-cas, .cn-far .cn-mk u { display: none; }
+.cn-far .cn-mk b { font-size: 7px; padding: 1px 2px 0; }
+.cn-far .cn-face { width: 14px; height: 14px; }
+body:not(.council-on) .cn-mk { display: none; }
+@keyframes cnblink { 50% { opacity: 0.25; } }
+/* terminal cards */
+.cn-card { position: fixed; inset: 0; z-index: 70; background: #000; display: grid; place-items: center; font-family: VT323, monospace; color: #f0f0f0; text-align: center; }
+.cn-card::after, .cn-battle::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, 0.28) 2px 4px); }
+.cn-card p { margin: 0; font-size: clamp(40px, 13vw, 72px); line-height: 0.95; letter-spacing: 0.08em; text-shadow: 0 0 8px rgba(255, 255, 255, 0.75), 3px 0 0 rgba(255, 0, 60, 0.35), -3px 0 0 rgba(0, 200, 255, 0.35); padding: 0 12px; }
+.cn-card.bad p { color: #ff8a7a; } .cn-card.good p { color: #b8ff9a; }
+/* the battle screen */
+.cn-battle { position: fixed; inset: 0; z-index: 68; background: #000; color: #fff; font-family: VT323, monospace; display: grid; grid-template-rows: auto auto auto 1fr auto auto; padding: calc(env(safe-area-inset-top, 0px) + 8px) 8px 14px; }
+.cb-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 6px; }
+.cb-who { display: grid; justify-items: center; gap: 2px; background: #000; border: 3px double #e2551d; padding: 6px 4px; }
+.cb-who img { width: 96px; height: 96px; image-rendering: pixelated; }
+.cb-noface { width: 96px; height: 96px; display: grid; place-items: center; background: repeating-conic-gradient(#2a2f8f 0 25%, #6a3fb0 0 50%) 0 0 / 6px 6px; }
+.cb-who.d .cb-noface svg { transform: scaleX(-1); }
+.cb-who b { font: 400 22px Georgia, 'Times New Roman', serif; color: #fff; text-align: center; line-height: 1; }
+.cb-who em { font: 22px 'Press Start 2P', monospace; font-style: normal; color: #ffe11a; }
+.cb-place { font-size: 22px; color: #58ff8a; text-align: center; background: #0d1250; border: 2px solid #f2c21a; padding: 3px 8px; align-self: center; max-width: 110px; line-height: 1; }
+.cb-bar { height: 16px; margin: 8px 0; background: #400; border: 2px solid #fff; display: flex; overflow: hidden; }
+.cb-bar i.a { transition: width 0.25s steps(6); } .cb-bar i.d { flex: 1; }
+.cb-field { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: center; background: repeating-conic-gradient(#0a2a12 0 25%, #0e3618 0 50%) 0 0 / 8px 8px; border: 2px solid #1e5a2e; padding: 8px 4px; min-height: 0; }
+.cb-crowd { display: flex; flex-wrap: wrap; gap: 3px; align-content: center; }
+.cb-crowd.a { justify-content: flex-end; } .cb-crowd.d { justify-content: flex-start; }
+.cb-crowd.d svg { transform: scaleX(-1); }
+.cb-crowd span { animation: cbbob 0.5s steps(2) infinite; }
+.cb-crowd span:nth-child(odd) { animation-delay: 0.25s; }
+.cb-crowd span.dead { animation: cbdie 0.4s steps(4) forwards; }
+@keyframes cbbob { 50% { transform: translateY(-2px); } }
+@keyframes cbdie { 0% { filter: brightness(4); } 100% { opacity: 0; transform: translateY(8px) rotate(90deg); } }
+.cb-dice { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; min-height: 34px; margin-bottom: 6px; font: 14px 'Press Start 2P', monospace; }
+.cb-dice .a { justify-content: flex-end; }
+.cb-dice div { display: flex; gap: 3px; }
+.cb-dice i { font-style: normal; width: 22px; height: 22px; display: grid; place-items: center; background: #fff; color: #000; border: 2px solid #000; outline: 1px solid #fff; }
+.cb-dice .d i { background: #ffd0c0; }
+.cb-dice i.l { background: #333; color: #777; outline-color: #555; }
+.cb-dice .vs { color: #f2c21a; font-size: 10px; }
+.cn-battle.hit .cb-field { animation: cbshake 0.2s steps(4); }
+@keyframes cbshake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+.cb-verdict { min-height: 70px; display: grid; place-items: center; }
+.cb-verdict p { margin: 0; font-size: clamp(34px, 10vw, 54px); letter-spacing: 0.06em; text-shadow: 0 0 8px rgba(255, 255, 255, 0.6); }
+.cb-verdict .good { color: #b8ff9a; } .cb-verdict .bad { color: #ff8a7a; }
+.cb-skip { text-align: center; color: #666; font-size: 16px; }

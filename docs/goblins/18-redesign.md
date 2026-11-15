@@ -141,3 +141,23 @@ The pure simulation and its tests. Real New Jersey geography, computed and never
 ## 11. What was patched alongside this document (R1)
 
 See the commit that carries this file. In short: captain portrait pins on the map; force as a separate badge that never shares a line with a name, and names only when zoomed in; the header cut to two lines; the news cut to three items that involve you; the first-move result leads straight to a named rival and a confrontation; and the action economy explained in one line where it is spent. These are patches on the old screen, not the redesign. The redesign is R2 onward.
+
+## 10. Council (R3, built 2026-11-15)
+
+The user's references: old Koei strategy screens (numbered provinces in flat colour, a framed portrait asking "what is your order for 24. Xiang Yang?", a command menu, a battle screen with officers and a troop bar), terminal text on black, black-and-white fantasy ink, a monster card on black. Council is an original front end in that genre, on the same simulation.
+
+**What changed in play**
+
+| Before | Council |
+|---|---|
+| Tap a township, read a panel, choose from many verbs | The game brings each captain to you in turn and asks for one order |
+| Action points that refill on a real clock | One order per captain; you end the turn; the world moves to the next part of the day |
+| A front of several maneuvers against a captain | One battle, captain against captain |
+| Lines of text for results | Terminal cards and a battle screen; the crowd on each side is the number of units |
+| Township names and force numbers stacked on the map | A number plate, a castle or the captain's face, and the men; the name is said in the dialogue |
+
+**Orders:** March (attack a neighbouring township), Muster (pull units in from your neighbouring townships), Walls (dig in), Dwarves (seek them, beside a rock town), Rest. With no captain left, your two strongest border garrisons act instead.
+
+**Not here yet, on purpose (one stage, then the user plays):** fog and the quiz link (the numbered map is itself a way to learn where places are; whether the quiz returns is the user's call), scouting, parley, insults, duels, convoys, chapters and seasons on screen, the messenger. The rules for all of them still run or wait in the simulation.
+
+**Open questions for the user after playing:** is one order per captain enough to do in a turn; do the rivals push back hard enough without the real clock; is the battle screen a moment or a wait; which missing system is wanted first.
