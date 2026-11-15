@@ -76,8 +76,10 @@ export function initGoblin(ctx) {
         paint();
       },
     } });
-    try { await film.play(events, w(), ME); } catch (err) { console.error('film', err); }
-    then();
+    let shown = false;
+    try { shown = await film.play(events, w(), ME); } catch (err) { console.error('film', err); panel(`<div class="gob"><p>The film failed: ${esc(err && err.message || err)}</p>${closeBtn}</div>`); return; }
+    if (!shown && !events.length) panel('<div class="gob"><p>Nothing to replay yet: no fight on your border.</p>' + closeBtn + '</div>');
+    else then();
   }
   const fw = () => G.content.json.force_words.map((x) => [x.min, x.max, x.word]);   // placeholder words, the user's to write (D68)
   /** What the player has learned decides what is shown (D173). Computed fresh each time from the review data and this war's play; nothing is written back. */
@@ -571,12 +573,13 @@ export function initGoblin(ctx) {
       ${acts.map((a) => `<button class="${a === 'decision' ? 'primary' : ''}" data-g="fact" data-front="${esc(fid)}" data-a="${a}"><b>${LABEL[a][0]}</b> <span class="fine">${LABEL[a][1]}</span></button>`).join('')}
       <button data-g="close">Close (the front waits)</button></div>`);
   }
-  function afterFrontOrder(events, fid) {
+  function afterFrontOrder(events, fid, fronted = false) {
     const closed = events.find((e) => e.type === 'front_closed');
     const rej = events.find((e) => e.type === 'order_rejected');
     sel = null; paint(); hud();
     if (checkOver()) return;
     if (rej) return panel(`<div class="gob"><h3>That did not work</h3><p>${esc(rej.reason)}</p>${closeBtn}</div>`);
+    if (closed && events.some((e) => e.type === 'front_beat' && e.maneuver === 'decision' && e.rounds) && !fronted) { panel(''); return showFilm(events, () => afterFrontOrder(events, fid, true)); }
     if (closed) {
       const en = entriesOf(events, ctxFor()).map((e) => `<p>${esc(e.text)}</p>`).join('');
       const dec = events.find((e) => e.type === 'front_beat' && e.maneuver === 'decision' && e.rounds);
@@ -763,7 +766,7 @@ export function initGoblin(ctx) {
     else if (a === 'do') { catchUp(); paint(); hud(); doPanel(); }
     else if (a === 'digest') { catchUp(); paint(); hud(); digestPanel(); }
     else if (a === 'ledger') ledgerPanel();
-    else if (a === 'film') { let ev = save.events.slice(-80); if (!battlesOf(ev, ME).length) ev = demoFight(); panel(''); showFilm(ev, () => {}); }
+    else if (a === 'film') { let ev = save.events.slice(-80); if (!battlesOf(ev, ME, 3, w()).length) ev = demoFight(); panel(''); showFilm(ev, () => {}); }
     else if (a === 'newwar') panel('<div class="gob"><p>Leave this war and start another? The current one is lost.</p><div class="gobrow"><button class="primary" data-g="newwar">Start another</button><button data-g="close">Keep this one</button></div></div>');
   }
 

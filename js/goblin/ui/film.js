@@ -15,9 +15,20 @@ const bearingOf = (a, b) => { const r = Math.PI / 180, dl = (b[0] - a[0]) * r, y
 const shortest = (from, to) => from + ((((to - from) % 360) + 540) % 360) - 180;
 
 /** The fights worth filming: those your clan was in, newest last, at most `max`. Pure, so it can be tested without a screen. */
-export function battlesOf(events, me, max = 3) {
+export function battlesOf(events, me, max = 3, world = null) {
   const out = [];
   events.forEach((e, i) => {
+    if (e.type === 'front_beat' && e.maneuver === 'decision' && e.rounds && e.rounds.length) {
+      // the decision of a front is a skirmish too: rebuild the same shape from its dice
+      const closed = events.slice(i + 1, i + 6).find((x) => x.type === 'front_closed' && x.front === e.front);
+      const r0 = e.rounds[0], rl = e.rounds[e.rounds.length - 1];
+      const dc = world && e.captain && world.chars[e.captain];
+      const against = dc ? dc.clan : (e.clan === me ? 'rats' : me);
+      if (e.clan !== me && against !== me) return;
+      const n = r0.attackers + r0.aLost, dB = r0.defenders + r0.dLost;
+      out.push({ e: { type: 'skirmish_result', by: e.clan, against, from: closed ? closed.from : null, to: e.to, n, won: e.won, lost: { attackers: n - rl.attackers, defenders: dB - rl.defenders }, left: { a: rl.attackers, d: rl.defenders }, lead: e.lead, rounds: e.rounds }, capturedChar: null });
+      return;
+    }
     if ((e.type !== 'skirmish_result' && e.type !== 'raid_landed') || (e.by !== me && e.against !== me)) return;
     const cap = events.slice(i + 1, i + 4).find((x) => x.type === 'captured' && x.town === e.to);
     out.push({ e, capturedChar: cap ? cap.char : null });
@@ -83,7 +94,7 @@ export function createFilm({ map, byKey, board, hooks }) {
   const $ = (s) => el.querySelector(s);
 
   async function battle({ e, capturedChar }, world) {
-    const A = byKey.get(e.from), D = byKey.get(e.to); if (!A || !D) return;
+    const A = byKey.get(e.from), D = byKey.get(e.to); if (!A || !D) return;   // (a front whose start is unknown is skipped)
     const ap = A.pt, dp = D.pt, brg = bearingOf(ap, dp);
     const defBefore = e.lost.defenders + e.left.d;
     const leadC = e.lead && world.chars[e.lead], defC = capturedChar ? world.chars[capturedChar] : (!e.won && world.towns[e.to] && world.towns[e.to].captain ? world.chars[world.towns[e.to].captain] : null);
@@ -135,7 +146,7 @@ export function createFilm({ map, byKey, board, hooks }) {
 
   /** Play a list of simulation events. Resolves when the film ends or is skipped. `world` is the state after them (for captains). */
   async function play(events, world, me) {
-    const list = battlesOf(events, me);
+    const list = battlesOf(events, me, 3, world);
     if (!list.length || busy || !map || !byKey.size) return false;
     busy = true; skip = false;
     const prePadding = map.getPadding ? map.getPadding() : null, preCam = { center: map.getCenter(), zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch() };
