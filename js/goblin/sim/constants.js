@@ -22,3 +22,11 @@ export const K = Object.freeze({
   captainCapBase: 1,          // spec: 1 + floor(townships / 4) captains per clan
   captainCapPerTowns: 4,
 });
+
+// Added in S3 (docs/goblins/04-systems-spec.md section 8; a new working rule beyond D205, flagged in the build log):
+export const K2 = Object.freeze({
+  aiCommitFraction: 0.75,     // an AI commits this share of its spare units (all but one) so it never empties a border
+  startHour: 8,               // the war begins at 08:00 so the first tick is the 09:00 major tick
+  smallThird: 3, midThird: 5, bigThird: 8, homeBonus: 2,   // starting forces by population rank within the theatre, home +2
+  absentAfterTicks: 72,       // D189: a human not seen for three days is "absent"
+});
