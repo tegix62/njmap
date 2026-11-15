@@ -24,32 +24,50 @@ const { chromium } = require('playwright');
   await page.waitForTimeout(1500);
   console.log('hud:', (await page.locator('#hud').innerText()).replace(/\n/g, ' | '));
   await page.screenshot({ path: 'scratch-board.png' });
-  // pick own township with force >= 2 that borders an enemy
-  const info = await page.evaluate(() => {
-    const s = JSON.parse(localStorage.getItem('njtf.goblin.save')); const w = s.world;
-    for (const [id, t] of Object.entries(w.towns)) if (t.owner === 'goblins' && t.force >= 3) { const nb = Object.keys(w.towns).find((x) => w.towns[x].owner && w.towns[x].owner !== 'goblins' && window.njtf.byKey.get(id)); return { id }; }
-  });
-  
-  // find a my-township/enemy-neighbour pair using the board file
-  const pair = await page.evaluate(async () => {
-    const bj = await fetch('data/goblin-board.json').then((r) => r.json());
-    const s = JSON.parse(localStorage.getItem('njtf.goblin.save')); const w = s.world;
-    for (const id of Object.keys(w.towns)) if (w.towns[id].owner === 'goblins' && w.towns[id].force >= 3) for (const n of bj.towns[id].nb) if (w.towns[n] && w.towns[n].owner && w.towns[n].owner !== 'goblins') return [id, n];
-  });
-  console.log('pair', pair);
+  console.log('do panel:', (await page.locator('#sheet').innerText()).replace(/\n/g, ' | ').slice(0, 260));
+  await page.click('[data-g=close]');
   const proj = (id) => page.evaluate((i) => { const m = window.njtf.byKey.get(i); const p = window.njtf.map.project(m.pt); return [p.x, p.y]; }, id);
-  await page.evaluate((id) => window.njtf.map.easeTo({ center: window.njtf.byKey.get(id).pt, zoom: 10, duration: 0 }), pair[0]);
-  await page.waitForTimeout(500);
-  let p0 = await proj(pair[0]); await page.mouse.click(p0[0], p0[1]);
-  await page.waitForSelector('[data-g=pick]'); await page.click('[data-g=pick]');
-  let p1 = await proj(pair[1]); await page.mouse.click(p1[0], p1[1]);
-  await page.waitForSelector('[data-g=send]');
-  console.log('order panel:', (await page.locator('#sheet').innerText()).replace(/\n/g, ' | ').slice(0, 300));
-  await page.screenshot({ path: 'scratch-order.png' });
-  await page.click('[data-g=send]');
-  await page.waitForSelector('.gobdice, #sheet h3');
-  console.log('result:', (await page.locator('#sheet').innerText()).replace(/\n/g, ' | ').slice(0, 400));
-  await page.screenshot({ path: 'scratch-result.png' });
+  const pairFor = (captain) => page.evaluate(async (cap) => {
+    const bj = await fetch('data/goblin-board.json').then((r) => r.json());
+    const w = JSON.parse(localStorage.getItem('njtf.goblin.save')).world;
+    for (const id of Object.keys(w.towns)) if (w.towns[id].owner === 'goblins' && w.towns[id].force >= 4) for (const n of bj.towns[id].nb) if (w.towns[n] && w.towns[n].owner && w.towns[n].owner !== 'goblins' && !!w.towns[n].captain === cap) return [id, n];
+  }, captain);
+  async function tapPair(pair) {
+    await page.evaluate((id) => window.njtf.map.easeTo({ center: window.njtf.byKey.get(id).pt, zoom: 10, duration: 0 }), pair[0]);
+    await page.waitForTimeout(400);
+    let p0 = await proj(pair[0]); await page.mouse.click(p0[0], p0[1]);
+    await page.waitForSelector('[data-g=pick]'); await page.click('[data-g=pick]');
+    let p1 = await proj(pair[1]); await page.mouse.click(p1[0], p1[1]);
+    await page.waitForSelector('[data-g=send]');
+  }
+  // 1) a plain skirmish against a township with no captain
+  const plain = await pairFor(false); console.log('plain pair', plain);
+  await tapPair(plain);
+  console.log('order panel:', (await page.locator('#sheet').innerText()).replace(/\n/g, ' | ').slice(0, 200));
+  await page.click('[data-g=send]'); await page.waitForSelector('#sheet h3');
+  console.log('result:', (await page.locator('#sheet h3').innerText()));
+  await page.click('[data-g=close]');
+  // 2) a front against a captain
+  const fr = await pairFor(true); console.log('front pair', fr);
+  await tapPair(fr);
+  console.log('front order:', (await page.locator('#sheet').innerText()).replace(/\n/g, ' | ').slice(0, 330));
+  await page.screenshot({ path: 'scratch-frontorder.png' });
+  await page.click('[data-g=send]'); await page.waitForSelector('[data-g=fact]');
+  console.log('front panel:', (await page.locator('#sheet').innerText()).replace(/\n/g, ' | ').slice(0, 420));
+  await page.screenshot({ path: 'scratch-front.png' });
+  for (let i = 0; i < 8; i++) {
+    const acts = await page.locator('[data-g=fact]').evaluateAll((els) => els.map((e) => e.dataset.a));
+    if (!acts.length) break;
+    const pick = acts.includes('decision') && i > 2 ? 'decision' : acts.includes('lever') ? 'lever' : acts.includes('probe') ? 'probe' : acts.includes('decision') ? 'decision' : 'disengage';
+    await page.click(`[data-g=fact][data-a=${pick}]`); await page.waitForTimeout(150);
+    const h = await page.locator('#sheet h3').first().innerText();
+    console.log(' beat', i, pick, '->', h);
+    if (!/^Front at/.test(h)) break;
+  }
+  console.log('after front:', (await page.locator('#sheet').innerText()).replace(/\n/g, ' | ').slice(0, 400));
+  await page.screenshot({ path: 'scratch-afterfront.png' });
+  await page.click('[data-g=close]');
+  console.log('hud:', (await page.locator('#hud').innerText()).replace(/\n/g, ' | '));
   await page.click('[data-gbar=digest]'); await page.waitForTimeout(300);
   console.log('digest:', (await page.locator('#sheet').innerText()).replace(/\n/g, ' | ').slice(0, 300));
   await page.click('[data-gbar=home]');

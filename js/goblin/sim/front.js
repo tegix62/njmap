@@ -89,10 +89,10 @@ export function actFront(w, board, rng, emit, o) {
   if (!frontActions(w, f).includes(o.action)) return `${o.action} is not available now`;
   const content = board.content;
   const act = o.action;
-  if (act === 'disengage') { f.beat++; emit('front_beat', { front: f.id, maneuver: 'disengage', standing: STANDING[f.standing] }); close(w, board, rng, emit, f, 'Withdrew'); return true; }
+  if (act === 'disengage') { f.beat++; emit('front_beat', { front: f.id, clan: f.attacker, captain: f.captain, to: f.target, maneuver: 'disengage', standing: STANDING[f.standing] }); close(w, board, rng, emit, f, 'Withdrew'); return true; }
   if (act === 'bridge') {
     f.beat++; f.maneuvers++; f.bridgeUsed = true; f.standing = 1;
-    emit('front_beat', { front: f.id, maneuver: 'bridge', standing: STANDING[f.standing] });
+    emit('front_beat', { front: f.id, clan: f.attacker, captain: f.captain, to: f.target, maneuver: 'bridge', standing: STANDING[f.standing] });
     return true;
   }
   if (act === 'decision') { f.beat++; return decide(w, board, rng, emit, f, o.n); }
@@ -113,7 +113,7 @@ export function actFront(w, board, rng, emit, o) {
   f.learned.push(...learned);
   f.beat++; f.maneuvers++;
   f.standing = clamp(f.standing + delta, 0, 3);
-  emit('front_beat', { front: f.id, maneuver: act, dice, mods: m.parts.map((p) => ({ why: p.why.startsWith('trait:') ? 'hidden' : p.why, v: p.v })), total: m.total, roll, change: delta, standing: STANDING[f.standing], learned });
+  emit('front_beat', { front: f.id, clan: f.attacker, captain: f.captain, to: f.target, maneuver: act, dice, mods: m.parts.map((p) => ({ why: p.why.startsWith('trait:') ? 'hidden' : p.why, v: p.v })), total: m.total, roll, change: delta, standing: STANDING[f.standing], learned });
   if (f.standing === 3) close(w, board, rng, emit, f, 'Yielded');
   return true;
 }
@@ -126,7 +126,7 @@ function decide(w, board, rng, emit, f, n) {
   const mods = { atkExtraDice: lead ? 1 : 0, atkBestPenalty: 0,
     defBestBonus: f.standing <= 1 ? 1 : 0, defExtraDice: f.standing === 0 ? 1 : 0 };
   const r = skirmish({ attackers: units, defenders: T.force, ...mods }, rng);
-  emit('front_beat', { front: f.id, maneuver: 'decision', standing: STANDING[f.standing], won: r.won, rounds: r.rounds, lead: lead ? lead.id : null });
+  emit('front_beat', { front: f.id, clan: f.attacker, captain: f.captain, to: f.target, maneuver: 'decision', standing: STANDING[f.standing], won: r.won, rounds: r.rounds, lead: lead ? lead.id : null });
   f.lostA = units - r.attackersLeft; f.lostD = defendersBefore - r.defendersLeft;
   if (r.won) { f.survivors = r.attackersLeft; f.defendersBefore = defendersBefore; close(w, board, rng, emit, f, 'Won'); }
   else { T.force = r.defendersLeft; f.survivors = r.attackersLeft; close(w, board, rng, emit, f, 'Lost'); }

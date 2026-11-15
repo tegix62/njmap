@@ -87,7 +87,7 @@ export function entriesOf(events, { board, state, content, clan }) {
         break;
       }
       case 'front_beat': {
-        const f = fronts[e.front] || {};
+        const f = fronts[e.front] || { to: e.to, captain: e.captain, clan: e.clan };
         if (e.maneuver === 'bridge') say(e.tick, cap(fill(T.beat_bridge, { clan: clanName(f.clan || ''), standing: e.standing })));
         else if (e.maneuver === 'decision') say(e.tick, cap(fill(T.beat_decision, { to: town(f.to), rounds: (e.rounds || []).length })) + ` ${e.won ? 'The attackers won.' : 'The attackers lost.'}`);
         else if (e.maneuver === 'disengage') { /* the closing line says it */ }
