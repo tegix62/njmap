@@ -46,9 +46,9 @@ export function initCouncil(ctx) {
 
   async function load() {
     if (G) return;
-    const [bj, cj, rj] = await Promise.all(['board', 'content', 'regions'].map((n) => fetch(`data/goblin-${n}.json`).then((r) => r.json())));
+    const [bj, cj, rj, tj] = await Promise.all(['board', 'content', 'regions', 'terrain'].map((n) => fetch(`data/goblin-${n}.json`).then((r) => r.json()).catch(() => null)));
     const content = loadContent(cj);
-    G = { board: makeBoard(bj, content, rj), content };
+    G = { board: makeBoard(bj, content, rj), content, terrain: tj };
   }
 
   // ---- portraits: the code-drawn face, shrunk to a few pixels and dithered to a small palette, the way an old machine would show it
@@ -101,19 +101,20 @@ export function initCouncil(ctx) {
     for (let y = 0; y < h * k; y++) for (let x = 0; x < wd * k; x++) { const c = pal[rows[Math.floor(y / k)][Math.floor(x / k)]] || [0, 0, 0, 0]; data.set(c, (y * wd * k + x) * 4); }
     map.addImage(name, { width: wd * k, height: h * k, data });
   }
-  const LAYERS = ['cn-sea', 'cn-land', 'cn-dither', 'cn-hills', 'cn-water', 'cn-river', 'cn-road-case', 'cn-road', 'cn-line', 'cn-hi'];
+  const LAYERS = ['cn-sea', 'cn-terrain', 'cn-land', 'cn-water', 'cn-river', 'cn-road-case', 'cn-road', 'cn-line', 'cn-hi'];
   function ensureLayers() {
     if (layers) return; layers = true;
     const cc = ['coalesce', ['feature-state', 'cc'], 0];
-    // dithered sea, a dither over all land (so every colour reads as two tones), and little peaks on the rock towns
+    // dithered sea; the real terrain as a dithered picture (tools/goblin/build_terrain.py); ownership as a tint over it
     pattern('cn-p-sea', ['ab', 'ba'], { a: [27, 42, 122, 255], b: [36, 60, 160, 255] }, 2);
-    pattern('cn-p-dither', ['x.', '.o'], { x: [0, 0, 0, 70], o: [255, 255, 255, 34] }, 2);
-    pattern('cn-p-hills', ['........', '...w....', '..wkk...', '.wkkkk..', 'wkkkkkk.', '........', '.....w..', '....wkk.'], { w: [255, 255, 255, 150], k: [0, 0, 0, 120] }, 2);
-    const rock = Object.keys(G.board.regions.rock || {}).map((id) => muni(id)).filter(Boolean).map((m) => m.id);
     map.addLayer({ id: 'cn-sea', type: 'background', layout: { visibility: 'none' }, paint: { 'background-pattern': 'cn-p-sea' } });
-    map.addLayer({ id: 'cn-land', type: 'fill', source: 'munis', layout: { visibility: 'none' }, paint: { 'fill-color': ['match', cc, 1, COL.goblins, 2, COL.rats, 3, COL.toads, 4, COL.gnomes, 5, COL.dwarves, 9, '#e6d9a8', '#7c8a4e'], 'fill-antialias': false } });
-    map.addLayer({ id: 'cn-dither', type: 'fill', source: 'munis', layout: { visibility: 'none' }, paint: { 'fill-pattern': 'cn-p-dither' } });
-    map.addLayer({ id: 'cn-hills', type: 'fill', source: 'munis', filter: ['in', ['id'], ['literal', rock]], layout: { visibility: 'none' }, paint: { 'fill-pattern': 'cn-p-hills' } });
+    if (G.terrain) {
+      map.addSource('cn-terrain', { type: 'image', url: 'data/goblin-terrain.png', coordinates: G.terrain.coordinates });
+      map.addLayer({ id: 'cn-terrain', type: 'raster', source: 'cn-terrain', layout: { visibility: 'none' }, paint: { 'raster-resampling': 'nearest', 'raster-fade-duration': 0 } });
+    }
+    map.addLayer({ id: 'cn-land', type: 'fill', source: 'munis', layout: { visibility: 'none' }, paint: { 'fill-antialias': false,
+      'fill-color': ['match', cc, 1, COL.goblins, 2, COL.rats, 3, COL.toads, 4, COL.gnomes, 5, '#ffffff', 9, '#fff3c4', G.terrain ? '#000000' : '#7c8a4e'],
+      'fill-opacity': G.terrain ? ['match', cc, 0, 0.42, 9, 0.16, 5, 0.26, 0.4] : 1 } });
     // the real water and the real highways, from the street map's own tiles (they need a connection; without one the map is still playable)
     if (map.getSource('omt')) {
       try {
@@ -124,7 +125,7 @@ export function initCouncil(ctx) {
         map.addLayer({ id: 'cn-road', type: 'line', source: 'omt', 'source-layer': 'transportation', minzoom: 7, filter: road, layout: { visibility: 'none', 'line-join': 'miter' }, paint: { 'line-color': '#f3e3ae', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1.2, 12, 3], 'line-dasharray': [3, 1] } });
       } catch (err) { console.warn('council: no water or roads', err); }
     }
-    map.addLayer({ id: 'cn-line', type: 'line', source: 'munis', layout: { visibility: 'none' }, paint: { 'line-color': '#1a1208', 'line-width': ['case', ['>', cc, 0], 1.6, 0.5] } });
+    map.addLayer({ id: 'cn-line', type: 'line', source: 'munis', layout: { visibility: 'none' }, paint: { 'line-color': '#120c04', 'line-width': ['case', ['>', cc, 0], 2, 0.4] } });
     map.addLayer({ id: 'cn-hi', type: 'line', source: 'munis', layout: { visibility: 'none' }, paint: { 'line-color': ['match', ['coalesce', ['feature-state', 'ch'], 0], 1, '#ffe11a', 2, '#ffffff', 'rgba(0,0,0,0)'], 'line-width': ['match', ['coalesce', ['feature-state', 'ch'], 0], 1, 5, 2, 3.5, 0] } });
   }
   const showLayers = (on) => { for (const id of LAYERS) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none'); };
@@ -180,7 +181,7 @@ export function initCouncil(ctx) {
     const url = await face(c, clan);
     $('.cn-port img').src = url; $('.cn-port span').textContent = c.name.toUpperCase();
     const p = $('.cn-say p'); clearInterval(typer); p.dataset.full = text; p.textContent = ''; let i = 0;
-    typer = setInterval(() => { i += 3; p.textContent = text.slice(0, i); if (i >= text.length) clearInterval(typer); }, 16);
+    typer = setInterval(() => { i += 6; p.textContent = text.slice(0, i); if (i >= text.length) clearInterval(typer); }, 16);
     btns = options.map((o) => o.go);
     $('.cn-cmd').innerHTML = options.map((o, k) => `<button data-i="${k}" class="${o.dim ? 'dim' : ''}${o.wide ? ' wide' : ''}">${esc(o.label)}</button>`).join('');
   }
@@ -296,10 +297,17 @@ export function initCouncil(ctx) {
     say(`${who}${why} What is your order, Master?`, [
       { label: 'MARCH', dim: !marches.length, go: () => chooseTarget(q, marches, 'march') },
       { label: 'MOVE', dim: !moves.length, go: () => chooseTarget(q, moves, 'move') },
-      { label: 'MUSTER', dim: !musters.length, go: async () => {
-        const ev = []; for (const o of musters) ev.push(...run([{ type: 'move', clan: ME, from: o.from, to: q.at, n: Math.min(o.n.max, w().towns[o.from].force - 1) }]));
-        const got = ev.filter((e) => e.type === 'units_moved').reduce((s, e) => s + e.n, 0);
-        done(q.id); paint(); await say(got ? `${got} more answer the call. ${tname(q.at)} now holds ${w().towns[q.at].force}.` : 'No one could be spared, Master.', [{ label: 'NEXT', wide: true, go: next }], q.c);
+      { label: 'GATHER', dim: !musters.length, go: () => {
+        const amount = (o, part) => Math.max(0, Math.min(o.n.max, Math.floor((w().towns[o.from].force - 1) * part)));
+        const total = (part) => musters.reduce((t, o) => t + amount(o, part), 0);
+        const gather = async (part) => {
+          const ev = []; for (const o of musters) { const n = amount(o, part); if (n > 0) ev.push(...run([{ type: 'move', clan: ME, from: o.from, to: q.at, n }])); }
+          const got = ev.filter((e) => e.type === 'units_moved').reduce((t, e) => t + e.n, 0);
+          done(q.id); paint(); await say(got ? `${got} men come in. ${tname(q.at)} now holds ${w().towns[q.at].force}.` : 'No one could be spared, Master.', [{ label: 'NEXT', wide: true, go: next }], q.c);
+        };
+        for (const o of musters) setFS(o.from, { ch: 2 });
+        say(`Call men in from the ${musters.length} marked township${musters.length === 1 ? '' : 's'} beside us? Half brings ${total(0.5)}. All brings ${total(1)} and leaves one man in each.`, [
+          { label: `HALF ${total(0.5)}`, dim: !total(0.5), go: () => gather(0.5) }, { label: `ALL ${total(1)}`, go: () => gather(1) }, { label: 'BACK', go: next }], q.c);
       } },
       { label: 'WALLS', dim: !dig, go: async () => {
         const ev = run([{ type: 'present', clan: ME }, dig]); const rej = ev.find((e) => e.type === 'order_rejected');
@@ -317,7 +325,8 @@ export function initCouncil(ctx) {
   function chooseTarget(q, options, kind) {
     phase = 'pick'; pick = { q, options, kind }; paint();
     const go = (o) => (kind === 'move' ? relocate(q, o) : march(q, o));
-    say(kind === 'move' ? 'Move to which of our townships, Master? The captain goes with the men. Tap it on the map, or choose.' : 'March on which township, Master? Tap it on the map, or choose.', [
+    const going = Math.max(1, w().towns[q.at].force - 1);
+    say(kind === 'move' ? `Move to which of our townships? The captain goes with ${going} men; one stays. Tap it, or choose.` : `March on which township? ${going} will march; one stays behind. Tap it on the map, or choose.`, [
       ...options.slice(0, 5).map((o) => ({ label: kind === 'move' ? `${num(o.to)} OURS ${w().towns[o.to].force}` : `${num(o.to)} ${cap(w().towns[o.to].owner || '').slice(0, 4).toUpperCase()} ${w().towns[o.to].force}`, go: () => go(o) })),
       { label: 'BACK', go: next },
     ], q.c);
@@ -375,7 +384,7 @@ export function initCouncil(ctx) {
       const hungry = ev.find((e) => e.type === 'hunger' && e.clan === ME);
       busy = false;
       if (w().war && w().war.over) return ending();
-      const news = [lost.length ? `We lost ${lost.map(tname).join(', ')}.` : '', gained.length ? `We gained ${gained.map(tname).join(', ')}.` : '', others ? `Elsewhere ${others} township${others === 1 ? '' : 's'} changed hands.` : '', coming.length ? `Enemies are marching on ${coming.map((r) => tname(r.target)).join(' and ')}.` : '', hungry ? 'Food runs short: an army this size cannot be fed for long.' : ''].filter(Boolean).join(' ');
+      const news = [lost.length ? `We lost ${lost.map(tname).join(', ')}.` : '', gained.length ? `We gained ${gained.map(tname).join(', ')}.` : '', others ? `Elsewhere ${others} township${others === 1 ? '' : 's'} changed hands.` : '', coming.length ? `Enemies are marching on ${coming.map((r) => tname(r.target)).join(' and ')}.` : '', hungry ? 'Food runs short, and unfed men drift home. Every 14 men eat 1 Food a turn, and men beyond 10 in one township eat double: spread them out.' : ''].filter(Boolean).join(' ');
       phase = 'orders'; paint();
       say(news || 'A quiet watch, Master. Nothing stirred.', [{ label: 'CONTINUE', wide: true, go: next }]);
     } catch (err) { busy = false; console.error(err); say(`Something broke: ${err.message}`, [{ label: 'CONTINUE', wide: true, go: next }]); }
@@ -411,6 +420,7 @@ export function initCouncil(ctx) {
     const now = Date.now(), seed = 'c1-' + now;
     const world = newWorld(G.board, { seed, home, clans: [{ id: ME, kind: 'goblin', lord: 'human' }, ...rivalsFor(seed)], startHour: 9, startMs: now - (now % 3600000), guidedStart: true, rules: { frontMinManeuvers: 0 } });
     delete world.clans[ME].ap;   // no action points here: one order per captain a turn
+    world.clans[ME].freeMarch = true;   // and a march costs no Food: the whole garrison but one goes
     const dist = G.board.distances(home);
     const order = Object.keys(world.towns).sort((a, b) => (dist.get(a) - dist.get(b)) || (a < b ? -1 : 1));
     save = { v: SAVE_V, world, num: Object.fromEntries(order.map((t, i) => [t, i + 1])), acted: [], overShown: false };
@@ -443,7 +453,7 @@ export function initCouncil(ctx) {
       save = store.get(SAVE, null);
       if (!save || save.v !== SAVE_V || !save.world) { save = null; return startChoose(); }
       // saves from the first Council build: fronts could not reach their decision and locked the armies in; set the rule and bring those men home
-      save.world.rules = { ...(save.world.rules || {}), frontMinManeuvers: 0 };
+      save.world.rules = { ...(save.world.rules || {}), frontMinManeuvers: 0 }; save.world.clans[ME].freeMarch = true;
       for (const o of legalOrders(G.board, w(), ME).filter((x) => x.type === 'front' && x.action === 'disengage')) run([o]);
       persist();
       await Promise.all(Object.values(w().chars).map((c) => face(c, c.clan)));

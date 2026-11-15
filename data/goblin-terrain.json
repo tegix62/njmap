@@ -1,0 +1,27 @@
+{
+ "v": 1,
+ "z": 10,
+ "size": [
+  1536,
+  2560
+ ],
+ "coordinates": [
+  [
+   -75.9375,
+   41.50857729743934
+  ],
+  [
+   -73.828125,
+   41.50857729743934
+  ],
+  [
+   -73.828125,
+   38.82259097617711
+  ],
+  [
+   -75.9375,
+   38.82259097617711
+  ]
+ ],
+ "source": "Mapzen/AWS terrain tiles (terrarium), zoom 10; shaded and ordered-dithered to 15 colours by tools/goblin/build_terrain.py"
+}

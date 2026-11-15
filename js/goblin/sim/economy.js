@@ -45,10 +45,10 @@ export const mouths = (w, clanId) => Object.values(w.towns).filter((t) => t.owne
 const perFood = (w, clanId) => unitsPerFoodFor(w.clans[clanId].kind, K8.unitsPerFood);
 export const upkeep = (w, clanId) => Math.ceil(mouths(w, clanId) / perFood(w, clanId));
 export const marchCost = (n) => Math.max(1, Math.ceil(n / K8.marchPerUnits));
-export const canMarch = (clan, n) => !active(clan) || clan.res.food >= marchCost(n);
-export const payMarch = (clan, n) => { if (active(clan)) clan.res.food -= marchCost(n); };
+export const canMarch = (clan, n) => !active(clan) || !!clan.freeMarch || clan.res.food >= marchCost(n);   // freeMarch: a clan whose marches cost no Food (Council)
+export const payMarch = (clan, n) => { if (active(clan) && !clan.freeMarch) clan.res.food -= marchCost(n); };
 /** The most units a clan can send with the Food it has. */
-export const maxMarch = (clan, force) => (active(clan) ? Math.min(force - 1, clan.res.food * K8.marchPerUnits) : force - 1);
+export const maxMarch = (clan, force) => (active(clan) && !clan.freeMarch ? Math.min(force - 1, clan.res.food * K8.marchPerUnits) : force - 1);
 
 /** Once per major tick, before recruits: income, upkeep, and what happens to a clan that cannot feed its units. */
 export function economyTick(w, board, emit) {

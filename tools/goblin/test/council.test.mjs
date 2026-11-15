@@ -45,3 +45,14 @@ test('a move can take the captain along when the township moved to has none; oth
   r = step(board, w, [{ type: 'move', clan: ME, from: to, to: from, n: 1 }], 0); w = r.state;
   assert.equal(w.towns[to].captain, c.id, 'a plain move leaves the captain');
 });
+
+test('a clan with freeMarch sends the whole garrison but one whatever its Food, and pays nothing for it', () => {
+  let w = fresh({ frontMinManeuvers: 0 });
+  w.clans[ME].res.food = 0;
+  assert.ok(!legalOrders(board, w, ME).some((o) => o.type === 'attack' || o.type === 'front_open'), 'with no Food and the ordinary rule nothing can march');
+  w.clans[ME].freeMarch = true;
+  const o = legalOrders(board, w, ME).find((x) => x.type === 'attack' || x.type === 'front_open');
+  assert.ok(o); assert.equal(o.n.max, w.towns[o.from].force - 1);
+  const r = step(board, w, [{ ...o, n: o.n.max }], 0);
+  assert.ok(!r.events.some((e) => e.type === 'order_rejected')); assert.equal(r.state.clans[ME].res.food, 0);
+});

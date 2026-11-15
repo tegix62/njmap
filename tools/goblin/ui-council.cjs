@@ -14,17 +14,18 @@ const { chromium } = require('playwright'); const fs = require('fs');
   await press('CONTINUE'); await page.waitForTimeout(1400); await shot('order');
   const said = () => page.locator('.cn-say p').getAttribute('data-full');
   let battles = 0, turns = 0, shotBattle = 0, marched = 0, moved = 0, plates = 0; const perTurn = [];
-  for (let step = 0; step < 400 && turns < 10; step++) {
+  for (let step = 0; step < 400 && turns < 5; step++) {
     if (await page.locator('.cn-battle').count()) { battles++; if (shotBattle < 3) { await page.waitForTimeout(1500); await shot('battle'); shotBattle++; } await page.locator('.cn-battle').click().catch(() => {}); await page.waitForTimeout(400); await page.locator('.cn-battle').click({ timeout: 800 }).catch(() => {}); await page.waitForTimeout(300); continue; }
     if (await page.locator('.cn-card').count()) { if (await page.locator('.cn-card.plate').count() && plates < 2) { plates++; await page.waitForTimeout(300); await shot('plate'); } else if (n < 9) await shot('card'); await page.locator('.cn-card').click({ timeout: 800 }).catch(() => {}); await page.waitForTimeout(200); continue; }
     const t = await said();
     if (await press('END TURN')) { turns++; perTurn.push(marched); marched = 0; await page.waitForTimeout(600); continue; }
     if (await press('NEXT') || await press('CONTINUE')) { await page.waitForTimeout(900); continue; }
     if (/Move to which/.test(t)) { moved++; await page.locator('.cn-cmd button').first().click(); await page.waitForTimeout(700); continue; }
-    if (/March on which/.test(t)) { marched++; if (n < 9) await shot('targets'); await page.locator('.cn-cmd button').first().click(); await page.waitForTimeout(700); continue; }
+    if (/March on which/.test(t)) { marched++; if (n < 9) { await page.waitForTimeout(700); await shot('targets'); } await page.locator('.cn-cmd button').first().click(); await page.waitForTimeout(700); continue; }
     if (await press('MARCH')) { await page.waitForTimeout(500); continue; }
     if (/move toward the front/.test(t) && await press('MOVE')) { await page.waitForTimeout(500); continue; }
-    if (await press('MUSTER')) { await page.waitForTimeout(600); continue; }
+    if (/Call men in/.test(t)) { if (n < 12) { await page.waitForTimeout(700); await shot('gather'); } await press('HALF') || await press('ALL'); await page.waitForTimeout(600); continue; }
+    if (await press('GATHER')) { await page.waitForTimeout(600); continue; }
     if (await press('REST')) { await page.waitForTimeout(600); continue; }
     await page.waitForTimeout(500);
   }
