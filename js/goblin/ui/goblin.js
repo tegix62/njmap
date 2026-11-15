@@ -27,7 +27,7 @@ import { nextChapterCfg, rivalsFor } from '../sim/chapters.js';
 import { scoutMods, isNight, hasAp } from '../sim/sitting.js';
 import { digestOf } from '../sim/digest.js';
 import { MUNI_LABEL_IDS } from '../../style.js';
-import { createFilm } from './film.js';
+import { createFilm, battlesOf } from './film.js';
 
 const ME = 'goblins';
 const CLANS = [{ id: 'goblins', kind: 'goblin', lord: 'human' }, { id: 'rats', kind: 'rat', lord: 'ai' }, { id: 'toads', kind: 'toad', lord: 'ai' }];
@@ -338,6 +338,21 @@ export function initGoblin(ctx) {
     const rej = events.find((e) => e.type === 'order_rejected');
     panel(`<div class="gob"><h3>${rej ? 'That did not work' : sk ? (sk.won ? 'Taken' : 'Thrown back') : 'Done'}</h3>
       ${rej ? `<p>${esc(rej.reason)}</p>` : en.map((e) => `<p>${esc(e.text)}</p>`).join('') || '<p>Done.</p>'}${diceRows}${rej ? '' : callout()}${closeBtn}</div>`);
+  }
+  /** A staged fight for the Replay button when there is nothing of yours to replay (or no actions left to start one). Real dice, nothing is changed. */
+  function demoFight() {
+    const world = w();
+    let best = null;
+    for (const id of Object.keys(world.towns)) {
+      const T = world.towns[id]; if (T.owner !== ME || T.force < 3) continue;
+      for (const n of G.board.neighbours(id)) { const D = world.towns[n]; if (D && D.owner && D.owner !== ME && D.owner !== 'dwarves' && (!best || T.force + (T.captain ? 5 : 0) > best.score)) best = { from: id, to: n, score: T.force + (T.captain ? 5 : 0) }; }
+    }
+    if (!best) return [];
+    const F = world.towns[best.from], D = world.towns[best.to], n = F.force;
+    const lead = F.captain && world.chars[F.captain] && world.chars[F.captain].status === 'active' ? F.captain : null;
+    const rng = makeRng(seedState(`demo${world.tick}${best.to}`));
+    const r = skirmish({ attackers: n, defenders: D.force, atkExtraDice: lead ? 1 : 0 }, rng);
+    return [{ tick: world.tick, type: 'skirmish_result', by: ME, against: D.owner, from: best.from, to: best.to, n, won: r.won, lost: r.lost, left: { a: r.attackersLeft, d: r.defendersLeft }, ...(lead ? { lead } : {}), rounds: r.rounds }];
   }
   const unseen = () => { const n = Math.max(0, (save.total || 0) - (save.seenTotal || 0)); return n ? save.events.slice(-n) : []; };
   /** The aftermath of your own captains (D107, D108): who was hurt, fled or taken since you last looked, with a portrait showing it. */
@@ -728,7 +743,6 @@ export function initGoblin(ctx) {
     }
     else if (a === 'go') { sel = b.dataset.from; paint(); orderPanel(b.dataset.from, b.dataset.to); }
     else if (a === 'ledger') ledgerPanel();
-    else if (a === 'film') { const ev = save.events.slice(-80); panel(''); showFilm(ev, () => {}); }
     else if (a === 'copy') { navigator.clipboard && navigator.clipboard.writeText(renderLedger(save.events, ctxFor())).then(() => ctx.toast('Copied'), () => ctx.toast('Could not copy')); }
     else if (a === 'cancelstart') { if (save) { mode = 'play'; panel(''); hud(); } else ctx.setMode(store.get('mode', 'practice') === 'goblin' ? 'practice' : store.get('mode', 'practice')); }
     else if (a === 'nextchapter') beginChapter(nextChapterCfg(G.board, w(), { guidedStart: true }));
@@ -749,6 +763,7 @@ export function initGoblin(ctx) {
     else if (a === 'do') { catchUp(); paint(); hud(); doPanel(); }
     else if (a === 'digest') { catchUp(); paint(); hud(); digestPanel(); }
     else if (a === 'ledger') ledgerPanel();
+    else if (a === 'film') { let ev = save.events.slice(-80); if (!battlesOf(ev, ME).length) ev = demoFight(); panel(''); showFilm(ev, () => {}); }
     else if (a === 'newwar') panel('<div class="gob"><p>Leave this war and start another? The current one is lost.</p><div class="gobrow"><button class="primary" data-g="newwar">Start another</button><button data-g="close">Keep this one</button></div></div>');
   }
 
