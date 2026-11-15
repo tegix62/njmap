@@ -1,0 +1,1 @@
+{ "type": "module", "private": true, "description": "Goblin-mode simulation. Plain ES modules: loaded by Node for tests and by the app later. No dependencies." }
