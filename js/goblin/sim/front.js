@@ -240,7 +240,7 @@ export function settleFronts(w, board, rng, emit) {
 export function legalOrders(board, w, clanId) {
   const out = [];
   const clan = w.clans[clanId];
-  if (!clan || clan.out) return out;
+  if (!clan || clan.out || (w.war && w.war.over)) return out;
   const mine = openFronts(w, clanId);
   for (const f of mine.sort((a, b) => byId(a.id, b.id))) {
     for (const action of frontActions(w, f)) out.push({ type: 'front', clan: clanId, front: f.id, action, ...(action === 'decision' ? { n: f.units } : {}) });

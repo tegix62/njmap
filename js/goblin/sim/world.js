@@ -12,6 +12,7 @@ import { K, K2, K4, K5, K6 } from './constants.js';
 import { makeRng, seedState } from './rng.js';
 import { skirmish, modsFor } from './skirmish.js';
 import * as Dir from './director.js';
+import { initWar, warTurn } from './war.js';
 import { applySitting, hasAp, spend as spendAp, refill as refillAp } from './sitting.js';
 import { openFront, actFront, settleFronts, pinnedTowns, openFronts } from './front.js';
 import { placeInitialCaptains, captainsOf, capture, place, promote, succeed } from './chars.js';
@@ -86,6 +87,7 @@ export function newWorld(board, cfg) {
               theatre, towns, clans, chars: {}, heirs: [], fronts: {}, raids: [], director: {}, nextId: 1, rules: { ...DEFAULT_RULES, ...(cfg.rules || {}) } };
   const rng = makeRng(seedState(cfg.seed ?? 1));
   if (board.content) placeInitialCaptains(w, rng, board.content);
+  initWar(w, board);
   w.rng = rng.state;
   return w;
 }
@@ -311,6 +313,7 @@ function majorTick(w, board, rng, emit) {
   for (const c of Object.values(w.clans)) {
     if (!c.out && !ownedBy(w, c.id).length) { c.out = true; emit('clan_out', { clan: c.id }); }
   }
+  warTurn(w, board, emit);
   w.lastMajor = w.tick;
 }
 
@@ -321,6 +324,10 @@ export function step(board, state, orders = [], ticks = 0, opts = {}) {
   const rng = opts.rng || makeRng(w.rng);   // opts.rng lets tests script the dice
   const events = [];
   const emit = (type, data = {}) => { const e = { tick: w.tick, type, ...data }; events.push(e); Dir.observe(w, [e]); };
+  if (w.war && w.war.over) {   // a finished war takes no orders and no time
+    for (const o of orders) emit('order_rejected', { clan: o.clan, order: o, reason: 'the war is over' });
+    return { state: w, events };
+  }
   for (const o of orders) (o.type === 'front_open' || o.type === 'front' ? applyFrontOrder : (o.type === 'scout' || o.type === 'fortify' || o.type === 'taunt') ? applySitting : applyOrder)(w, board, rng, emit, o);
   const n = Math.min(ticks, K.catchUpCapTicks);
   for (let i = 0; i < n; i++) {

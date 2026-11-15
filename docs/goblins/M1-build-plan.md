@@ -1,49 +1,60 @@
-# M1: goblin mode on the map (solo, placeholders)
+# Simulation 03: bot lords over 21 days (M0 step S7)
 
-Started 2026-11-15 after the S8 read of M0 (D210 adopted) and the user's answers on screens (D211 to D213). Scope of D199's M1: the skirmish layer on the real map in the starting theatre, solo, placeholder wording. No fronts, captains or characters yet (M2): the sim runs without content attached, so no township has a captain.
+Run 2026-11-15 with `node tools/goblin/run.mjs --seeds 10 --days 21 --bot careful|bold|passive`, home Paterson, spec rules as written (`frontMaxGain` 2), three clans (the bot's goblins against two AI clans). Ten seeds take under a second per bot. Everything is placeholder wording; the numbers are what matter here.
 
-## Built (first pass)
+**The bots** (see `tools/goblin/bots.mjs`): **Careful** keeps 3 at home, opens one front at a time against a captain it can roughly match, probes and presses, levers once it has learned something, fights the decision only when Ahead, and gives up from Behind after three maneuvers; it attacks without a captain only at 2 to 1. **Bold** keeps 1 at home, runs up to three fronts, presses and levers, decides after one or two maneuvers, and attacks at 1.2 to 1. **Passive** only opens the game (a `present` order) and never gives another.
 
-- **Home page** (`js/goblin/ui/home.js`, reusing the welcome card): Goblin mode or Normal mode, asked on each opening, remembered per session. Settings has a "Back to the home page" button and the goblin bar has Home.
-- **Goblin mode** (`js/goblin/ui/goblin.js`, a normal app mode beside Drive, Map, Play, Progress): paints the war onto the app's own `munis` source with feature-state (clan wash, selected outline, attack and move targets, incoming raids) and a force-and-name label per township; the map's own township names step aside during a war.
-- **Starting a war:** tap a home township, confirm; the theatre is the usual 3 steps (12 to 60 townships), the rats and toads take the rest. The world clock aligns to Eastern time at the hour the war begins.
-- **Playing:** tap one of your townships, then a neighbour: attack (red) or move (blue). The order card states the place from map data (distance, direction, river or ridge, highway) and the rule in words, no odds. The result shows the dice for every round.
-- **Real time:** the world advances one tick per real hour, including while the app is closed (caught up on opening, capped at 72 hours by the sim) and while it is open (checked every 30 seconds). Saved in local storage (`njtf.goblin.save`: world, last real time, last 600 events, last seen tick).
-- **The digest** (`js/goblin/sim/digest.js`, D213): a headline, raids still coming, at most five lines ranked by what matters to you, and a count of what the Ledger holds. The full Ledger is a tap away and can be copied.
-- Service worker precaches the new files (`njtf-v235`).
+## Results (means over 10 seeds; start 20 townships each)
 
-## Checked
+| | Careful | Bold | Passive |
+|---|---|---|---|
+| Townships after 21 days | 47.8 | 57.7 | 14.0 |
+| Distinct event shapes per day | 6.1 | 6.6 | 1.3 |
+| Fronts opened | 18 | 34 | 0 |
+| Fronts closed by Yield / Won / Lost (all 10 seeds) | 125 / 36 / 15 | 194 / 57 / 89 | |
+| Units lost per township taken | 6.3 | 7.8 | |
+| Extra raids from two Calm days | 1.8 | 0.8 | 5.4 |
 
-- Unit tests for the digest (`tools/goblin/test/digest.test.mjs`); the sim's 89 tests all pass.
-- A scripted headless-browser run (`tools/goblin/ui-smoke.cjs`): home page, start a war at Paterson, attack, result with dice, digest, back to Normal mode with the tab bar restored; no page errors.
-- Not yet checked on a phone, in the installed (home-screen) app, or across an overnight gap.
+## What it answers (the table in the M0 plan)
 
-## Known gaps and questions
+- **H2, does a three-week war keep producing new situations?** Yes by this measure: 6 to 7 different kinds of event on an average day for an active lord. A passive lord sees about 1: raids against them and the mood word.
+- **H48, are losses too high or too low?** About 6 to 8 of the player's units per township taken, and the AI armies lose far more (they fight with stacks of 50 or more). Not alarming. Whether it *feels* too high is the user's call in S8.
+- **H44, do fronts end?** Always. Beats per front ran 1 to 4 for the bots; none stalled (one front was open at the end of a run, as expected).
+- **H41 / D156, careful or bold?** Both win, bold more and with far more lost fronts (89 against 15). That is the shape wanted, but both conquer most of the theatre in three weeks, which is too fast (below).
+- **H20, is the Director doing anything?** Yes. It held back hostile actions 8 to 9 times per run against an active lord and added 1 to 2 extra raids; a passive lord drew 5.4 extra raids. The empty-day rule did not matter in these runs either.
+- **H1, do the stories read well?** The user's judgment, S8.
 
-- Wording is placeholder throughout and the order card text is mine.
-- No fog of war (everything is visible), no quiz charge, no resources: all later stages.
-- Recruits are placed automatically (D203), so there is no place-your-recruits step.
-- The HUD heading is large in this theme; the force labels crowd at the state-wide zoom.
-- Next in M1: a play session on a phone, then whatever it shows.
+## Findings that need the user's decision (none applied)
 
-## Round 2, 2026-11-15 (after the user's first phone play)
+1. **A front is usually over in one or two beats.** Of 125 + 36 + 15 Careful fronts, 71 percent ended by the defender yielding (Commanding), usually probe, then lever. A lever has +2 for the known fact, so a roll of 6 or more moves up two, and from Even two steps is Commanding. The decision beat, the tension the design wanted, appears in under a third of fronts. Variant tested: `frontMaxGain` 1 (no maneuver moves more than one step): yields vanish, the decision happens in every front, Careful loses 21 percent of its fronts (Careful 41 lost, 135 won) and pays 8.1 units per township instead of 6.3, and the end result barely changes (44.9 townships). This is probably the right direction but it changes D148 and is the user's call.
+2. **The AI hoards.** Each AI clan masses all its recruits in one township (D208), so stacks of 50 to 80 sit beside garrisons of 1 to 3. The bots exploit the thin garrisons, and whenever a stack moves against the player it crushes a 10-unit township (H52, force without upkeep, is the cause). Needs the economy (Food upkeep) or a spreading rule in recruits.
+3. **The player conquers 80 to 100 percent of the theatre in 21 days.** Follows from the first two. The conquest tempo (D209) only throttles the AI.
+4. **Passive loses ground slowly** (20 to 14), mostly to a few huge raids; that is the "losing" Ledger.
+5. The first sitting often has nothing to do: forces start at 3 to 10, and the bots need 7 or more to open a front.
 
-The user's words: attrition on the map felt like Strategery, but "I can't even tell if a turn ends or something, or what to even do after I've tried to take these little counties. I don't see any characters, none of that."
+## The three Ledgers for S8
 
-Three gaps, three changes (`js/goblin/ui/goblin.js`):
+`docs/goblins/ledgers/ledger-careful-1.md`, `ledger-bold-1.md`, `ledger-passive-1.md` (seed 1, with their metrics files beside them). Wording is all placeholder.
 
-1. **No sense of time.** The HUD now says when the world next acts and how long that is ("Next: 09:00 (in 9h 5m): recruits arrive and the other clans move"). There is still no end-turn button, by design (D82, the world clock); the **Do** panel says so in plain words.
-2. **No sense of what next.** A new **Do** button lists open fronts and the best targets by name, with the force on both sides and a word for how it looks (a good chance, an even fight, risky). Tapping one opens the order card.
-3. **No characters.** The sim's captains are now on the board: a ★ before the township name, a captain line on the township card (what you know about them; nothing until you learn it), and your own captain leading attacks from their township. Attacking a township with a captain opens a **front** (spec section 6): a panel with Probe, Pressure, Use a weakness, Certain move, Decide and Pull back, the standing in words (Behind, Even, Ahead, Commanding), and a tally when it ends. This pulls the front, captain and tally work (M2's core) forward into M1 because the first play showed the skirmish layer alone is not a game.
+## After the read (2026-11-15)
 
-Also: the digest now counts events since you last looked, so your own moves at the same hour are not skipped; front beats carry the captain and township so their Ledger lines name them. Saves are version 2, so an existing war is replaced by a new one on first opening. Smoke test (`tools/goblin/ui-smoke.cjs`) now plays a skirmish and a whole front.
+The user skimmed the Ledgers, said they were too long to absorb in full, and that they would play from the skim. Finding 1's variant was adopted as D210: with `frontMaxGain` 1 the tables above for the bots become Careful 44.9 townships, 135 won / 41 lost, 8.1 units per township; Bold 56.1 townships, 254 won / 151 lost, 9.9 units per township. The three Ledgers in `ledgers/` were regenerated under the new default. A shorter Ledger (a daily digest) is a to-do for M1.
 
-Still missing and noticed: no goal or ending to a war (what wins?), no fog of war, no quiz link, no resources. The first of these is a design question for the user.
+## Experiment: spread the AI's recruits (not adopted)
 
-## Round 3, 2026-11-15: the sitting model (D214)
+`node tools/goblin/experiments/hoard.mjs`, 10 seeds, 21 days, rule `aiRecruitSpread` (0 = mass at the best attack position, D208; 1 = reinforce the weakest border township like a human).
 
-The user's words: "I'm a bit surprised that all I can do is attack, and then I just have to close the app. What happened to the whole thing where we were gonna allow the player to continue playing and do all these things, and then the significant moves would come in those periodic daily check-in things?" Cause: D202, my own proposal, had parked the Advance button and personal encounters (D80, D83, D92); the user's reply to it was never an explicit yes. D214 replaces it.
+| | end townships (Careful / Bold / Passive) | biggest AI stack (Careful / Passive) | AI-vs-AI fights per run | raids per run |
+|---|---|---|---|---|
+| mass (default) | 44.9 / 56.1 / 14.0 | 121 / 193 | 4 to 7 | 6 to 8 |
+| spread | 24.4 / 40.9 / 16.3 | 40 / 41 | 0.5 to 1.1 | 7 to 16 |
 
-Built in the sim (`js/goblin/sim/sitting.js`, 95 tests): actions with refill at major ticks, Scout, Fortify, Taunt, and a taunted front starts a step higher. `legalOrders` lists the affordable ones and never a rejected one. Bots: Careful scouts a captain before opening a front; Bold does not. With actions the bots still take 43 and 56 townships in 21 days (as before): they only make one or two attacks a day, so the action cap does not slow conquest by itself. Screens: next.
+Spreading cures the hoarding and stops the runaway conquest (the AI now fights back: 9.5 and 15.6 raids against the careful and bold lords), but it nearly stops AI-vs-AI war (about one fight per run), because forces stay level and nothing reaches 2 to 1. With it on, four existing tests fail for the same reason (captains are rarely captured in a 365-day run; a passive player has a visible chance on only 45 of 400 player-days; the AI no longer masses). Left **off by default**; the choice between a hoarding AI that wars on itself and a level AI that presses the player belongs with the economy work (Food upkeep, H52).
 
-Screens for D214 built: the HUD shows actions and the refill; an enemy captain's township card offers Scout (three methods with a hint in words for each) and Taunt (once something is known); your own townships offer Dig in now; the Do panel lists scouting; result cards show the dice. Smoke test covers a scout. Service worker v237.
+## With the goal for a war (D215, 2026-11-15)
+
+Holding more than half the theatre for three days now ends a war. Ten seeds each: Careful won on days 10 to 15 (every seed), Bold on days 8 to 11 (every seed), Passive never won and no rival did within 21 days. Both active bots win every time, in under two weeks, so the rivals do not push back enough. That is the AI's side of the same problem as the hoarding finding, to be answered by the economy (upkeep) and a smarter AI, not by changing the goal.
+
+## Round 4, 2026-11-15: the goal for a war (D215, proposed)
+
+`js/goblin/sim/war.js`: the hold clock, win and loss, five milestones, a frozen finished war (101 tests). On screen: a War line in the HUD ("hold 30 of 58 townships for 3 days to win · you 21 · Toads 19", with the days left once you hold enough), a result card when a war ends, and new wars start from it. Saves are version 3 (new wars only). Service worker v238.

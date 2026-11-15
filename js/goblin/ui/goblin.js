@@ -6,7 +6,8 @@ import { newWorld, step } from '../sim/world.js';
 import { entriesOf, renderLedger, placePhrase } from '../sim/ledger.js';
 import { frontActions, openFronts } from '../sim/front.js';
 import { captainsOf } from '../sim/chars.js';
-import { K6 } from '../sim/constants.js';
+import { K6, K7 } from '../sim/constants.js';
+import { progress } from '../sim/war.js';
 import { scoutMods, isNight, hasAp } from '../sim/sitting.js';
 import { digestOf } from '../sim/digest.js';
 import { MUNI_LABEL_IDS } from '../../style.js';
@@ -15,7 +16,7 @@ const ME = 'goblins';
 const CLANS = [{ id: 'goblins', kind: 'goblin', lord: 'human' }, { id: 'rats', kind: 'rat', lord: 'ai' }, { id: 'toads', kind: 'toad', lord: 'ai' }];
 const NO = { goblins: 1, rats: 2, toads: 3 };
 const COLOUR = { 1: '#3f9b5a', 2: '#b9712f', 3: '#3a86a8' };
-const HOUR = 3600000, KEEP_EVENTS = 600, SAVE = 'goblin.save', SAVE_V = 2;
+const HOUR = 3600000, KEEP_EVENTS = 600, SAVE = 'goblin.save', SAVE_V = 3;
 const MAJORS = [9, 12, 18];
 const STAND = ['Behind', 'Even', 'Ahead', 'Commanding'];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -126,6 +127,14 @@ export function initGoblin(ctx) {
     }
     return null;
   }
+  function warLine() {
+    const world = w();
+    if (world.war && world.war.over) return world.war.over.winner === ME ? 'The war is won.' : 'The war is lost.';
+    const p = progress(world, ME);
+    const rival = Object.values(world.clans).filter((c) => c.id !== ME && !c.out).map((c) => ({ id: c.id, p: progress(world, c.id) })).sort((a, b) => b.p.held - a.p.held)[0];
+    const hold = p.hoursLeft != null ? ` · holding it: ${Math.ceil(p.hoursLeft / 24 * 10) / 10 < 1 ? `${p.hoursLeft}h` : `${Math.ceil(p.hoursLeft / 24)}d`} to go` : '';
+    return `War: hold ${p.need} of ${p.total} townships for ${K7.warHoldTicks / 24} days to win · you ${p.held}${rival ? ` · ${cap(rival.id)} ${rival.p.held}` : ''}${hold}`;
+  }
   function hud() {
     const world = w();
     const mine = Object.values(world.towns).filter((t) => t.owner === ME);
@@ -134,6 +143,7 @@ export function initGoblin(ctx) {
     const nx = nextMajor();
     ctx.hud(`<div class="town">${mine.length} townships · ${units} units${fr ? ` · ${fr} front${fr === 1 ? '' : 's'}` : ''}</div>
       <div class="meta">Goblins · ${clock()} · actions ${world.clans[ME].ap} of ${K6.apCap}</div>
+      <div class="meta">${warLine()}</div>
       <div class="meta">${nx ? `Next: ${nx.hour} (in ${nx.left}): +${K6.apPerMajor} actions, recruits, the other clans move` : ''}</div>`);
   }
   const panel = (html) => ctx.sheet(html);
@@ -207,6 +217,17 @@ export function initGoblin(ctx) {
     panel(`<div class="gob"><h3>Ledger</h3>${en.length ? en.map((e) => `<p><span class="fine">Day ${e.day} ${e.hour}</span> ${esc(e.text)}</p>`).join('') : '<p class="fine">Nothing has happened yet.</p>'}
       <div class="gobrow"><button data-g="copy">Copy</button><button class="primary" data-g="close">Close</button></div></div>`);
   }
+  function warOverPanel() {
+    const o = w().war.over, won = o.winner === ME;
+    const days = Math.max(1, Math.round(o.tick / 24));
+    const mine = Object.values(w().towns).filter((t) => t.owner === ME).length;
+    save.overShown = true; persist();
+    panel(`<div class="gob"><h3>${won ? 'The war is won' : 'The war is lost'}</h3>
+      <p>${won ? 'Your goblins held more than half the map for three days.' : o.how === 'wiped out' ? 'Your goblins have no townships left.' : `The ${cap(o.winner)} held more than half the map for three days.`}</p>
+      <p class="fine">It lasted ${days} day${days === 1 ? '' : 's'}. You finished with ${mine} townships.</p>
+      <div class="gobrow"><button data-g="ledger">Ledger</button><button class="primary" data-g="newwar">New war</button></div></div>`);
+  }
+  function checkOver() { if (w().war && w().war.over && !save.overShown) { warOverPanel(); return true; } return false; }
   function startPanel() {
     mode = 'choose-home'; pendingHome = null; sel = null;
     ctx.hud('<div class="town">Goblin mode</div><div class="meta">Tap the township where your clan begins.</div>');
@@ -221,7 +242,7 @@ export function initGoblin(ctx) {
   function beginWar(home) {
     const now = Date.now(), lastReal = now - (now % HOUR);
     const world = newWorld(G.board, { seed: 'm1-' + lastReal, home, clans: CLANS, startHour: easternHour(lastReal) });
-    save = { v: SAVE_V, world, lastReal, events: [], total: 0, seenTotal: 0 };
+    save = { v: SAVE_V, world, lastReal, events: [], total: 0, seenTotal: 0, overShown: false };
     persist(); mode = 'play'; sel = null;
     paint(); hud(); fitTheatre();
     doPanel();
@@ -281,6 +302,7 @@ export function initGoblin(ctx) {
     const closed = events.find((e) => e.type === 'front_closed');
     const rej = events.find((e) => e.type === 'order_rejected');
     sel = null; paint(); hud();
+    if (checkOver()) return;
     if (rej) return panel(`<div class="gob"><h3>That did not work</h3><p>${esc(rej.reason)}</p>${closeBtn}</div>`);
     if (closed) {
       const en = entriesOf(events, ctxFor()).map((e) => `<p>${esc(e.text)}</p>`).join('');
@@ -336,6 +358,7 @@ export function initGoblin(ctx) {
     const id = m.key;
     if (mode === 'choose-home') { if (!G.board.has(id)) return ctx.toast('Not on the war map'); return confirmStart(id); }
     if (!save || !w().towns[id]) return ctx.toast('Outside the war');
+    if (w().war && w().war.over) return warOverPanel();
     const T = w().towns[id];
     if (sel && sel !== id && G.board.neighbours(sel).includes(id)) { if (T.owner === ME || T.owner) return orderPanel(sel, id); return ctx.toast('Nobody holds that'); }
     if (T.owner === ME && T.force >= 2) { sel = id; paint(); }
@@ -354,6 +377,7 @@ export function initGoblin(ctx) {
       const type = T.owner === ME ? 'move' : T.captain ? 'front_open' : 'attack';
       const ev = run([{ type: 'present', clan: ME }, { type, clan: ME, from, to, n }], 0);
       sel = null; paint(); hud();
+      if (checkOver()) return;
       if (type === 'front_open') { const o = ev.find((e) => e.type === 'front_opened'); return o ? frontPanel(o.front, ev.filter((e) => e.type === 'front_opened')) : afterFrontOrder(ev, null); }
       resultPanel(ev);
     }
@@ -362,7 +386,7 @@ export function initGoblin(ctx) {
     else if (a === 'scoutdo' || a === 'taunt' || a === 'fortify') {
       const o = a === 'scoutdo' ? { type: 'scout', clan: ME, town: b.dataset.town, method: b.dataset.m } : { type: a, clan: ME, town: b.dataset.town };
       const ev = run([{ type: 'present', clan: ME }, o], 0);
-      paint(); hud(); sittingResult(ev);
+      paint(); hud(); if (checkOver()) return; sittingResult(ev);
     }
     else if (a === 'fact') { const ev = run([{ type: 'present', clan: ME }, { type: 'front', clan: ME, front: b.dataset.front, action: b.dataset.a, ...(b.dataset.a === 'decision' ? { n: (w().fronts[b.dataset.front] || {}).units } : {}) }], 0); afterFrontOrder(ev, b.dataset.front); }
     else if (a === 'go') { sel = b.dataset.from; paint(); orderPanel(b.dataset.from, b.dataset.to); }
@@ -396,10 +420,11 @@ export function initGoblin(ctx) {
       mode = 'play'; sel = null;
       const ev = catchUp();
       paint(); hud(); fitTheatre();
+      if (checkOver()) return;
       const d = digestOf(unseen(), ctxFor());
       if (d.lines.length || d.incoming.length) digestPanel(); else panel('');
       clearInterval(timer);
-      timer = setInterval(() => { if (ctx.mode !== 'goblin' || !save) return; const ev2 = catchUp(); if (ev2.length) { paint(); hud(); } }, 30000);
+      timer = setInterval(() => { if (ctx.mode !== 'goblin' || !save) return; const ev2 = catchUp(); if (ev2.length) { paint(); hud(); checkOver(); } }, 30000);
     },
     leave() {
       clearInterval(timer); document.body.classList.remove('goblin-on');

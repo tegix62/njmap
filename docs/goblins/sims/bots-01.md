@@ -50,3 +50,7 @@ The user skimmed the Ledgers, said they were too long to absorb in full, and tha
 | spread | 24.4 / 40.9 / 16.3 | 40 / 41 | 0.5 to 1.1 | 7 to 16 |
 
 Spreading cures the hoarding and stops the runaway conquest (the AI now fights back: 9.5 and 15.6 raids against the careful and bold lords), but it nearly stops AI-vs-AI war (about one fight per run), because forces stay level and nothing reaches 2 to 1. With it on, four existing tests fail for the same reason (captains are rarely captured in a 365-day run; a passive player has a visible chance on only 45 of 400 player-days; the AI no longer masses). Left **off by default**; the choice between a hoarding AI that wars on itself and a level AI that presses the player belongs with the economy work (Food upkeep, H52).
+
+## With the goal for a war (D215, 2026-11-15)
+
+Holding more than half the theatre for three days now ends a war. Ten seeds each: Careful won on days 10 to 15 (every seed), Bold on days 8 to 11 (every seed), Passive never won and no rival did within 21 days. Both active bots win every time, in under two weeks, so the rivals do not push back enough. That is the AI's side of the same problem as the hoarding finding, to be answered by the economy (upkeep) and a smarter AI, not by changing the goal.

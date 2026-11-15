@@ -2,7 +2,7 @@
 // cached, so "which town am I in" keeps working with no signal. Online, the
 // app's own files come from the network first (the latest version every time). Background map
 // tiles are only cached opportunistically.
-const VERSION = 'njtf-v237';
+const VERSION = 'njtf-v238';
 const SHELL = [
   './',
   'index.html',
@@ -69,6 +69,7 @@ const SHELL = [
   'js/goblin/sim/rng.js',
   'js/goblin/sim/skirmish.js',
   'js/goblin/sim/sitting.js',
+  'js/goblin/sim/war.js',
   'js/goblin/sim/world.js',
   'data/goblin-board.json',
   'data/goblin-content.json',

@@ -10,7 +10,7 @@ Territory and skirmish on real township borders with river, ridge and highway ru
 
 | # | Design feature (source) | Status | What is missing | Needs from the user |
 |---|---|---|---|---|
-| 1 | **A goal for a war** (not in the log; noticed in play, 2026-11-15) | Missing | Nothing says what winning is or when a war ends. Without it conquest has no point | **A decision** (options below) |
+| 1 | **A goal for a war** (D215, proposed) | Built, to confirm | Hold more than half for three days wins; a rival doing it loses; five milestones; the screen shows the count and the days left. Bots win in 8 to 15 days, so the AI does not push back enough yet | Confirm or choose another option (below) |
 | 2 | **Fog of war from quiz knowledge** (D15, D81, D176 to D182, D186) | Missing | `fogLevel` from your Progress data, the four levels on the map, "known" is box 1 or better, play also raises knowledge (D90). This is the part that teaches NJ geography, the reason for the game | Confirm the four level names and look |
 | 3 | **Quiz charge** (D53, D54, D179) | Missing | An optional answer that adds +1 to a maneuver roll, one per beat, never required | Confirm after fog exists |
 | 4 | **Economy: Food, Build, Coin; upkeep** (D110 to D117, spec 13) | Missing | Resources per clan, what units and building cost, upkeep (also the cure for the hoarding found in S7, H52), what Build builds | Which things Build makes (a short list) |

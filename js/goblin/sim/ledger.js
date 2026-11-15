@@ -121,6 +121,9 @@ export function entriesOf(events, { board, state, content, clan }) {
       }
       case 'fortified': say(e.tick, cap(fill(T.fortified, { clan: clanName(e.clan), town: town(e.town) }))); break;
       case 'taunted': say(e.tick, cap(fill(T[e.ok ? 'taunt_ok' : 'taunt_fail'], { clan: clanName(e.clan), town: town(e.town), captain: char(e.char) }))); break;
+      case 'milestone': say(e.tick, cap(fill(T['milestone_' + e.key], { clan: clanName(e.clan), town: e.town ? town(e.town) : '', county: e.county || '', of: e.of || '' }))); break;
+      case 'war_hold': say(e.tick, cap(fill(T[e.started ? 'war_hold_start' : 'war_hold_end'], { clan: clanName(e.clan) }))); break;
+      case 'war_over': say(e.tick, cap(fill(T[e.how === 'wiped out' ? 'war_wiped' : e.human ? 'war_won' : 'war_lost'], { clan: clanName(e.winner || 'nobody') }))); break;
       case 'promoted': say(e.tick, cap(fill(T.promoted, { clan: clanName(e.clan), char: char(e.char), town: town(e.town) }))); break;
       case 'succeeded': say(e.tick, cap(fill(T.succeeded, { char: char(e.char), town: town(e.town) }))); break;
       case 'captured': break;   // reported by the closing line or the skirmish line

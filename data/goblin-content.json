@@ -650,6 +650,56 @@
    "id": "taunt_fail",
    "text": "{clan} needled {captain} at {town}. It backfired: {captain} dug in out of spite.",
    "placeholder": true
+  },
+  {
+   "id": "milestone_first_township",
+   "text": "First ground taken: {town}. {clan} has begun.",
+   "placeholder": true
+  },
+  {
+   "id": "milestone_first_captain",
+   "text": "{clan} holds a captain prisoner for the first time.",
+   "placeholder": true
+  },
+  {
+   "id": "milestone_third",
+   "text": "{clan} now holds a third of the map.",
+   "placeholder": true
+  },
+  {
+   "id": "milestone_county",
+   "text": "{clan} holds all of {county} County.",
+   "placeholder": true
+  },
+  {
+   "id": "milestone_rival_home",
+   "text": "{clan} took the home of the {of}: {town}.",
+   "placeholder": true
+  },
+  {
+   "id": "war_hold_start",
+   "text": "{clan} now holds more than half the map. If it keeps it for three days, the war is over.",
+   "placeholder": true
+  },
+  {
+   "id": "war_hold_end",
+   "text": "{clan} has slipped back under half the map.",
+   "placeholder": true
+  },
+  {
+   "id": "war_won",
+   "text": "The war is won. {clan} held more than half the map for three days.",
+   "placeholder": true
+  },
+  {
+   "id": "war_lost",
+   "text": "The war is lost. {clan} held more than half the map for three days.",
+   "placeholder": true
+  },
+  {
+   "id": "war_wiped",
+   "text": "The war is lost. {clan} has no townships left.",
+   "placeholder": true
   }
  ]
 }

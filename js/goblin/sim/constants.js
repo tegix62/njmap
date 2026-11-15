@@ -85,3 +85,11 @@ export const K6 = Object.freeze({
   scoutBigTownPop: 20000, scoutBigTownBonus: 2,         // Ask a trader: busier towns have more traders
   tauntTarget: 8, tauntKnownBonus: 2, tauntWindowTicks: 24,   // Taunt: 8+ (with +2 if you use something you have learned) and the next front there starts a step higher
 });
+
+// Added with the goal for a war (D215, proposed): what winning is.
+export const K7 = Object.freeze({
+  warShare: 0.5,            // hold MORE than this share of the theatre...
+  warHoldTicks: 72,         // ...for this many ticks (three days) and the war is won
+  countyMin: 3,             // a "county" milestone needs a county with at least this many townships in the theatre
+  thirdShare: 1 / 3,
+});

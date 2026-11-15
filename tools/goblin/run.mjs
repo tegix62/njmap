@@ -24,7 +24,10 @@ export function runWar({ seed, days = 21, bot = 'careful', home = 'Paterson City
   const startTowns = Object.values(w.towns).filter((t) => t.owner === 'goblins').length;
   const events = [], perDay = [];
   const rejected = [];
+  let ranDays = 0;
   for (let day = 0; day < days; day++) {
+    if (w.war && w.war.over) break;   // the war has ended
+    ranDays++;
     const dayEvents = [];
     const apply = (orders, ticks) => { const r = step(board, w, orders, ticks); w = r.state; dayEvents.push(...r.events); return r.events; };
     apply([{ type: 'present', clan: 'goblins' }], 0);
@@ -40,7 +43,7 @@ export function runWar({ seed, days = 21, bot = 'careful', home = 'Paterson City
     if (bad.length) throw new Error(`seed ${seed} day ${day}: ${bad.join('; ')}`);
     events.push(...dayEvents); perDay.push(dayEvents);
   }
-  return { state: w, events, perDay, startTowns, rejected, bot: lord.name };
+  return { state: w, events, perDay, startTowns, rejected, bot: lord.name, ranDays };
 }
 
 const shapeKey = (e) => {
@@ -57,6 +60,7 @@ const QUIET = new Set(['recruits', 'dug_in', 'director_word', 'order_rejected'])
 
 export function metricsOf(run, days) {
   const { events, perDay, state } = run;
+  days = run.ranDays || days;   // a war that ended early is measured over the days it ran
   const count = {}; for (const e of events) count[e.type] = (count[e.type] || 0) + 1;
   const shapesPerDay = perDay.map((d) => new Set(d.filter((e) => !QUIET.has(e.type)).map(shapeKey)).size);
   const taken = {}, lost = {};
@@ -70,7 +74,8 @@ export function metricsOf(run, days) {
   const words = {}; for (const e of events) if (e.type === 'director_word' && e.clan === 'goblins') words[e.word] = (words[e.word] || 0) + 1;
   const owners = {}; for (const t of Object.values(state.towns)) owners[t.owner] = (owners[t.owner] || 0) + 1;
   const d = state.director.goblins || {};
-  return { days, bot: run.bot, startTowns: run.startTowns, endTowns: owners.goblins || 0, finalTownsByClan: owners,
+  const over = state.war && state.war.over;
+  return { days, war: over ? { winner: over.winner, how: over.how, day: Math.floor((state.startHour + over.tick) / 24) + 1 } : null, bot: run.bot, startTowns: run.startTowns, endTowns: owners.goblins || 0, finalTownsByClan: owners,
     eventCounts: count, distinctShapesPerDay: { mean: +(shapesPerDay.reduce((a, b) => a + b, 0) / days).toFixed(2), min: Math.min(...shapesPerDay), perDay: shapesPerDay },
     unitsLost: lost, townshipsTaken: taken, unitsLostPerTownshipTaken: lossPerTown,
     fronts: { opened: count.front_opened || 0, closedByVerdict: verdicts, beatsDistribution: beats, stillOpenAtEnd: Object.keys(state.fronts).length },

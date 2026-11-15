@@ -26,7 +26,7 @@ test('bots play 21 days on 3 seeds each: deterministic, no rejected orders, no s
       assert.doesNotMatch(text, /\{\w+\}/, 'unfilled token');
       assert.ok(text.split('\n').length > 5);
       const m = metricsOf(a, 21);
-      assert.equal(m.days, 21); assert.ok(m.distinctShapesPerDay.mean > 0);
+      assert.equal(m.days, a.ranDays); assert.ok(m.distinctShapesPerDay.mean > 0);
     }
   }
 });
