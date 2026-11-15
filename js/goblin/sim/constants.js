@@ -26,6 +26,11 @@ export const K = Object.freeze({
 // Added in S3 (docs/goblins/04-systems-spec.md section 8; a new working rule beyond D205, flagged in the build log):
 export const K2 = Object.freeze({
   aiCommitFraction: 0.75,     // an AI commits this share of its spare units (all but one) so it never empties a border
+  // Tried in S3 and NOT adopted (docs/goblins/sims/snowball-01.md): a force cap froze the world or left the snowball untouched. They stay available as
+  // per-world rules (world.rules) so tuning can vary them; the defaults below switch them off.
+  townForceCap: 99999,        // no township holds more than this; recruits that do not fit spill to the clan's next township, else are lost
+  recruitFullTowns: 999,      // up to this many townships a clan recruits 1 per 3 (D203)...
+  recruitDivisorBeyond: 6,    // ...and 1 per this many for each township beyond it
   startHour: 8,               // the war begins at 08:00 so the first tick is the 09:00 major tick
   smallThird: 3, midThird: 5, bigThird: 8, homeBonus: 2,   // starting forces by population rank within the theatre, home +2
   absentAfterTicks: 72,       // D189: a human not seen for three days is "absent"

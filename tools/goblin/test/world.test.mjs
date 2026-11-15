@@ -167,6 +167,24 @@ test('catch-up cap: only 72 ticks are simulated, the rest settle', () => {
   assert.equal(recruitsPerClan, 9, 'nine major ticks in the first 72 hours');
 });
 
+test('world rules: a force cap stops townships growing and loses what does not fit; a taper cuts recruits beyond a size', () => {
+  const capped = step(tiny, { ...mk({ A: ['x', 30], B: ['x', 30] }, [clanOf('x', 'ai')]), rules: { townForceCap: 30, recruitFullTowns: 999, recruitDivisorBeyond: 6, aiAttackRatio: 2, aiCommitFraction: 0.75 } }, [], 1);
+  assert.equal(capped.state.towns.A.force, 30); assert.equal(capped.state.towns.B.force, 30);
+  assert.equal(types(capped.events, 'recruits')[0].lost, 1);
+  const rules = (o) => ({ townForceCap: 99999, recruitFullTowns: 999, recruitDivisorBeyond: 6, aiAttackRatio: 2, aiCommitFraction: 0.75, ...o });
+  const four = { A: ['x', 4], B: ['x', 4], C: ['x', 4], D: ['x', 4] };
+  const full = step(tiny, { ...mk(four, [clanOf('x', 'ai')]), rules: rules({}) }, [], 1);
+  const taper = step(tiny, { ...mk(four, [clanOf('x', 'ai')]), rules: rules({ recruitFullTowns: 1, recruitDivisorBeyond: 12 }) }, [], 1);
+  assert.equal(types(full.events, 'recruits')[0].n, 2);
+  assert.equal(types(taper.events, 'recruits')[0].n, 1);
+});
+
+test('with a force cap in the rules, no township ever exceeds it over 100 days', () => {
+  let w = newWorld(real, { seed: 'cap', home: PAT, rules: { townForceCap: 12 }, clans: [{ id: 'a', kind: 'goblin', lord: 'ai' }, { id: 'b', kind: 'rat', lord: 'ai' }] });
+  for (let d = 0; d < 100; d++) { w = step(real, w, [], 24).state; assert.deepEqual(checkInvariants(real, w), []); }
+  assert.ok(Math.max(...Object.values(w.towns).map((t) => t.force)) <= 12);
+});
+
 // ---- the long run on the real board ----
 test('invariants hold for 1,000 simulated days on each of 20 seeds, and the shield and warning rules are never broken', () => {
   let raids = 0, aiFights = 0;

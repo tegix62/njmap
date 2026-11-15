@@ -12,6 +12,11 @@ import { K, K2 } from './constants.js';
 import { makeRng, seedState } from './rng.js';
 import { skirmish, modsFor } from './skirmish.js';
 
+/** The world-level tunables, kept in each world (w.rules) so a saved or simulated war records the rules it ran under, and tuning can vary them per run. */
+export const DEFAULT_RULES = Object.freeze({ townForceCap: K2.townForceCap, recruitFullTowns: K2.recruitFullTowns, recruitDivisorBeyond: K2.recruitDivisorBeyond,
+  aiAttackRatio: K.aiAttackRatio, aiCommitFraction: K2.aiCommitFraction });
+const R = (w) => w.rules || DEFAULT_RULES;
+
 export const hourOf = (w) => (w.startHour + w.tick) % 24;
 export const isMajor = (w) => K.majorTickHours.includes(hourOf(w));
 const byId = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -68,7 +73,7 @@ export function newWorld(board, cfg) {
                     lastActive: 0, absentSince: null, out: false };
   });
   return { v: 1, seed: cfg.seed ?? 1, rng: seedState(cfg.seed ?? 1), tick: 0, startHour: cfg.startHour ?? K2.startHour, lastMajor: 0,
-           theatre, towns, clans, chars: {}, fronts: {}, raids: [], director: {}, nextId: 1 };
+           theatre, towns, clans, chars: {}, fronts: {}, raids: [], director: {}, nextId: 1, rules: { ...DEFAULT_RULES, ...(cfg.rules || {}) } };
 }
 
 // ---------------------------------------------------------------- helpers
@@ -85,7 +90,7 @@ function fight(w, board, rng, emit, { by, from, to, n, inTransit = false, raid =
   const T = w.towns[to], F = w.towns[from];
   if (!inTransit) { F.force -= n; F.attackedTick = w.tick; F.dugIn = false; }
   const against = T.owner;
-  if (against === by) { T.force += n; emit('units_arrived', { clan: by, from, to, n }); return; }
+  if (against === by) { T.force = Math.min(R(w).townForceCap, T.force + n); emit('units_arrived', { clan: by, from, to, n }); return; }
   const r = skirmish({ attackers: n, defenders: T.force, ...borderMods(board, from, to, T.dugIn) }, rng);
   const detail = isHuman(w, by) || isHuman(w, against);
   if (r.won) { T.owner = by; T.force = r.attackersLeft; T.dugIn = false; T.captain = null; T.attackedTick = -1; }
@@ -105,7 +110,7 @@ function applyOrder(w, board, rng, emit, o) {
   if (!board.border(o.from, o.to)) return reject('not neighbours');
   if (!Number.isInteger(o.n) || o.n < 1 || o.n > F.force - 1) return reject('n must be from 1 to the force minus 1');
   clan.lastActive = w.tick; clan.absentSince = null;
-  if (o.type === 'move') { if (T.owner !== o.clan) return reject('move needs your own township'); F.force -= o.n; T.force += o.n; return emit('units_moved', { clan: o.clan, from: o.from, to: o.to, n: o.n }); }
+  if (o.type === 'move') { if (T.owner !== o.clan) return reject('move needs your own township'); if (T.force + o.n > R(w).townForceCap) return reject('that township would be over the cap'); F.force -= o.n; T.force += o.n; return emit('units_moved', { clan: o.clan, from: o.from, to: o.to, n: o.n }); }
   if (o.type === 'attack') {
     if (T.owner === o.clan) return reject('that is your own township');
     if (T.captain) return reject('a captain defends it: this needs a front (S5)');   // hook for S5
@@ -121,7 +126,7 @@ function recruits(w, board, emit) {
     if (clan.out) continue;
     const mine = ownedBy(w, clan.id);
     if (!mine.length) continue;
-    const n = Math.ceil(mine.length / K.recruitsDivisor);
+    const n = Math.ceil(Math.min(mine.length, R(w).recruitFullTowns) / K.recruitsDivisor + Math.max(0, mine.length - R(w).recruitFullTowns) / R(w).recruitDivisorBeyond);
     const enemyNb = (t) => board.neighbours(t).filter((x) => w.towns[x] && w.towns[x].owner && w.towns[x].owner !== clan.id);
     const border = mine.filter((t) => enemyNb(t).length);
     let at;
@@ -134,8 +139,11 @@ function recruits(w, board, emit) {
       const pool = border.length ? border : mine;
       at = pool.slice().sort((a, b) => (w.towns[a].force - w.towns[b].force) || byId(a, b))[0];
     }
-    w.towns[at].force += n;
-    emit('recruits', { clan: clan.id, town: at, n });
+    // fill the chosen township up to the cap, then spill the rest to the clan's weakest townships; whatever fits nowhere is lost
+    let left = n;
+    const order = [at, ...mine.filter((t) => t !== at).sort((x, y) => (w.towns[x].force - w.towns[y].force) || byId(x, y))];
+    for (const t of order) { const put = Math.min(left, R(w).townForceCap - w.towns[t].force); if (put > 0) { w.towns[t].force += put; left -= put; } if (!left) break; }
+    emit('recruits', { clan: clan.id, town: at, n, lost: left });
   }
 }
 
@@ -158,14 +166,14 @@ function aiTurn(w, board, rng, emit, clan) {
   for (const t of ownedBy(w, clan.id)) {
     const avail = w.towns[t].force - 1;
     if (avail < 2) continue;
-    const n = Math.max(2, Math.floor(avail * K2.aiCommitFraction));
+    const n = Math.max(2, Math.floor(avail * R(w).aiCommitFraction));
     for (const u of board.neighbours(t)) {
       const U = w.towns[u];
       if (!U || !U.owner || U.owner === clan.id) continue;
       if (shielded(w, U.owner) || protectedHome(w, u)) continue;
       // hook for S5: a township whose captain is pinned to a player's front is never attacked
       const ratio = n / Math.max(1, U.force);
-      if (ratio >= K.aiAttackRatio && (!best || ratio > best.ratio)) best = { from: t, to: u, n, ratio };
+      if (ratio >= R(w).aiAttackRatio && (!best || ratio > best.ratio)) best = { from: t, to: u, n, ratio };
     }
   }
   if (!best) return;
@@ -235,6 +243,7 @@ export function checkInvariants(board, w) {
     if (!Number.isInteger(t.force) || t.force < 0) bad.push(`${id}: force ${t.force}`);
     if (t.owner !== null && !w.clans[t.owner]) bad.push(`${id}: owner ${t.owner} does not exist`);
     if (t.owner !== null && t.force < 1) bad.push(`${id}: owned but empty`);
+    if (t.force > R(w).townForceCap) bad.push(`${id}: force ${t.force} is over the cap`);
   }
   for (const r of w.raids) {
     if (r.landsAt - r.declaredAt < K.raidWarningTicks) bad.push(`raid ${r.id}: warning of ${r.landsAt - r.declaredAt} ticks`);
