@@ -1,0 +1,58 @@
+{
+  "v": 1,
+  "note": "PLACEHOLDER CONTENT for the simulation (docs/goblins, D68, D194). Every entry is flagged placeholder: the user writes the real names, trait words, state words and verdicts. Words here are plain on purpose so they cannot be mistaken for finished writing. The machine fields (suits, counters, drive, earnedBy) are rules, not writing.",
+  "maneuvers": ["probe", "pressure", "lever"],
+  "clans": {
+    "goblin": { "placeholder": true, "first": ["Ash", "Birch", "Cinder", "Dunn", "Ember", "Flint", "Gale", "Heath", "Ivor", "Jett", "Kern", "Lark", "Moss", "Nettle"], "last": ["Stone", "Marsh", "Hill", "Brook", "Vale", "Reed", "Crag"] },
+    "rat":    { "placeholder": true, "first": ["Pip", "Quill", "Rook", "Sedge", "Tarn", "Umber", "Wick", "Yarrow"], "last": ["Grey", "Fenn", "Dace", "Holt", "Mere", "Lane"] },
+    "toad":   { "placeholder": true, "first": ["Bram", "Cob", "Dub", "Elm", "Fen", "Grub", "Hob", "Ivo"], "last": ["Pond", "Mire", "Sump", "Wade", "Bog", "Reach"] },
+    "default":{ "placeholder": true, "first": ["Alder", "Briar", "Clay", "Dale", "Elder", "Fern"], "last": ["North", "South", "East", "West", "Mid"] }
+  },
+  "traits": [
+    { "id": "proud",      "word": "Proud",      "pool": "notable", "suits": ["pressure"],          "counters": { "pressure": 1 },              "drive": "stand", "earnedBy": ["outnumbered"], "placeholder": true },
+    { "id": "cautious",   "word": "Cautious",   "pool": "notable", "suits": ["probe"],             "counters": { "pressure": -1, "probe": -1 }, "drive": "flee",  "earnedBy": ["bloody"],      "placeholder": true },
+    { "id": "greedy",     "word": "Greedy",     "pool": "notable", "suits": [],                    "counters": { "lever": 1 },                 "drive": "grab",  "earnedBy": ["raid"],        "placeholder": true },
+    { "id": "reckless",   "word": "Reckless",   "pool": "notable", "suits": ["pressure"],          "counters": { "pressure": 1 },              "drive": "stand", "earnedBy": ["outnumbered"], "placeholder": true },
+    { "id": "stubborn",   "word": "Stubborn",   "pool": "notable", "suits": [],                    "counters": { "pressure": -1 },             "drive": "stand", "earnedBy": ["bloody", "river"], "placeholder": true },
+    { "id": "patient",    "word": "Patient",    "pool": "notable", "suits": ["probe", "lever"],    "counters": {},                             "drive": null,    "earnedBy": ["river"],       "placeholder": true },
+    { "id": "sharp-eyed", "word": "Sharp-eyed", "pool": "notable", "suits": ["probe"],             "counters": { "probe": -1 },                "drive": null,    "earnedBy": ["highway"],     "placeholder": true },
+    { "id": "vain",       "word": "Vain",       "pool": "notable", "suits": [],                    "counters": { "pressure": 1, "lever": 1 },  "drive": "stand", "earnedBy": ["outnumbered"], "placeholder": true },
+    { "id": "timid",      "word": "Timid",      "pool": "notable", "suits": [],                    "counters": { "pressure": 1 },              "drive": "flee",  "earnedBy": [],              "placeholder": true },
+    { "id": "clever",     "word": "Clever",     "pool": "notable", "suits": ["lever"],             "counters": { "lever": -1 },                "drive": null,    "earnedBy": ["highway"],     "placeholder": true },
+    { "id": "ruthless",   "word": "Ruthless",   "pool": "notable", "suits": ["pressure"],          "counters": {},                             "drive": "grab",  "earnedBy": ["bloody"],      "placeholder": true },
+    { "id": "loyal",      "word": "Loyal",      "pool": "notable", "suits": [],                    "counters": {},                             "drive": "stand", "earnedBy": ["raid"],        "placeholder": true },
+    { "id": "night-owl",     "word": "Night owl",     "pool": "minor", "suits": [],            "counters": { "probe": -1 }, "drive": null, "earnedBy": [], "placeholder": true },
+    { "id": "clumsy",        "word": "Clumsy",        "pool": "minor", "suits": [],            "counters": { "lever": 1 },  "drive": null, "earnedBy": [], "placeholder": true },
+    { "id": "hoarder",       "word": "Hoarder",       "pool": "minor", "suits": [],            "counters": {},              "drive": null, "earnedBy": [], "placeholder": true },
+    { "id": "light-sleeper", "word": "Light sleeper", "pool": "minor", "suits": [],            "counters": { "probe": -1 }, "drive": null, "earnedBy": [], "placeholder": true },
+    { "id": "loud",          "word": "Loud",          "pool": "minor", "suits": ["pressure"],  "counters": {},              "drive": null, "earnedBy": [], "placeholder": true },
+    { "id": "sleeps-in",     "word": "Sleeps in",     "pool": "minor", "suits": [],            "counters": { "probe": 1 },  "drive": null, "earnedBy": [], "placeholder": true },
+    { "id": "hungry",        "word": "Hungry",        "pool": "minor", "suits": [],            "counters": {},              "drive": null, "earnedBy": [], "placeholder": true },
+    { "id": "forgetful",     "word": "Forgetful",     "pool": "minor", "suits": [],            "counters": { "lever": 1 },  "drive": null, "earnedBy": [], "placeholder": true },
+    { "id": "quick",         "word": "Quick",         "pool": "minor", "suits": ["probe"],     "counters": {},              "drive": null, "earnedBy": [], "placeholder": true },
+    { "id": "stout",         "word": "Stout",         "pool": "minor", "suits": [],            "counters": {},              "drive": null, "earnedBy": [], "placeholder": true },
+    { "id": "fussy",         "word": "Fussy",         "pool": "minor", "suits": [],            "counters": {},              "drive": null, "earnedBy": [], "placeholder": true },
+    { "id": "cheerful",      "word": "Cheerful",      "pool": "minor", "suits": [],            "counters": {},              "drive": null, "earnedBy": [], "placeholder": true }
+  ],
+  "fears": [
+    { "id": "river",   "kind": "terrain", "ref": "river",   "word": "Afraid of rivers",   "placeholder": true },
+    { "id": "ridge",   "kind": "terrain", "ref": "ridge",   "word": "Afraid of ridges",   "placeholder": true },
+    { "id": "highway", "kind": "terrain", "ref": "highway", "word": "Afraid of highways", "placeholder": true }
+  ],
+  "injuries": [
+    { "id": "scar",     "word": "A scar",         "placeholder": true },
+    { "id": "lost-ear", "word": "A missing ear",  "placeholder": true },
+    { "id": "limp",     "word": "A limp",         "placeholder": true },
+    { "id": "lost-eye", "word": "A missing eye",  "placeholder": true },
+    { "id": "burn",     "word": "A burn",         "placeholder": true }
+  ],
+  "states": [
+    { "id": "humiliated", "word": "Humiliated", "placeholder": false, "source": "the user's own word (D131)" },
+    { "id": "shaken",     "word": "Shaken",     "placeholder": true },
+    { "id": "grieving",   "word": "Grieving",   "placeholder": true }
+  ],
+  "verdicts": [
+    { "id": "won", "word": "Won", "placeholder": true }, { "id": "lost", "word": "Lost", "placeholder": true },
+    { "id": "withdrew", "word": "Withdrew", "placeholder": true }, { "id": "yielded", "word": "Yielded", "placeholder": true }
+  ]
+}

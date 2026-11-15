@@ -11,6 +11,7 @@
 import { K, K2 } from './constants.js';
 import { makeRng, seedState } from './rng.js';
 import { skirmish, modsFor } from './skirmish.js';
+import { placeInitialCaptains, captainsOf, capture, place, promote, succeed } from './chars.js';
 
 /** The world-level tunables, kept in each world (w.rules) so a saved or simulated war records the rules it ran under, and tuning can vary them per run. */
 export const DEFAULT_RULES = Object.freeze({ townForceCap: K2.townForceCap, recruitFullTowns: K2.recruitFullTowns, recruitDivisorBeyond: K2.recruitDivisorBeyond,
@@ -75,31 +76,64 @@ export function newWorld(board, cfg) {
     clans[c.id] = { id: c.id, kind: c.kind, lord: c.lord, home: homes[i], shieldUntil: c.lord === 'human' ? K.newPlayerShieldTicks : 0,
                     lastActive: 0, absentSince: null, out: false };
   });
-  return { v: 1, seed: cfg.seed ?? 1, rng: seedState(cfg.seed ?? 1), tick: 0, startHour: cfg.startHour ?? K2.startHour, lastMajor: 0,
-           theatre, towns, clans, chars: {}, fronts: {}, raids: [], director: {}, nextId: 1, rules: { ...DEFAULT_RULES, ...(cfg.rules || {}) } };
+  for (const c of Object.values(clans)) c.peakTowns = theatre.filter((t) => towns[t].owner === c.id).length;
+  const w = { v: 1, seed: cfg.seed ?? 1, rng: 0, tick: 0, startHour: cfg.startHour ?? K2.startHour, lastMajor: 0,
+              theatre, towns, clans, chars: {}, heirs: [], fronts: {}, raids: [], director: {}, nextId: 1, rules: { ...DEFAULT_RULES, ...(cfg.rules || {}) } };
+  const rng = makeRng(seedState(cfg.seed ?? 1));
+  if (board.content) placeInitialCaptains(w, rng, board.content);
+  w.rng = rng.state;
+  return w;
 }
 
 // ---------------------------------------------------------------- helpers
 
 const ownedBy = (w, clanId) => Object.keys(w.towns).filter((t) => w.towns[t].owner === clanId).sort(byId);
 const isHuman = (w, id) => !!id && w.clans[id] && w.clans[id].lord === 'human';
-const borderMods = (board, from, to, dugIn) => {
+const borderMods = (board, from, to, dugIn, captainLeads = false) => {
   const b = board.border(from, to) || {};
-  return modsFor({ dugIn, riverBorder: !!(b.river || b.ridge), highway: !!(b.highways && b.highways.length) });
+  return modsFor({ dugIn, captainLeads, riverBorder: !!(b.river || b.ridge), highway: !!(b.highways && b.highways.length) });
 };
 
-/** One skirmish: units from `from` (or already on the road, `inTransit`) attack `to`. Mutates w, emits one event. */
+/** One skirmish: units from `from` (or already on the road, `inTransit`) attack `to`. Mutates w, emits events.
+ *  A captain in the origin township leads the attack (an extra die) and travels with it; if the attack wins they take the township, if it loses they go home.
+ *  A captain defending a township that falls is captured (D201). A win against odds (or a very costly one) names a grunt a captain. */
 function fight(w, board, rng, emit, { by, from, to, n, inTransit = false, raid = null }) {
   const T = w.towns[to], F = w.towns[from];
+  const content = board.content;
+  let leadId = null;
+  if (inTransit) leadId = raid && raid.lead ? raid.lead : null;
+  else if (content && F.captain && w.chars[F.captain] && w.chars[F.captain].status === 'active') { leadId = F.captain; F.captain = null; w.chars[leadId].at = null; }
   if (!inTransit) { F.force -= n; F.attackedTick = w.tick; F.dugIn = false; }
   const against = T.owner;
-  if (against === by) { T.force = Math.min(R(w).townForceCap, T.force + n); emit('units_arrived', { clan: by, from, to, n }); return; }
-  const r = skirmish({ attackers: n, defenders: T.force, ...borderMods(board, from, to, T.dugIn) }, rng);
+  if (against === by) {
+    T.force = Math.min(R(w).townForceCap, T.force + n);
+    if (leadId && !place(w, w.chars[leadId], to)) w.chars[leadId].status = 'dead';
+    emit('units_arrived', { clan: by, from, to, n }); return;
+  }
+  const defendersBefore = T.force;
+  const bd = board.border(from, to) || {};
+  const r = skirmish({ attackers: n, defenders: T.force, ...borderMods(board, from, to, T.dugIn, !!leadId) }, rng);
   const detail = isHuman(w, by) || isHuman(w, against);
-  if (r.won) { T.owner = by; T.force = r.attackersLeft; T.dugIn = false; T.captain = null; T.attackedTick = -1; if (w.clans[by].lord === 'ai') w.clans[by].coolUntil = w.tick + R(w).aiCaptureCooldownTicks; }
-  else { T.force = r.defendersLeft; if (F.owner === by) F.force += r.attackersLeft; }
+  const extra = [];
+  if (r.won) {
+    const dc = T.captain && w.chars[T.captain];
+    if (dc && dc.status === 'active') { capture(w, dc, by); extra.push(['captured', { clan: against, by, char: dc.id, town: to }]); }
+    T.owner = by; T.force = r.attackersLeft; T.dugIn = false; T.captain = null; T.attackedTick = -1;
+    if (w.clans[by].lord === 'ai') w.clans[by].coolUntil = w.tick + R(w).aiCaptureCooldownTicks;
+    if (leadId) { w.chars[leadId].at = to; T.captain = leadId; }
+    else if (content) {
+      const tag = n < defendersBefore ? 'outnumbered' : (bd.river ? 'river' : (r.attackersLeft <= 3 && n >= 6 ? 'bloody' : null));
+      const c = tag && promote(w, rng, content, to, tag);
+      if (c) extra.push(['promoted', { clan: by, char: c.id, town: to, tag }]);
+    }
+  } else {
+    T.force = r.defendersLeft;
+    if (F.owner === by) F.force += r.attackersLeft;
+    if (leadId && !place(w, w.chars[leadId], from)) w.chars[leadId].status = 'dead';
+  }
   emit(raid ? 'raid_landed' : 'skirmish_result', { by, against, from, to, n, won: r.won, lost: r.lost, left: { a: r.attackersLeft, d: r.defendersLeft },
-        ...(detail ? { rounds: r.rounds } : {}) });
+        ...(leadId ? { lead: leadId } : {}), ...(detail ? { rounds: r.rounds } : {}) });
+  for (const [type, data] of extra) emit(type, data);
 }
 
 // ---------------------------------------------------------------- orders (a human's, applied before time passes)
@@ -186,7 +220,9 @@ function aiTurn(w, board, rng, emit, clan) {
   if (isHuman(w, w.towns[best.to].owner)) {   // against a human: a visible raid with a warning (D12, D205)
     const F = w.towns[best.from];
     F.force -= best.n; F.attackedTick = w.tick; F.dugIn = false;
-    const raid = { id: w.nextId++, by: clan.id, from: best.from, target: best.to, force: best.n, declaredAt: w.tick, landsAt: w.tick + K.raidWarningTicks };
+    let lead = null;
+    if (board.content && F.captain && w.chars[F.captain] && w.chars[F.captain].status === 'active') { lead = F.captain; F.captain = null; w.chars[lead].at = null; }   // the captain rides with the raid
+    const raid = { id: w.nextId++, by: clan.id, from: best.from, target: best.to, force: best.n, lead, declaredAt: w.tick, landsAt: w.tick + K.raidWarningTicks };
     w.raids.push(raid);
     emit('raid_declared', { by: clan.id, from: best.from, to: best.to, n: best.n, landsAt: raid.landsAt, raid: raid.id });
   } else {
@@ -210,6 +246,8 @@ function majorTick(w, board, rng, emit) {
   }
   recruits(w, board, emit);
   digIn(w, emit);
+  if (board.content) for (const m of succeed(w, rng, board.content)) emit('succeeded', { clan: m.char.clan, char: m.char.id, town: m.char.at, dynasty: m.char.dynasty });
+  for (const c of Object.values(w.clans)) c.peakTowns = Math.max(c.peakTowns || 0, ownedBy(w, c.id).length);
   for (const clan of Object.values(w.clans).sort((a, b) => byId(a.id, b.id))) {
     if (clan.out || clan.lord === 'human') continue;            // AI lords only; a human's clan is theirs (an absent one sits defensively)
     aiTurn(w, board, rng, emit, clan);
@@ -257,5 +295,30 @@ export function checkInvariants(board, w) {
     if (!w.clans[r.by]) bad.push(`raid ${r.id}: unknown clan`);
   }
   for (const c of Object.values(w.clans)) if (!w.towns[c.home]) bad.push(`clan ${c.id}: home missing`);
+  if (board.content) {
+    const content = board.content;
+    for (const c of Object.values(w.chars)) {
+      if (!['active', 'captured', 'dead'].includes(c.status)) bad.push(`${c.id}: status ${c.status}`);
+      if (c.status === 'active') {
+        if (c.at === null) { if (!w.raids.some((r) => r.lead === c.id)) bad.push(`${c.id}: active but nowhere`); }
+        else if (!w.towns[c.at]) bad.push(`${c.id}: at unknown township`);
+        else if (w.towns[c.at].captain !== c.id) bad.push(`${c.id}: not recorded in ${c.at}`);
+        else if (w.towns[c.at].owner !== c.clan) bad.push(`${c.id}: in a township their clan does not own`);
+      }
+      if (c.status === 'captured' && !w.clans[c.heldBy]) bad.push(`${c.id}: held by unknown clan`);
+      const ids = c.traits.map((t) => t.id);
+      if (new Set(ids).size !== ids.length) bad.push(`${c.id}: repeated trait`);
+      for (const id of ids) if (!content.traits.has(id)) bad.push(`${c.id}: trait ${id} is not in the content`);
+      const nn = c.traits.filter((t) => t.notable).length;
+      if (c.tier === 2 && (c.traits.length !== 4 || nn !== 2)) bad.push(`${c.id}: tier 2 needs 4 traits, 2 notable`);
+      if (c.tier === 3 && (c.traits.length !== 5 || nn !== 3)) bad.push(`${c.id}: tier 3 needs 5 traits, 3 notable`);
+    }
+    for (const [id, t] of Object.entries(w.towns)) if (t.captain) { const c = w.chars[t.captain]; if (!c || c.status !== 'active' || c.at !== id) bad.push(`${id}: captain ${t.captain} is not there`); }
+    for (const clan of Object.values(w.clans)) {
+      const peak = Math.max(clan.peakTowns || 0, Object.values(w.towns).filter((t) => t.owner === clan.id).length);
+      const count = captainsOf(w, clan.id).length + w.raids.filter((r) => r.lead && w.chars[r.lead] && w.chars[r.lead].clan === clan.id).length * 0;
+      if (count > K.captainCapBase + Math.floor(peak / K.captainCapPerTowns)) bad.push(`clan ${clan.id}: ${count} captains is over its cap`);
+    }
+  }
   return bad;
 }

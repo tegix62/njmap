@@ -1,7 +1,7 @@
 // Read access to the static board (data/goblin-board.json, built by tools/build_goblin_board.py). The simulation never reads files:
 // it is given the parsed JSON and wraps it here. Nothing in this file changes the board.
 
-export function makeBoard(json) {
+export function makeBoard(json, content = null) {
   const towns = json.towns;
   const bmap = new Map();
   for (const [k, v] of Object.entries(json.borders)) {
@@ -12,6 +12,8 @@ export function makeBoard(json) {
 
   const api = {
     json, towns,
+    /** The loaded placeholder content (chars.js loadContent), or null: without it the simulation runs with no named characters. */
+    content,
     has: (id) => id in towns,
     town: (id) => towns[id],
     neighbours: (id) => towns[id].nb,
