@@ -125,6 +125,15 @@ Asked "where is he? are we near each other? hearing about coin is enough to make
 - **A lever needs a visible cause before it works**, and a bonus is never explained by a sentence the player was not shown. If the game cannot draw why a move works, the move does not exist.
 - **The same applies to a trait's payoff off the battlefield** (the coin cart): the trait is a rule on his portrait ("goes out for loose coin"), the cart is visible on the road beforehand, and his squad is seen walking to meet it.
 
+### R0, continued: how a front must work (the user's choice, 2026-11-15)
+
+The user rejected "an easy exploit-weakness button into a minigame that is meant to get you to cross a line if you press the button enough". Decided: **A and B**.
+
+- **A. One use each.** A discovered weakness works once. V's greed is spent after the coin pole; to climb again you need a different thing (probe, read, pressure, a second weakness). Repeating a move gets nothing.
+- **B. He acts back.** Each beat the captain visibly picks something (charge, hold, call for help, bait), shown before you choose, and your best move depends on it. No move is right every time (D156).
+- The standing bar stays, as drawn positions on the ground. **Decide** stays available after one move.
+- The sim change is small: weaknesses get a `used` flag per front; the front has a `his move` chosen by a simple rule each beat, with counters between moves. The paper test's own fight (R0) was played under the old repeatable lever, then finished; the new rules apply from R2.
+
 ## 10. What stays true
 
 The pure simulation and its tests. Real New Jersey geography, computed and never recalled. No percentages. The user writes the comedy; everything else is a flagged placeholder. A loss is framed. The quiz is a help and never a gate.
