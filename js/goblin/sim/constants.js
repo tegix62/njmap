@@ -49,3 +49,15 @@ export const K3 = Object.freeze({
   captainsPerTowns: 4,        // ...about one per this many townships
   maneuverSuitNotable: 2, maneuverSuitMinor: 1,   // roll bonus when a captain's trait suits a maneuver
 });
+
+// Added in S5 (docs/goblins/04-systems-spec.md section 6): fronts.
+export const K4 = Object.freeze({
+  frontMaxPerPlayer: 3,       // D134
+  frontMaxManeuvers: 4,       // after this many maneuvers the next beat must be the decision (a front is 2 to 5 beats)
+  frontMinManeuvers: 1,       // at least one maneuver before a decision, so a front is never a single beat
+  frontStartStanding: 1,      // Even
+  leverBonus: 2,              // a Lever uses a known weakness
+  modClamp: 4,                // total modifier to a maneuver roll is clamped to +-this
+  maneuverNeedUnits: 3,       // Probe and Pressure need a leading captain or at least this many committed units
+  closeupBreakMax: 6, closeupHoldMax: 10,   // 2d6: up to 6 he breaks, 7-10 he holds and is captured, 11+ he persists
+});

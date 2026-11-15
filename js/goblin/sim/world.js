@@ -8,9 +8,10 @@
 // S3 covers the territory game: recruits, dig-in, AI attacks, declared raids and human attack and move orders. Characters, fronts and the
 // Director are added in S4 to S6; their hooks are marked.
 
-import { K, K2 } from './constants.js';
+import { K, K2, K4 } from './constants.js';
 import { makeRng, seedState } from './rng.js';
 import { skirmish, modsFor } from './skirmish.js';
+import { openFront, actFront, settleFronts, pinnedTowns, openFronts } from './front.js';
 import { placeInitialCaptains, captainsOf, capture, place, promote, succeed } from './chars.js';
 
 /** The world-level tunables, kept in each world (w.rules) so a saved or simulated war records the rules it ran under, and tuning can vary them per run. */
@@ -150,10 +151,19 @@ function applyOrder(w, board, rng, emit, o) {
   if (o.type === 'move') { if (T.owner !== o.clan) return reject('move needs your own township'); if (T.force + o.n > R(w).townForceCap) return reject('that township would be over the cap'); F.force -= o.n; T.force += o.n; return emit('units_moved', { clan: o.clan, from: o.from, to: o.to, n: o.n }); }
   if (o.type === 'attack') {
     if (T.owner === o.clan) return reject('that is your own township');
-    if (T.captain) return reject('a captain defends it: this needs a front (S5)');   // hook for S5
+    if (T.captain) return reject('a captain defends it: open a front (front_open)');
     return fight(w, board, rng, emit, { by: o.clan, from: o.from, to: o.to, n: o.n });
   }
   return reject('unknown order');
+}
+
+function applyFrontOrder(w, board, rng, emit, o) {
+  const clan = w.clans[o.clan];
+  const reject = (reason) => emit('order_rejected', { clan: o.clan, order: o, reason });
+  if (!clan || clan.lord !== 'human' || clan.out) return reject('not a live human clan');
+  clan.lastActive = w.tick; clan.absentSince = null;
+  const res = o.type === 'front_open' ? openFront(w, board, emit, o) : actFront(w, board, rng, emit, o);
+  if (res !== true) reject(res);
 }
 
 // ---------------------------------------------------------------- the world's turn
@@ -199,19 +209,19 @@ function protectedHome(w, to) {
 }
 
 function aiTurn(w, board, rng, emit, clan) {
-  if (w.tick < (clan.coolUntil || 0)) return;                                  // conquest tempo
+  if (w.tick < (clan.coolUntil || 0)) return;
+  const pinned = pinnedTowns(w);                                               // a captain pinned to a player's front: his township neither attacks nor is attacked                                  // conquest tempo
   const share = ownedBy(w, clan.id).length / Object.keys(w.towns).length;
   const need = share > R(w).leaderShare ? R(w).leaderAttackRatio : R(w).aiAttackRatio;   // a leader needs better odds
   let best = null;
   for (const t of ownedBy(w, clan.id)) {
     const avail = w.towns[t].force - 1;
-    if (avail < 2) continue;
+    if (avail < 2 || pinned.has(t)) continue;
     const n = Math.max(2, Math.floor(avail * R(w).aiCommitFraction));
     for (const u of board.neighbours(t)) {
       const U = w.towns[u];
       if (!U || !U.owner || U.owner === clan.id) continue;
-      if (shielded(w, U.owner) || protectedHome(w, u)) continue;
-      // hook for S5: a township whose captain is pinned to a player's front is never attacked
+      if (shielded(w, U.owner) || protectedHome(w, u) || pinned.has(u)) continue;
       const ratio = n / Math.max(1, U.force);
       if (ratio >= need && (!best || ratio > best.ratio)) best = { from: t, to: u, n, ratio };
     }
@@ -252,6 +262,7 @@ function majorTick(w, board, rng, emit) {
     if (clan.out || clan.lord === 'human') continue;            // AI lords only; a human's clan is theirs (an absent one sits defensively)
     aiTurn(w, board, rng, emit, clan);
   }
+  settleFronts(w, board, rng, emit);
   // hook for S6: the Director adjusts here
   for (const c of Object.values(w.clans)) {
     if (!c.out && !ownedBy(w, c.id).length) { c.out = true; emit('clan_out', { clan: c.id }); }
@@ -263,10 +274,10 @@ function majorTick(w, board, rng, emit) {
  *  simulated; any more are skipped and the world "settles" (D168). Never changes `state`. */
 export function step(board, state, orders = [], ticks = 0, opts = {}) {
   const w = structuredClone(state);
-  const rng = makeRng(w.rng);
+  const rng = opts.rng || makeRng(w.rng);   // opts.rng lets tests script the dice
   const events = [];
   const emit = (type, data = {}) => events.push({ tick: w.tick, type, ...data });
-  for (const o of orders) applyOrder(w, board, rng, emit, o);
+  for (const o of orders) (o.type === 'front_open' || o.type === 'front' ? applyFrontOrder : applyOrder)(w, board, rng, emit, o);
   const n = Math.min(ticks, K.catchUpCapTicks);
   for (let i = 0; i < n; i++) {
     w.tick++;
@@ -274,7 +285,7 @@ export function step(board, state, orders = [], ticks = 0, opts = {}) {
     if (isMajor(w)) majorTick(w, board, rng, emit);
   }
   if (ticks > n) { w.tick += ticks - n; emit('settled', { skipped: ticks - n }); }
-  w.rng = rng.state;
+  if (!opts.rng) w.rng = rng.state;
   return { state: w, events };
 }
 
@@ -295,6 +306,13 @@ export function checkInvariants(board, w) {
     if (!w.clans[r.by]) bad.push(`raid ${r.id}: unknown clan`);
   }
   for (const c of Object.values(w.clans)) if (!w.towns[c.home]) bad.push(`clan ${c.id}: home missing`);
+  for (const f of openFronts(w)) {
+    if (!w.clans[f.attacker]) bad.push(`front ${f.id}: unknown clan`);
+    if (f.units < 1) bad.push(`front ${f.id}: ${f.units} units`);
+    if (f.beat > K4.frontMaxManeuvers + 1) bad.push(`front ${f.id}: ${f.beat} beats`);
+    if (!w.towns[f.target] || !w.towns[f.target].captain) bad.push(`front ${f.id}: no captain at the target`);
+  }
+  for (const c of Object.values(w.clans)) if (openFronts(w, c.id).length > K4.frontMaxPerPlayer) bad.push(`clan ${c.id}: too many fronts`);
   if (board.content) {
     const content = board.content;
     for (const c of Object.values(w.chars)) {
@@ -310,8 +328,8 @@ export function checkInvariants(board, w) {
       if (new Set(ids).size !== ids.length) bad.push(`${c.id}: repeated trait`);
       for (const id of ids) if (!content.traits.has(id)) bad.push(`${c.id}: trait ${id} is not in the content`);
       const nn = c.traits.filter((t) => t.notable).length;
-      if (c.tier === 2 && (c.traits.length !== 4 || nn !== 2)) bad.push(`${c.id}: tier 2 needs 4 traits, 2 notable`);
-      if (c.tier === 3 && (c.traits.length !== 5 || nn !== 3)) bad.push(`${c.id}: tier 3 needs 5 traits, 3 notable`);
+      if (c.tier === 2 && (c.traits.length !== 4 || nn < 2)) bad.push(`${c.id}: tier 2 needs 4 traits, 2 notable`);
+      if (c.tier === 3 && (c.traits.length !== 5 || nn < 3)) bad.push(`${c.id}: tier 3 needs 5 traits, 3 notable`);
     }
     for (const [id, t] of Object.entries(w.towns)) if (t.captain) { const c = w.chars[t.captain]; if (!c || c.status !== 'active' || c.at !== id) bad.push(`${id}: captain ${t.captain} is not there`); }
     for (const clan of Object.values(w.clans)) {
