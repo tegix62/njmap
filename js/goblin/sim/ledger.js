@@ -112,6 +112,15 @@ export function entriesOf(events, { board, state, content, clan }) {
           learned_text: learned(e.learned), changed_text: ch ? ` Changes: ${ch}.` : '', exposed_text: exposed(e.exposed) })));
         break;
       }
+      case 'scouted': {
+        const how = { sneak: 'sneaking in', ask: 'asking around', watch: 'watching from across the water' }[e.method];
+        const mods = e.mods.length ? ` (${e.mods.map((m) => `${m.v > 0 ? '+' : ''}${m.v} ${m.why}`).join(', ')})` : '';
+        const id = e.lost ? 'scout_lost' : e.learned.length ? 'scout_ok' : 'scout_nothing';
+        say(e.tick, cap(fill(T[id], { clan: clanName(e.clan), town: town(e.town), how, roll: e.roll, mods, captain: char(e.char), learned: e.learned.map((f) => factWord(content, f)).join(', ') })));
+        break;
+      }
+      case 'fortified': say(e.tick, cap(fill(T.fortified, { clan: clanName(e.clan), town: town(e.town) }))); break;
+      case 'taunted': say(e.tick, cap(fill(T[e.ok ? 'taunt_ok' : 'taunt_fail'], { clan: clanName(e.clan), town: town(e.town), captain: char(e.char) }))); break;
       case 'promoted': say(e.tick, cap(fill(T.promoted, { clan: clanName(e.clan), char: char(e.char), town: town(e.town) }))); break;
       case 'succeeded': say(e.tick, cap(fill(T.succeeded, { char: char(e.char), town: town(e.town) }))); break;
       case 'captured': break;   // reported by the closing line or the skirmish line

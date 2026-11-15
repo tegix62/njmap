@@ -39,3 +39,9 @@ Three gaps, three changes (`js/goblin/ui/goblin.js`):
 Also: the digest now counts events since you last looked, so your own moves at the same hour are not skipped; front beats carry the captain and township so their Ledger lines name them. Saves are version 2, so an existing war is replaced by a new one on first opening. Smoke test (`tools/goblin/ui-smoke.cjs`) now plays a skirmish and a whole front.
 
 Still missing and noticed: no goal or ending to a war (what wins?), no fog of war, no quiz link, no resources. The first of these is a design question for the user.
+
+## Round 3, 2026-11-15: the sitting model (D214)
+
+The user's words: "I'm a bit surprised that all I can do is attack, and then I just have to close the app. What happened to the whole thing where we were gonna allow the player to continue playing and do all these things, and then the significant moves would come in those periodic daily check-in things?" Cause: D202, my own proposal, had parked the Advance button and personal encounters (D80, D83, D92); the user's reply to it was never an explicit yes. D214 replaces it.
+
+Built in the sim (`js/goblin/sim/sitting.js`, 95 tests): actions with refill at major ticks, Scout, Fortify, Taunt, and a taunted front starts a step higher. `legalOrders` lists the affordable ones and never a rejected one. Bots: Careful scouts a captain before opening a front; Bold does not. With actions the bots still take 43 and 56 townships in 21 days (as before): they only make one or two attacks a day, so the action cap does not slow conquest by itself. Screens: next.

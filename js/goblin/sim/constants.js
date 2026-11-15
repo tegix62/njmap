@@ -74,3 +74,14 @@ export const K5 = Object.freeze({
   emptyDayRatio: 2.0,         // a bordering enemy weaker than this ratio is "a chance"
   hourMinor: 9, hourPeak: 12, hourRelax: 18,
 });
+
+// Added in the sitting model (D214): what a player does between the world's ticks.
+export const K6 = Object.freeze({
+  apStart: 3, apCap: 4, apPerMajor: 2,   // actions: a human clan starts with 3, gains 2 at each 09:00, 12:00 and 18:00 tick, holds at most 4
+  costAttack: 1, costFront: 1, costScout: 1, costFortify: 1, costTaunt: 1,
+  scoutTarget: 7, scoutGreat: 10, scoutLoseUnit: 3,   // 2d6 + mods: 7+ learns one fact, 10+ two, 3 or less costs the scout his life (one unit)
+  scoutNightBonus: 2, nightFrom: 21, nightTo: 5,       // Sneak: +2 between 21:00 and 05:00
+  scoutRiverBonus: 2,                                   // Watch from across the water
+  scoutBigTownPop: 20000, scoutBigTownBonus: 2,         // Ask a trader: busier towns have more traders
+  tauntTarget: 8, tauntKnownBonus: 2, tauntWindowTicks: 24,   // Taunt: 8+ (with +2 if you use something you have learned) and the next front there starts a step higher
+});

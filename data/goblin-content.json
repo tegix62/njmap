@@ -620,6 +620,36 @@
    "id": "settled",
    "text": "The world moved on without a report for {n} hours.",
    "placeholder": true
+  },
+  {
+   "id": "scout_ok",
+   "text": "{clan} sent a scout to {town} ({how}). Rolled {roll}{mods}. Learned about {captain}: {learned}.",
+   "placeholder": true
+  },
+  {
+   "id": "scout_nothing",
+   "text": "{clan} sent a scout to {town} ({how}). Rolled {roll}{mods}. Nothing new about {captain}.",
+   "placeholder": true
+  },
+  {
+   "id": "scout_lost",
+   "text": "{clan} sent a scout to {town} ({how}). Rolled {roll}{mods}. The scout did not come back.",
+   "placeholder": true
+  },
+  {
+   "id": "fortified",
+   "text": "{clan} dug in at {town} at once.",
+   "placeholder": true
+  },
+  {
+   "id": "taunt_ok",
+   "text": "{clan} needled {captain} at {town}. It worked: a fight there will start a step higher.",
+   "placeholder": true
+  },
+  {
+   "id": "taunt_fail",
+   "text": "{clan} needled {captain} at {town}. It backfired: {captain} dug in out of spite.",
+   "placeholder": true
   }
  ]
 }

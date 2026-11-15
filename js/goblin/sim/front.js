@@ -10,6 +10,7 @@
 
 import { K, K2, K4 } from './constants.js';
 import { skirmish } from './skirmish.js';
+import { takeTaunt, hasAp, scoutMods } from './sitting.js';
 import { discoverOne, discover, knows, undiscovered, suitBonus, counterMod, hasConflict, injuryRoll, applyInjury, kill, capture, place, promote } from './chars.js';
 
 const byId = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -53,12 +54,13 @@ export function openFront(w, board, emit, o) {
   const b = board.border(o.from, o.to) || {};
   const behindByRiver = !!(b.river || b.ridge) && !(b.highways && b.highways.length);
   const lead = F.captain && w.chars[F.captain] && w.chars[F.captain].status === 'active' ? F.captain : null;
+  const taunted = takeTaunt(w, o.clan, o.to);
   F.force -= o.n; F.attackedTick = w.tick; F.dugIn = false;
   const f = { id: 'f' + w.nextId++, attacker: o.clan, defender: T.owner, from: o.from, target: o.to, captain: d.id, lead, units: o.n,
-    standing: behindByRiver ? 0 : K4.frontStartStanding, behindByRiver, bridgeUsed: false, beat: 0, maneuvers: 0,
+    standing: Math.min(2, (behindByRiver ? 0 : K4.frontStartStanding) + (taunted ? 1 : 0)), behindByRiver, bridgeUsed: false, beat: 0, maneuvers: 0,
     learned: [], lostA: 0, lostD: 0, changed: [], log: [], status: 'open', openedTick: w.tick };
   w.fronts[f.id] = f;
-  emit('front_opened', { front: f.id, clan: o.clan, from: o.from, to: o.to, n: o.n, standing: STANDING[f.standing], captain: d.id, lead });
+  emit('front_opened', { front: f.id, taunted, clan: o.clan, from: o.from, to: o.to, n: o.n, standing: STANDING[f.standing], captain: d.id, lead });
   return true;
 }
 
@@ -244,17 +246,34 @@ export function legalOrders(board, w, clanId) {
     for (const action of frontActions(w, f)) out.push({ type: 'front', clan: clanId, front: f.id, action, ...(action === 'decision' ? { n: f.units } : {}) });
   }
   const targeted = new Set(openFronts(w).map((f) => f.target));
+  const canHit = hasAp(clan, 1);   // attacks and fronts cost an action
+  const scouted = new Set();
   for (const from of Object.keys(w.towns).sort(byId)) {
     const F = w.towns[from];
-    if (F.owner !== clanId || F.force < 2) continue;
+    if (F.owner !== clanId) continue;
+    if (board.content && canHit && !F.dugIn && F.force >= K.digInMinForce) out.push({ type: 'fortify', clan: clanId, town: from });
+    if (F.force < 2) continue;
     const range = { min: 1, max: F.force - 1 };
     for (const to of board.neighbours(from)) {
       const T = w.towns[to];
       if (!T) continue;
       if (T.owner === clanId) { out.push({ type: 'move', clan: clanId, from, to, n: range }); continue; }
       if (!T.owner) continue;
+      if (!canHit) continue;
       if (T.captain) { if (mine.length < K4.frontMaxPerPlayer && !targeted.has(to)) out.push({ type: 'front_open', clan: clanId, from, to, n: range }); }
       else out.push({ type: 'attack', clan: clanId, from, to, n: range });
+    }
+  }
+  if (board.content && canHit) {
+    for (const town of Object.keys(w.towns).sort(byId)) {
+      const T = w.towns[town], c = T.captain && w.chars[T.captain];
+      if (!c || c.status !== 'active' || T.owner === clanId || scouted.has(town)) continue;
+      if (!board.neighbours(town).some((n) => w.towns[n] && w.towns[n].owner === clanId)) continue;
+      scouted.add(town);
+      const methods = ['sneak', 'ask'];
+      if (scoutMods(w, board, clanId, town, 'watch').total > 0) methods.push('watch');
+      for (const method of methods) out.push({ type: 'scout', clan: clanId, town, method });
+      if ((c.known[clanId] || []).length) out.push({ type: 'taunt', clan: clanId, town });
     }
   }
   return out;
