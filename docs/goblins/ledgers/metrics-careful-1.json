@@ -10,88 +10,89 @@
  },
  "eventCounts": {
   "recruits": 189,
-  "dug_in": 146,
+  "dug_in": 153,
   "director_word": 63,
   "front_opened": 18,
-  "front_beat": 41,
-  "closeup": 16,
-  "front_closed": 17,
-  "skirmish_result": 26,
-  "raid_declared": 6,
-  "raid_landed": 6,
-  "captured": 4,
-  "promoted": 4,
+  "front_beat": 50,
+  "front_closed": 18,
+  "skirmish_result": 29,
+  "closeup": 11,
+  "promoted": 7,
+  "raid_declared": 7,
+  "raid_landed": 7,
+  "captured": 3,
   "director_extra": 4,
-  "director_nudge": 3
+  "succeeded": 1,
+  "director_nudge": 1
  },
  "distinctShapesPerDay": {
-  "mean": 6.38,
+  "mean": 6.71,
   "min": 0,
   "perDay": [
    0,
    6,
-   4,
+   5,
    11,
-   5,
-   6,
-   8,
-   8,
-   5,
    6,
    6,
-   13,
-   9,
-   7,
-   8,
+   6,
    10,
-   5,
+   6,
+   8,
+   11,
+   6,
+   11,
+   6,
    9,
-   0,
-   0,
-   8
+   5,
+   6,
+   4,
+   6,
+   10,
+   3
   ]
  },
  "unitsLost": {
-  "goblins": 202,
-  "rats": 144,
-  "toads": 219
+  "goblins": 266,
+  "rats": 146,
+  "toads": 172
  },
  "townshipsTaken": {
-  "goblins": 31,
+  "goblins": 32,
   "toads": 8,
-  "rats": 5
+  "rats": 6
  },
  "unitsLostPerTownshipTaken": {
-  "goblins": 6.52,
-  "toads": 27.38,
-  "rats": 28.8
+  "goblins": 8.31,
+  "toads": 21.5,
+  "rats": 24.33
  },
  "fronts": {
   "opened": 18,
   "closedByVerdict": {
-   "Yielded": 12,
-   "Lost": 1,
-   "Won": 4
+   "Lost": 4,
+   "Won": 12,
+   "Withdrew": 2
   },
   "beatsDistribution": {
-   "1": 5,
-   "2": 7,
-   "3": 1,
-   "4": 4
+   "2": 10,
+   "3": 3,
+   "4": 4,
+   "5": 1
   },
-  "stillOpenAtEnd": 1
+  "stillOpenAtEnd": 0
  },
  "director": {
   "goblinsWordChanges": {
-   "Calm": 36,
-   "Heated": 11,
-   "Steady": 15,
-   "Overwhelmed": 1
+   "Calm": 33,
+   "Heated": 9,
+   "Steady": 18,
+   "Overwhelmed": 3
   },
   "extras": 4,
-  "nudges": 3,
-  "heldBack": 11,
-  "raidsDeclared": 6
+  "nudges": 1,
+  "heldBack": 9,
+  "raidsDeclared": 7
  },
  "orderRejected": 0
 }

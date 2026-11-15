@@ -55,6 +55,7 @@ export const K4 = Object.freeze({
   frontMaxPerPlayer: 3,       // D134
   frontMaxManeuvers: 4,       // after this many maneuvers the next beat must be the decision (a front is 2 to 5 beats)
   frontMinManeuvers: 1,       // at least one maneuver before a decision, so a front is never a single beat
+  frontMaxGain: 1,            // D210: no single maneuver raises standing by more than one step (the roll bands still read 2, but the gain is capped)
   frontStartStanding: 1,      // Even
   leverBonus: 2,              // a Lever uses a known weakness
   modClamp: 4,                // total modifier to a maneuver roll is clamped to +-this

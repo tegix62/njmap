@@ -2,92 +2,94 @@
  "days": 21,
  "bot": "Bold",
  "startTowns": 20,
- "endTowns": 58,
+ "endTowns": 55,
  "finalTownsByClan": {
-  "goblins": 58
+  "goblins": 55,
+  "rats": 3
  },
  "eventCounts": {
-  "front_opened": 34,
-  "front_beat": 50,
-  "front_closed": 34,
-  "closeup": 25,
-  "skirmish_result": 30,
-  "promoted": 2,
-  "recruits": 162,
-  "dug_in": 147,
-  "director_nudge": 3,
+  "front_opened": 46,
+  "front_beat": 94,
+  "front_closed": 46,
+  "closeup": 24,
+  "skirmish_result": 26,
+  "recruits": 180,
+  "dug_in": 159,
+  "director_nudge": 5,
   "director_word": 63,
+  "promoted": 5,
   "raid_declared": 8,
-  "raid_landed": 5,
-  "units_arrived": 3,
+  "raid_landed": 7,
+  "units_arrived": 1,
+  "succeeded": 1,
+  "director_extra": 3,
   "captured": 2,
-  "clan_out": 2
+  "clan_out": 1
  },
  "distinctShapesPerDay": {
-  "mean": 7.05,
-  "min": 0,
+  "mean": 7.76,
+  "min": 2,
   "perDay": [
-   12,
-   11,
-   9,
-   12,
+   10,
+   10,
    8,
-   9,
-   13,
-   10,
-   7,
-   9,
-   10,
+   12,
    11,
+   9,
+   12,
+   3,
+   11,
+   11,
+   6,
+   13,
+   7,
+   2,
    2,
    4,
-   5,
+   8,
+   6,
    7,
    4,
-   0,
-   5,
-   0,
-   0
+   7
   ]
  },
  "unitsLost": {
-  "goblins": 284,
-  "toads": 109,
-  "rats": 131
+  "goblins": 458,
+  "toads": 132,
+  "rats": 160
  },
  "townshipsTaken": {
-  "goblins": 43,
-  "rats": 4,
-  "toads": 4
+  "goblins": 42,
+  "toads": 6,
+  "rats": 6
  },
  "unitsLostPerTownshipTaken": {
-  "goblins": 6.6,
-  "rats": 32.75,
-  "toads": 27.25
+  "goblins": 10.9,
+  "toads": 22,
+  "rats": 26.67
  },
  "fronts": {
-  "opened": 34,
+  "opened": 46,
   "closedByVerdict": {
-   "Lost": 9,
-   "Yielded": 20,
-   "Won": 5
+   "Lost": 21,
+   "Won": 25
   },
   "beatsDistribution": {
-   "1": 20,
-   "2": 12,
+   "2": 44,
    "3": 2
   },
   "stillOpenAtEnd": 0
  },
  "director": {
   "goblinsWordChanges": {
-   "Calm": 32,
-   "Heated": 14,
-   "Steady": 17
+   "Calm": 25,
+   "Steady": 26,
+   "Heated": 8,
+   "Overwhelmed": 4
   },
-  "extras": 0,
-  "nudges": 3,
-  "heldBack": 6,
+  "extras": 3,
+  "nudges": 5,
+  "heldBack": 7,
   "raidsDeclared": 8
  },
  "orderRejected": 0

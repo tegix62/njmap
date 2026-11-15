@@ -35,3 +35,7 @@ Run 2026-11-15 with `node tools/goblin/run.mjs --seeds 10 --days 21 --bot carefu
 ## The three Ledgers for S8
 
 `docs/goblins/ledgers/ledger-careful-1.md`, `ledger-bold-1.md`, `ledger-passive-1.md` (seed 1, with their metrics files beside them). Wording is all placeholder.
+
+## After the read (2026-11-15)
+
+The user skimmed the Ledgers, said they were too long to absorb in full, and that they would play from the skim. Finding 1's variant was adopted as D210: with `frontMaxGain` 1 the tables above for the bots become Careful 44.9 townships, 135 won / 41 lost, 8.1 units per township; Bold 56.1 townships, 254 won / 151 lost, 9.9 units per township. The three Ledgers in `ledgers/` were regenerated under the new default. A shorter Ledger (a daily digest) is a to-do for M1.

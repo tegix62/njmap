@@ -144,22 +144,30 @@ test('Lever: needs a known fact, adds +2, and the defender\'s Greedy, Vain and C
   assert.ok(frontActions(st, st.fronts[id]).includes('lever'));
   const r = act(board, st, id, 'lever', [2, 4]);
   const b = ev(r.events, 'front_beat')[0];
-  assert.equal(b.total, 4, '+2 and +3 clamped to +4'); assert.equal(b.roll, 10); assert.equal(b.change, 2);
-  assert.equal(b.standing, 'Commanding', 'Even up two is Commanding');
-  assert.equal(ev(r.events, 'front_closed')[0].verdict, 'Yielded');
+  assert.equal(b.total, 4, '+2 and +3 clamped to +4'); assert.equal(b.roll, 10); assert.equal(b.change, 1, 'a band of up two is capped at one step (D210)');
+  assert.equal(b.standing, 'Ahead');
+  assert.equal(ev(r.events, 'front_closed').length, 0);
+  const r2 = act(board, r.state, id, 'lever', [2, 4]);
+  assert.equal(ev(r2.events, 'front_beat')[0].standing, 'Commanding');
+  assert.equal(ev(r2.events, 'front_closed')[0].verdict, 'Yielded');
+  // the uncapped band is still available as a world rule
+  const { board: b3, w: w3 } = setup(); w3.rules = { frontMaxGain: 2 };
+  let s3 = open(b3, w3).state; s3 = act(b3, s3, fid(s3), 'probe', [4, 1]).state;
+  assert.equal(ev(act(b3, s3, fid(s3), 'lever', [2, 4]).events, 'front_closed')[0].verdict, 'Yielded', 'Even up two is Commanding when the cap is 2');
 });
 
 test('Commanding: the defender yields, the attacker takes the township with no losses, and the closeup decides the captain', () => {
   const { board, w } = setup({ refuge: true });
   let st = open(board, w).state; const id = fid(st);
   st = act(board, st, id, 'probe', [4, 1]).state;
-  const r = act(board, st, id, 'lever', [2, 4]);
+  st = act(board, st, id, 'lever', [2, 4]).state;   // Even to Ahead
+  const r = act(board, st, id, 'lever', [2, 4]);     // Ahead to Commanding
   const c = ev(r.events, 'front_closed')[0];
   assert.equal(c.lost.a, 0); assert.equal(c.lost.d, 0);
   assert.equal(r.state.towns.B.owner, 'z'); assert.equal(r.state.towns.B.force, 10, 'the units arrive intact');
   assert.equal(r.state.towns.B.captain, st.fronts[id].lead, 'the leading captain moves in');
   assert.equal(Object.keys(r.state.fronts).length, 0);
-  assert.deepEqual(c.learned, ['trait:greedy']); assert.ok(c.exposed.includes('A') === (r.state.towns.A.force <= 1));
+  assert.ok(c.learned.includes('trait:greedy'), 'the tally lists what was learned'); assert.ok(c.exposed.includes('A') === (r.state.towns.A.force <= 1));
   // Greedy (grab) and Vain (stand) do not pull both ways with a flee, so no roll: the captain retreats to a friendly neighbour with their units
   const cu = ev(r.events, 'closeup')[0];
   assert.equal(cu.roll, null); assert.equal(cu.what, 'fled'); assert.ok(['C', 'D'].includes(cu.to));
@@ -246,16 +254,16 @@ test('paper test 02, replayed with the same choices and forced maneuver dice: sa
     r = step(board, st, [{ type: 'front', clan: 'z', front: id, action: 'decision' }], 0, { rng: scripted([], seed) });
     return { log, tally: ev(r.events, 'front_closed')[0], state: r.state, events: r.events, def, ld };
   };
-  // Behind by the river, a probe finds Greedy and does not move, a Lever on Greedy moves up two to Ahead
+  // Behind by the river, a probe finds Greedy and does not move, a Lever on Greedy moves up one (the cap) to Even
   const a = play('paper');
-  assert.deepEqual(a.log, ['Behind', 'Ahead']);
+  assert.deepEqual(a.log, ['Behind', 'Even']);
   assert.deepEqual(play('paper').tally, a.tally, 'deterministic');
   const verdicts = new Set();
   for (let i = 0; i < 30; i++) {
     const p = play('paper' + i); verdicts.add(p.tally.verdict);
-    assert.deepEqual(p.log, ['Behind', 'Ahead']);
+    assert.deepEqual(p.log, ['Behind', 'Even']);
     assert.equal(p.tally.beats, 3); assert.ok(p.tally.learned.includes('trait:greedy'));
-    assert.equal(ev(p.events, 'front_beat')[0].rounds[0].d.length, 2, 'Ahead: the defender has no extra die');
+    assert.equal(ev(p.events, 'front_beat')[0].rounds[0].d.length, 2, 'Even: two dice, best die +1');
     if (p.tally.verdict === 'Won') {
       assert.equal(p.state.towns.B.owner, 'z'); assert.ok(['captured', 'dead'].includes(p.state.chars[p.def.id].status), 'no refuge: captured, as in the paper test (or killed by the enemy injury roll)');
       assert.equal(p.tally.lost.a + p.state.towns.B.force, 17); assert.equal(p.tally.lost.d, 9);

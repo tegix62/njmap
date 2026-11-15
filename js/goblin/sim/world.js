@@ -21,7 +21,7 @@ export const DEFAULT_RULES = Object.freeze({ townForceCap: K2.townForceCap, recr
   aiCaptureCooldownTicks: 72,  // conquest tempo (D209): after taking a township an AI clan waits this many ticks before attacking again (0 = off)
   leaderShare: 0.5,            // (D209) a clan holding more than this share of the theatre needs leaderAttackRatio to attack (1.01 = never)
   leaderAttackRatio: 3.0,
-  frontMaxGain: 2 });          // the most a single front maneuver may raise standing (2 as specified; 1 is a tuning variant)
+  frontMaxGain: K4.frontMaxGain });   // the most a single front maneuver may raise standing (D210: 1)
 const R = (w) => w.rules || DEFAULT_RULES;
 
 export const hourOf = (w) => (w.startHour + w.tick) % 24;
