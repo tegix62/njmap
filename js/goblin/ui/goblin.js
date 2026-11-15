@@ -28,6 +28,7 @@ import { scoutMods, isNight, hasAp } from '../sim/sitting.js';
 import { digestOf } from '../sim/digest.js';
 import { MUNI_LABEL_IDS } from '../../style.js';
 import { createFilm, battlesOf } from './film.js';
+import { createRush } from './rush.js';
 
 const ME = 'goblins';
 const CLANS = [{ id: 'goblins', kind: 'goblin', lord: 'human' }, { id: 'rats', kind: 'rat', lord: 'ai' }, { id: 'toads', kind: 'toad', lord: 'ai' }];
@@ -59,7 +60,23 @@ export function initGoblin(ctx) {
     G = { board: makeBoard(bj, content, rj), content };   // content attached: townships can have captains, and so fronts
   }
   const persist = () => store.set(SAVE, save);
-  let film = null;
+  let film = null, rush = null, rushing = false;
+  /** Rush: find the named township on the map; a throwaway game on a copy of the board, writing only real reviews (see rush.js). */
+  async function startRush() {
+    rush = rush || createRush({ map, byKey: ctx.byKey, board: G.board, locate: (p) => ctx.locate(p), hooks: {
+      begin: (owner) => {
+        rushing = true; panel(''); sel = null;
+        for (const mk of pins) mk.remove(); pins = [];
+        for (const l of ['gob-force', 'gob-name']) if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', 'none');
+        for (const id of Object.keys(owner)) { const m = muniOf(id); if (m) map.setFeatureState({ source: 'munis', id: m.id }, { gc: NO[owner[id]] || 0, gf: 0, gs: 0, gt: 0, gr: 0 }); }
+      },
+      setOwner: (id, no) => { const m = muniOf(id); if (m) map.setFeatureState({ source: 'munis', id: m.id }, { gc: no }); },
+      flash: (id, on) => { const m = muniOf(id); if (m) map.setFeatureState({ source: 'munis', id: m.id }, { gs: on ? 1 : 0 }); },
+      review: (key, ok) => { recordReview(store, key, ok); markPlayed(key); },
+      end: () => { rushing = false; for (const l of ['gob-force', 'gob-name']) if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', 'visible'); paint(); fitTheatre(); },
+    } });
+    try { await rush.play(w()); } catch (err) { console.error('rush', err); rushing = false; panel(`<div class="gob"><p>Rush failed: ${esc(err && err.message || err)}</p>${closeBtn}</div>`); }
+  }
   /** Play the fights in `events` as a film, then call `then`. The map's own paint is held back while it runs and redone after. */
   async function showFilm(events, then) {
     film = film || createFilm({ map, byKey: ctx.byKey, board: G.board, hooks: {
@@ -664,7 +681,7 @@ export function initGoblin(ctx) {
 
   // ---------------------------------------------------------------- taps and buttons
   function onMapClick(e) {
-    if (ctx.mode !== 'goblin' || !G) return;
+    if (ctx.mode !== 'goblin' || !G || rushing) return;
     const m = ctx.locate([e.lngLat.lng, e.lngLat.lat]);
     if (!m) return;
     const id = m.key;
@@ -766,6 +783,7 @@ export function initGoblin(ctx) {
     else if (a === 'do') { catchUp(); paint(); hud(); doPanel(); }
     else if (a === 'digest') { catchUp(); paint(); hud(); digestPanel(); }
     else if (a === 'ledger') ledgerPanel();
+    else if (a === 'rush') startRush();
     else if (a === 'film') { let ev = save.events.slice(-80); if (!battlesOf(ev, ME, 3, w()).length) ev = demoFight(); panel(''); showFilm(ev, () => {}); }
     else if (a === 'newwar') panel('<div class="gob"><p>Leave this war and start another? The current one is lost.</p><div class="gobrow"><button class="primary" data-g="newwar">Start another</button><button data-g="close">Keep this one</button></div></div>');
   }

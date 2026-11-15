@@ -3538,3 +3538,25 @@ body:not([data-mode='goblin']) .gobpin { display: none; }
 @keyframes shake { 20% { transform: translateX(-5px); } 60% { transform: translateX(5px); } }
 @keyframes fall { to { transform: translateY(14px) rotate(70deg) scale(0.7); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .fb, .fb-flag, .film-card .fc-side, .film-stamp { animation: none !important; } }
+
+/* ---- redesign R2: Rush (the quiz is the war) ---- */
+#rush { position: fixed; inset: 0; z-index: 55; pointer-events: none; font-family: Georgia, 'Times New Roman', serif; }
+.rs-top { position: absolute; left: 0; right: 0; top: 0; padding: 10px 14px 12px; background: linear-gradient(#0b0b0e 70%, rgba(11, 11, 14, 0)); text-align: center; border-bottom: 0; }
+.rs-kind { color: #d9b84a; font-size: 12px; letter-spacing: 0.22em; }
+.rs-name { color: #f6e7b4; font-size: clamp(30px, 10vw, 46px); font-weight: 700; line-height: 1.1; text-shadow: 0 3px 0 #7a1d12; }
+.rs-bar { height: 6px; margin: 8px auto 0; max-width: 320px; background: #2a2a30; border-radius: 3px; overflow: hidden; }
+.rs-bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #b8860b, #ffd34d); }
+.rs-score { position: absolute; left: 12px; top: 128px; color: #fff; background: rgba(11, 11, 14, 0.8); border: 2px solid #b8860b; border-radius: 6px; padding: 3px 9px; font-size: 15px; }
+.rs-score b { font-size: 22px; color: #ffd34d; }
+.rs-msg { position: absolute; left: 0; right: 0; bottom: 120px; text-align: center; color: #f6e7b4; font-size: 22px; text-shadow: 0 2px 6px #000, 0 0 3px #000; }
+.rs-msg.good { color: #ffd34d; } .rs-msg.bad { color: #ff9b8a; }
+.rs-msg[hidden] { display: none; }
+.rs-quit { position: absolute; right: 10px; top: 128px; pointer-events: auto; background: rgba(11, 11, 14, 0.8); color: #f6e7b4; border: 1px solid #b8860b; border-radius: 6px; padding: 5px 10px; font-size: 13px; }
+.rs-end { position: absolute; left: 8%; right: 8%; bottom: 90px; pointer-events: auto; background: #0b0b0e; border: 2px solid #b8860b; border-radius: 10px; padding: 14px 16px; text-align: center; color: #f6e7b4; }
+.rs-end h3 { margin: 0 0 6px; font-size: 22px; color: #ffd34d; }
+.rs-end p { margin: 0 0 10px; }
+.rs-row { display: flex; gap: 10px; justify-content: center; }
+.rb { width: 20px; height: 20px; border-radius: 50%; pointer-events: none; animation: ring 1.2s ease-out forwards; }
+.rb.win { border: 4px solid #ffd34d; } .rb.loss { border: 4px solid #ef4444; } .rb.shield { border: 4px solid #60a5fa; }
+@keyframes ring { from { transform: scale(0.4); opacity: 1; } to { transform: scale(9); opacity: 0; } }
+body:not([data-mode='goblin']) #rush { display: none; }
