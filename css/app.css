@@ -3486,3 +3486,10 @@ body[data-mode='goblin'] #gobbar {
 .dice.them { color: #9a3412; }
 @keyframes tumble { 0% { transform: translateY(-14px) rotate(-220deg); opacity: 0; } 70% { transform: translateY(2px) rotate(15deg); opacity: 1; } 100% { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .dice i { animation: none; } }
+
+/* ---- redesign R1: faces on the map, a short header ---- */
+.gobpin { width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 3px solid #555; background: #fff; overflow: hidden; display: grid; place-items: center; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); cursor: pointer; }
+.gobpin .portrait { background: none; border-radius: 0; }
+.gobpin.mine { box-shadow: 0 0 0 2px #fff, 0 2px 6px rgba(0, 0, 0, 0.35); }
+body:not([data-mode='goblin']) .gobpin { display: none; }
+.gobhud { font-size: 15px; }

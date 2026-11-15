@@ -285,6 +285,9 @@ Nothing here blocks building: every item has a flagged placeholder until it arri
 
 ## 9. Status
 
+**2026-11-15: the user played the result of F0 to F7 and found it very boring.** The order and emphasis of this plan are superseded by `18-redesign.md` (stages R0 to R6). The simulation built here stays; F8 and F9 are on hold.
+
+
 | Stage | Status |
 |---|---|
 | F0 | built 2026-11-15; gate pending (the user plays three days). Rival recruit split adopted (0.5), guided first move (four taps from the home page), targets script and tuning plan written. 5 of 9 targets pass; Bold's win rate, the passive player's losses and Careful's lost fronts still fail (see 11-tuning-plan.md) |
