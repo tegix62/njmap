@@ -4,6 +4,11 @@ Written 2026-11-15. M0 is the first stage of the build order (D199): the rules a
 
 **Read first:** `04-systems-spec.md` (the rules), then `03-design-summary.md` (what the game is). The decisions log (01) is the record, not required reading. Sections marked [M0] in the spec are in scope; nothing else is.
 
+## Status
+
+- **S1 built 2026-11-15** (`tools/build_goblin_board.py`, `data/goblin-board.json`, 418 KB, about 50 KB gzipped). All asserted anchors hold. Findings that changed the spec: (1) the river tolerance is **150 m**, not 50 m: wide rivers such as the Raritan sit about 100 m off the boundary line; (2) **Paterson–Totowa is a land border**, so the earlier claim that the Passaic runs along half of it was wrong (it came from sampling uneven border vertices; the builder samples every 25 m); (3) highways are stored in several pieces, and the two carriageways of one road are separate duplicates, so `lanes[].segments` keeps each ordered piece and drops any that adds no new link; (4) only 8 ridge lines exist (the Watchungs are not among them), so ridge borders are few (9); (5) 166 of 1,445 borders are river borders and 568 are crossed by a highway.
+- S2 to S8: not started.
+
 ## What M0 must answer
 
 | Question | Hole | How M0 answers it |
@@ -42,7 +47,7 @@ Plain ES modules, no dependencies, no DOM, no `Date`, no `Math.random` inside `j
 Each step is small, ends with something runnable, and has a check that can fail. Do them in order; commit after each.
 
 **S1. The board.** Write `tools/build_goblin_board.py` per spec section 3.
-- Done when: 564 towns and 1,445 borders are written; every border has miles and river, ridge and highway fields; the spot-check table prints; the four anchors in spec section 3 hold (Paterson–Totowa river, Paterson–Hawthorne river, Paterson–Haledon none, Clifton–Totowa not neighbours).
+- Done when: 564 towns and 1,445 borders are written; every border has miles and river, ridge and highway fields; the spot-check table prints; the anchors in spec section 3 hold (Paterson–Hawthorne, Newark–Harrison and New Brunswick–Highland Park are river borders; Paterson–Totowa, Paterson–Haledon and Haledon–Totowa are land borders; Clifton–Totowa are not neighbours).
 - Then stop and show the user the 12-row spot-check table. This is the one human check in S1 (D187).
 
 **S2. Random numbers and the skirmish.** `rng.js` (mulberry32 or similar; the state is a value passed in and returned). `skirmish.js` per spec section 5, returning the rounds as events.

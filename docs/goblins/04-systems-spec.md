@@ -46,8 +46,9 @@ Built once by `tools/build_goblin_board.py` into `data/goblin-board.json` (D184 
 
 - `towns[id] = { name, type, county, pop, centroid, neighbours: [id] }` for all 564 townships. `id` is `"Name|County"` (names repeat across counties).
 - `borders["a~b"] = { miles, river: name|null, ridge: name|null, highway: [names] }` for all 1,445 pairs. `highway` lists highways that pass through both towns.
-- **River on a border, the rule (D187):** sample the shared boundary; the border is a river border when at least 25% of its points lie within 0.05 miles of a river line. Measure against the boundary line itself, never by points inside a town (the mistake in paper test 01, H42). The same test with ridges.
-- The builder prints a spot-check table of 12 borders for a human to compare with a map. Known anchors: Paterson–Totowa is a Passaic border (about half its 1.5 miles); Paterson–Hawthorne is entirely the Passaic; Paterson–Haledon and Haledon–Totowa have no river; Clifton and Totowa do not touch.
+- **River on a border, the rule (D187):** sample the shared boundary; the border is a river border when at least 25% of its points (sampled every 25 m) lie within 150 m of a river line. Measure against the boundary line itself, never by points inside a town (the mistake in paper test 01, H42). The same test with ridges.
+- The builder prints a spot-check table of 12 borders for a human to compare with a map. Anchors the builder asserts (measured, 2026-11-15): Paterson–Hawthorne, Newark–Harrison and Garfield–Passaic City are Passaic borders; New Brunswick–Highland Park is a Raritan border; Paterson–Totowa, Paterson–Haledon and Haledon–Totowa are land borders (the Passaic crosses Paterson–Totowa but does not run along it); Clifton and Totowa do not touch. River tolerance is 150 m, because wide rivers sit about 100 m off the boundary line.
+- **Lanes (D185):** `lanes[] = { road, segments: [[townId, ...], ...], towns, meets }`. Each segment is one ordered piece of a highway; consecutive towns in a segment are joined by a fast lane. Segments are never joined to each other (the stored pieces are not in route order, and the two carriageways of a road are duplicates the builder drops).
 - **Theatre [M0]:** the playable set is the home township plus everything within N border steps (D183, default 3, clamped to 12–60 townships).
 
 ## 4. Time [M0]

@@ -4,7 +4,7 @@ Run 2026-11-14 in text, Claude as the engine, the user as the goblin lord. Purpo
 
 ## Setting (from data/nj.topo.json and data/nj-geoms.json)
 
-Goblins hold Paterson. Haledon shares a land border with Paterson and with Totowa (0.4 miles, no river). The Passaic runs along about half of the 1.5-mile Paterson–Totowa border; I-80 and Route 46 run through both towns.
+Goblins hold Paterson. Haledon shares a land border with Paterson and with Totowa (0.4 miles, no river). **Correction (2026-11-15):** this test said the Passaic runs along about half of the Paterson–Totowa border. It does not (see H42): Paterson–Totowa is a land border, and I-80 and Route 46 run through both towns.
 
 ## Hidden state (revealed)
 
@@ -36,7 +36,7 @@ Goblins hold Paterson. Haledon shares a land border with Paterson and with Totow
 3. **Patience and risk were both rewarded** (H41). Scouting found the lever; the gamble on the river and the all-in decision were the user's own risks.
 4. **Losses ran high but felt fair.** Ten of twenty goblins over two fights. Worth watching in tuning (H48), not changing yet.
 5. **The board was readable.** The user sensed the empty Haledon before being told. The game must still show exposed townships plainly; the test engine failed to flag it at the time.
-6. **Real geography made the choice real.** The land border from Haledon against the river from Paterson was a genuine decision taken from the map. This test also found that test 01's in-test geography correction was itself wrong (H42).
+6. **The geography premise of beat 1 was wrong.** The choice between a land border from Haledon and a river crossing from Paterson rested on the claim that the Passaic runs along the Paterson–Totowa border. A later, evenly sampled check shows it does not. The user's gamble was real and the front mechanics were genuinely tested, but "cross the river" was not a true option here. The choice should be re-run on a true river border (for example Paterson–Hawthorne or New Brunswick–Highland Park) before it is counted as evidence.
 7. **A design error:** front beat 1's third option was strictly worse than the second (same march, worse start), against D156. The user picked it deliberately as a gamble, but a real game should not offer a choice that is never right.
 8. **A new rule is needed** for captured captains (H51).
 9. **The test-only front rules worked** and are proposed for adoption (D200).
