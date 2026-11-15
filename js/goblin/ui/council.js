@@ -449,6 +449,8 @@ export function initCouncil(ctx) {
       await Promise.all(Object.values(w().chars).map((c) => face(c, c.clan)));
       paint(); next();
     },
+    /** For the browser check only: show the ink plate card of your first captain. */
+    async debugPlate() { const c = Object.values(w().chars).find((x) => x.clan === ME); return card([c.name, 'is taken prisoner'], 4000, 'bad', await ink(c, ME)); },
     leave() {
       document.body.classList.remove('council-on', 'cn-far'); clearInterval(typer);
       clearMap(); showLayers(false); if (root) root.hidden = true; phase = 'idle';

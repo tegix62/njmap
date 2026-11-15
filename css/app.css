@@ -3574,7 +3574,7 @@ body:not([data-mode='goblin']) #rush { display: none; }
 /* ---- redesign R3: Council (goblin mode as an old strategy game) ---- */
 @font-face { font-family: VT323; font-display: swap; src: url('../fonts/vt323-latin-400-normal.woff2') format('woff2'); }
 @font-face { font-family: 'Press Start 2P'; font-display: swap; src: url('../fonts/press-start-2p-latin-400-normal.woff2') format('woff2'); }
-body.council-on #gobbar, body.council-on #hud, body.council-on #sheet, body.council-on .maplibregl-ctrl-bottom-left, body.council-on #compass, body.council-on #edges, body.council-on .fab, body.council-on #fabs { display: none !important; }
+body.council-on #gobbar, body.council-on #hud, body.council-on #sheet, body.council-on .maplibregl-ctrl-bottom-left, body.council-on #compass, body.council-on #edges, body.council-on .fab, body.council-on #fabs, body.council-on #lookFab { display: none !important; }
 #council { position: fixed; inset: 0; z-index: 40; pointer-events: none; font-family: VT323, ui-monospace, monospace; color: #fff; --frame: #e2551d; --panel: #0d1250; }
 #council[hidden] { display: none; }
 #council > * { pointer-events: auto; }
