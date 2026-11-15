@@ -21,6 +21,7 @@ export const DEFAULT_RULES = Object.freeze({ townForceCap: K2.townForceCap, recr
   aiCaptureCooldownTicks: 72,  // conquest tempo (D209): after taking a township an AI clan waits this many ticks before attacking again (0 = off)
   leaderShare: 0.5,            // (D209) a clan holding more than this share of the theatre needs leaderAttackRatio to attack (1.01 = never)
   leaderAttackRatio: 3.0,
+  aiRecruitSpread: 0,          // 1: an AI reinforces its weakest border township like a human instead of massing at its best attack position (experiment, H52)
   frontMaxGain: K4.frontMaxGain });   // the most a single front maneuver may raise standing (D210: 1)
 const R = (w) => w.rules || DEFAULT_RULES;
 
@@ -180,7 +181,7 @@ function recruits(w, board, emit) {
     const enemyNb = (t) => board.neighbours(t).filter((x) => w.towns[x] && w.towns[x].owner && w.towns[x].owner !== clan.id);
     const border = mine.filter((t) => enemyNb(t).length);
     let at;
-    if (clan.lord === 'ai' && border.length) {
+    if (clan.lord === 'ai' && border.length && !R(w).aiRecruitSpread) {
       // an AI masses its recruits where it can attack: the border township with the best force against its weakest attackable neighbour
       const score = (t) => { const tg = enemyNb(t).filter((x) => !shielded(w, w.towns[x].owner) && !protectedHome(w, x)).map((x) => w.towns[x].force); return tg.length ? w.towns[t].force / Math.max(1, Math.min(...tg)) : -1; };
       at = border.slice().sort((a, b) => (score(b) - score(a)) || byId(a, b))[0];

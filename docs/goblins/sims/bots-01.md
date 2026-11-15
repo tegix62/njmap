@@ -39,3 +39,14 @@ Run 2026-11-15 with `node tools/goblin/run.mjs --seeds 10 --days 21 --bot carefu
 ## After the read (2026-11-15)
 
 The user skimmed the Ledgers, said they were too long to absorb in full, and that they would play from the skim. Finding 1's variant was adopted as D210: with `frontMaxGain` 1 the tables above for the bots become Careful 44.9 townships, 135 won / 41 lost, 8.1 units per township; Bold 56.1 townships, 254 won / 151 lost, 9.9 units per township. The three Ledgers in `ledgers/` were regenerated under the new default. A shorter Ledger (a daily digest) is a to-do for M1.
+
+## Experiment: spread the AI's recruits (not adopted)
+
+`node tools/goblin/experiments/hoard.mjs`, 10 seeds, 21 days, rule `aiRecruitSpread` (0 = mass at the best attack position, D208; 1 = reinforce the weakest border township like a human).
+
+| | end townships (Careful / Bold / Passive) | biggest AI stack (Careful / Passive) | AI-vs-AI fights per run | raids per run |
+|---|---|---|---|---|
+| mass (default) | 44.9 / 56.1 / 14.0 | 121 / 193 | 4 to 7 | 6 to 8 |
+| spread | 24.4 / 40.9 / 16.3 | 40 / 41 | 0.5 to 1.1 | 7 to 16 |
+
+Spreading cures the hoarding and stops the runaway conquest (the AI now fights back: 9.5 and 15.6 raids against the careful and bold lords), but it nearly stops AI-vs-AI war (about one fight per run), because forces stay level and nothing reaches 2 to 1. With it on, four existing tests fail for the same reason (captains are rarely captured in a 365-day run; a passive player has a visible chance on only 45 of 400 player-days; the AI no longer masses). Left **off by default**; the choice between a hoarding AI that wars on itself and a level AI that presses the player belongs with the economy work (Food upkeep, H52).
