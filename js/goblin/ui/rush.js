@@ -32,27 +32,70 @@ export function createRush({ map, byKey, board, locate, hooks, me = 'goblins' })
 
   // ---- camera and banners (the banner look is the film's: a flag over a crowd of tiny soldiers)
   const eased = (ms, fn, alive) => new Promise((res) => { const t0 = performance.now(); (async function loop() { for (;;) { if (!alive()) return res(); const t = Math.min(1, (performance.now() - t0) / ms); fn(t); if (t >= 1) return res(); await frame(); } })(); });
-  function banner(clan, p) {
-    const d = document.createElement('div'); d.className = 'fb'; d.style.setProperty('--c', COLOUR[clan]);
-    d.innerHTML = `<div class="fb-flag"><b>⚑</b></div><div class="fb-crowd">${'<i></i>'.repeat(9)}</div>`;
-    const b = { el: d, mk: new maplibregl.Marker({ element: d, anchor: 'bottom' }).setLngLat(p).addTo(map), at(q) { b.mk.setLngLat(q); } };
+  /** An army: a flag leading a column of little soldiers, each a step behind the one in front. place(path, t) puts it t (0..1) of the way along a list of points. */
+  const FIGS = 13;
+  const segs = (ps) => { const seg = []; let tot = 0; for (let i = 0; i < ps.length - 1; i++) { const d = Math.hypot((ps[i + 1][0] - ps[i][0]) * 0.75, ps[i + 1][1] - ps[i][1]); seg.push(d); tot += d; } return { seg, tot }; };
+  function along(ps, t) {
+    const { seg, tot } = segs(ps);
+    let at = Math.max(0, Math.min(1, t)) * tot, i = 0;
+    while (i < seg.length - 1 && at > seg[i]) { at -= seg[i]; i++; }
+    const f = seg[i] ? Math.min(1, at / seg[i]) : 0, a = ps[i], z = ps[i + 1];
+    return { pos: [lerp(a[0], z[0], f), lerp(a[1], z[1], f)], leg: i, brg: bearingOf(a, z) };
+  }
+  /** The polyline from its start to t (0..1) of the way: the trail an army has left. */
+  function cut(ps, t) {
+    const { seg, tot } = segs(ps); let rem = Math.max(0, Math.min(1, t)) * tot; const out = [ps[0]];
+    for (let i = 0; i < seg.length; i++) { if (rem >= seg[i]) { out.push(ps[i + 1]); rem -= seg[i]; } else { const f = seg[i] ? rem / seg[i] : 0; out.push([lerp(ps[i][0], ps[i + 1][0], f), lerp(ps[i][1], ps[i + 1][1], f)]); break; } }
+    return out;
+  }
+  function banner(clan) {
+    const mk = (cls, html) => { const d = document.createElement('div'); d.className = cls; d.style.setProperty('--c', COLOUR[clan]); d.innerHTML = html; return new maplibregl.Marker({ element: d, anchor: 'bottom' }).setLngLat([0, 0]).addTo(map); };
+    const flag = mk('gfb', '<div class="fb-flag"><b>⚑</b></div>');
+    const figs = Array.from({ length: FIGS }, (_, i) => mk('gfig' + (i % 3 ? '' : ' big'), '<i></i>'));
+    const b = { clan, flag, figs, el: flag.getElement(), path: null, place(path, t) {
+      b.path = path; const ps = path.map(pt);
+      flag.setLngLat(along(ps, t).pos);
+      const tot = segs(ps).tot || 1; figs.forEach((m, i) => { const lag = (i + 1) * 0.0024 / tot, o = along(ps, Math.max(0, t - lag)); const side = ((i * 7919) % 13 - 6) * 0.00022; m.setLngLat([o.pos[0] + side, o.pos[1] + ((i * 31) % 7 - 3) * 0.00012]); m.getElement().style.opacity = t - lag < -0.001 ? 0 : 1; });
+    } };
     banners.push(b); return b;
   }
-  const drop = (b) => { b.mk.remove(); banners = banners.filter((x) => x !== b); };
+  const drop = (b) => { b.flag.remove(); b.figs.forEach((m) => m.remove()); banners = banners.filter((x) => x !== b); };
+  // the trail an army leaves: a glowing line along the border path, drawn as it walks
+  const TRAIL = 'rushtrail';
+  function trail(coords, colour) {
+    if (!map.getSource(TRAIL)) {
+      map.addSource(TRAIL, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({ id: TRAIL + '-halo', type: 'line', source: TRAIL, layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#000', 'line-width': 11, 'line-opacity': 0.55, 'line-blur': 2 } });
+      map.addLayer({ id: TRAIL, type: 'line', source: TRAIL, layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': ['get', 'c'], 'line-width': 6 } });
+    }
+    map.getSource(TRAIL).setData({ type: 'FeatureCollection', features: coords && coords.length > 1 ? [{ type: 'Feature', properties: { c: colour }, geometry: { type: 'LineString', coordinates: coords } }] : [] });
+  }
+  const trailOff = () => { if (map.getSource(TRAIL)) trail(null); };
+  const trailUpTo = (ps, t) => cut(ps, t);
   function burst(p, cls) { const d = document.createElement('div'); d.className = 'rb ' + cls; const m = new maplibregl.Marker({ element: d }).setLngLat(p).addTo(map); markers.push(m); setTimeout(() => { m.remove(); markers = markers.filter((x) => x !== m); }, 1400); }
-  const clearAll = () => { for (const b of banners) b.mk.remove(); for (const m of markers) m.remove(); banners = []; markers = []; };
+  const clearAll = () => { for (const b of [...banners]) drop(b); for (const m of markers) m.remove(); markers = []; trailOff(); };
 
   function overview(ids, ms = 900) { const ps = ids.map(pt), b = ps.reduce((a, p) => [Math.min(a[0], p[0]), Math.min(a[1], p[1]), Math.max(a[2], p[0]), Math.max(a[3], p[1])], [180, 90, -180, -90]); map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: { top: 150, bottom: 70, left: 24, right: 24 }, bearing: 0, pitch: 0, duration: ms, essential: true }); return sleep(ms + 80); }
-  /** Walk a banner along a list of township ids with the camera behind it, tilted, turning at each bend. */
-  async function walk(b, ids, ms, alive, follow = true) {
-    const ps = ids.map(pt), legs = ps.length - 1; if (legs < 1) return;
-    let cam = { c: map.getCenter(), z: map.getZoom(), br: map.getBearing(), p: map.getPitch() };
+  /** March an army along township ids with a lit trail and the camera swooping in behind it, tilted and turning at each bend. */
+  async function walk(b, ids, ms, alive) {
+    const ps = ids.map(pt); if (ps.length < 2) return;
+    const colour = COLOUR[b.clan];
+    b.place(ids, 0);
+    const start = along(ps, 0);
+    // swoop in behind the army before it moves
+    const from = { c: map.getCenter(), z: map.getZoom(), br: map.getBearing(), p: map.getPitch() };
+    await eased(650, (t) => { const k = ease(t); map.jumpTo({ center: [lerp(from.c.lng, start.pos[0], k), lerp(from.c.lat, start.pos[1], k)], zoom: lerp(from.z, 11.4, k), bearing: lerp(from.br, shortest(from.br, start.brg), k), pitch: lerp(from.p, 52, k) }); }, alive);
+    let br = start.brg, z = 11.4, p = 52;
     await eased(ms, (t) => {
-      const k = t * legs, i = Math.min(legs - 1, Math.floor(k)), f = ease(k - i), a = ps[i], z = ps[i + 1];
-      const pos = [lerp(a[0], z[0], f), lerp(a[1], z[1], f)]; b.at(pos);
-      if (follow) { const target = bearingOf(a, z); cam.br = lerp(cam.br, shortest(cam.br, target), 0.06); cam.z = lerp(cam.z, 11.6, 0.05); cam.p = lerp(cam.p, 50, 0.05); map.jumpTo({ center: pos, zoom: cam.z, bearing: cam.br, pitch: cam.p }); }
+      const k = ease(t), cur = along(ps, k);
+      b.place(ids, k); trail(trailUpTo(ps, k), colour);
+      br = lerp(br, shortest(br, cur.brg), 0.08); z = lerp(z, 11.8, 0.04); p = lerp(p, 56, 0.04);
+      const bob = Math.sin(t * ms / 90) * 0.0004;
+      map.jumpTo({ center: [cur.pos[0], cur.pos[1] + bob], zoom: z, bearing: br, pitch: p });
     }, alive);
   }
+  /** A short shake of the whole map and a buzz, for an impact. */
+  async function shake(alive, amp = 0.0016) { const c0 = map.getCenter(); await eased(380, (t) => { const d = (1 - t) * amp; map.jumpTo({ center: [c0.lng + Math.sin(t * 60) * d, c0.lat + Math.cos(t * 47) * d] }); }, alive); if (navigator.vibrate) try { navigator.vibrate(40); } catch (e) { /* not available */ } }
 
   const $ = (s) => el.querySelector(s);
   function mount() {
@@ -99,19 +142,19 @@ export function createRush({ map, byKey, board, locate, hooks, me = 'goblins' })
         const E = board.neighbours(B).filter((n) => owner[n] && owner[n] !== me && owner[n] !== 'dwarves' && byKey.has(n)).sort(() => Math.random() - 0.5)[0];
         const clan = owner[E];
         setPrompt('A RIVAL ARMY IS COMING FOR', name(B)); stats.asked++;
-        const eb = banner(clan, pt(E)); const t0 = performance.now(), ms = DEFEND_SECONDS * 1000;
+        const eb = banner(clan), route = [E, B], eps = route.map(pt); let prog = 0; const t0 = performance.now(), ms = DEFEND_SECONDS * 1000; eb.place(route, 0);
         let stop = false;
-        (async () => { for (;;) { if (stop || !alive()) return; const f = Math.min(1, (performance.now() - t0) / ms); const a = pt(E), z = pt(B); eb.at([lerp(a[0], z[0], f * 0.92), lerp(a[1], z[1], f * 0.92)]); if (f >= 1) return; await frame(); } })();
+        (async () => { for (;;) { if (stop || !alive()) return; const f = Math.min(1, (performance.now() - t0) / ms); prog = f * 0.9; eb.place(route, prog); trail(trailUpTo(eps, prog), '#ef4444'); if (f >= 1) return; await frame(); } })();
         const res = await waitTap(DEFEND_SECONDS, alive, null, (key, ll) => { if (key === B) return false; if (key) { msg(`Not ${name(key)}. Find ${name(B)}.`, 'bad'); const m = new maplibregl.Marker({ color: '#b91c1c' }).setLngLat(ll).addTo(map); markers.push(m); setTimeout(() => m.remove(), 1200); return true; } return true; });
         stop = true;
         if (res.quit) break;
         if (res.key === B) {
           stats.held++; stats.found++; hooks.review(B, true);
           burst(pt(B), 'shield'); msg(`${name(B)} is ready. They turn back.`, 'good');
-          const from = eb.mk.getLngLat(), to = pt(E); await eased(1100, (t) => eb.at([lerp(from.lng, to[0], ease(t)), lerp(from.lat, to[1], ease(t))]), alive); await sleep(500); drop(eb);
+          const p0 = prog; await eased(1100, (t) => { eb.place(route, p0 * (1 - ease(t))); trail(trailUpTo(eps, p0 * (1 - ease(t)) + 0.0001), '#60a5fa'); }, alive); trailOff(); await sleep(300); drop(eb);
         } else {
           hooks.review(B, false); stats.lost++; owner[B] = clan; hooks.setOwner(B, NO[clan]);
-          await overview([B, E], 600); eb.at(pt(B)); burst(pt(B), 'loss'); msg(`${name(B)} fell. It was here.`, 'bad'); await sleep(1700); drop(eb);
+          await overview([B, E], 500); await eased(700, (t) => { eb.place(route, lerp(prog, 1, ease(t))); trail(trailUpTo(eps, lerp(prog, 1, ease(t))), '#ef4444'); }, alive); burst(pt(B), 'loss'); await shake(alive, 0.0022); msg(`${name(B)} fell. It was here.`, 'bad'); await sleep(1500); trailOff(); drop(eb);
         }
       } else {
         const T = targets[Math.floor(Math.random() * targets.length)];
@@ -121,8 +164,8 @@ export function createRush({ map, byKey, board, locate, hooks, me = 'goblins' })
         if (res.key === T) {
           stats.found++; stats.taken++; hooks.review(T, true);
           const path = marchPath(board, T, mine); msg(''); setPrompt('MARCH', name(T));
-          const ab = banner(me, pt(path[0])); await walk(ab, path, 900 + 900 * (path.length - 1), alive);
-          owner[T] = me; hooks.setOwner(T, NO[me]); burst(pt(T), 'win'); msg(`${name(T)} is yours.`, 'good'); score(); await sleep(1300); drop(ab);
+          const ab = banner(me); await walk(ab, path, 1800 + 1300 * (path.length - 1), alive);
+          owner[T] = me; hooks.setOwner(T, NO[me]); hooks.flash(T, true); burst(pt(T), 'win'); ab.el.classList.add('plant'); msg(`${name(T)} is yours.`, 'good'); score(); await shake(alive); hooks.flash(T, false); await sleep(1100); trailOff(); drop(ab);
         } else {
           hooks.review(T, false);
           setPrompt('IT WAS HERE', name(T)); msg(res.timeout ? 'Too slow.' : res.key ? `That was ${name(res.key)}.` : 'Not on the war map.', 'bad');

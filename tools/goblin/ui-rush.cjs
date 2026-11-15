@@ -20,7 +20,7 @@ const { chromium } = require('playwright'); const fs = require('fs');
     const key = await byName(name);
     if (r === 1) { await tap('Paterson City|Passaic'); } else { await page.evaluate((k) => { const m = window.njtf.byKey.get(k); window.njtf.map.easeTo({ center: m.pt, zoom: 10.5, duration: 0 }); }, key); await page.waitForTimeout(150); await tap(key); }
     console.log(r, kind, name, r === 1 ? 'WRONG tap' : 'right tap');
-    await page.waitForTimeout(1200); await page.screenshot({ path: `${out}/r${r}b.png` });
+    await page.waitForTimeout(1200); await page.screenshot({ path: `${out}/r${r}b.png` }); await page.waitForTimeout(1100); await page.screenshot({ path: `${out}/r${r}c.png` });
     await page.waitForTimeout(2500);
   }
   await page.waitForSelector('.rs-end', { timeout: 20000 }); await page.screenshot({ path: `${out}/end.png` });
