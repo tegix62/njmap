@@ -77,6 +77,13 @@ function policyBot(name, P) {
 export function makeBot(kind) {
   if (kind === 'careful') return policyBot('Careful', careful);
   if (kind === 'bold') return policyBot('Bold', bold);
+  if (kind === 'footholder') {   // H29's grind check: a lord who only does foothold runs, at the best-odds township, as often as actions allow
+    return { name: 'Footholder', newCtx: () => ({}), next(board, w, clan) {
+      const legal = legalOrders(board, w, clan).filter((o) => o.type === 'foothold' && o.method === 'swarm');
+      const score = (o) => Math.max(0, ...board.neighbours(o.town).filter((n) => w.towns[n] && w.towns[n].owner === clan).map((n) => w.towns[n].force - 1)) / Math.max(1, w.towns[o.town].force);
+      return legal.sort((a, b) => (score(b) - score(a)) || (a.town < b.town ? -1 : 1))[0] || null;
+    } };
+  }
   if (kind === 'passive') return { name: 'Passive', newCtx: () => ({}), next: () => null };
   throw new Error('unknown bot ' + kind);
 }

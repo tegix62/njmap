@@ -735,6 +735,81 @@
    "id": "bridge_built",
    "text": "{clan}'s bridge between {a} and {b} is finished.",
    "placeholder": true
+  },
+  {
+   "id": "foothold_placed",
+   "text": "{clan} got a foothold at {town} ({how}). Rolled {roll}{mods}. It will be decided at the next tick.",
+   "placeholder": true
+  },
+  {
+   "id": "foothold_failed",
+   "text": "{clan} tried for a foothold at {town} ({how}). Rolled {roll}{mods}. Nothing came of it.",
+   "placeholder": true
+  },
+  {
+   "id": "foothold_lost_unit",
+   "text": "{clan} tried for a foothold at {town} ({how}). Rolled {roll}{mods}. {lost} did not come back.",
+   "placeholder": true
+  },
+  {
+   "id": "foothold_held",
+   "text": "The foothold held: {clan} took {town} with {n} marched from {from}.",
+   "placeholder": true
+  },
+  {
+   "id": "foothold_lost",
+   "text": "The foothold at {town} did not hold: {why}.",
+   "placeholder": true
+  },
+  {
+   "id": "parleyed",
+   "text": "{clan} parleyed with {captain} at {town}. A day's truce.",
+   "placeholder": true
+  },
+  {
+   "id": "insult_ok",
+   "text": "{clan} insulted {captain} at {town}. It stung.{state}",
+   "placeholder": true
+  },
+  {
+   "id": "insult_fail",
+   "text": "{clan} insulted {captain} at {town}. It backfired: {captain} only held on tighter.",
+   "placeholder": true
+  },
+  {
+   "id": "duel_won",
+   "text": "{winner} beat {loser} in a duel at the border of {town}.{hurt}",
+   "placeholder": true
+  },
+  {
+   "id": "duel_draw",
+   "text": "{mine} and {theirs} fought to a standstill at the border of {town}.",
+   "placeholder": true
+  },
+  {
+   "id": "ransomed",
+   "text": "{clan} ransomed {char} back to {from} for {price} Coin.",
+   "placeholder": true
+  },
+  {
+   "id": "released",
+   "text": "{clan} let {char} go home. {char} will remember it.",
+   "placeholder": true
+  },
+  {
+   "id": "escaped",
+   "text": "{char} slipped away from the captors and went home ({why}).",
+   "placeholder": true
+  },
+  {
+   "id": "legend",
+   "text": "{char} of {clan} has won enough to be called a legend.",
+   "placeholder": true
+  },
+  {
+   "id": "truce_broken",
+   "text": "{clan} broke the truce at {town}.",
+   "placeholder": true
   }
  ],
  "force_words": [

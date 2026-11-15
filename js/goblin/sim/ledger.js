@@ -130,6 +130,22 @@ export function entriesOf(events, { board, state, content, clan }) {
       case 'hired': say(e.tick, cap(fill(T.hired, { clan: clanName(e.clan), n: e.n, town: town(e.town) }))); break;
       case 'bridge_started': say(e.tick, cap(fill(T.bridge_started, { clan: clanName(e.clan), a: town(e.a), b: town(e.b), majors: e.majors }))); break;
       case 'bridge_built': say(e.tick, cap(fill(T.bridge_built, { clan: clanName(e.clan), a: town(e.a), b: town(e.b) }))); break;
+      case 'foothold_run': {
+        const how = { swarm: 'with numbers', night: 'by night', ford: 'across the water' }[e.method];
+        const mods = e.mods.length ? ` (${e.mods.map((m) => `${m.v > 0 ? '+' : ''}${m.v} ${m.why}`).join(', ')})` : '';
+        say(e.tick, cap(fill(T[e.placed ? 'foothold_placed' : e.lost ? 'foothold_lost_unit' : 'foothold_failed'], { clan: clanName(e.clan), town: town(e.town), how, roll: e.roll, mods, lost: e.lost === 1 ? 'a unit' : `${e.lost} units` })));
+        break;
+      }
+      case 'foothold_held': say(e.tick, cap(fill(T.foothold_held, { clan: clanName(e.clan), town: town(e.town), n: e.n, from: town(e.from) }))); break;
+      case 'foothold_lost': say(e.tick, cap(fill(T.foothold_lost, { town: town(e.town), why: e.why }))); break;
+      case 'parleyed': say(e.tick, cap(fill(T.parleyed, { clan: clanName(e.clan), captain: char(e.char), town: town(e.town) }))); break;
+      case 'insulted': say(e.tick, cap(fill(T[e.ok ? 'insult_ok' : 'insult_fail'], { clan: clanName(e.clan), captain: char(e.char), town: town(e.town), state: e.humiliated ? ` ${char(e.char)} is now ${content.states.get('humiliated').word}.` : '' }))); break;
+      case 'dueled': say(e.tick, e.won === null ? cap(fill(T.duel_draw, { mine: char(e.mine), theirs: char(e.theirs), town: town(e.town) })) : cap(fill(T.duel_won, { winner: char(e.won ? e.mine : e.theirs), loser: char(e.loser), town: town(e.town), hurt: e.hurt === 'dead' ? ` ${char(e.loser)} did not survive.` : e.hurt === 'injured' ? ` ${char(e.loser)} was hurt.` : '' }))); break;
+      case 'ransomed': say(e.tick, cap(fill(T.ransomed, { clan: clanName(e.clan), char: char(e.char), from: clanName(e.from), price: e.price }))); break;
+      case 'released': say(e.tick, cap(fill(T.released, { clan: clanName(e.clan), char: char(e.char) }))); break;
+      case 'escaped': say(e.tick, cap(fill(T.escaped, { char: char(e.char), why: e.why }))); break;
+      case 'legend': say(e.tick, cap(fill(T.legend, { char: char(e.char), clan: clanName(e.clan) }))); break;
+      case 'truce_broken': say(e.tick, cap(fill(T.truce_broken, { clan: clanName(e.clan), town: town(e.town) }))); break;
       case 'promoted': say(e.tick, cap(fill(T.promoted, { clan: clanName(e.clan), char: char(e.char), town: town(e.town) }))); break;
       case 'succeeded': say(e.tick, cap(fill(T.succeeded, { char: char(e.char), town: town(e.town) }))); break;
       case 'captured': break;   // reported by the closing line or the skirmish line

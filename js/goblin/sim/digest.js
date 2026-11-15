@@ -16,6 +16,10 @@ function weight(e, clan) {
     case 'front_closed': return e.clan === clan ? 75 : 20;
     case 'clan_out': return 60;
     case 'player_absent': return 5;
+    case 'foothold_held': return e.clan === clan ? 72 : e.against === clan ? 100 : 20;
+    case 'foothold_lost': return 30;
+    case 'legend': return 60;
+    case 'escaped': return 35;
     case 'hunger': return e.clan === clan ? 92 : 0;
     case 'deserted': return e.clan === clan ? 88 : 0;
     case 'bridge_built': return e.clan === clan ? 40 : 0;

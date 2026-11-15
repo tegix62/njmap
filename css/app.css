@@ -3473,3 +3473,5 @@ body[data-mode='goblin'] #gobbar {
 .gob > button.primary { text-align: center; }
 
 .warnline { color: #b42318; font-weight: 600; }
+
+.gob h4 { margin: 10px 0 2px; font-size: 14px; }

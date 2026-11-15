@@ -13,7 +13,8 @@ import { makeRng, seedState } from '../sim/rng.js';
 import { fogMap, forceWord, rank } from './fog.js';
 import { recordReview } from './review.js';
 import { active as ecoActive, marchCost, maxMarch, income as ecoIncome, hasBridge } from '../sim/economy.js';
-import { K8 } from '../sim/constants.js';
+import { K8, K9 } from '../sim/constants.js';
+import { footholdMods, ransomPrice, roomFor } from '../sim/encounters.js';
 import { scoutMods, isNight, hasAp } from '../sim/sitting.js';
 import { digestOf } from '../sim/digest.js';
 import { MUNI_LABEL_IDS } from '../../style.js';
@@ -181,7 +182,8 @@ export function initGoblin(ctx) {
     if (!c || rank(L) < rank('familiar')) return '';
     if (c.clan !== ME && L === 'familiar') return '<p>★ A captain commands here.</p>';
     const known = (c.known[ME] || []).map(factWord);
-    return `<p>★ <b>${esc(c.name)}</b> of ${cap(c.clan)} commands here${c.injuries.length ? ` (hurt: ${c.injuries.map(esc).join(', ')})` : ''}. ${c.clan === ME ? '' : known.length ? `You know: ${known.map(esc).join(', ')}.` : 'You know nothing about them yet.'}</p>`;
+    const st = c.state && G.content.states.get(c.state) ? ` <b>${esc(G.content.states.get(c.state).word)}</b>.` : '';
+    return `<p>★ <b>${esc(c.name)}</b>${c.tier === 3 ? ' <i>(a legend)</i>' : ''} of ${cap(c.clan)} commands here${c.injuries.length ? ` (hurt: ${c.injuries.map(esc).join(', ')})` : ''}.${st} ${c.clan === ME ? '' : known.length ? `You know: ${known.map(esc).join(', ')}.` : 'You know nothing about them yet.'}</p>`;
   }
   /** What the player may be told about a township's owner and strength, by how well they know the place (D173, F1). */
   function whatYouKnow(id, L) {
@@ -205,7 +207,8 @@ export function initGoblin(ctx) {
     panel(`<div class="gob"><h3>${esc(b.name)} <small>${esc(b.county)} County</small></h3>
       <p>${whatYouKnow(id, L)}</p>${captainBlock(T, L)}
       ${fr ? `<button class="primary" data-g="front" data-id="${fr.id}">Continue the front here</button>` : ''}
-      ${near ? `<button data-g="scout" data-town="${esc(id)}">Scout the captain <span class="fine">1 action</span></button>${knownSome ? `<button data-g="taunt" data-town="${esc(id)}">Taunt the captain <span class="fine">1 action; the next front here starts a step higher</span></button>` : ''}` : ''}
+      ${near ? `<button data-g="scout" data-town="${esc(id)}">Scout the captain <span class="fine">1 action</span></button>${knownSome ? `<button data-g="talk" data-town="${esc(id)}">Talk to the captain <span class="fine">taunt, insult, parley or duel</span></button>` : ''}` : ''}
+      ${!cptn && !mine && T.owner && touchesMine(id) && rank(L) >= rank('familiar') && !(w().footholds || {})[id] ? `<button data-g="foothold" data-town="${esc(id)}">Try for a foothold <span class="fine">1 action; decided at the next tick</span></button>` : ''}
       ${mine && T.force >= 3 && !T.dugIn ? `<button data-g="fortify" data-town="${esc(id)}">Dig in now <span class="fine">${ecoActive(w().clans[ME]) ? `${K8.fortifyCost} Build` : '1 action'}; defenders fight better</span></button>` : ''}
       ${mine && T.force >= 2 ? '<p class="fine">Tap a township next to it to send units, or:</p><button class="primary" data-g="pick" data-id="' + esc(id) + '">Send units from here</button>' : mine ? '<p class="fine">One unit alone has to stay home.</p>' : ''}
       ${closeBtn}</div>`);
@@ -332,13 +335,45 @@ export function initGoblin(ctx) {
       ${methods.map((m) => `<button data-g="scoutdo" data-town="${esc(town)}" data-m="${m}"><b>${name[m]}</b> <span class="fine">${hint[m]}</span></button>`).join('')}
       <button data-g="close">Cancel</button></div>`);
   }
+  function talkPanel(town) {
+    const T = w().towns[town], c = w().chars[T.captain]; if (!c) return panel('');
+    const me = w().clans[ME], hasCoin = ecoActive(me) && me.res.coin >= K9.parleyCost;
+    const duelOk = G.board.neighbours(town).some((n) => w().towns[n] && w().towns[n].owner === ME && w().towns[n].captain);
+    panel(`<div class="gob"><h3>Talk to ${esc(c.name)}</h3>
+      <p class="fine">Each costs one action. ${esc(c.name)} is ${c.state ? esc(G.content.states.get(c.state).word.toLowerCase()) : 'steady'}.</p>
+      <button data-g="taunt" data-town="${esc(town)}"><b>Taunt</b> <span class="fine">the next front here starts a step higher</span></button>
+      <button data-g="insult" data-town="${esc(town)}"><b>Insult</b> <span class="fine">shake their nerve; a shaken captain fights worse for a while</span></button>
+      ${hasCoin ? `<button data-g="parley" data-town="${esc(town)}"><b>Parley</b> <span class="fine">${K9.parleyCost} Coin: a day's truce from this township</span></button>` : ''}
+      ${duelOk ? `<button data-g="duel" data-town="${esc(town)}"><b>Duel</b> <span class="fine">your captain against theirs; a loser may be hurt</span></button>` : ''}
+      <button data-g="close">Cancel</button></div>`);
+  }
+  function footholdPanel(town) {
+    const hour = (w().startHour + w().tick) % 24;
+    const hint = { swarm: 'Numbers count: the more you can bring, the better.', night: 'Better after dark (21:00 to 05:00).', ford: 'Cross the water where they do not expect it. Riskier.' };
+    const name = { swarm: 'Swarm', night: 'By night', ford: 'Ford the river' };
+    const methods = ['swarm'];
+    if (footholdMods(w(), G.board, ME, town, 'night').mods.some((m) => m.v > 0)) methods.push('night');
+    if (footholdMods(w(), G.board, ME, town, 'ford').mods.some((m) => m.v > 0)) methods.push('ford');
+    const tired = footholdMods(w(), G.board, ME, town, 'swarm').mods.some((m) => m.why === 'your scouts are tired');
+    panel(`<div class="gob"><h3>A foothold at ${esc(G.board.town(town).name)}</h3>
+      <p class="fine">One action. A good roll plants a foothold, and at the next 09:00, 12:00 or 18:00 it becomes a conquest if your border garrison can hold it. ${tired ? 'Your scouts are tired from earlier runs today.' : ''}</p>
+      ${methods.map((m) => `<button data-g="footdo" data-town="${esc(town)}" data-m="${m}"><b>${name[m]}</b> <span class="fine">${hint[m]}</span></button>`).join('')}
+      <button data-g="close">Cancel</button></div>`);
+  }
+  function prisoners() {
+    const list = Object.values(w().chars).filter((c) => c.status === 'captured' && c.heldBy === ME);
+    if (!list.length) return '';
+    return `<h4>Prisoners</h4>` + list.map((c) => `<p>${esc(c.name)} of ${cap(c.clan)} <span class="fine">(costs ${K9.keepFood} Food a tick to keep)</span></p>
+      <div class="gobrow">${roomFor(w(), c) ? `<button data-g="ransom" data-char="${esc(c.id)}">Ransom <span class="fine">${ransomPrice(c)} Coin</span></button><button data-g="release" data-char="${esc(c.id)}">Let go <span class="fine">they will remember</span></button>` : '<span class="fine">Their clan has no place for them yet.</span>'}</div>`).join('');
+  }
   function sittingResult(events) {
     const en = entriesOf(events, ctxFor());
     const rej = events.find((e) => e.type === 'order_rejected');
-    const sc = events.find((e) => e.type === 'scouted' || e.type === 'taunted');
-    panel(`<div class="gob"><h3>${rej ? 'That did not work' : sc && sc.type === 'scouted' ? (sc.lost ? 'The scout is gone' : sc.learned.length ? 'Something learned' : 'Nothing new') : sc ? (sc.ok ? 'It worked' : 'It backfired') : 'Done'}</h3>
+    const sc = events.find((e) => e.type === 'scouted' || e.type === 'taunted' || e.type === 'insulted');
+    const other = events.find((e) => ['foothold_run', 'dueled', 'parleyed', 'ransomed', 'released'].includes(e.type));
+    panel(`<div class="gob"><h3>${rej ? 'That did not work' : other ? ({ foothold_run: other.placed ? 'A foothold' : 'No foothold', dueled: other.won === null ? 'A standoff' : other.won ? 'You won the duel' : 'You lost the duel', parleyed: 'A truce', ransomed: 'Ransomed', released: 'Let go' })[other.type] : sc && sc.type === 'scouted' ? (sc.lost ? 'The scout is gone' : sc.learned.length ? 'Something learned' : 'Nothing new') : sc ? (sc.ok ? 'It worked' : 'It backfired') : 'Done'}</h3>
       ${rej ? `<p>${esc(rej.reason)}</p>` : en.map((e) => `<p>${esc(e.text)}</p>`).join('')}
-      ${sc ? `<p class="fine">Dice: ${sc.dice.join(' + ')}</p>` : ''}${closeBtn}</div>`);
+      ${sc && sc.dice ? `<p class="fine">Dice: ${sc.dice.join(' + ')}</p>` : ''}${closeBtn}</div>`);
   }
 
   // ---------------------------------------------------------------- the quiz charge (D179)
@@ -460,6 +495,7 @@ export function initGoblin(ctx) {
     panel(`<div class="gob"><h3>What can I do?</h3>
       <p class="fine">There is no end-turn button. You have <b>${ap()}</b> action${ap() === 1 ? '' : 's'} (attacks, fronts, scouting, digging in and taunts cost one; moving is free). The world moves by itself on the hour: at 09:00, 12:00 and 18:00 you get ${K6.apPerMajor} more (up to ${K6.apCap}), everyone gets recruits and the other clans act${nx ? `. Next: ${nx.hour}, in ${nx.left}` : ''}.</p>
       ${list.length ? list.map((o) => `<button ${o.data}><b>${esc(o.label)}</b><br><span class="fine">${esc(o.sub)}</span></button>`).join('') : '<p>Nothing worth doing right now. Your townships next to enemies are too thin to attack. Wait for recruits.</p>'}
+      ${prisoners()}
       <button data-g="chargetoggle">Quiz charges: ${prefs().charges ? 'on' : 'off'} <span class="fine">tap to switch</span></button>
       ${closeBtn}</div>`);
   }
@@ -503,6 +539,14 @@ export function initGoblin(ctx) {
     }
     else if (a === 'front') frontPanel(b.dataset.id);
     else if (a === 'scout') scoutPanel(b.dataset.town);
+    else if (a === 'talk') talkPanel(b.dataset.town);
+    else if (a === 'foothold') footholdPanel(b.dataset.town);
+    else if (a === 'footdo' || a === 'insult' || a === 'parley' || a === 'duel' || a === 'ransom' || a === 'release') {
+      const o = a === 'footdo' ? { type: 'foothold', clan: ME, town: b.dataset.town, method: b.dataset.m } : (a === 'ransom' || a === 'release') ? { type: a, clan: ME, char: b.dataset.char } : { type: a, clan: ME, town: b.dataset.town };
+      const ev = run([{ type: 'present', clan: ME }, o], 0);
+      if (b.dataset.town) markPlayed(b.dataset.town);
+      paint(); hud(); if (checkOver()) return; sittingResult(ev);
+    }
     else if (a === 'scoutdo' || a === 'taunt' || a === 'fortify') {
       const o = a === 'scoutdo' ? { type: 'scout', clan: ME, town: b.dataset.town, method: b.dataset.m } : { type: a, clan: ME, town: b.dataset.town };
       const ev = run([{ type: 'present', clan: ME }, o], 0);

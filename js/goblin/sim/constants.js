@@ -111,3 +111,18 @@ export const K8 = Object.freeze({
   bridgeCost: 4, bridgeMajors: 3,   // Build, and major ticks to finish a goblin bridge over a river border (D109)
   hireCost: 6, hireUnits: 4,  // Coin: a hired band of this many units in one township, once a day
 });
+
+// Added in F3 (docs/goblins/13-finish-plan.md): the rest of the sitting. All proposals until the user has played them.
+export const K9 = Object.freeze({
+  footholdTarget: 8, footholdLoseUnit: 4, footholdDecay: 2,   // 2d6 + method: 8+ places a foothold, 4 or less loses a unit; each earlier run on the same township the same day is -2 (D95)
+  swarmCap: 3, nightBonus: 2, fordBonus: 3, fordLose: 2,        // swarm: +1 per whole 1x of your force over theirs (to +3); night: +2; ford: +3 across a river, but a bad roll costs 2 units
+  footholdTired: 3,            // each earlier foothold run by the same clan the same day is this much worse (the grind brake, H29)
+  footholdHoldAt: 1,           // at the next tick the foothold becomes a conquest if your best bordering garrison (minus the one that stays) is at least this multiple of theirs
+  parleyCost: 4, truceTicks: 24,   // Coin; the captain's township will not attack you for a day
+  insultTarget: 8, insultKnownBonus: 2, insultDrop: 15, insultBackfire: 10,
+  humiliatedBelow: 40, recoverAbove: 55, confidenceRecovery: 5,   // confidence 0 to 100; at or below 40 a captain is Humiliated and his fronts start a step better for you; +5 a day back toward 70
+  frontWinConfidence: 10, frontLossConfidence: 15,
+  duelWin: 10, duelLose: 15,
+  ransomBase: 6, ransomPerGeneration: 3, keepFood: 1,           // Coin the other clan pays; Food a major tick to keep a captive
+  legendWins: 3,
+});

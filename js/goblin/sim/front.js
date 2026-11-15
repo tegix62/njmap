@@ -11,6 +11,8 @@
 import { K, K2, K4 } from './constants.js';
 import { skirmish } from './skirmish.js';
 import { takeTaunt, hasAp, scoutMods } from './sitting.js';
+import { frontConfidence, maybeLegend, FOOTHOLD_METHODS, footholdMods, roomFor, ransomPrice } from './encounters.js';
+import { K9 } from './constants.js';
 import { active, hasBridge, maxMarch, canMarch, marchCost } from './economy.js';
 import { K8 } from './constants.js';
 import { discoverOne, discover, knows, undiscovered, suitBonus, counterMod, hasConflict, injuryRoll, applyInjury, kill, capture, place, promote } from './chars.js';
@@ -59,10 +61,10 @@ export function openFront(w, board, emit, o) {
   const taunted = takeTaunt(w, o.clan, o.to);
   F.force -= o.n; F.attackedTick = w.tick; F.dugIn = false;
   const f = { id: 'f' + w.nextId++, attacker: o.clan, defender: T.owner, from: o.from, target: o.to, captain: d.id, lead, units: o.n,
-    standing: Math.min(2, (behindByRiver ? 0 : K4.frontStartStanding) + (taunted ? 1 : 0)), behindByRiver, bridgeUsed: false, beat: 0, maneuvers: 0,
+    standing: Math.min(2, (behindByRiver ? 0 : K4.frontStartStanding) + (taunted ? 1 : 0) + (d.state === 'humiliated' ? 1 : 0) + ((d.bonds || []).includes(o.clan) ? 1 : 0)), behindByRiver, bridgeUsed: false, beat: 0, maneuvers: 0,
     learned: [], lostA: 0, lostD: 0, changed: [], log: [], status: 'open', openedTick: w.tick };
   w.fronts[f.id] = f;
-  emit('front_opened', { front: f.id, taunted, clan: o.clan, from: o.from, to: o.to, n: o.n, standing: STANDING[f.standing], captain: d.id, lead });
+  emit('front_opened', { front: f.id, taunted, humiliated: d.state === 'humiliated', mercy: (d.bonds || []).includes(o.clan), clan: o.clan, from: o.from, to: o.to, n: o.n, standing: STANDING[f.standing], captain: d.id, lead });
   return true;
 }
 
@@ -221,6 +223,11 @@ function close(w, board, rng, emit, f, verdict) {
       if (c) changed.push({ char: c.id, what: 'promoted', tag });
     }
   }
+  if (verdict === 'Won' || verdict === 'Yielded' || verdict === 'Lost') {
+    const wonIt = verdict !== 'Lost', ld = f.lead && w.chars[f.lead];
+    frontConfidence(content, ld && ld.status === 'active' ? ld : null, d && d.status !== 'dead' ? d : null, wonIt);
+    if (wonIt && ld && ld.status === 'active') maybeLegend(w, content, rng, ld, emit);
+  }
   f.status = 'closed'; f.verdict = verdict;
   const exposed = Object.keys(w.towns).filter((t) => w.towns[t].owner === f.attacker && w.towns[t].force <= 1).sort(byId);
   emit('front_closed', { front: f.id, clan: f.attacker, verdict, town: f.target, from: f.from, beats: f.beat,
@@ -270,8 +277,18 @@ export function legalOrders(board, w, clanId) {
       else out.push({ type: 'attack', clan: clanId, from, to, n: range });
     }
   }
+  if (active(clan)) for (const c of Object.values(w.chars).filter((x) => x.status === 'captured' && x.heldBy === clanId).sort((a, b) => byId(a.id, b.id))) {
+    if (!roomFor(w, c) || !w.clans[c.clan] || w.clans[c.clan].out) continue;
+    out.push({ type: 'release', clan: clanId, char: c.id });
+    const theirs = w.clans[c.clan];
+    if (!active(theirs) || theirs.res.coin >= ransomPrice(c)) out.push({ type: 'ransom', clan: clanId, char: c.id });
+  }
   if (board.content && canHit) {
     for (const town of Object.keys(w.towns).sort(byId)) {
+      const T0 = w.towns[town];
+      if (T0 && T0.owner && T0.owner !== clanId && !T0.captain && board.neighbours(town).some((n) => w.towns[n] && w.towns[n].owner === clanId) && !(w.footholds && w.footholds[town])) {
+        for (const m of FOOTHOLD_METHODS) { const fm = footholdMods(w, board, clanId, town, m); if (m === 'swarm' || fm.mods.some((x) => x.v > 0)) out.push({ type: 'foothold', clan: clanId, town, method: m }); }
+      }
       const T = w.towns[town], c = T.captain && w.chars[T.captain];
       if (!c || c.status !== 'active' || T.owner === clanId || scouted.has(town)) continue;
       if (!board.neighbours(town).some((n) => w.towns[n] && w.towns[n].owner === clanId)) continue;
@@ -279,7 +296,8 @@ export function legalOrders(board, w, clanId) {
       const methods = ['sneak', 'ask'];
       if (scoutMods(w, board, clanId, town, 'watch').total > 0) methods.push('watch');
       for (const method of methods) out.push({ type: 'scout', clan: clanId, town, method });
-      if ((c.known[clanId] || []).length) out.push({ type: 'taunt', clan: clanId, town });
+      if ((c.known[clanId] || []).length) { out.push({ type: 'taunt', clan: clanId, town }); out.push({ type: 'insult', clan: clanId, town }); if (active(clan) && clan.res.coin >= K9.parleyCost) out.push({ type: 'parley', clan: clanId, town }); }
+      if (board.neighbours(town).some((n) => w.towns[n] && w.towns[n].owner === clanId && w.towns[n].captain && w.chars[w.towns[n].captain].status === 'active')) out.push({ type: 'duel', clan: clanId, town });
     }
   }
   return out;
