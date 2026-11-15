@@ -1,0 +1,80 @@
+{
+ "days": 21,
+ "bot": "Passive",
+ "startTowns": 20,
+ "endTowns": 14,
+ "finalTownsByClan": {
+  "toads": 19,
+  "goblins": 14,
+  "rats": 25
+ },
+ "eventCounts": {
+  "recruits": 189,
+  "dug_in": 82,
+  "director_word": 63,
+  "raid_declared": 6,
+  "skirmish_result": 6,
+  "raid_landed": 6,
+  "director_extra": 5,
+  "promoted": 1,
+  "captured": 2
+ },
+ "distinctShapesPerDay": {
+  "mean": 1.24,
+  "min": 0,
+  "perDay": [
+   0,
+   0,
+   0,
+   3,
+   0,
+   0,
+   5,
+   0,
+   0,
+   5,
+   0,
+   0,
+   4,
+   0,
+   0,
+   4,
+   0,
+   0,
+   5,
+   0,
+   0
+  ]
+ },
+ "unitsLost": {
+  "rats": 90,
+  "toads": 174,
+  "goblins": 109
+ },
+ "townshipsTaken": {
+  "rats": 6,
+  "toads": 6
+ },
+ "unitsLostPerTownshipTaken": {
+  "rats": 15,
+  "toads": 29
+ },
+ "fronts": {
+  "opened": 0,
+  "closedByVerdict": {},
+  "beatsDistribution": {},
+  "stillOpenAtEnd": 0
+ },
+ "director": {
+  "goblinsWordChanges": {
+   "Calm": 39,
+   "Steady": 11,
+   "Heated": 13
+  },
+  "extras": 5,
+  "nudges": 0,
+  "heldBack": 0,
+  "raidsDeclared": 6
+ },
+ "orderRejected": 0
+}

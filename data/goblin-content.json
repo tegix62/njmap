@@ -1,58 +1,625 @@
 {
-  "v": 1,
-  "note": "PLACEHOLDER CONTENT for the simulation (docs/goblins, D68, D194). Every entry is flagged placeholder: the user writes the real names, trait words, state words and verdicts. Words here are plain on purpose so they cannot be mistaken for finished writing. The machine fields (suits, counters, drive, earnedBy) are rules, not writing.",
-  "maneuvers": ["probe", "pressure", "lever"],
-  "clans": {
-    "goblin": { "placeholder": true, "first": ["Ash", "Birch", "Cinder", "Dunn", "Ember", "Flint", "Gale", "Heath", "Ivor", "Jett", "Kern", "Lark", "Moss", "Nettle"], "last": ["Stone", "Marsh", "Hill", "Brook", "Vale", "Reed", "Crag"] },
-    "rat":    { "placeholder": true, "first": ["Pip", "Quill", "Rook", "Sedge", "Tarn", "Umber", "Wick", "Yarrow"], "last": ["Grey", "Fenn", "Dace", "Holt", "Mere", "Lane"] },
-    "toad":   { "placeholder": true, "first": ["Bram", "Cob", "Dub", "Elm", "Fen", "Grub", "Hob", "Ivo"], "last": ["Pond", "Mire", "Sump", "Wade", "Bog", "Reach"] },
-    "default":{ "placeholder": true, "first": ["Alder", "Briar", "Clay", "Dale", "Elder", "Fern"], "last": ["North", "South", "East", "West", "Mid"] }
+ "v": 1,
+ "note": "PLACEHOLDER CONTENT for the simulation (docs/goblins, D68, D194). Every entry is flagged placeholder: the user writes the real names, trait words, state words and verdicts. Words here are plain on purpose so they cannot be mistaken for finished writing. The machine fields (suits, counters, drive, earnedBy) are rules, not writing.",
+ "maneuvers": [
+  "probe",
+  "pressure",
+  "lever"
+ ],
+ "clans": {
+  "goblin": {
+   "placeholder": true,
+   "first": [
+    "Ash",
+    "Birch",
+    "Cinder",
+    "Dunn",
+    "Ember",
+    "Flint",
+    "Gale",
+    "Heath",
+    "Ivor",
+    "Jett",
+    "Kern",
+    "Lark",
+    "Moss",
+    "Nettle"
+   ],
+   "last": [
+    "Stone",
+    "Marsh",
+    "Hill",
+    "Brook",
+    "Vale",
+    "Reed",
+    "Crag"
+   ]
   },
-  "traits": [
-    { "id": "proud",      "word": "Proud",      "pool": "notable", "suits": ["pressure"],          "counters": { "pressure": 1 },              "drive": "stand", "earnedBy": ["outnumbered"], "placeholder": true },
-    { "id": "cautious",   "word": "Cautious",   "pool": "notable", "suits": ["probe"],             "counters": { "pressure": -1, "probe": -1 }, "drive": "flee",  "earnedBy": ["bloody"],      "placeholder": true },
-    { "id": "greedy",     "word": "Greedy",     "pool": "notable", "suits": [],                    "counters": { "lever": 1 },                 "drive": "grab",  "earnedBy": ["raid"],        "placeholder": true },
-    { "id": "reckless",   "word": "Reckless",   "pool": "notable", "suits": ["pressure"],          "counters": { "pressure": 1 },              "drive": "stand", "earnedBy": ["outnumbered"], "placeholder": true },
-    { "id": "stubborn",   "word": "Stubborn",   "pool": "notable", "suits": [],                    "counters": { "pressure": -1 },             "drive": "stand", "earnedBy": ["bloody", "river"], "placeholder": true },
-    { "id": "patient",    "word": "Patient",    "pool": "notable", "suits": ["probe", "lever"],    "counters": {},                             "drive": null,    "earnedBy": ["river"],       "placeholder": true },
-    { "id": "sharp-eyed", "word": "Sharp-eyed", "pool": "notable", "suits": ["probe"],             "counters": { "probe": -1 },                "drive": null,    "earnedBy": ["highway"],     "placeholder": true },
-    { "id": "vain",       "word": "Vain",       "pool": "notable", "suits": [],                    "counters": { "pressure": 1, "lever": 1 },  "drive": "stand", "earnedBy": ["outnumbered"], "placeholder": true },
-    { "id": "timid",      "word": "Timid",      "pool": "notable", "suits": [],                    "counters": { "pressure": 1 },              "drive": "flee",  "earnedBy": [],              "placeholder": true },
-    { "id": "clever",     "word": "Clever",     "pool": "notable", "suits": ["lever"],             "counters": { "lever": -1 },                "drive": null,    "earnedBy": ["highway"],     "placeholder": true },
-    { "id": "ruthless",   "word": "Ruthless",   "pool": "notable", "suits": ["pressure"],          "counters": {},                             "drive": "grab",  "earnedBy": ["bloody"],      "placeholder": true },
-    { "id": "loyal",      "word": "Loyal",      "pool": "notable", "suits": [],                    "counters": {},                             "drive": "stand", "earnedBy": ["raid"],        "placeholder": true },
-    { "id": "night-owl",     "word": "Night owl",     "pool": "minor", "suits": [],            "counters": { "probe": -1 }, "drive": null, "earnedBy": [], "placeholder": true },
-    { "id": "clumsy",        "word": "Clumsy",        "pool": "minor", "suits": [],            "counters": { "lever": 1 },  "drive": null, "earnedBy": [], "placeholder": true },
-    { "id": "hoarder",       "word": "Hoarder",       "pool": "minor", "suits": [],            "counters": {},              "drive": null, "earnedBy": [], "placeholder": true },
-    { "id": "light-sleeper", "word": "Light sleeper", "pool": "minor", "suits": [],            "counters": { "probe": -1 }, "drive": null, "earnedBy": [], "placeholder": true },
-    { "id": "loud",          "word": "Loud",          "pool": "minor", "suits": ["pressure"],  "counters": {},              "drive": null, "earnedBy": [], "placeholder": true },
-    { "id": "sleeps-in",     "word": "Sleeps in",     "pool": "minor", "suits": [],            "counters": { "probe": 1 },  "drive": null, "earnedBy": [], "placeholder": true },
-    { "id": "hungry",        "word": "Hungry",        "pool": "minor", "suits": [],            "counters": {},              "drive": null, "earnedBy": [], "placeholder": true },
-    { "id": "forgetful",     "word": "Forgetful",     "pool": "minor", "suits": [],            "counters": { "lever": 1 },  "drive": null, "earnedBy": [], "placeholder": true },
-    { "id": "quick",         "word": "Quick",         "pool": "minor", "suits": ["probe"],     "counters": {},              "drive": null, "earnedBy": [], "placeholder": true },
-    { "id": "stout",         "word": "Stout",         "pool": "minor", "suits": [],            "counters": {},              "drive": null, "earnedBy": [], "placeholder": true },
-    { "id": "fussy",         "word": "Fussy",         "pool": "minor", "suits": [],            "counters": {},              "drive": null, "earnedBy": [], "placeholder": true },
-    { "id": "cheerful",      "word": "Cheerful",      "pool": "minor", "suits": [],            "counters": {},              "drive": null, "earnedBy": [], "placeholder": true }
-  ],
-  "fears": [
-    { "id": "river",   "kind": "terrain", "ref": "river",   "word": "Afraid of rivers",   "placeholder": true },
-    { "id": "ridge",   "kind": "terrain", "ref": "ridge",   "word": "Afraid of ridges",   "placeholder": true },
-    { "id": "highway", "kind": "terrain", "ref": "highway", "word": "Afraid of highways", "placeholder": true }
-  ],
-  "injuries": [
-    { "id": "scar",     "word": "A scar",         "placeholder": true },
-    { "id": "lost-ear", "word": "A missing ear",  "placeholder": true },
-    { "id": "limp",     "word": "A limp",         "placeholder": true },
-    { "id": "lost-eye", "word": "A missing eye",  "placeholder": true },
-    { "id": "burn",     "word": "A burn",         "placeholder": true }
-  ],
-  "states": [
-    { "id": "humiliated", "word": "Humiliated", "placeholder": false, "source": "the user's own word (D131)" },
-    { "id": "shaken",     "word": "Shaken",     "placeholder": true },
-    { "id": "grieving",   "word": "Grieving",   "placeholder": true }
-  ],
-  "verdicts": [
-    { "id": "won", "word": "Won", "placeholder": true }, { "id": "lost", "word": "Lost", "placeholder": true },
-    { "id": "withdrew", "word": "Withdrew", "placeholder": true }, { "id": "yielded", "word": "Yielded", "placeholder": true }
-  ]
+  "rat": {
+   "placeholder": true,
+   "first": [
+    "Pip",
+    "Quill",
+    "Rook",
+    "Sedge",
+    "Tarn",
+    "Umber",
+    "Wick",
+    "Yarrow"
+   ],
+   "last": [
+    "Grey",
+    "Fenn",
+    "Dace",
+    "Holt",
+    "Mere",
+    "Lane"
+   ]
+  },
+  "toad": {
+   "placeholder": true,
+   "first": [
+    "Bram",
+    "Cob",
+    "Dub",
+    "Elm",
+    "Fen",
+    "Grub",
+    "Hob",
+    "Ivo"
+   ],
+   "last": [
+    "Pond",
+    "Mire",
+    "Sump",
+    "Wade",
+    "Bog",
+    "Reach"
+   ]
+  },
+  "default": {
+   "placeholder": true,
+   "first": [
+    "Alder",
+    "Briar",
+    "Clay",
+    "Dale",
+    "Elder",
+    "Fern"
+   ],
+   "last": [
+    "North",
+    "South",
+    "East",
+    "West",
+    "Mid"
+   ]
+  }
+ },
+ "traits": [
+  {
+   "id": "proud",
+   "word": "Proud",
+   "pool": "notable",
+   "suits": [
+    "pressure"
+   ],
+   "counters": {
+    "pressure": 1
+   },
+   "drive": "stand",
+   "earnedBy": [
+    "outnumbered"
+   ],
+   "placeholder": true
+  },
+  {
+   "id": "cautious",
+   "word": "Cautious",
+   "pool": "notable",
+   "suits": [
+    "probe"
+   ],
+   "counters": {
+    "pressure": -1,
+    "probe": -1
+   },
+   "drive": "flee",
+   "earnedBy": [
+    "bloody"
+   ],
+   "placeholder": true
+  },
+  {
+   "id": "greedy",
+   "word": "Greedy",
+   "pool": "notable",
+   "suits": [],
+   "counters": {
+    "lever": 1
+   },
+   "drive": "grab",
+   "earnedBy": [
+    "raid"
+   ],
+   "placeholder": true
+  },
+  {
+   "id": "reckless",
+   "word": "Reckless",
+   "pool": "notable",
+   "suits": [
+    "pressure"
+   ],
+   "counters": {
+    "pressure": 1
+   },
+   "drive": "stand",
+   "earnedBy": [
+    "outnumbered"
+   ],
+   "placeholder": true
+  },
+  {
+   "id": "stubborn",
+   "word": "Stubborn",
+   "pool": "notable",
+   "suits": [],
+   "counters": {
+    "pressure": -1
+   },
+   "drive": "stand",
+   "earnedBy": [
+    "bloody",
+    "river"
+   ],
+   "placeholder": true
+  },
+  {
+   "id": "patient",
+   "word": "Patient",
+   "pool": "notable",
+   "suits": [
+    "probe",
+    "lever"
+   ],
+   "counters": {},
+   "drive": null,
+   "earnedBy": [
+    "river"
+   ],
+   "placeholder": true
+  },
+  {
+   "id": "sharp-eyed",
+   "word": "Sharp-eyed",
+   "pool": "notable",
+   "suits": [
+    "probe"
+   ],
+   "counters": {
+    "probe": -1
+   },
+   "drive": null,
+   "earnedBy": [
+    "highway"
+   ],
+   "placeholder": true
+  },
+  {
+   "id": "vain",
+   "word": "Vain",
+   "pool": "notable",
+   "suits": [],
+   "counters": {
+    "pressure": 1,
+    "lever": 1
+   },
+   "drive": "stand",
+   "earnedBy": [
+    "outnumbered"
+   ],
+   "placeholder": true
+  },
+  {
+   "id": "timid",
+   "word": "Timid",
+   "pool": "notable",
+   "suits": [],
+   "counters": {
+    "pressure": 1
+   },
+   "drive": "flee",
+   "earnedBy": [],
+   "placeholder": true
+  },
+  {
+   "id": "clever",
+   "word": "Clever",
+   "pool": "notable",
+   "suits": [
+    "lever"
+   ],
+   "counters": {
+    "lever": -1
+   },
+   "drive": null,
+   "earnedBy": [
+    "highway"
+   ],
+   "placeholder": true
+  },
+  {
+   "id": "ruthless",
+   "word": "Ruthless",
+   "pool": "notable",
+   "suits": [
+    "pressure"
+   ],
+   "counters": {},
+   "drive": "grab",
+   "earnedBy": [
+    "bloody"
+   ],
+   "placeholder": true
+  },
+  {
+   "id": "loyal",
+   "word": "Loyal",
+   "pool": "notable",
+   "suits": [],
+   "counters": {},
+   "drive": "stand",
+   "earnedBy": [
+    "raid"
+   ],
+   "placeholder": true
+  },
+  {
+   "id": "night-owl",
+   "word": "Night owl",
+   "pool": "minor",
+   "suits": [],
+   "counters": {
+    "probe": -1
+   },
+   "drive": null,
+   "earnedBy": [],
+   "placeholder": true
+  },
+  {
+   "id": "clumsy",
+   "word": "Clumsy",
+   "pool": "minor",
+   "suits": [],
+   "counters": {
+    "lever": 1
+   },
+   "drive": null,
+   "earnedBy": [],
+   "placeholder": true
+  },
+  {
+   "id": "hoarder",
+   "word": "Hoarder",
+   "pool": "minor",
+   "suits": [],
+   "counters": {},
+   "drive": null,
+   "earnedBy": [],
+   "placeholder": true
+  },
+  {
+   "id": "light-sleeper",
+   "word": "Light sleeper",
+   "pool": "minor",
+   "suits": [],
+   "counters": {
+    "probe": -1
+   },
+   "drive": null,
+   "earnedBy": [],
+   "placeholder": true
+  },
+  {
+   "id": "loud",
+   "word": "Loud",
+   "pool": "minor",
+   "suits": [
+    "pressure"
+   ],
+   "counters": {},
+   "drive": null,
+   "earnedBy": [],
+   "placeholder": true
+  },
+  {
+   "id": "sleeps-in",
+   "word": "Sleeps in",
+   "pool": "minor",
+   "suits": [],
+   "counters": {
+    "probe": 1
+   },
+   "drive": null,
+   "earnedBy": [],
+   "placeholder": true
+  },
+  {
+   "id": "hungry",
+   "word": "Hungry",
+   "pool": "minor",
+   "suits": [],
+   "counters": {},
+   "drive": null,
+   "earnedBy": [],
+   "placeholder": true
+  },
+  {
+   "id": "forgetful",
+   "word": "Forgetful",
+   "pool": "minor",
+   "suits": [],
+   "counters": {
+    "lever": 1
+   },
+   "drive": null,
+   "earnedBy": [],
+   "placeholder": true
+  },
+  {
+   "id": "quick",
+   "word": "Quick",
+   "pool": "minor",
+   "suits": [
+    "probe"
+   ],
+   "counters": {},
+   "drive": null,
+   "earnedBy": [],
+   "placeholder": true
+  },
+  {
+   "id": "stout",
+   "word": "Stout",
+   "pool": "minor",
+   "suits": [],
+   "counters": {},
+   "drive": null,
+   "earnedBy": [],
+   "placeholder": true
+  },
+  {
+   "id": "fussy",
+   "word": "Fussy",
+   "pool": "minor",
+   "suits": [],
+   "counters": {},
+   "drive": null,
+   "earnedBy": [],
+   "placeholder": true
+  },
+  {
+   "id": "cheerful",
+   "word": "Cheerful",
+   "pool": "minor",
+   "suits": [],
+   "counters": {},
+   "drive": null,
+   "earnedBy": [],
+   "placeholder": true
+  }
+ ],
+ "fears": [
+  {
+   "id": "river",
+   "kind": "terrain",
+   "ref": "river",
+   "word": "Afraid of rivers",
+   "placeholder": true
+  },
+  {
+   "id": "ridge",
+   "kind": "terrain",
+   "ref": "ridge",
+   "word": "Afraid of ridges",
+   "placeholder": true
+  },
+  {
+   "id": "highway",
+   "kind": "terrain",
+   "ref": "highway",
+   "word": "Afraid of highways",
+   "placeholder": true
+  }
+ ],
+ "injuries": [
+  {
+   "id": "scar",
+   "word": "A scar",
+   "placeholder": true
+  },
+  {
+   "id": "lost-ear",
+   "word": "A missing ear",
+   "placeholder": true
+  },
+  {
+   "id": "limp",
+   "word": "A limp",
+   "placeholder": true
+  },
+  {
+   "id": "lost-eye",
+   "word": "A missing eye",
+   "placeholder": true
+  },
+  {
+   "id": "burn",
+   "word": "A burn",
+   "placeholder": true
+  }
+ ],
+ "states": [
+  {
+   "id": "humiliated",
+   "word": "Humiliated",
+   "placeholder": false,
+   "source": "the user's own word (D131)"
+  },
+  {
+   "id": "shaken",
+   "word": "Shaken",
+   "placeholder": true
+  },
+  {
+   "id": "grieving",
+   "word": "Grieving",
+   "placeholder": true
+  }
+ ],
+ "verdicts": [
+  {
+   "id": "won",
+   "word": "Won",
+   "placeholder": true
+  },
+  {
+   "id": "lost",
+   "word": "Lost",
+   "placeholder": true
+  },
+  {
+   "id": "withdrew",
+   "word": "Withdrew",
+   "placeholder": true
+  },
+  {
+   "id": "yielded",
+   "word": "Yielded",
+   "placeholder": true
+  }
+ ],
+ "templates": [
+  {
+   "id": "heading",
+   "text": "Day {day}, {hour}",
+   "placeholder": true
+  },
+  {
+   "id": "taken",
+   "text": "{by} sent {n} from {from} against {to} ({where}) and took it. {left} are standing there; {lost_a} of theirs and {lost_d} of the {against} fell.{lead}",
+   "placeholder": true
+  },
+  {
+   "id": "repulsed",
+   "text": "{by} sent {n} from {from} against {to} ({where}) and were thrown back. {lost_a} of theirs and {lost_d} of the {against} fell.{lead}",
+   "placeholder": true
+  },
+  {
+   "id": "raid_declared",
+   "text": "Word from the {dir_word}: {by} are gathering {n} at {from} to strike {to} ({where}). They will arrive at {lands}.",
+   "placeholder": true
+  },
+  {
+   "id": "raid_taken",
+   "text": "The raid from {from} landed on {to}. {by} took it with {left} standing. {lost_a} raiders and {lost_d} defenders fell.{lead}",
+   "placeholder": true
+  },
+  {
+   "id": "raid_repulsed",
+   "text": "The raid from {from} landed on {to} and was driven off. {lost_a} raiders and {lost_d} defenders fell.{lead}",
+   "placeholder": true
+  },
+  {
+   "id": "front_opened",
+   "text": "{clan} marched {n} from {from} to {to} ({where}), where {captain} holds the town. The fight begins {standing}.",
+   "placeholder": true
+  },
+  {
+   "id": "beat_move",
+   "text": "{clan} chose {maneuver} against {captain}. Rolled {roll} ({mods}). {change_text} Now {standing}.{learned_text}",
+   "placeholder": true
+  },
+  {
+   "id": "beat_bridge",
+   "text": "{clan} made a certain move across the water. Now {standing}.",
+   "placeholder": true
+  },
+  {
+   "id": "beat_decision",
+   "text": "The decision at {to}: {rounds} rounds of dice.",
+   "placeholder": true
+  },
+  {
+   "id": "closed_Won",
+   "text": "Won {to}. {clan} lost {lost_a}; {defender} lost {lost_d}.{learned_text}{changed_text}{exposed_text}",
+   "placeholder": true
+  },
+  {
+   "id": "closed_Lost",
+   "text": "Lost the fight for {to}. {clan} lost {lost_a}; the defenders lost {lost_d}.{learned_text}{changed_text}{exposed_text}",
+   "placeholder": true
+  },
+  {
+   "id": "closed_Withdrew",
+   "text": "{clan} pulled out of the fight for {to}.{learned_text}{exposed_text}",
+   "placeholder": true
+  },
+  {
+   "id": "closed_Yielded",
+   "text": "{captain} yielded {to} to {clan} without a fight to the finish.{learned_text}{changed_text}{exposed_text}",
+   "placeholder": true
+  },
+  {
+   "id": "closeup_fled",
+   "text": "{char} fled {town} for {refuge}.",
+   "placeholder": true
+  },
+  {
+   "id": "closeup_captured",
+   "text": "{char} was taken prisoner by {by}.",
+   "placeholder": true
+  },
+  {
+   "id": "closeup_persisted",
+   "text": "{char} escaped to {refuge} and came out changed.",
+   "placeholder": true
+  },
+  {
+   "id": "promoted",
+   "text": "A grunt of {clan} at {town} earned a name: {char}.",
+   "placeholder": true
+  },
+  {
+   "id": "succeeded",
+   "text": "{char} took the place of the fallen at {town}.",
+   "placeholder": true
+  },
+  {
+   "id": "absent",
+   "text": "{clan} has not been seen for three days; their lords sit tight.",
+   "placeholder": true
+  },
+  {
+   "id": "clan_out",
+   "text": "{clan} has no townships left.",
+   "placeholder": true
+  },
+  {
+   "id": "director",
+   "text": "The mood of the war for the {clan}: {word}.",
+   "placeholder": true
+  },
+  {
+   "id": "arrived",
+   "text": "{clan} moved {n} from {from} to {to}.",
+   "placeholder": true
+  },
+  {
+   "id": "settled",
+   "text": "The world moved on without a report for {n} hours.",
+   "placeholder": true
+  }
+ ]
 }

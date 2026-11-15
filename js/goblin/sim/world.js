@@ -20,7 +20,8 @@ export const DEFAULT_RULES = Object.freeze({ townForceCap: K2.townForceCap, recr
   aiAttackRatio: K.aiAttackRatio, aiCommitFraction: K2.aiCommitFraction,
   aiCaptureCooldownTicks: 72,  // conquest tempo (D209): after taking a township an AI clan waits this many ticks before attacking again (0 = off)
   leaderShare: 0.5,            // (D209) a clan holding more than this share of the theatre needs leaderAttackRatio to attack (1.01 = never)
-  leaderAttackRatio: 3.0 });
+  leaderAttackRatio: 3.0,
+  frontMaxGain: 2 });          // the most a single front maneuver may raise standing (2 as specified; 1 is a tuning variant)
 const R = (w) => w.rules || DEFAULT_RULES;
 
 export const hourOf = (w) => (w.startHour + w.tick) % 24;
@@ -144,6 +145,7 @@ function applyOrder(w, board, rng, emit, o) {
   const clan = w.clans[o.clan];
   const reject = (reason) => emit('order_rejected', { clan: o.clan, order: o, reason });
   if (!clan || clan.lord !== 'human' || clan.out) return reject('not a live human clan');
+  if (o.type === 'present') { clan.lastActive = w.tick; clan.absentSince = null; return; }   // the player opened the game
   const F = w.towns[o.from], T = w.towns[o.to];
   if (!F || !T || F.owner !== o.clan) return reject('origin is not yours');
   if (!board.border(o.from, o.to)) return reject('not neighbours');
@@ -223,7 +225,7 @@ function aiTurn(w, board, rng, emit, clan) {
       const U = w.towns[u];
       if (!U || !U.owner || U.owner === clan.id) continue;
       if (shielded(w, U.owner) || protectedHome(w, u) || pinned.has(u)) continue;
-      if (isHuman(w, U.owner) && !Dir.allowsHostile(w, U.owner)) continue;   // the Director: rhythm, budget, pressure
+      if (isHuman(w, U.owner) && !Dir.allowsHostile(w, U.owner)) { Dir.noteHeld(w, U.owner); continue; }   // the Director: rhythm, budget, pressure
       const ratio = n / Math.max(1, U.force);
       if (ratio >= need && (!best || ratio > best.ratio)) best = { from: t, to: u, n, ratio };
     }

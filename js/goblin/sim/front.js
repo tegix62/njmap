@@ -101,7 +101,7 @@ export function actFront(w, board, rng, emit, o) {
   const dice = [rng.d6(), rng.d6()];
   const m = rollMods(w, board, f, act);
   const roll = dice[0] + dice[1] + m.total;
-  const delta = bandOf(act, roll);
+  const delta = Math.min(bandOf(act, roll), R(w).frontMaxGain ?? 2);   // frontMaxGain 1 is a tuning variant: no maneuver moves more than one step
   const learned = [];
   // a hidden trait that changed the band becomes known: the player learns why
   for (const p of m.parts) {

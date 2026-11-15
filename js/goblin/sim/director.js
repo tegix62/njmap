@@ -67,6 +67,8 @@ export function allowsHostile(w, id) {
   if (h === K5.hourMinor) return d.minor < K5.minorPerDay;
   return false;
 }
+/** Count a hostile action the Director held back (for the metrics); once per tick per player. */
+export function noteHeld(w, id) { const d = dstate(w, id); if (d.heldTick !== w.tick) { d.heldTick = w.tick; d.held = (d.held || 0) + 1; } }
 export function spend(w, id) {
   if (!present(w, id)) return;
   const d = rollDay(w, id), h = hourOf(w);
