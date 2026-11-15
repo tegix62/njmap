@@ -24,6 +24,7 @@ The strategy layer is optional. Turned off, the app is exactly the quiz, Drive a
 | 12 | [Gap list](12-gap-list.md): the game as built against the design, with what is missing, what each piece needs from the user, and the order to finish | written 2026-11-15 |
 | 13 | [The plan to finish the game](13-finish-plan.md): what finished means, ten stages with checks and gates, the decisions each needs, what only the user can write and when, tuning targets | written 2026-11-15; the build follows this |
 | 06 | [Content bible](06-content-bible.md) (started): the ten region kits, how each rule was computed, and the fact pipeline (no fact shipped yet) | started 2026-11-15 |
+| 17 | [The three-week play](17-play-guide.md): what to do, what to note, the Solo 1.0 checklist as it stands | ready 2026-11-15 |
 | 05 | [The Director and the dwarves](05-director.md): the pressure words, rhythm and shared peak as built, the dwarf rules, the hidden hand in timing only | written 2026-11-15 |
 | 07 | [Screens and flows](07-screens.md): the game as built | written 2026-11-15 |
 | 08 | [Art](08-art.md): placeholders drawn in code, against D196's list | written 2026-11-15 |
