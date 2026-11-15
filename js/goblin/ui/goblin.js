@@ -12,6 +12,8 @@ import { skirmish, modsFor } from '../sim/skirmish.js';
 import { makeRng, seedState } from '../sim/rng.js';
 import { fogMap, forceWord, rank } from './fog.js';
 import { recordReview } from './review.js';
+import { active as ecoActive, marchCost, maxMarch, income as ecoIncome, hasBridge } from '../sim/economy.js';
+import { K8 } from '../sim/constants.js';
 import { scoutMods, isNight, hasAp } from '../sim/sitting.js';
 import { digestOf } from '../sim/digest.js';
 import { MUNI_LABEL_IDS } from '../../style.js';
@@ -149,6 +151,14 @@ export function initGoblin(ctx) {
     const hold = p.hoursLeft != null ? ` · holding it: ${Math.ceil(p.hoursLeft / 24 * 10) / 10 < 1 ? `${p.hoursLeft}h` : `${Math.ceil(p.hoursLeft / 24)}d`} to go` : '';
     return `War: hold ${p.need} of ${p.total} townships for ${K7.warHoldTicks / 24} days to win · you ${p.held}${rival ? ` · ${cap(rival.id)} ${rival.p.held}` : ''}${hold}`;
   }
+  /** Food, Build and Coin (F2), with a plain warning when Food runs short. */
+  function resLine() {
+    const c = w().clans[ME];
+    if (!ecoActive(c)) return '';
+    const inc = ecoIncome(w(), ME);
+    const warn = c.short > 0 ? `<div class="meta warnline">Short of Food: units will start drifting home ${c.short > K8.graceMajors ? 'now' : `if it lasts ${K8.graceMajors + 1 - c.short} more tick${K8.graceMajors + 1 - c.short === 1 ? '' : 's'}`}.</div>` : '';
+    return `<div class="meta">Food ${c.res.food} (+${inc.food} a tick) · Build ${c.res.build} · Coin ${c.res.coin}</div>${warn}`;
+  }
   function hud() {
     const world = w();
     const mine = Object.values(world.towns).filter((t) => t.owner === ME);
@@ -157,6 +167,7 @@ export function initGoblin(ctx) {
     const nx = nextMajor();
     ctx.hud(`<div class="town">${mine.length} townships · ${units} units${fr ? ` · ${fr} front${fr === 1 ? '' : 's'}` : ''}</div>
       <div class="meta">Goblins · ${clock()} · actions ${world.clans[ME].ap} of ${K6.apCap}</div>
+      ${resLine()}
       <div class="meta">${warLine()}</div>
       <div class="meta">${nx ? `Next: ${nx.hour} (in ${nx.left}): +${K6.apPerMajor} actions, recruits, the other clans move` : ''}</div>`);
   }
@@ -195,7 +206,7 @@ export function initGoblin(ctx) {
       <p>${whatYouKnow(id, L)}</p>${captainBlock(T, L)}
       ${fr ? `<button class="primary" data-g="front" data-id="${fr.id}">Continue the front here</button>` : ''}
       ${near ? `<button data-g="scout" data-town="${esc(id)}">Scout the captain <span class="fine">1 action</span></button>${knownSome ? `<button data-g="taunt" data-town="${esc(id)}">Taunt the captain <span class="fine">1 action; the next front here starts a step higher</span></button>` : ''}` : ''}
-      ${mine && T.force >= 3 && !T.dugIn ? `<button data-g="fortify" data-town="${esc(id)}">Dig in now <span class="fine">1 action; defenders fight better</span></button>` : ''}
+      ${mine && T.force >= 3 && !T.dugIn ? `<button data-g="fortify" data-town="${esc(id)}">Dig in now <span class="fine">${ecoActive(w().clans[ME]) ? `${K8.fortifyCost} Build` : '1 action'}; defenders fight better</span></button>` : ''}
       ${mine && T.force >= 2 ? '<p class="fine">Tap a township next to it to send units, or:</p><button class="primary" data-g="pick" data-id="' + esc(id) + '">Send units from here</button>' : mine ? '<p class="fine">One unit alone has to stay home.</p>' : ''}
       ${closeBtn}</div>`);
   }
@@ -205,20 +216,24 @@ export function initGoblin(ctx) {
     const L = levelOf(to);
     const front = attack && !!T.captain;
     const blind = attack && rank(L) < rank('familiar');
-    const max = F.force - 1;
+    const max = attack ? Math.max(1, maxMarch(w().clans[ME], F.force)) : F.force - 1;
+    const noFood = attack && maxMarch(w().clans[ME], F.force) < 1;
     const water = bd.river ? `across the ${typeof bd.river === 'string' ? esc(bd.river) : 'river'}` : bd.ridge ? 'over a ridge' : '';
     const hw = bd.highways && bd.highways.length ? `${esc(bd.highways[0])} runs through both` : '';
     const notes = [];
     if (attack && (bd.river || bd.ridge)) notes.push(hw ? `The ${bd.river ? 'river' : 'ridge'} is no obstacle: ${hw}.` : `Crossing ${bd.river ? 'the river' : 'the ridge'} makes the attackers' best roll worse.`);
     if (attack && T.dugIn) notes.push('They are dug in: their best roll is better.');
+    if (noFood) notes.push(`You have no Food for a march (${marchCost(1)} needed). Food comes every tick.`);
+    else if (attack && ecoActive(w().clans[ME]) && maxMarch(w().clans[ME], F.force) < F.force - 1) notes.push(`Your Food only pays for ${maxMarch(w().clans[ME], F.force)} units to march.`);
     if (attack && !hasAp(w().clans[ME], 1)) notes.push('You have no actions left. They refill at the next 09:00, 12:00 or 18:00.');
     if (front) notes.push('A captain defends it, so this is a front: a slow fight where you probe, press and look for a weakness before you decide. Nothing is lost until you decide, and you can pull back.');
     panel(`<div class="gob"><h3>${front ? 'Open a front at' : attack ? 'Attack' : 'Move to'} ${esc(G.board.town(to).name)}</h3>
       <p>${esc(placePhrase(G.board, from, to))}${water && !placePhrase(G.board, from, to).includes('over') ? ', ' + water : ''}. ${attack ? whatYouKnow(to, L) : `You hold it with <b>${T.force}</b>.`}${blind ? ' You would attack blind.' : ''} You send from ${esc(G.board.town(from).name)} (<b>${F.force}</b>; one stays).</p>
       ${front ? captainBlock(T, L) : ''}${notes.map((n) => `<p class="fine">${n}</p>`).join('')}
-      <label class="gobn">Send <b id="gobN">${max}</b><input id="gobRange" type="range" min="1" max="${max}" value="${max}"></label>
+      <label class="gobn">Send <b id="gobN">${max}</b> <span class="fine" id="gobCost">${attack && ecoActive(w().clans[ME]) ? `costs ${marchCost(max)} Food` : ''}</span><input id="gobRange" type="range" min="1" max="${max}" value="${max}"></label>
+      ${attack && ecoActive(w().clans[ME]) && (bd.river) && !hasBridge(w(), ME, from, to) && w().clans[ME].res.build >= K8.bridgeCost ? `<button data-g="bridge" data-from="${esc(from)}" data-to="${esc(to)}">Build a goblin bridge here <span class="fine">${K8.bridgeCost} Build, ${K8.bridgeMajors} ticks: the river stops hurting you</span></button>` : ''}
       <div class="gobrow"><button class="primary" data-g="send" data-from="${esc(from)}" data-to="${esc(to)}">${front ? 'Open the front' : attack ? 'Attack' : 'Move'}${attack ? ' <span class="fine">1 action</span>' : ''}</button><button data-g="close">Cancel</button></div></div>`);
-    const r = $('#gobRange'); r.addEventListener('input', () => { $('#gobN').textContent = r.value; });
+    const r = $('#gobRange'); r.addEventListener('input', () => { $('#gobN').textContent = r.value; const c = $('#gobCost'); if (c && attack && ecoActive(w().clans[ME])) c.textContent = `costs ${marchCost(+r.value)} Food`; });
   }
   function resultPanel(events) {
     const en = entriesOf(events, ctxFor());
@@ -429,6 +444,14 @@ export function initGoblin(ctx) {
       const known = lv.get(c.to) === 'known';
       out.push({ rank: 1, label: `${c.captain ? 'Front' : 'Attack'}: ${G.board.town(c.to).name}`, sub: known ? `${c.T.force} there (${cap(c.T.owner)}${c.captain ? ', a captain' : ''}) against your ${c.F.force - 1} from ${G.board.town(c.from).name}: ${how}` : `${cap(c.T.owner)} hold it with ${forceWord(c.T.force, fw())}${c.captain ? ', and a captain' : ''}. You can send ${c.F.force - 1} from ${G.board.town(c.from).name}.`, data: `data-g="go" data-from="${esc(c.from)}" data-to="${esc(c.to)}"` });
     }
+    const me = world.clans[ME];
+    if (ecoActive(me)) {
+      if (me.hireDay !== Math.floor((world.startHour + world.tick) / 24) && me.res.coin >= K8.hireCost) {
+        const spot = Object.keys(world.towns).filter((t) => world.towns[t].owner === ME && G.board.neighbours(t).some((n) => world.towns[n] && world.towns[n].owner && world.towns[n].owner !== ME)).sort((a, b) => world.towns[a].force - world.towns[b].force)[0];
+        if (spot) out.push({ rank: 2, label: `Hire a band at ${G.board.town(spot).name}`, sub: `${K8.hireCost} Coin for ${K8.hireUnits} units, once a day. You have ${me.res.coin} Coin.`, data: `data-g="hire" data-town="${esc(spot)}"` });
+      }
+      if (me.res.food === 0) out.push({ rank: 0, label: 'You are out of Food', sub: 'Marches and recruits wait for Food. Units drift home if it lasts a day. Fewer units, or more farming townships.', data: 'data-g="close"' });
+    }
     if (hidden) out.push({ rank: 9, label: 'Learn the map', sub: `${hidden} neighbouring township${hidden === 1 ? ' is' : 's are'} hidden in fog. Learn them in the quiz and they will show.`, data: 'data-g="close"' });
     return out;
   }
@@ -485,6 +508,11 @@ export function initGoblin(ctx) {
       const ev = run([{ type: 'present', clan: ME }, o], 0);
       markPlayed(b.dataset.town);
       paint(); hud(); if (checkOver()) return; sittingResult(ev);
+    }
+    else if (a === 'bridge' || a === 'hire') {
+      const o = a === 'bridge' ? { type: 'bridge', clan: ME, from: b.dataset.from, to: b.dataset.to } : { type: 'hire', clan: ME, town: b.dataset.town };
+      const ev = run([{ type: 'present', clan: ME }, o], 0);
+      paint(); hud(); sittingResult(ev);
     }
     else if (a === 'chargeq') chargeQuestion(b.dataset.front);
     else if (a === 'chargea') chargeAnswer(b.dataset.front, b.dataset.ans, b.dataset.right);

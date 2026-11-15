@@ -40,3 +40,7 @@ After any rule or constant change, run `targets.mjs` and compare to this table; 
 ## After the peace rule went on (D216b, the user's yes to P2)
 
 With `aiPeaceShare` 0.4: Careful wins 55 percent (pass), won chapters last 26.3 days (pass), the biggest stack is 5.2 times the median (fails by 0.2), Bold still wins 100 percent. Four of nine targets pass. The stack figure is the price of the rivals not fighting each other; the economy (F2) is the remedy.
+
+## After the economy (F2, 2026-11-15)
+
+Four of nine targets pass: Careful wins 50 percent of chapters and they last 20.8 days; fronts reach a decision and the day is varied (8.9 kinds of event). Failing: Bold 100 percent, the passive player keeping 68 percent, a rival beating a passive player on day 36, the biggest stack at 6.7 times the median, and Careful losing 33 percent of fronts. Force is bounded now (under 40 units a township after 400 days, a test), which closes H52. See `14-economy.md` for what was tried (a conquest unrest and a tighter upkeep) and why they were dropped. The bold bot is the open problem: it wins before income matters.
