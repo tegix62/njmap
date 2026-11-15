@@ -21,6 +21,7 @@ The strategy layer is optional. Turned off, the app is exactly the quiz, Drive a
 | 04 | [Systems spec, version 0](04-systems-spec.md): the rules as a builder needs them, with the data model, constants, and where it fills or departs from the log | written 2026-11-15; five new working rules await the user (D202 to D206) |
 | M0 | [M0 build plan](M0-build-plan.md): the headless simulation in eight small steps, each with a check, ending in three Ledgers for the user to read | written 2026-11-15; S1 to S7 built; S8 (the user reads three Ledgers) next |
 | M1 | [M1 build plan](M1-build-plan.md): goblin mode on the app's own map, with a home page and a short digest | first pass built 2026-11-15; needs a phone play session |
+| 12 | [Gap list](12-gap-list.md): the game as built against the design, with what is missing, what each piece needs from the user, and the order to finish | written 2026-11-15 |
 | 05 | Director spec: pressure estimate, drama budget, relief valve | to write |
 | 06 | Content bible: clans, dwarf towns, every real fact with its source and a verified flag | to write |
 | 07 | Screen map and flows | to write |
