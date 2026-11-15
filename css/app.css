@@ -3442,3 +3442,28 @@ body.paper .hub-tile { border: 1.5px solid #14235e; border-radius: 0; background
 body.paper .hub-big { background: #e8603a; color: #fff; }
 body.holo .hub-tile { border: 1px solid rgba(95, 243, 255, 0.4); border-radius: 2px; background: rgba(60, 220, 255, 0.06); }
 body.holo .hub-big { background: rgba(95, 243, 255, 0.2); border-color: #5ff3ff; }
+
+/* ---- Goblin mode (M1) ---- */
+#gobbar { display: none; }
+body[data-mode='goblin'] #tabs, body[data-mode='goblin'] #fabs { display: none; }
+body[data-mode='goblin'] #gobbar {
+  position: fixed; left: 0; right: 0; bottom: 0; height: calc(var(--tabs-h) + var(--safe-b)); padding-bottom: var(--safe-b);
+  display: grid; grid-template-columns: repeat(4, 1fr); background: var(--ink); z-index: 6;
+}
+#gobbar button { border: 0; background: none; color: var(--panel-muted); font-size: 12px; font-weight: 600; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; }
+#gobbar .ti { font-size: 20px; line-height: 1; }
+#gobbar button:active { color: #fff; }
+.gob h3 { margin: 2px 0 6px; font-size: 17px; }
+.gob h3 small { font-weight: 500; color: var(--panel-muted); font-size: 12px; }
+.gob p { margin: 5px 0; line-height: 1.35; }
+.gob .fine { font-size: 12px; color: var(--panel-muted); }
+.gob .warn { color: #b42318; font-weight: 600; }
+.gobrow { display: flex; gap: 8px; margin-top: 10px; }
+.gobrow button, .gob > button { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--panel-muted); background: none; color: inherit; font-weight: 600; }
+.gob .primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+.gob > button { width: 100%; margin-top: 8px; }
+.gobn { display: block; margin-top: 8px; }
+.gobn input { width: 100%; margin-top: 6px; }
+.gobdice { margin-top: 8px; font-size: 13px; }
+.gobdice div { padding: 2px 0; }
+#settings #homeBtn { width: 100%; margin: 4px 0 10px; padding: 10px; border-radius: 10px; }

@@ -20,6 +20,8 @@ import { createLooks } from './looks.js';
 import { createToolbar } from './toolbar.js';
 import { createPerfTest } from './perftest.js';
 import { initProgress } from './progress.js';
+import { initGoblin } from './goblin/ui/goblin.js';
+import { askHome } from './goblin/ui/home.js';
 
 /** Map filter for one road, by the label people use ("I-287", "Columbia Turnpike"). */
 const roadFilter = (label) => (label ? ['==', LABEL_EXPR, label] : ['==', ['get', 'ref'], '__none__']);
@@ -78,7 +80,12 @@ function askRegion() {
 }
 
 async function main() {
-  if (needsRegionChoice()) await askRegion();
+  // the home page: Goblin mode or Normal mode (remembered for this session)
+  const entry = await askHome();
+  if (entry === 'goblin' && activeRegion().id !== 'nj') {   // Goblin mode is New Jersey only: open the NJ map for this visit without changing the saved map
+    const u = new URL(location.href); u.searchParams.set('region', 'nj'); location.replace(u.toString()); return;
+  }
+  if (needsRegionChoice()) { if (entry === 'goblin') setRegion('nj'); else await askRegion(); }
   const region = activeRegion();
   document.body.dataset.region = region.id;
   document.title = `${REGION_BLURB[region.id]?.tag === 'NJ' ? 'NJ' : 'Manhattan'} Townfinder`;
@@ -595,6 +602,7 @@ async function main() {
     explore: initExplore(ctx),
     practice: initPractice(ctx),
     progress: initProgress(ctx),
+    goblin: initGoblin(ctx),
   };
   ctx.modes = modes;
 
@@ -606,13 +614,21 @@ async function main() {
     map.setGlobalStateProperty('quiet', m === 'practice');
     document.body.classList.toggle('on-progress', m === 'progress');
     for (const b of document.querySelectorAll('#tabs [data-mode]')) b.setAttribute('aria-selected', b.dataset.mode === m);
-    store.set('mode', m);
+    if (m !== 'goblin') store.set('mode', m);
     // Study modes are north-up; Drive re-applies its own orientation.
     if (m !== 'drive' && map.getBearing() !== 0) map.easeTo({ bearing: 0, duration: ctx.dur(900) });
     modes[m].enter();
     updateEdges();
   }
   ctx.setMode = setMode;
+  const normalMode = () => { const m = store.get('mode', 'practice'); return modes[m] && m !== 'goblin' ? m : 'practice'; };
+  ctx.showHome = async () => {
+    const e = await askHome({ force: true });
+    if (e === 'goblin') {
+      if (ctx.region.id !== 'nj') { const u = new URL(location.href); u.searchParams.set('region', 'nj'); location.replace(u.toString()); return; }
+      setMode('goblin');
+    } else if (ctx.mode === 'goblin') setMode(normalMode());
+  };
   for (const b of document.querySelectorAll('#tabs [data-mode]')) b.addEventListener('click', () => setMode(b.dataset.mode));
 
   // compass button: north-up <-> heading-up (drive) / reset to north (other modes)
@@ -740,6 +756,7 @@ async function main() {
     ctx.toast('Forgotten.');
   });
   $('#closeSettings').addEventListener('click', () => dlg.close());
+  $('#homeBtn').addEventListener('click', () => { dlg.close(); ctx.showHome(); });
   $('#exportNotes').addEventListener('click', () => {
     const blob = new Blob([notes.exportJSON()], { type: 'application/json' });
     const a = document.createElement('a');
@@ -764,7 +781,8 @@ async function main() {
     dlg.close();
   });
 
-  setMode(store.get('mode', 'practice'));
+  if (new URLSearchParams(location.search).has('debug')) window.njtf = ctx;   // for scripted browser tests
+  setMode(entry === 'goblin' ? 'goblin' : normalMode());
   document.body.classList.add('ready');
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {

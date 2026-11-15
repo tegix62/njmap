@@ -1,0 +1,252 @@
+// Goblin mode on the app's own map (M1: the skirmish layer, solo, placeholders). The simulation lives in ../sim and knows nothing of the screen;
+// this file paints it onto the township polygons the app already draws and turns taps into orders.
+import { makeBoard } from '../sim/board.js';
+import { loadContent } from '../sim/chars.js';
+import { newWorld, step } from '../sim/world.js';
+import { entriesOf, renderLedger, placePhrase } from '../sim/ledger.js';
+import { digestOf } from '../sim/digest.js';
+import { MUNI_LABEL_IDS } from '../../style.js';
+
+const ME = 'goblins';
+const CLANS = [{ id: 'goblins', kind: 'goblin', lord: 'human' }, { id: 'rats', kind: 'rat', lord: 'ai' }, { id: 'toads', kind: 'toad', lord: 'ai' }];
+const NO = { goblins: 1, rats: 2, toads: 3 };
+const COLOUR = { 1: '#3f9b5a', 2: '#b9712f', 3: '#3a86a8' };
+const HOUR = 3600000, KEEP_EVENTS = 600, SAVE = 'goblin.save';
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+const easternHour = (t) => +new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', hourCycle: 'h23' }).format(new Date(t));
+
+export function initGoblin(ctx) {
+  const { map, store } = ctx;
+  const $ = (s) => document.querySelector(s);
+  let G = null;            // { board, content } once loaded
+  let save = null;         // { v, world, lastReal, events, seenTick }
+  let sel = null;          // the township you have picked to send units from
+  let timer = 0, bound = false, layersReady = false, mode = 'idle', pendingHome = null;
+
+  // ---------------------------------------------------------------- loading and saving
+  async function load() {
+    if (G) return;
+    const [bj, cj] = await Promise.all([fetch('data/goblin-board.json').then((r) => r.json()), fetch('data/goblin-content.json').then((r) => r.json())]);
+    G = { board: makeBoard(bj, null), content: loadContent(cj) };   // no captains in M1: the board has no content attached
+  }
+  const persist = () => store.set(SAVE, save);
+  const w = () => save.world;
+  const run = (orders, ticks) => {
+    const r = step(G.board, save.world, orders, ticks);
+    save.world = r.state;
+    save.events = [...save.events, ...r.events].slice(-KEEP_EVENTS);
+    persist();
+    return r.events;
+  };
+  const ctxFor = (state = w()) => ({ board: G.board, state, content: G.content, clan: ME });
+  function catchUp() {
+    const n = Math.floor((Date.now() - save.lastReal) / HOUR);
+    if (n <= 0) return [];
+    save.lastReal += n * HOUR;
+    return run([{ type: 'present', clan: ME }], 0).concat(run([], n));
+  }
+
+  // ---------------------------------------------------------------- map layers and painting
+  function ensureLayers() {
+    if (layersReady) return;
+    layersReady = true;
+    const before = MUNI_LABEL_IDS.find((id) => map.getLayer(id));
+    const colour = ['match', ['coalesce', ['feature-state', 'gc'], 0]];
+    for (const [k, v] of Object.entries(COLOUR)) colour.push(+k, v);
+    colour.push('rgba(0,0,0,0)');
+    map.addLayer({ id: 'gob-fill', type: 'fill', source: 'munis', layout: { visibility: 'none' }, paint: { 'fill-color': colour, 'fill-opacity': 0.5 } }, before);
+    map.addLayer({ id: 'gob-target', type: 'fill', source: 'munis', layout: { visibility: 'none' },
+      paint: { 'fill-color': ['match', ['coalesce', ['feature-state', 'gt'], 0], 1, '#dc2626', 2, '#2563eb', 'rgba(0,0,0,0)'], 'fill-opacity': ['match', ['coalesce', ['feature-state', 'gt'], 0], 0, 0, 0.28] } }, before);
+    map.addLayer({ id: 'gob-line', type: 'line', source: 'munis', layout: { visibility: 'none' },
+      paint: { 'line-color': ['case', ['==', ['coalesce', ['feature-state', 'gs'], 0], 1], '#111827', ['==', ['coalesce', ['feature-state', 'gr'], 0], 1], '#dc2626', 'rgba(0,0,0,0)'],
+               'line-width': ['case', ['==', ['coalesce', ['feature-state', 'gs'], 0], 1], 4, 3] } }, before);
+    map.addSource('gobforce', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({ id: 'gob-force', type: 'symbol', source: 'gobforce', layout: { visibility: 'none', 'text-field': ['format', ['get', 'n'], { 'font-scale': 0.62 }, '\n', {}, ['get', 'f'], { 'font-scale': 1.15 }], 'text-font': ['Noto Sans Medium'], 'text-size': 13, 'text-line-height': 1.0, 'text-allow-overlap': true, 'text-ignore-placement': true },
+      paint: { 'text-color': '#111827', 'text-halo-color': '#ffffff', 'text-halo-width': 2 } });
+  }
+  const hiddenLabels = new Map();
+  const showLayers = (on) => {
+    for (const id of ['gob-fill', 'gob-target', 'gob-line', 'gob-force']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+    // the township names move into the force labels, so the map's own names step aside while the war is on
+    for (const id of MUNI_LABEL_IDS) {
+      if (!map.getLayer(id)) continue;
+      if (on) { hiddenLabels.set(id, map.getLayoutProperty(id, 'visibility') || 'visible'); map.setLayoutProperty(id, 'visibility', 'none'); }
+      else if (hiddenLabels.has(id)) { map.setLayoutProperty(id, 'visibility', hiddenLabels.get(id)); hiddenLabels.delete(id); }
+    }
+  };
+  const muniOf = (id) => ctx.byKey.get(id);
+  function paint() {
+    if (!G || !save) return;
+    const world = w();
+    const raidTargets = new Set(world.raids.filter((r) => world.towns[r.target] && world.towns[r.target].owner === ME).map((r) => r.target));
+    const nbs = sel ? new Set(G.board.neighbours(sel)) : new Set();
+    const feats = [];
+    for (const id of Object.keys(world.towns)) {
+      const m = muniOf(id); if (!m) continue;
+      const T = world.towns[id];
+      const gt = sel && nbs.has(id) ? (T.owner === ME ? 2 : T.owner ? 1 : 0) : 0;
+      map.setFeatureState({ source: 'munis', id: m.id }, { gc: NO[T.owner] || 0, gs: sel === id ? 1 : 0, gt, gr: raidTargets.has(id) ? 1 : 0 });
+      feats.push({ type: 'Feature', properties: { f: String(T.force), n: m.n }, geometry: { type: 'Point', coordinates: m.pt } });
+    }
+    map.getSource('gobforce').setData({ type: 'FeatureCollection', features: feats });
+  }
+  function clearPaint() {
+    if (!save) return;
+    for (const id of Object.keys(w().towns)) { const m = muniOf(id); if (m) map.setFeatureState({ source: 'munis', id: m.id }, { gc: 0, gs: 0, gt: 0, gr: 0 }); }
+  }
+  function fitTheatre() {
+    const pts = Object.keys(w().towns).map((id) => muniOf(id)).filter(Boolean).map((m) => m.pt);
+    if (!pts.length) return;
+    const b = pts.reduce((a, p) => [Math.min(a[0], p[0]), Math.min(a[1], p[1]), Math.max(a[2], p[0]), Math.max(a[3], p[1])], [180, 90, -180, -90]);
+    map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: { top: 90, bottom: 260, left: 30, right: 30 }, duration: ctx.dur ? ctx.dur(700) : 700 });
+  }
+
+  // ---------------------------------------------------------------- HUD and panels
+  const clock = () => { const abs = w().startHour + w().tick; return `Day ${Math.floor(abs / 24) + 1}, ${String(abs % 24).padStart(2, '0')}:00`; };
+  function hud() {
+    const world = w();
+    const mine = Object.values(world.towns).filter((t) => t.owner === ME);
+    const units = mine.reduce((n, t) => n + t.force, 0);
+    const mood = (digestOf([], ctxFor()).mood) || ((world.director[ME] && world.director[ME].word) || 'calm').toLowerCase();
+    ctx.hud(`<div class="town">${mine.length} townships · ${units} units</div><div class="meta">Goblins · ${clock()} · mood: ${esc(mood)}</div>`);
+  }
+  const panel = (html) => ctx.sheet(html);
+  const closeBtn = '<button class="primary" data-g="close">Close</button>';
+
+  function ownerName(o) { return o ? cap(o) : 'Nobody'; }
+  function townCard(id) {
+    const T = w().towns[id], b = G.board.town(id);
+    const mine = T.owner === ME;
+    panel(`<div class="gob"><h3>${esc(b.name)} <small>${esc(b.county)} County</small></h3>
+      <p>${ownerName(T.owner)} hold it with <b>${T.force}</b>${T.dugIn ? ', dug in' : ''}.</p>
+      ${mine && T.force >= 2 ? '<p class="fine">Tap another township next to it to send units, or:</p><button class="primary" data-g="pick" data-id="' + esc(id) + '">Send units from here</button>' : mine ? '<p class="fine">One unit alone has to stay home.</p>' : ''}
+      ${closeBtn}</div>`);
+  }
+  function orderPanel(from, to) {
+    const F = w().towns[from], T = w().towns[to], bd = G.board.border(from, to) || {};
+    const attack = T.owner !== ME;
+    const max = F.force - 1;
+    const water = bd.river ? `across the ${typeof bd.river === 'string' ? esc(bd.river) : 'river'}` : bd.ridge ? 'over a ridge' : '';
+    const hw = bd.highways && bd.highways.length ? `${esc(bd.highways[0])} runs through both` : '';
+    const notes = [];
+    if (attack && (bd.river || bd.ridge)) notes.push(hw ? `The ${bd.river ? 'river' : 'ridge'} is no obstacle: ${hw}.` : `Crossing ${bd.river ? 'the river' : 'the ridge'} makes the attackers' best roll worse.`);
+    if (attack && T.dugIn) notes.push('They are dug in: their best roll is better.');
+    panel(`<div class="gob"><h3>${attack ? 'Attack' : 'Move to'} ${esc(G.board.town(to).name)}</h3>
+      <p>${esc(placePhrase(G.board, from, to))}${water && !placePhrase(G.board, from, to).includes('over') ? ', ' + water : ''}. ${attack ? `${ownerName(T.owner)} hold it with <b>${T.force}</b>.` : `You hold it with <b>${T.force}</b>.`} You send from ${esc(G.board.town(from).name)} (<b>${F.force}</b>; one stays).</p>
+      ${notes.map((n) => `<p class="fine">${n}</p>`).join('')}
+      <label class="gobn">Send <b id="gobN">${max}</b><input id="gobRange" type="range" min="1" max="${max}" value="${max}"></label>
+      <div class="gobrow"><button class="primary" data-g="send" data-from="${esc(from)}" data-to="${esc(to)}">${attack ? 'Attack' : 'Move'}</button><button data-g="close">Cancel</button></div></div>`);
+    const r = $('#gobRange'); r.addEventListener('input', () => { $('#gobN').textContent = r.value; });
+  }
+  function resultPanel(events) {
+    const en = entriesOf(events, ctxFor());
+    const sk = events.find((e) => e.type === 'skirmish_result' && e.rounds);
+    const dice = sk ? `<div class="gobdice">${sk.rounds.map((r, i) => `<div><span class="fine">Round ${i + 1}</span> you <b>${r.a.join(' ')}</b> · them <b>${r.d.join(' ')}</b> → ${r.dLost ? `${r.dLost} of theirs` : ''}${r.dLost && r.aLost ? ', ' : ''}${r.aLost ? `${r.aLost} of yours` : ''}</div>`).join('')}</div>` : '';
+    const rej = events.find((e) => e.type === 'order_rejected');
+    panel(`<div class="gob"><h3>${rej ? 'That did not work' : sk ? (sk.won ? 'Taken' : 'Thrown back') : 'Done'}</h3>
+      ${rej ? `<p>${esc(rej.reason)}</p>` : en.map((e) => `<p>${esc(e.text)}</p>`).join('') || '<p>Done.</p>'}${dice}${closeBtn}</div>`);
+  }
+  function digestPanel(note) {
+    const d = digestOf(save.events.filter((e) => e.tick > save.seenTick), ctxFor());
+    save.seenTick = w().tick; persist();
+    panel(`<div class="gob"><h3>${esc(d.headline)}</h3>
+      ${d.incoming.map((i) => `<p class="warn">${esc(i.text)}</p>`).join('')}
+      ${d.lines.map((l) => `<p><span class="fine">${esc(l.when)}</span> ${esc(l.text)}</p>`).join('')}
+      ${d.hidden ? `<p class="fine">${d.hidden} more in the Ledger.</p>` : ''}
+      ${note ? `<p class="fine">${esc(note)}</p>` : ''}
+      <div class="gobrow"><button data-g="ledger">Everything</button><button class="primary" data-g="close">Close</button></div></div>`);
+  }
+  function ledgerPanel() {
+    const en = entriesOf(save.events, ctxFor()).slice(-80).reverse();
+    panel(`<div class="gob"><h3>Ledger</h3>${en.length ? en.map((e) => `<p><span class="fine">Day ${e.day} ${e.hour}</span> ${esc(e.text)}</p>`).join('') : '<p class="fine">Nothing has happened yet.</p>'}
+      <div class="gobrow"><button data-g="copy">Copy</button><button class="primary" data-g="close">Close</button></div></div>`);
+  }
+  function startPanel() {
+    mode = 'choose-home'; pendingHome = null; sel = null;
+    ctx.hud('<div class="town">Goblin mode</div><div class="meta">Tap the township where your clan begins.</div>');
+    panel('<div class="gob"><p>Pick your home township. Two rival clans, the rats and the toads, take the townships around it. The war runs in real hours, even while you are away.</p><button class="primary" data-g="cancelstart">Back</button></div>');
+  }
+  function confirmStart(id) {
+    pendingHome = id; const b = G.board.town(id);
+    const th = G.board.theatre(id, 3, { min: 12, max: 60 });
+    panel(`<div class="gob"><h3>Start at ${esc(b.name)}?</h3><p>${th.length} townships are in play. You hold ${esc(b.name)} and the clans of rats and toads hold the rest.</p>
+      <div class="gobrow"><button class="primary" data-g="begin">Begin the war</button><button data-g="startover">Choose another</button></div></div>`);
+  }
+  function beginWar(home) {
+    const now = Date.now(), lastReal = now - (now % HOUR);
+    const world = newWorld(G.board, { seed: 'm1-' + lastReal, home, clans: CLANS, startHour: easternHour(lastReal) });
+    save = { v: 1, world, lastReal, events: [], seenTick: 0 };
+    persist(); mode = 'play'; sel = null;
+    paint(); hud(); fitTheatre();
+    panel('<div class="gob"><h3>The war begins</h3><p>Your goblins are green. Tap one of your townships, then a neighbour, to send units. New recruits arrive at 09:00, 12:00 and 18:00; the rats and toads act then too, and anything aimed at you is announced six hours ahead.</p>' + closeBtn + '</div>');
+  }
+
+  // ---------------------------------------------------------------- taps and buttons
+  function onMapClick(e) {
+    if (ctx.mode !== 'goblin' || !G) return;
+    const m = ctx.locate([e.lngLat.lng, e.lngLat.lat]);
+    if (!m) return;
+    const id = m.key;
+    if (mode === 'choose-home') { if (!G.board.has(id)) return ctx.toast('Not on the war map'); return confirmStart(id); }
+    if (!save || !w().towns[id]) return ctx.toast('Outside the war');
+    const T = w().towns[id];
+    if (sel && sel !== id && G.board.neighbours(sel).includes(id)) { if (T.owner === ME || T.owner) return orderPanel(sel, id); return ctx.toast('Nobody holds that'); }
+    if (T.owner === ME && T.force >= 2) { sel = id; paint(); }
+    else { sel = null; paint(); }
+    townCard(id);
+  }
+  function onSheetClick(e) {
+    if (ctx.mode !== 'goblin') return;
+    const b = e.target.closest('[data-g]'); if (!b) return;
+    const a = b.dataset.g;
+    if (a === 'close') { sel = null; panel(''); paint(); }
+    else if (a === 'pick') { sel = b.dataset.id; paint(); panel('<div class="gob"><p>Tap a neighbouring township: red to attack, blue to move units in.</p><button data-g="close">Cancel</button></div>'); }
+    else if (a === 'send') {
+      const from = b.dataset.from, to = b.dataset.to, n = +$('#gobRange').value;
+      const type = w().towns[to].owner === ME ? 'move' : 'attack';
+      const ev = run([{ type: 'present', clan: ME }, { type, clan: ME, from, to, n }], 0);
+      sel = null; paint(); hud(); resultPanel(ev);
+    }
+    else if (a === 'ledger') ledgerPanel();
+    else if (a === 'copy') { navigator.clipboard && navigator.clipboard.writeText(renderLedger(save.events, ctxFor())).then(() => ctx.toast('Copied'), () => ctx.toast('Could not copy')); }
+    else if (a === 'cancelstart') { if (save) { mode = 'play'; panel(''); hud(); } else ctx.setMode(store.get('mode', 'practice') === 'goblin' ? 'practice' : store.get('mode', 'practice')); }
+    else if (a === 'startover') startPanel();
+    else if (a === 'begin') beginWar(pendingHome);
+    else if (a === 'newwar') { startPanel(); }
+  }
+  function onBar(e) {
+    const b = e.target.closest('[data-gbar]'); if (!b) return;
+    const a = b.dataset.gbar;
+    if (a === 'home') ctx.showHome && ctx.showHome();
+    else if (!save) return;
+    else if (a === 'digest') { catchUp(); paint(); hud(); digestPanel(); }
+    else if (a === 'ledger') ledgerPanel();
+    else if (a === 'newwar') panel('<div class="gob"><p>Leave this war and start another? The current one is lost.</p><div class="gobrow"><button class="primary" data-g="newwar">Start another</button><button data-g="close">Keep this one</button></div></div>');
+  }
+
+  // ---------------------------------------------------------------- mode interface
+  return {
+    async enter() {
+      document.body.classList.add('goblin-on');
+      await load();
+      ensureLayers(); showLayers(true);
+      if (!bound) { bound = true; map.on('click', onMapClick); $('#sheet').addEventListener('click', onSheetClick); $('#gobbar').addEventListener('click', onBar); }
+      save = store.get(SAVE, null);
+      if (!save || !save.world || save.v !== 1) { save = null; return startPanel(); }
+      mode = 'play'; sel = null;
+      const seenBefore = save.seenTick;
+      const ev = catchUp();
+      paint(); hud(); fitTheatre();
+      const d = digestOf(save.events.filter((e) => e.tick > seenBefore), ctxFor());
+      if (d.lines.length || d.incoming.length) digestPanel(); else panel('');
+      clearInterval(timer);
+      timer = setInterval(() => { if (ctx.mode !== 'goblin' || !save) return; const ev2 = catchUp(); if (ev2.length) { paint(); hud(); } }, 30000);
+    },
+    leave() {
+      clearInterval(timer); document.body.classList.remove('goblin-on');
+      clearPaint(); showLayers(false); ctx.hud(''); panel(''); sel = null;
+    },
+  };
+}

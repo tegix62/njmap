@@ -582,3 +582,7 @@ Play opens on a front door, one per region, instead of dropping you into a quest
 ### Choose the spoken voice
 
 Settings → More voice has a Voice list, Speed, Pitch and a Test button. The list is whatever text-to-speech voices the phone's browser reports (English ones shown); the app downloads and ships no audio. The choice is stored with the other settings (`voiceURI`, `voiceRate`, `voicePitch`) and applied by `ctx.applyVoice(utterance)`, which every spoken line goes through. "Phone default" keeps the old behaviour. On an iPhone, better voices can be downloaded in Settings → Accessibility → Spoken Content → Voices, and then show up in the list. Whether a given browser honours a chosen voice, rate and pitch varies by device; the Test button is how to find out.
+
+## Goblin mode (early build)
+
+The app opens on a home page: **Normal mode** (everything above) or **Goblin mode**, a strategy game in which small clans fight over real New Jersey townships on this same map. It runs in real hours, even while the app is closed, and opens with a short digest of what happened. It is New Jersey only, solo, and all of its wording is placeholder. Design documents and the simulation notes are in `docs/goblins/`; the simulation (no screens) is in `js/goblin/sim/` and is tested with `node --test "tools/goblin/test/*.test.mjs"`.

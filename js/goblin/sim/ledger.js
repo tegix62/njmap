@@ -39,29 +39,40 @@ const poss = (s) => (s.endsWith('s') ? s + "'" : s + "'s");
 const fill = (tpl, v) => tpl.replace(/\{(\w+)\}/g, (_, k) => (k in v ? v[k] : `{${k}}`));
 const factWord = (content, f) => { const [kind, ref] = f.split(':'); if (kind === 'trait') return content.traits.get(ref).word; if (kind === 'fear') return `a fear of ${ref}`; return f; };
 
-export function renderLedger(events, { board, state, content, clan }) {
+export function renderLedger(events, ctx) {
+  const lines = [];
+  let day = -1;
+  for (const en of entriesOf(events, ctx)) {
+    if (en.day !== day) { day = en.day; lines.push('', `### Day ${en.day}`, ''); }
+    lines.push(`- \`${en.hour}\` ${en.text}`);
+  }
+  return lines.join('\n') + '\n';
+}
+
+/** One entry per line the Ledger would print: { tick, day, hour, text, event }. The digest and the screens use these directly. */
+export function entriesOf(events, { board, state, content, clan }) {
   const T = Object.fromEntries(content.json.templates.map((t) => [t.id, t.text]));
   const town = (id) => nameOf(board, id);
   const clanName = (id) => cap(id);
   const char = (id) => { const c = state.chars[id]; return c ? `${c.name} of ${clanName(c.clan)}` : id; };
   const trait = (id) => content.traits.get(id).word;
   const fronts = {};
-  const lines = [];
-  let day = -1;
+  const entries = [];
+  let cur = null;
   const heading = (tick) => {
     const abs = state.startHour + tick, d = Math.floor(abs / 24) + 1, hour = abs % 24;
     return { d, text: fill(T.heading, { day: d, hour: String(hour).padStart(2, '0') + ':00' }) };
   };
   const say = (tick, text) => {
     const h = heading(tick);
-    if (h.d !== day) { day = h.d; lines.push('', `### ${h.text.replace(/, \d\d:00$/, '')}`, ''); }
-    lines.push(`- \`${String(h.text.match(/(\d\d:00)$/)[1])}\` ${text}`);
+    entries.push({ tick, day: h.d, hour: String(h.text.match(/(\d\d:00)$/)[1]), text, event: cur });
   };
   const lead = (e) => (e.lead ? ` ${char(e.lead)} led them.` : '');
   const learned = (facts) => (facts && facts.length ? ` Learned: ${facts.map((f) => factWord(content, f)).join(', ')}.` : '');
   const exposed = (xs) => (xs && xs.length ? ` Exposed: ${xs.map(town).join(', ')} down to one.` : '');
   const mine = (id) => id === clan;
   for (const e of events) {
+    cur = e;
     switch (e.type) {
       case 'skirmish_result': case 'raid_landed': {
         const raid = e.type === 'raid_landed';
@@ -112,5 +123,5 @@ export function renderLedger(events, { board, state, content, clan }) {
       default: break;   // recruits, dug_in and the Director's quiet events are for the metrics, not the story
     }
   }
-  return lines.join('\n') + '\n';
+  return entries;
 }
