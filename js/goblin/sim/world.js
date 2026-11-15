@@ -8,11 +8,12 @@
 // S3 covers the territory game: recruits, dig-in, AI attacks, declared raids and human attack and move orders. Characters, fronts and the
 // Director are added in S4 to S6; their hooks are marked.
 
-import { K, K2, K4, K5, K6 } from './constants.js';
+import { K, K2, K4, K5, K6, K8 } from './constants.js';
 import { makeRng, seedState } from './rng.js';
 import { skirmish, modsFor } from './skirmish.js';
 import * as Dir from './director.js';
 import { initWar, warTurn } from './war.js';
+import * as Eco from './economy.js';
 import { applySitting, hasAp, spend as spendAp, refill as refillAp } from './sitting.js';
 import { openFront, actFront, settleFronts, pinnedTowns, openFronts } from './front.js';
 import { placeInitialCaptains, captainsOf, capture, place, promote, succeed } from './chars.js';
@@ -23,6 +24,7 @@ export const DEFAULT_RULES = Object.freeze({ townForceCap: K2.townForceCap, recr
   aiCaptureCooldownTicks: 72,  // conquest tempo (D209): after taking a township an AI clan waits this many ticks before attacking again (0 = off)
   leaderShare: 0.5,            // (D209) a clan holding more than this share of the theatre needs leaderAttackRatio to attack (1.01 = never)
   leaderAttackRatio: 3.0,
+  economy: 1,                  // Food, Build and Coin (F2); 0 gives the older free-recruit rules
   aiRecruitSplit: 0.5,           // 0 to 1: this fraction of an AI's recruits go to its weakest border township (a human's rule), the rest to its best attack position (F0)
   aiCounterRatio: 0,           // if above 0: an AI clan may retake a township it lost in the last 24 ticks at this ratio instead of aiAttackRatio (F0)
   aiPeaceShare: 0.4,             // if above 0: while a human holds more than this share of the theatre the AI clans do not attack each other (F0, announced in the Ledger)
@@ -91,6 +93,7 @@ export function newWorld(board, cfg) {
   const rng = makeRng(seedState(cfg.seed ?? 1));
   if (board.content) placeInitialCaptains(w, rng, board.content);
   initWar(w, board);
+  if (w.rules.economy) Eco.initEconomy(w, board);
   if (cfg.guidedStart) guidedStart(w, board, cfg.clans.find((c) => c.lord === 'human').id);
   w.rng = rng.state;
   return w;
@@ -121,9 +124,9 @@ function guidedStart(w, board, humanId) {
 
 const ownedBy = (w, clanId) => Object.keys(w.towns).filter((t) => w.towns[t].owner === clanId).sort(byId);
 const isHuman = (w, id) => !!id && w.clans[id] && w.clans[id].lord === 'human';
-const borderMods = (board, from, to, dugIn, captainLeads = false) => {
+const borderMods = (board, from, to, dugIn, captainLeads = false, bridged = false) => {
   const b = board.border(from, to) || {};
-  return modsFor({ dugIn, captainLeads, riverBorder: !!(b.river || b.ridge), highway: !!(b.highways && b.highways.length) });
+  return modsFor({ dugIn, captainLeads, riverBorder: !!(b.river || b.ridge) && !bridged, highway: !!(b.highways && b.highways.length) });
 };
 
 /** One skirmish: units from `from` (or already on the road, `inTransit`) attack `to`. Mutates w, emits events.
@@ -144,14 +147,14 @@ function fight(w, board, rng, emit, { by, from, to, n, inTransit = false, raid =
   }
   const defendersBefore = T.force;
   const bd = board.border(from, to) || {};
-  const r = skirmish({ attackers: n, defenders: T.force, ...borderMods(board, from, to, T.dugIn, !!leadId) }, rng);
+  const r = skirmish({ attackers: n, defenders: T.force, ...borderMods(board, from, to, T.dugIn, !!leadId, Eco.hasBridge(w, by, from, to)) }, rng);
   const detail = isHuman(w, by) || isHuman(w, against);
   const extra = [];
   if (r.won) {
     const dc = T.captain && w.chars[T.captain];
     if (dc && dc.status === 'active') { capture(w, dc, by); extra.push(['captured', { clan: against, by, char: dc.id, town: to }]); }
     if (against) (w.revenge ||= {})[to] = { clan: against, until: w.tick + 24 };
-    T.owner = by; T.force = r.attackersLeft; T.dugIn = false; T.captain = null; T.attackedTick = -1;
+    T.owner = by; T.force = r.attackersLeft; T.dugIn = false; T.captain = null; T.attackedTick = -1; T.freshUntil = w.tick + K8.unrestTicks;
     if (w.clans[by].lord === 'ai') w.clans[by].coolUntil = w.tick + R(w).aiCaptureCooldownTicks;
     if (leadId) { w.chars[leadId].at = to; T.captain = leadId; }
     else if (content) {
@@ -186,7 +189,8 @@ function applyOrder(w, board, rng, emit, o) {
     if (T.owner === o.clan) return reject('that is your own township');
     if (T.captain) return reject('a captain defends it: open a front (front_open)');
     if (!hasAp(clan, K6.costAttack)) return reject('no actions left: they refill at 09:00, 12:00 and 18:00');
-    spendAp(clan, K6.costAttack);
+    if (!Eco.canMarch(clan, o.n)) return reject(`the march needs ${Eco.marchCost(o.n)} Food: you have ${clan.res.food}`);
+    spendAp(clan, K6.costAttack); Eco.payMarch(clan, o.n);
     return fight(w, board, rng, emit, { by: o.clan, from: o.from, to: o.to, n: o.n });
   }
   return reject('unknown order');
@@ -198,9 +202,10 @@ function applyFrontOrder(w, board, rng, emit, o) {
   if (!clan || clan.lord !== 'human' || clan.out) return reject('not a live human clan');
   clan.lastActive = w.tick; clan.absentSince = null;
   if (o.type === 'front_open' && !hasAp(clan, K6.costFront)) return reject('no actions left: they refill at 09:00, 12:00 and 18:00');
+  if (o.type === 'front_open' && !Eco.canMarch(clan, o.n)) return reject(`the march needs ${Eco.marchCost(o.n)} Food: you have ${clan.res.food}`);
   const res = o.type === 'front_open' ? openFront(w, board, emit, o) : actFront(w, board, rng, emit, o);
   if (res !== true) reject(res);
-  else if (o.type === 'front_open') spendAp(clan, K6.costFront);
+  else if (o.type === 'front_open') { spendAp(clan, K6.costFront); Eco.payMarch(clan, o.n); }
 }
 
 // ---------------------------------------------------------------- the world's turn
@@ -210,7 +215,8 @@ function recruits(w, board, emit) {
     if (clan.out) continue;
     const mine = ownedBy(w, clan.id);
     if (!mine.length) continue;
-    const n = Math.ceil(Math.min(mine.length, R(w).recruitFullTowns) / K.recruitsDivisor + Math.max(0, mine.length - R(w).recruitFullTowns) / R(w).recruitDivisorBeyond);
+    let n = Math.ceil(Math.min(mine.length, R(w).recruitFullTowns) / K.recruitsDivisor + Math.max(0, mine.length - R(w).recruitFullTowns) / R(w).recruitDivisorBeyond);
+    if (Eco.active(clan)) { n = Math.min(n, Math.floor(clan.res.food / K8.recruitCost)); clan.res.food -= n * K8.recruitCost; }   // recruits eat Food (F2)
     const enemyNb = (t) => board.neighbours(t).filter((x) => w.towns[x] && w.towns[x].owner && w.towns[x].owner !== clan.id);
     const border = mine.filter((t) => enemyNb(t).length);
     let at;
@@ -234,6 +240,9 @@ function recruits(w, board, emit) {
     let left = 0;
     if (split) { const weakest = border.slice().sort((a, b) => (w.towns[a].force - w.towns[b].force) || byId(a, b))[0]; left += fillFrom(weakest, split); }
     left += fillFrom(at, n - split);
+    if (clan.lord === 'ai' && Eco.active(clan) && clan.res.coin >= K8.hireCost && clan.hireDay !== Eco.dayOf(w)) {   // an AI spends its Coin on a hired band at its best attack position
+      clan.res.coin -= K8.hireCost; clan.hireDay = Eco.dayOf(w); w.towns[at].force = Math.min(R(w).townForceCap, w.towns[at].force + K8.hireUnits); emit('hired', { clan: clan.id, town: at, n: K8.hireUnits });
+    }
     emit('recruits', { clan: clan.id, town: at, n, lost: left });
   }
 }
@@ -241,7 +250,11 @@ function recruits(w, board, emit) {
 function digIn(w, emit) {
   for (const t of Object.keys(w.towns).sort(byId)) {
     const T = w.towns[t];
-    if (T.owner && !T.dugIn && T.force >= K.digInMinForce && T.attackedTick <= w.lastMajor) { T.dugIn = true; emit('dug_in', { town: t, clan: T.owner }); }
+    if (T.owner && !T.dugIn && T.force >= K.digInMinForce && T.attackedTick <= w.lastMajor) {
+      const c = w.clans[T.owner];
+      if (Eco.active(c)) { if (c.res.build < K8.digInCost) continue; c.res.build -= K8.digInCost; }   // digging in costs Build (D204)
+      T.dugIn = true; emit('dug_in', { town: t, clan: T.owner });
+    }
   }
 }
 
@@ -276,6 +289,7 @@ function aiTurn(w, board, rng, emit, clan) {
       if (!U || !U.owner || U.owner === clan.id) continue;
       if (shielded(w, U.owner) || protectedHome(w, u) || pinned.has(u)) continue;
       if (isHuman(w, U.owner) && !Dir.allowsHostile(w, U.owner)) { Dir.noteHeld(w, U.owner); continue; }   // the Director: rhythm, budget, pressure
+      if (!Eco.canMarch(clan, n)) continue;   // it cannot feed the march
       if (peace && !isHuman(w, U.owner)) continue;   // the rivals stop fighting each other while a human is winning
       const ratio = n / Math.max(1, U.force);
       const rv = w.revenge && w.revenge[u];
@@ -284,6 +298,7 @@ function aiTurn(w, board, rng, emit, clan) {
     }
   }
   if (!best) return;
+  Eco.payMarch(clan, best.n);
   if (isHuman(w, w.towns[best.to].owner)) {   // against a human: a visible raid with a warning (D12, D205)
     declareRaid(w, board, emit, clan, best);
     Dir.spend(w, w.towns[best.to].owner);
@@ -344,6 +359,8 @@ function majorTick(w, board, rng, emit) {
   for (const c of Object.values(w.clans)) {                    // who is absent (D189)
     if (c.lord === 'human' && !c.out && c.absentSince === null && w.tick - c.lastActive >= K2.absentAfterTicks) { c.absentSince = w.tick; emit('player_absent', { clan: c.id }); }
   }
+  Eco.economyTick(w, emit);
+  Eco.completeBridges(w, emit);
   recruits(w, board, emit);
   refillAp(w);
   digIn(w, emit);
@@ -375,7 +392,7 @@ export function step(board, state, orders = [], ticks = 0, opts = {}) {
     for (const o of orders) emit('order_rejected', { clan: o.clan, order: o, reason: 'the war is over' });
     return { state: w, events };
   }
-  for (const o of orders) (o.type === 'front_open' || o.type === 'front' ? applyFrontOrder : (o.type === 'scout' || o.type === 'fortify' || o.type === 'taunt') ? applySitting : applyOrder)(w, board, rng, emit, o);
+  for (const o of orders) (o.type === 'front_open' || o.type === 'front' ? applyFrontOrder : (o.type === 'scout' || o.type === 'fortify' || o.type === 'taunt') ? applySitting : (o.type === 'hire' || o.type === 'bridge') ? (w_, b_, r_, e_, o_) => Eco.applyEconomyOrder(w_, b_, e_, o_) : applyOrder)(w, board, rng, emit, o);
   const n = Math.min(ticks, K.catchUpCapTicks);
   for (let i = 0; i < n; i++) {
     w.tick++;

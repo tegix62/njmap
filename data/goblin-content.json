@@ -710,6 +710,31 @@
    "id": "peace_end",
    "text": "The rival clans are at each other's throats again.",
    "placeholder": true
+  },
+  {
+   "id": "hunger",
+   "text": "{clan} are running short of Food. If it is not put right within a day, units will start to drift home.",
+   "placeholder": true
+  },
+  {
+   "id": "deserted",
+   "text": "{n} of {clan}'s units drifted home hungry.",
+   "placeholder": true
+  },
+  {
+   "id": "hired",
+   "text": "{clan} hired a band of {n} at {town}.",
+   "placeholder": true
+  },
+  {
+   "id": "bridge_started",
+   "text": "{clan} began a bridge between {a} and {b}. It will take until the {majors}th tick.",
+   "placeholder": true
+  },
+  {
+   "id": "bridge_built",
+   "text": "{clan}'s bridge between {a} and {b} is finished.",
+   "placeholder": true
   }
  ],
  "force_words": [

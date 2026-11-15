@@ -93,3 +93,21 @@ export const K7 = Object.freeze({
   countyMin: 3,             // a "county" milestone needs a county with at least this many townships in the theatre
   thirdShare: 1 / 3,
 });
+
+// Added in F2 (docs/goblins/14-economy.md): Food, Build and Coin. All proposals until the user has played them.
+export const K8 = Object.freeze({
+  start: { food: 12, build: 4, coin: 4 },
+  foodPerTown: 1, foodTownBonus: 2, buildPerTown: 1, coinPerTown: 1,   // every township farms 1 Food a major tick; Food towns +2; a Build town yields 1 Build and a Coin town 1 Coin, once a day (the 12:00 tick)
+  unitsPerFood: 14,            // 1 Food a major tick feeds this many units
+  crowd: 10,                  // units in one township beyond this eat double: a big stack costs more to keep than the same units spread out
+  unrestTicks: 0,             // a township just conquered yields nothing for this many ticks (tried 48 to 144: it hurt the careful bot and not the bold one, so it is off)
+  recruitCost: 1,             // Food per recruit
+  marchPerUnits: 4,           // an attack, front or raid costs 1 Food per this many units sent (at least 1)
+  resCap: 60,                 // a stockpile holds at most this much of each
+  graceMajors: 3,             // short of Food for this many major ticks in a row (a day) and units start to drift home
+  desertDivisor: 4,           // ...losing this fraction (1 in 4) of the unfed units each major tick
+  digInCost: 1,               // Build, per township, when it digs in at a tick
+  fortifyCost: 2,             // Build, to dig in at once (instead of an action)
+  bridgeCost: 4, bridgeMajors: 3,   // Build, and major ticks to finish a goblin bridge over a river border (D109)
+  hireCost: 6, hireUnits: 4,  // Coin: a hired band of this many units in one township, once a day
+});

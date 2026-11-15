@@ -11,6 +11,8 @@
 import { K, K2, K4 } from './constants.js';
 import { skirmish } from './skirmish.js';
 import { takeTaunt, hasAp, scoutMods } from './sitting.js';
+import { active, hasBridge, maxMarch, canMarch, marchCost } from './economy.js';
+import { K8 } from './constants.js';
 import { discoverOne, discover, knows, undiscovered, suitBonus, counterMod, hasConflict, injuryRoll, applyInjury, kill, capture, place, promote } from './chars.js';
 
 const byId = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -52,7 +54,7 @@ export function openFront(w, board, emit, o) {
   if (openFronts(w).some((f) => f.target === o.to)) return 'a front is already open there';
   if (!Number.isInteger(o.n) || o.n < 1 || o.n > F.force - 1) return 'n must be from 1 to the force minus 1';
   const b = board.border(o.from, o.to) || {};
-  const behindByRiver = !!(b.river || b.ridge) && !(b.highways && b.highways.length);
+  const behindByRiver = !!(b.river || b.ridge) && !(b.highways && b.highways.length) && !hasBridge(w, o.clan, o.from, o.to);
   const lead = F.captain && w.chars[F.captain] && w.chars[F.captain].status === 'active' ? F.captain : null;
   const taunted = takeTaunt(w, o.clan, o.to);
   F.force -= o.n; F.attackedTick = w.tick; F.dugIn = false;
@@ -203,7 +205,7 @@ function close(w, board, rng, emit, f, verdict) {
     const garrison = yielded ? f.units : f.survivors;
     const defenders = yielded ? T.force : 0;
     const wasOutnumbered = f.units < (f.defendersBefore ?? T.force);
-    T.owner = f.attacker; T.force = garrison; T.dugIn = false; T.attackedTick = -1;
+    T.owner = f.attacker; T.force = garrison; T.dugIn = false; T.attackedTick = -1; T.freshUntil = w.tick + K8.unrestTicks;
     T.captain = null;
     if (w.clans[f.attacker].lord === 'ai') w.clans[f.attacker].coolUntil = w.tick + (R(w).aiCaptureCooldownTicks ?? 0);
     if (d && !died) {
@@ -252,9 +254,12 @@ export function legalOrders(board, w, clanId) {
   for (const from of Object.keys(w.towns).sort(byId)) {
     const F = w.towns[from];
     if (F.owner !== clanId) continue;
-    if (board.content && canHit && !F.dugIn && F.force >= K.digInMinForce) out.push({ type: 'fortify', clan: clanId, town: from });
+    if (board.content && !F.dugIn && F.force >= K.digInMinForce && (active(clan) ? clan.res.build >= K8.fortifyCost : canHit)) out.push({ type: 'fortify', clan: clanId, town: from });
+    if (active(clan) && clan.hireDay !== Math.floor((w.startHour + w.tick) / 24) && clan.res.coin >= K8.hireCost && board.neighbours(from).some((n) => w.towns[n] && w.towns[n].owner && w.towns[n].owner !== clanId)) out.push({ type: 'hire', clan: clanId, town: from });
+    if (active(clan) && clan.res.build >= K8.bridgeCost) for (const to of board.neighbours(from)) { const bd = board.border(from, to); if (bd && bd.river && w.towns[to] && !hasBridge(w, clanId, from, to) && !(w.bridging || []).some((x) => x.clan === clanId && ((x.a === from && x.b === to) || (x.a === to && x.b === from)))) out.push({ type: 'bridge', clan: clanId, from, to }); }
     if (F.force < 2) continue;
-    const range = { min: 1, max: F.force - 1 };
+    const range = { min: 1, max: maxMarch(clan, F.force) };
+    if (range.max < 1) continue;
     for (const to of board.neighbours(from)) {
       const T = w.towns[to];
       if (!T) continue;

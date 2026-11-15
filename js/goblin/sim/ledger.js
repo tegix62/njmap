@@ -125,6 +125,11 @@ export function entriesOf(events, { board, state, content, clan }) {
       case 'war_hold': say(e.tick, cap(fill(T[e.started ? 'war_hold_start' : 'war_hold_end'], { clan: clanName(e.clan) }))); break;
       case 'war_over': say(e.tick, cap(fill(T[e.how === 'wiped out' ? 'war_wiped' : e.human ? 'war_won' : 'war_lost'], { clan: clanName(e.winner || 'nobody') }))); break;
       case 'ai_peace': say(e.tick, T[e.started ? 'peace_start' : 'peace_end']); break;
+      case 'hunger': say(e.tick, cap(fill(T.hunger, { clan: clanName(e.clan) }))); break;
+      case 'deserted': say(e.tick, cap(fill(T.deserted, { clan: clanName(e.clan), n: e.n }))); break;
+      case 'hired': say(e.tick, cap(fill(T.hired, { clan: clanName(e.clan), n: e.n, town: town(e.town) }))); break;
+      case 'bridge_started': say(e.tick, cap(fill(T.bridge_started, { clan: clanName(e.clan), a: town(e.a), b: town(e.b), majors: e.majors }))); break;
+      case 'bridge_built': say(e.tick, cap(fill(T.bridge_built, { clan: clanName(e.clan), a: town(e.a), b: town(e.b) }))); break;
       case 'promoted': say(e.tick, cap(fill(T.promoted, { clan: clanName(e.clan), char: char(e.char), town: town(e.town) }))); break;
       case 'succeeded': say(e.tick, cap(fill(T.succeeded, { char: char(e.char), town: town(e.town) }))); break;
       case 'captured': break;   // reported by the closing line or the skirmish line

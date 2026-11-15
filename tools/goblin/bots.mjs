@@ -50,7 +50,7 @@ function policyBot(name, P) {
       const home = (o) => w.towns[o.from].force;
       if (openFronts(w, clan).length < P.maxFronts && ctx.opens < P.maxFronts) {
         const cands = legal.filter((o) => o.type === 'front_open' && home(o) - P.keep >= 4)
-          .map((o) => ({ o, n: home(o) - P.keep, t: byForce(w, o.to) })).filter((x) => x.n >= x.t * P.frontRatio)
+          .map((o) => ({ o, n: Math.min(home(o) - P.keep, maxN(o)), t: byForce(w, o.to) })).filter((x) => x.n >= 1 && x.n >= x.t * P.frontRatio)
           .sort((a, b) => (a.t - b.t) || (a.o.to < b.o.to ? -1 : 1));
         if (cands.length) {
           const tgt = cands[0].o.to, c = w.chars[w.towns[tgt].captain];
@@ -65,7 +65,7 @@ function policyBot(name, P) {
       }
       if (ctx.attacks < 2) {
         const cands = legal.filter((o) => o.type === 'attack' && home(o) - P.keep >= 2)
-          .map((o) => ({ o, n: home(o) - P.keep, t: byForce(w, o.to) })).filter((x) => x.n / Math.max(1, x.t) >= P.attackRatio)
+          .map((o) => ({ o, n: Math.min(home(o) - P.keep, maxN(o)), t: byForce(w, o.to) })).filter((x) => x.n >= 1 && x.n / Math.max(1, x.t) >= P.attackRatio)
           .sort((a, b) => (b.n / Math.max(1, b.t) - a.n / Math.max(1, a.t)) || (a.o.to < b.o.to ? -1 : 1));
         if (cands.length) { ctx.attacks++; return { ...cands[0].o, n: cands[0].n }; }
       }

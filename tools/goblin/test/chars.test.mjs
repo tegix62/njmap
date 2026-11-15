@@ -232,7 +232,7 @@ test('promotion in play: winning against odds names a captain at the captured to
 test('the long run with captains: 20 seeds, 365 days, invariants every day; captains are captured and promoted, none over a cap', () => {
   let captured = 0, promoted = 0, maxCaps = 0;
   for (let s = 0; s < 20; s++) {
-    let w = newWorld(board, { seed: 'cl' + s, home: PAT, clans: [{ id: 'goblins', kind: 'goblin', lord: 'human' }, { id: 'rats', kind: 'rat', lord: 'ai' }, { id: 'toads', kind: 'toad', lord: 'ai' }] });
+    let w = newWorld(board, { rules: { economy: 0 }, seed: 'cl' + s, home: PAT, clans: [{ id: 'goblins', kind: 'goblin', lord: 'human' }, { id: 'rats', kind: 'rat', lord: 'ai' }, { id: 'toads', kind: 'toad', lord: 'ai' }] });
     for (let day = 0; day < 365; day++) {
       const r = step(board, w, [], 24); w = r.state;
       captured += types(r.events, 'captured').length; promoted += types(r.events, 'promoted').length;

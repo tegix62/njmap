@@ -6,6 +6,8 @@
 
 import { K, K6 } from './constants.js';
 import { counterMod, discoverOne, knows, undiscovered } from './chars.js';
+import { K8 } from './constants.js';
+import { active as ecoActive } from './economy.js';
 
 export const METHODS = ['sneak', 'ask', 'watch'];
 const hourOf = (w) => (w.startHour + w.tick) % 24;
@@ -49,14 +51,16 @@ export function applySitting(w, board, rng, emit, o) {
   if (!clan || clan.lord !== 'human' || clan.out) return reject('not a live human clan');
   if (!board.content) return reject('no characters in this war');
   clan.lastActive = w.tick; clan.absentSince = null;
+  const buildCost = o.type === 'fortify' && ecoActive(clan);   // F2: digging in at once costs Build, not an action
   const cost = o.type === 'scout' ? K6.costScout : o.type === 'taunt' ? K6.costTaunt : K6.costFortify;
-  if (!hasAp(clan, cost)) return reject('no actions left: they refill at 09:00, 12:00 and 18:00');
+  if (!buildCost && !hasAp(clan, cost)) return reject('no actions left: they refill at 09:00, 12:00 and 18:00');
   if (o.type === 'fortify') {
     const T = w.towns[o.town];
     if (!T || T.owner !== o.clan) return reject('not your township');
     if (T.dugIn) return reject('already dug in');
     if (T.force < K.digInMinForce) return reject(`needs at least ${K.digInMinForce} units to dig in`);
-    spend(clan, cost); T.dugIn = true;
+    if (buildCost) { if (clan.res.build < K8.fortifyCost) return reject(`digging in at once costs ${K8.fortifyCost} Build: you have ${clan.res.build}`); clan.res.build -= K8.fortifyCost; } else spend(clan, cost);
+    T.dugIn = true;
     return emit('fortified', { clan: o.clan, town: o.town });
   }
   const tg = targetOf(w, board, o.clan, o.town);

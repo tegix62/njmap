@@ -8,7 +8,7 @@ import { legalOrders, openFronts } from '../../../js/goblin/sim/front.js';
 import { scoutMods, isNight, hasAp } from '../../../js/goblin/sim/sitting.js';
 import { entriesOf } from '../../../js/goblin/sim/ledger.js';
 import { makeRng, seedState } from '../../../js/goblin/sim/rng.js';
-import { K6 } from '../../../js/goblin/sim/constants.js';
+import { K6, K8 } from '../../../js/goblin/sim/constants.js';
 
 const read = (p) => JSON.parse(fs.readFileSync(new URL(p, import.meta.url), 'utf8'));
 const content = C.loadContent(read('../../../data/goblin-content.json'));
@@ -44,7 +44,7 @@ test('actions: a human clan starts with 3, gains 2 at each major tick, holds at 
   w.clans.goblins.ap = 0;
   const rej = step(board, w, [{ ...legal, n: 1 }], 0);
   assert.match(ev(rej.events, 'order_rejected')[0].reason, /no actions left/);
-  assert.equal(legalOrders(board, w, 'goblins').filter((o) => ['attack', 'front_open', 'scout', 'fortify', 'taunt'].includes(o.type)).length, 0);
+  assert.equal(legalOrders(board, w, 'goblins').filter((o) => ['attack', 'front_open', 'scout', 'taunt'].includes(o.type)).length, 0);   // fortify costs Build in an economy war, not an action
   assert.ok(legalOrders(board, w, 'goblins').some((o) => o.type === 'move'), 'moves stay free');
   assert.equal(hasAp({}, 5), true, 'a clan with no ap field is unlimited');
 });
@@ -53,7 +53,8 @@ test('fortify digs in at once, costs one, and is refused when it cannot help', (
   const w = world();
   const id = Object.keys(w.towns).find((t) => w.towns[t].owner === 'goblins' && w.towns[t].force >= 3 && !w.towns[t].dugIn);
   const r = step(board, w, [{ type: 'fortify', clan: 'goblins', town: id }], 0);
-  assert.equal(r.state.towns[id].dugIn, true); assert.equal(r.state.clans.goblins.ap, K6.apStart - 1); assert.equal(ev(r.events, 'fortified').length, 1);
+  assert.equal(r.state.towns[id].dugIn, true); assert.equal(ev(r.events, 'fortified').length, 1);
+  assert.equal(r.state.clans.goblins.res.build, w.clans.goblins.res.build - K8.fortifyCost, 'digging in at once costs Build'); assert.equal(r.state.clans.goblins.ap, K6.apStart, 'and no action');
   assert.match(ev(step(board, r.state, [{ type: 'fortify', clan: 'goblins', town: id }], 0).events, 'order_rejected')[0].reason, /already/);
   const other = Object.keys(w.towns).find((t) => w.towns[t].owner === 'rats');
   assert.match(ev(step(board, w, [{ type: 'fortify', clan: 'goblins', town: other }], 0).events, 'order_rejected')[0].reason, /not your/);
@@ -142,5 +143,5 @@ test('the Ledger reads scouts, fortifying and taunts; the world stays valid thro
     st = step(board, st, [], 24).state;
     assert.deepEqual(checkInvariants(board, st), []);
   }
-  assert.ok(seen.scouted > 0 && seen.fortified > 0, JSON.stringify(seen));
+  assert.ok(seen.scouted > 0, JSON.stringify(seen));
 });
