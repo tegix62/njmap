@@ -845,6 +845,31 @@
    "id": "season",
    "text": "{name} begins. {text}",
    "placeholder": true
+  },
+  {
+   "id": "hammering",
+   "text": "Hammering is heard from the rock at {town}.",
+   "placeholder": true
+  },
+  {
+   "id": "goaded",
+   "text": "The {by} pushed at the dwarves of {town}. The dwarves will answer them.",
+   "placeholder": true
+  },
+  {
+   "id": "dwarves_help",
+   "text": "Dwarf miners came down from {from} to {town}: {n} stand with {clan}.",
+   "placeholder": true
+  },
+  {
+   "id": "seek_ok",
+   "text": "{clan} made their way to the dwarves at {town} and were heard out. The dwarves are friends now.",
+   "placeholder": true
+  },
+  {
+   "id": "seek_fail",
+   "text": "{clan} made their way to the dwarves at {town} and were turned away.",
+   "placeholder": true
   }
  ],
  "force_words": [

@@ -16,6 +16,10 @@ function weight(e, clan) {
     case 'front_closed': return e.clan === clan ? 75 : 20;
     case 'clan_out': return 60;
     case 'player_absent': return 5;
+    case 'hammering': return 42;
+    case 'dwarves_goaded': return 48;
+    case 'dwarves_help': return e.clan === clan ? 52 : 0;
+    case 'dwarves_sought': return e.clan === clan ? 58 : 0;
     case 'season': return 45;
     case 'convoy_ambushed': return e.clan === clan ? 98 : 20;
     case 'sighting': return e.clan === clan ? 38 : 0;

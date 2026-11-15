@@ -17,7 +17,7 @@ const fs = require('fs');
   const targets = await page.evaluate(async () => {
     const bj = await fetch('data/goblin-board.json').then((r) => r.json());
     const s = JSON.parse(localStorage.getItem('njtf.goblin.save')); const w = s.world; let plain = null, capt = null;
-    for (const id of Object.keys(w.towns)) if (w.towns[id].owner === 'goblins') for (const n of bj.towns[id].nb) { const T = w.towns[n]; if (!T || !T.owner || T.owner === 'goblins') continue; if (!T.captain && !plain) plain = n; if (T.captain && !capt) capt = n; }
+    for (const id of Object.keys(w.towns)) if (w.towns[id].owner === 'goblins') for (const n of bj.towns[id].nb) { const T = w.towns[n]; if (!T || !T.owner || T.owner === 'goblins' || T.owner === 'dwarves') continue; if (!T.captain && !plain) plain = n; if (T.captain && !capt) capt = n; }
     const c = w.chars[w.towns[capt].captain]; c.known.goblins = ['trait:' + c.traits[0].id]; w.clans.goblins.res.coin = 30; w.clans.goblins.ap = 4;
     localStorage.setItem('njtf.goblin.save', JSON.stringify(s));
     return { plain, capt };

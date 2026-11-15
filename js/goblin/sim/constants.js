@@ -139,3 +139,13 @@ export const K10 = Object.freeze({
   ambushUnits: 5, ambushMinForce: 4,
   reprisalTicks: 48,          // an answer to an ambush: the first attack on the ambushers' township within this long costs no action
 });
+
+// Added in F6 (docs/goblins/05-director.md): the dwarves and the Director's hidden hand. All proposals until the user has played them.
+export const K11 = Object.freeze({
+  dwarfForce: 12, dwarfKeep: 4,       // a rock town starts with this many, and a goaded dwarf force keeps this many at home when it strikes
+  goadTicks: 48,                      // after a rival provokes a rock town, the dwarves answer that clan for this long (D160)
+  strikeRatio: 1.0,                   // a goaded dwarf force strikes a bordering township of the provoker at this ratio or better
+  seekTarget: 8, seekCooldown: 24,    // seeking the dwarves: 2d6, 8 or more makes them friends for the chapter (D161); a failure waits a day
+  helpUnits: 2,                       // a friendly rock town sends this many miners to a township of yours that borders it, each major tick
+  steerGap: 72,                       // the Director steers a rival at a rock town at most once in three days, only while a player is Heated or Overwhelmed (D162)
+});

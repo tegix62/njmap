@@ -8,13 +8,15 @@ import { runWar, metricsOf } from './run.mjs';
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i < 0 ? d : process.argv[i + 1]; };
 const SEEDS = +arg('seeds', 20);
 const rules = Object.fromEntries((arg('set', '') || '').split(',').filter(Boolean).map((kv) => { const [k, v] = kv.split('='); return [k, +v]; }));
+// The real map is uneven, so a war's difficulty depends on where it starts: seeds rotate through four homes (docs/goblins/11-tuning-plan.md)
+const HOMES = ['Paterson City|Passaic', 'Newark City|Essex', 'Edison Township|Middlesex', 'Hackensack City|Bergen'];
 const median = (xs) => { const s = xs.slice().sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : 0; };
 const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
 function batch(bot, days, seeds) {
   const out = { wins: 0, winDays: [], endShare: [], stackRatio: [], decided: 0, closed: 0, lost: 0, resolved: 0, shapes: [], rivalWinDays: [], emptyDays: 0, days: 0 };
   for (let s = 1; s <= seeds; s++) {
-    const r = runWar({ seed: s, days, bot, rules });
+    const r = runWar({ seed: s, days, bot, rules, home: HOMES[s % HOMES.length], rivals: 'pool' });
     const m = metricsOf(r, days), w = r.state;
     const over = w.war && w.war.over;
     if (over && over.winner === 'goblins') { out.wins++; out.winDays.push(over.tick / 24); }
@@ -46,7 +48,7 @@ const rows = [
 // passive keeps at least 80 percent after 21 days: measured on its own 21-day runs
 {
   const shares = [];
-  for (let s = 1; s <= Math.max(8, SEEDS >> 1); s++) { const r = runWar({ seed: s, days: 21, bot: 'passive', rules }); const m = metricsOf(r, 21); shares.push(m.endTowns / m.startTowns); }
+  for (let s = 1; s <= Math.max(8, SEEDS >> 1); s++) { const r = runWar({ seed: s, days: 21, bot: 'passive', rules, home: HOMES[s % HOMES.length], rivals: 'pool' }); const m = metricsOf(r, 21); shares.push(m.endTowns / m.startTowns); }
   const v = mean(shares);
   rows[3][1] = `${(100 * v).toFixed(0)} percent`; rows[3][2] = v >= 0.8;
 }

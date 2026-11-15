@@ -44,3 +44,23 @@ With `aiPeaceShare` 0.4: Careful wins 55 percent (pass), won chapters last 26.3 
 ## After the economy (F2, 2026-11-15)
 
 Four of nine targets pass: Careful wins 50 percent of chapters and they last 20.8 days; fronts reach a decision and the day is varied (8.9 kinds of event). Failing: Bold 100 percent, the passive player keeping 68 percent, a rival beating a passive player on day 36, the biggest stack at 6.7 times the median, and Careful losing 33 percent of fronts. Force is bounded now (under 40 units a township after 400 days, a test), which closes H52. See `14-economy.md` for what was tried (a conquest unrest and a tighter upkeep) and why they were dropped. The bold bot is the open problem: it wins before income matters.
+
+## After the dwarves (F6, 2026-11-15)
+
+The targets script now rotates four homes (Paterson, Newark, Edison, Hackensack) and draws rivals from the pool, because the real map is uneven: with one home (Paterson) the dwarves around it made the careful bot win every chapter and left a passive player almost untouched, while Newark gave 4 wins in 10 and Toms River (no rock towns) 10 in 10. Results over the four homes:
+
+```
+Targets (20 seeds)
+FAIL  Careful wins a chapter (35 days)                               80 percent             want 50 to 70 percent
+FAIL  Bold wins a chapter (35 days)                                  100 percent            want 40 to 60 percent
+pass  Length of a won chapter (Careful, mean days)                   17.8                   want 14 to 28 days
+FAIL  Passive keeps townships after 21 days (mean share of start)    76 percent             want at least 80 percent
+pass  A rival wins against a passive player                          earliest day 44        want not before day 40
+FAIL  Biggest stack against the median garrison (mean)               8.4 times              want under 5 times
+pass  Fronts that reach a decision beat (Careful)                    95 percent             want at least 60 percent
+FAIL  Fronts lost by Careful                                         32 percent             want 15 to 30 percent
+pass  Distinct kinds of event on an active day (mean)                12.0                   want at least 6
+4 of 9 pass
+```
+
+The baseline moved: earlier tables used Paterson only and fixed rats and toads, so they are not comparable with this one. The dwarf strength numbers (goad time, strike ratio, garrison) were swept and made no difference; what matters is that rivals lose their rock towns at the start and waste attacks on the rock.

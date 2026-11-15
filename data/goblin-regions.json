@@ -1,5 +1,5 @@
 {
- "v": 1,
+ "v": 2,
  "kits": [
   {
    "id": "skylands",
@@ -888,5 +888,119 @@
   "Woolwich Township|Gloucester": "bayshore",
   "Wrightstown Borough|Burlington": "pines",
   "Wyckoff Township|Bergen": "palisades"
- }
+ },
+ "rock": {
+  "Montague Township|Sussex": [
+   "High Point"
+  ],
+  "Wantage Township|Sussex": [
+   "High Point"
+  ],
+  "Hardwick Township|Warren": [
+   "Mount Tammany (Delaware Water Gap)"
+  ],
+  "Knowlton Township|Warren": [
+   "Mount Tammany (Delaware Water Gap)"
+  ],
+  "Sandyston Township|Sussex": [
+   "Kittatinny Ridge"
+  ],
+  "Bloomfield Township|Essex": [
+   "Garret Mountain"
+  ],
+  "Cedar Grove Township|Essex": [
+   "Garret Mountain"
+  ],
+  "Montclair Township|Essex": [
+   "Garret Mountain"
+  ],
+  "Little Falls Township|Passaic": [
+   "Garret Mountain"
+  ],
+  "Clifton City|Passaic": [
+   "Garret Mountain"
+  ],
+  "Woodland Park Borough|Passaic": [
+   "Garret Mountain"
+  ],
+  "Mountainside Borough|Union": [
+   "Watchung Reservation"
+  ],
+  "Scotch Plains Township|Union": [
+   "Watchung Reservation"
+  ],
+  "Berkeley Heights Township|Union": [
+   "Watchung Reservation"
+  ],
+  "Summit City|Union": [
+   "Watchung Reservation"
+  ],
+  "Mahwah Township|Bergen": [
+   "Ramapo Mountains"
+  ],
+  "Ringwood Borough|Passaic": [
+   "Ramapo Mountains"
+  ],
+  "Cliffside Park Borough|Bergen": [
+   "The Palisades"
+  ],
+  "Fort Lee Borough|Bergen": [
+   "The Palisades"
+  ],
+  "Englewood City|Bergen": [
+   "The Palisades"
+  ],
+  "Englewood Cliffs Borough|Bergen": [
+   "The Palisades"
+  ],
+  "Tenafly Borough|Bergen": [
+   "The Palisades"
+  ],
+  "Cresskill Borough|Bergen": [
+   "The Palisades"
+  ],
+  "Alpine Borough|Bergen": [
+   "The Palisades"
+  ],
+  "Washington Township|Morris": [
+   "Schooley’s Mountain"
+  ],
+  "Mount Olive Township|Morris": [
+   "Schooley’s Mountain"
+  ],
+  "Montgomery Township|Somerset": [
+   "Sourland Mountain"
+  ],
+  "Hillsborough Township|Somerset": [
+   "Sourland Mountain"
+  ],
+  "Hopewell Township|Mercer": [
+   "Sourland Mountain"
+  ],
+  "East Amwell Township|Hunterdon": [
+   "Sourland Mountain"
+  ],
+  "West Amwell Township|Hunterdon": [
+   "Sourland Mountain"
+  ],
+  "Liberty Township|Warren": [
+   "Jenny Jump Mountain"
+  ],
+  "Hope Township|Warren": [
+   "Jenny Jump Mountain"
+  ],
+  "Independence Township|Warren": [
+   "Jenny Jump Mountain"
+  ],
+  "Frelinghuysen Township|Warren": [
+   "Jenny Jump Mountain"
+  ],
+  "West Milford Township|Passaic": [
+   "Bearfort Mountain"
+  ],
+  "Vernon Township|Sussex": [
+   "Bearfort Mountain"
+  ]
+ },
+ "rockSource": "data/nj-places.json (the app's own list of named mountains and ridges): a named mountain or ridge lies in or over the township. Mining history is not claimed."
 }

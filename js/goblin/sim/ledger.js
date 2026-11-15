@@ -152,6 +152,10 @@ export function entriesOf(events, { board, state, content, clan }) {
       case 'convoy_raided': { const cg = e.cargo ? [e.cargo.build ? `${e.cargo.build} Build` : '', e.cargo.coin ? `${e.cargo.coin} Coin` : ''].filter(Boolean).join(' and ') : ''; say(e.tick, cap(fill(T[e.won ? 'convoy_raid_ok' : 'convoy_raid_fail'], { clan: clanName(e.clan), against: clanName(e.against), at: town(e.at), cargo: cg }))); break; }
       case 'reprisal': say(e.tick, cap(fill(T.reprisal, { clan: clanName(e.clan), town: town(e.town) }))); break;
       case 'season': say(e.tick, cap(fill(T.season, { name: e.name, text: e.text }))); break;
+      case 'hammering': say(e.tick, cap(fill(T.hammering, { town: town(e.town) }))); break;
+      case 'dwarves_goaded': say(e.tick, cap(fill(T.goaded, { by: clanName(e.by), town: town(e.town) }))); break;
+      case 'dwarves_help': say(e.tick, cap(fill(T.dwarves_help, { clan: clanName(e.clan), town: town(e.town), from: town(e.from), n: e.n }))); break;
+      case 'dwarves_sought': say(e.tick, cap(fill(T[e.ok ? 'seek_ok' : 'seek_fail'], { clan: clanName(e.clan), town: town(e.town) }))); break;
       case 'promoted': say(e.tick, cap(fill(T.promoted, { clan: clanName(e.clan), char: char(e.char), town: town(e.town) }))); break;
       case 'succeeded': say(e.tick, cap(fill(T.succeeded, { char: char(e.char), town: town(e.town) }))); break;
       case 'captured': break;   // reported by the closing line or the skirmish line

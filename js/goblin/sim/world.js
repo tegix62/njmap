@@ -18,6 +18,7 @@ import { applyEncounter, encounterTick } from './encounters.js';
 import { convoyTick, ambushTurn, applyConvoyOrder } from './convoys.js';
 import { ruleOf } from './regions.js';
 import { seatCarried } from './chapters.js';
+import { initDwarves, goad, dwarfTurn, helpTurn, steerTurn, resolveSteer, untouchable, applySeek } from './dwarves.js';
 import { seasonOf, SEASONS } from './seasons.js';
 import { digMinFor, recruitBonusFor, ignoresRiver, digCostFree } from './kinds.js';
 import { applySitting, hasAp, spend as spendAp, refill as refillAp } from './sitting.js';
@@ -100,6 +101,7 @@ export function newWorld(board, cfg) {
   if (board.content) placeInitialCaptains(w, rng, board.content);
   initWar(w, board);
   if (w.rules.economy) Eco.initEconomy(w, board);
+  initDwarves(w, board);   // after the economy, so the dwarves keep none
   if (cfg.carry) {   // a later chapter: your clan travels with you (F5)
     const h = cfg.clans.find((c) => c.lord === 'human').id;
     if (cfg.carry.res && w.clans[h].res) w.clans[h].res = { ...cfg.carry.res };
@@ -117,7 +119,7 @@ function guidedStart(w, board, humanId) {
   const mine = Object.keys(w.towns).filter((t) => w.towns[t].owner === humanId).sort((a, b) => (w.towns[b].force - w.towns[a].force) || byId(a, b));
   for (const from of mine) {
     const F = w.towns[from], send = F.force - 1;
-    const cands = board.neighbours(from).filter((n) => w.towns[n] && w.towns[n].owner && w.towns[n].owner !== humanId && !w.towns[n].captain)
+    const cands = board.neighbours(from).filter((n) => w.towns[n] && w.towns[n].owner && w.towns[n].owner !== humanId && !w.towns[n].captain && !untouchable(w, board, n))
       .filter((n) => { const b = board.border(from, n) || {}; return !(b.river || b.ridge) || (b.highways && b.highways.length); })
       .sort((a, b) => (w.towns[a].force - w.towns[b].force) || byId(a, b));
     if (!cands.length || send < 3) continue;
@@ -190,6 +192,7 @@ function fight(w, board, rng, emit, { by, from, to, n, inTransit = false, raid =
 
 const ENCOUNTER = ['foothold', 'parley', 'insult', 'duel', 'ransom', 'release'];
 const CONVOY_ORDERS = ['guard', 'raidconvoy', 'setting'];
+const SEEK = ['seek'];
 
 function breakTruce(w, emit, clan, town) {
   const t = w.truces && w.truces[town];
@@ -209,6 +212,7 @@ function applyOrder(w, board, rng, emit, o) {
   if (o.type === 'move') { if (T.owner !== o.clan) return reject('move needs your own township'); if (T.force + o.n > R(w).townForceCap) return reject('that township would be over the cap'); F.force -= o.n; T.force += o.n; return emit('units_moved', { clan: o.clan, from: o.from, to: o.to, n: o.n }); }
   if (o.type === 'attack') {
     if (T.owner === o.clan) return reject('that is your own township');
+    if (untouchable(w, board, o.to)) return reject('the dwarves hold the rock: they cannot be conquered, only befriended (seek them out)');
     if (T.captain) return reject('a captain defends it: open a front (front_open)');
     const rp = w.reprisal && w.reprisal[o.clan], answer = !!rp && rp.target === o.to && w.tick <= rp.until;   // an answer to an ambush is free of an action (F4)
     if (!answer && !hasAp(clan, K6.costAttack)) return reject('no actions left: they refill at 09:00, 12:00 and 18:00');
@@ -226,6 +230,7 @@ function applyFrontOrder(w, board, rng, emit, o) {
   const reject = (reason) => emit('order_rejected', { clan: o.clan, order: o, reason });
   if (!clan || clan.lord !== 'human' || clan.out) return reject('not a live human clan');
   clan.lastActive = w.tick; clan.absentSince = null;
+  if (o.type === 'front_open' && untouchable(w, board, o.to)) return reject('the dwarves hold the rock: they cannot be conquered, only befriended (seek them out)');
   if (o.type === 'front_open' && !hasAp(clan, K6.costFront)) return reject('no actions left: they refill at 09:00, 12:00 and 18:00');
   if (o.type === 'front_open' && !Eco.canMarch(clan, o.n)) return reject(`the march needs ${Eco.marchCost(o.n)} Food: you have ${clan.res.food}`);
   const res = o.type === 'front_open' ? openFront(w, board, emit, o) : actFront(w, board, rng, emit, o);
@@ -237,7 +242,7 @@ function applyFrontOrder(w, board, rng, emit, o) {
 
 function recruits(w, board, emit) {
   for (const clan of Object.values(w.clans)) {
-    if (clan.out) continue;
+    if (clan.out || clan.kind === 'dwarf') continue;   // the dwarves do not recruit
     const mine = ownedBy(w, clan.id);
     if (!mine.length) continue;
     let n = Math.ceil(Math.min(mine.length, R(w).recruitFullTowns) / K.recruitsDivisor + Math.max(0, mine.length - R(w).recruitFullTowns) / R(w).recruitDivisorBeyond);
@@ -301,6 +306,7 @@ function peaceOn(w) {
 }
 
 function aiTurn(w, board, rng, emit, clan) {
+  if (clan.kind === 'dwarf') return;   // the dwarves act only when goaded (dwarfTurn)
   if (w.tick < (clan.coolUntil || 0)) return;
   const peace = peaceOn(w);
   const pinned = pinnedTowns(w);                                               // a captain pinned to a player's front: his township neither attacks nor is attacked                                  // conquest tempo
@@ -316,6 +322,7 @@ function aiTurn(w, board, rng, emit, clan) {
       if (!U || !U.owner || U.owner === clan.id) continue;
       if (shielded(w, U.owner) || protectedHome(w, u) || pinned.has(u)) continue;
       if (isHuman(w, U.owner) && !Dir.allowsHostile(w, U.owner)) { Dir.noteHeld(w, U.owner); continue; }   // the Director: rhythm, budget, pressure
+      if (untouchable(w, board, u) && w.goaded && w.goaded[clan.id] >= w.tick) continue;   // already provoked them: look elsewhere
       if (!Eco.canMarch(clan, n)) continue;   // it cannot feed the march
       const tr = w.truces && w.truces[t];
       if (tr && tr.by === U.owner && w.tick < tr.until) continue;   // a parley: this township will not attack that clan for a day
@@ -323,10 +330,11 @@ function aiTurn(w, board, rng, emit, clan) {
       const ratio = n / Math.max(1, U.force);
       const rv = w.revenge && w.revenge[u];
       const needHere = rv && rv.clan === clan.id && w.tick <= rv.until && (R(w).aiCounterRatio || 0) > 0 ? Math.min(need, R(w).aiCounterRatio) : need;
-      if (ratio >= needHere && (!best || ratio > best.ratio)) best = { from: t, to: u, n, ratio };
+      if (ratio >= needHere && (!best || ratio > best.ratio)) best = { from: t, to: u, n, ratio, goad: untouchable(w, board, u) };
     }
   }
   if (!best) return;
+  if (best.goad) { goad(w, clan.id, best.to, emit); return; }   // a rock town cannot be taken: trying provokes the dwarves
   Eco.payMarch(clan, best.n);
   if (isHuman(w, w.towns[best.to].owner)) {   // against a human: a visible raid with a warning (D12, D205)
     declareRaid(w, board, emit, clan, best);
@@ -396,15 +404,19 @@ function majorTick(w, board, rng, emit) {
   digIn(w, board, emit);
   if (board.content) for (const m of succeed(w, rng, board.content)) emit('succeeded', { clan: m.char.clan, char: m.char.id, town: m.char.at, dynasty: m.char.dynasty });
   for (const c of Object.values(w.clans)) c.peakTowns = Math.max(c.peakTowns || 0, ownedBy(w, c.id).length);
+  resolveSteer(w, board, emit);
   const peace = peaceOn(w);
   if (peace !== !!w.peace) { w.peace = peace; emit('ai_peace', { started: peace }); }   // a rule of the world, said out loud (H49)
   for (const clan of Object.values(w.clans).sort((a, b) => byId(a.id, b.id))) {
     if (clan.out || clan.lord === 'human') continue;            // AI lords only; a human's clan is theirs (an absent one sits defensively)
     aiTurn(w, board, rng, emit, clan);
   }
+  dwarfTurn(w, board, emit, (w_, b_, e_, o_) => fight(w_, b_, rng, e_, o_));
+  helpTurn(w, board, emit);
   settleFronts(w, board, rng, emit);
   directorTurn(w, board, emit);
-  ambushTurn(w, board, emit, Dir.wordOf);
+  steerTurn(w, board, emit, Dir);
+  ambushTurn(w, board, emit, Dir);
   for (const c of Object.values(w.clans)) {
     if (!c.out && !ownedBy(w, c.id).length) { c.out = true; emit('clan_out', { clan: c.id }); }
   }
@@ -425,7 +437,7 @@ export function step(board, state, orders = [], ticks = 0, opts = {}) {
     for (const o of orders) emit('order_rejected', { clan: o.clan, order: o, reason: 'the war is over' });
     return { state: w, events };
   }
-  for (const o of orders) (o.type === 'front_open' || o.type === 'front' ? applyFrontOrder : (o.type === 'scout' || o.type === 'fortify' || o.type === 'taunt') ? applySitting : (o.type === 'hire' || o.type === 'bridge') ? (w_, b_, r_, e_, o_) => Eco.applyEconomyOrder(w_, b_, e_, o_) : ENCOUNTER.includes(o.type) ? applyEncounter : CONVOY_ORDERS.includes(o.type) ? (w_, b_, r_, e_, o_) => applyConvoyOrder(w_, b_, r_, e_, o_, hasAp, spendAp) : applyOrder)(w, board, rng, emit, o);
+  for (const o of orders) (o.type === 'front_open' || o.type === 'front' ? applyFrontOrder : (o.type === 'scout' || o.type === 'fortify' || o.type === 'taunt') ? applySitting : (o.type === 'hire' || o.type === 'bridge') ? (w_, b_, r_, e_, o_) => Eco.applyEconomyOrder(w_, b_, e_, o_) : ENCOUNTER.includes(o.type) ? applyEncounter : CONVOY_ORDERS.includes(o.type) ? (w_, b_, r_, e_, o_) => applyConvoyOrder(w_, b_, r_, e_, o_, hasAp, spendAp) : SEEK.includes(o.type) ? (w_, b_, r_, e_, o_) => applySeek(w_, b_, r_, e_, o_, hasAp, spendAp) : applyOrder)(w, board, rng, emit, o);
   const n = Math.min(ticks, K.catchUpCapTicks);
   for (let i = 0; i < n; i++) {
     w.tick++;

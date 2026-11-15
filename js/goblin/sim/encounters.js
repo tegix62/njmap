@@ -11,6 +11,7 @@ import { K, K6, K8, K9 } from './constants.js';
 import { counterMod, injuryRoll, applyInjury, kill, place, suitBonus, captainsOf, captainCap } from './chars.js';
 import { active as ecoActive, canMarch, payMarch, dayOf } from './economy.js';
 import { hasAp, spend } from './sitting.js';
+import { untouchable } from './dwarves.js';
 
 const byId = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
@@ -50,6 +51,7 @@ export function applyEncounter(w, board, rng, emit, o) {
   if (o.type === 'foothold') {
     if (!T || !T.owner || T.owner === o.clan) return reject('pick a township a rival holds');
     if (T.captain) return reject('a captain holds it: that is a front');
+    if (untouchable(w, board, o.town)) return reject('the dwarves hold the rock: they cannot be conquered, only befriended');
     if (!ownedNear(w, board, o.clan, o.town).length) return reject('it must border one of yours');
     if (!FOOTHOLD_METHODS.includes(o.method)) return reject('unknown method');
     if (w.footholds && w.footholds[o.town]) return reject('a foothold is already waiting there');

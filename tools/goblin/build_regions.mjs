@@ -50,6 +50,18 @@ for (const k of KITS) {
   // Facts: a row has text, a source to check and a verified flag. Nothing here is verified yet; unverified rows are kept for checking and never shipped (D195).
   k.facts = [];
 }
-fs.writeFileSync(new URL('../../data/goblin-regions.json', import.meta.url), JSON.stringify({ v: 1, kits: KITS, townKit }, null, 1));
+// Rock towns (D29, D158, H50): the townships the app's own curated list of named mountains and ridges (data/nj-places.json, kind "mountain") puts them in.
+// This is a geometry-of-the-map fact and nothing more: whether a township also has a mining history is NOT claimed and is left to verified fact rows (D195).
+const places = JSON.parse(fs.readFileSync(new URL('../../data/nj-places.json', import.meta.url), 'utf8')).filter((p) => p.kind === 'mountain');
+const byFull = {};
+for (const [id, t] of Object.entries(board.towns)) (byFull[`${t.name} ${t.type}`] ||= []).push(id);
+const rock = {};
+for (const p of places) for (const name of p.towns) {
+  const ids = (byFull[name] || []).filter((id) => (p.counties || [p.c]).includes(board.towns[id].county));
+  if (!ids.length) throw new Error(`mountain township not on the board: ${name} (${p.n})`);
+  for (const id of ids) (rock[id] ||= []).push(p.n);
+}
+fs.writeFileSync(new URL('../../data/goblin-regions.json', import.meta.url), JSON.stringify({ v: 2, kits: KITS, townKit, rock, rockSource: 'data/nj-places.json (the app\'s own list of named mountains and ridges): a named mountain or ridge lies in or over the township. Mining history is not claimed.' }, null, 1));
+console.log(Object.keys(rock).length, 'rock townships from', places.length, 'mountains and ridges');
 for (const k of KITS) console.log(`${k.id.padEnd(10)} ${String(k.stats.towns).padStart(3)} townships  avgPop ${String(k.stats.avgPop).padStart(6)}  river ${k.stats.riverShare}  highway ${k.stats.highwayShare}  ridge ${k.stats.ridgeShare}  -> ${k.rule}`);
 console.log(Object.keys(townKit).length, 'townships in', KITS.length, 'kits');

@@ -69,6 +69,9 @@ export function allowsHostile(w, id) {
 }
 /** Count a hostile action the Director held back (for the metrics); once per tick per player. */
 export function noteHeld(w, id) { const d = dstate(w, id); if (d.heldTick !== w.tick) { d.heldTick = w.tick; d.held = (d.held || 0) + 1; } }
+/** The day's one peak is shared by everything that is a peak: a raid at 12:00, an ambush, the dwarves' hidden hand (D164, D165). */
+export function peakFree(w, id) { if (!present(w, id)) return false; return rollDay(w, id).peak < K5.peakPerDay; }
+export function spendPeak(w, id) { if (present(w, id)) rollDay(w, id).peak++; }
 export function spend(w, id) {
   if (!present(w, id)) return;
   const d = rollDay(w, id), h = hourOf(w);

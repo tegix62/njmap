@@ -17,7 +17,7 @@ export function initWar(w, board) {
 const countOf = (w, id) => Object.values(w.towns).filter((t) => t.owner === id).length;
 
 export function progress(w, clanId) {
-  const total = Object.keys(w.towns).length;
+  const total = Object.values(w.towns).filter((t) => t.owner !== 'dwarves').length;   // the dwarves' townships cannot be taken, so they are not part of the map to be won
   const need = Math.floor(total * K7.warShare) + 1;
   const held = countOf(w, clanId);
   const since = w.war && w.war.hold[clanId];
@@ -32,7 +32,7 @@ function milestones(w, board, emit, id) {
   const gained = mine.find((t) => !start.has(t));
   if (gained) give('first_township', { town: gained });
   if (Object.values(w.chars).some((c) => c.heldBy === id && c.status === 'captured')) give('first_captain');
-  if (mine.length / Object.keys(w.towns).length >= K7.thirdShare) give('third');
+  if (mine.length / Object.values(w.towns).filter((t) => t.owner !== 'dwarves').length >= K7.thirdShare) give('third');
   const byCounty = {};
   for (const t of Object.keys(w.towns)) { const c = board.town(t).county; (byCounty[c] ||= []).push(t); }
   for (const [county, ts] of Object.entries(byCounty)) if (ts.length >= K7.countyMin && ts.every((t) => w.towns[t].owner === id)) give('county', { county });
@@ -42,9 +42,9 @@ function milestones(w, board, emit, id) {
 export function warTurn(w, board, emit) {
   if (!w.war || w.war.over) return false;
   for (const c of Object.values(w.clans)) if (c.lord === 'human' && !c.out) milestones(w, board, emit, c.id);
-  const total = Object.keys(w.towns).length, need = Math.floor(total * K7.warShare) + 1;
+  const total = Object.values(w.towns).filter((t) => t.owner !== 'dwarves').length, need = Math.floor(total * K7.warShare) + 1;
   for (const c of Object.values(w.clans).sort((a, b) => (a.id < b.id ? -1 : 1))) {
-    if (c.out) { delete w.war.hold[c.id]; continue; }
+    if (c.out || c.kind === 'dwarf') { delete w.war.hold[c.id]; continue; }
     if (countOf(w, c.id) >= need) {
       if (w.war.hold[c.id] == null) { w.war.hold[c.id] = w.tick; emit('war_hold', { clan: c.id, started: true }); }
       if (w.tick - w.war.hold[c.id] >= K7.warHoldTicks) { w.war.over = { winner: c.id, tick: w.tick, how: 'held' }; emit('war_over', { winner: c.id, how: 'held', human: c.lord === 'human' }); return true; }

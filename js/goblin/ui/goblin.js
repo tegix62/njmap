@@ -20,6 +20,7 @@ import { wordOf } from '../sim/director.js';
 import { legalOrders } from '../sim/front.js';
 import { messengerFace } from './messenger.js';
 import { kitOf, kitById, kitName } from '../sim/regions.js';
+import { untouchable } from '../sim/dwarves.js';
 import { seasonOf, SEASONS } from '../sim/seasons.js';
 import { nextChapterCfg, rivalsFor } from '../sim/chapters.js';
 import { scoutMods, isNight, hasAp } from '../sim/sitting.js';
@@ -28,8 +29,8 @@ import { MUNI_LABEL_IDS } from '../../style.js';
 
 const ME = 'goblins';
 const CLANS = [{ id: 'goblins', kind: 'goblin', lord: 'human' }, { id: 'rats', kind: 'rat', lord: 'ai' }, { id: 'toads', kind: 'toad', lord: 'ai' }];
-const NO = { goblins: 1, rats: 2, toads: 3, gnomes: 4 };
-const COLOUR = { 1: '#3f9b5a', 2: '#b9712f', 3: '#3a86a8', 4: '#8b5cf6' };
+const NO = { goblins: 1, rats: 2, toads: 3, gnomes: 4, dwarves: 5 };
+const COLOUR = { 1: '#3f9b5a', 2: '#b9712f', 3: '#3a86a8', 4: '#8b5cf6', 5: '#a16207' };
 const HOUR = 3600000, KEEP_EVENTS = 600, SAVE = 'goblin.save', SAVE_V = 4;
 const MAJORS = [9, 12, 18];
 const STAND = ['Behind', 'Even', 'Ahead', 'Commanding'];
@@ -228,6 +229,14 @@ export function initGoblin(ctx) {
     const can = new Set(legalOrders(G.board, w(), ME).filter((o) => o.type === 'raidconvoy').map((o) => o.convoy));
     return here.filter((c) => c.clan === ME || rank(lv) >= rank('familiar')).map((c) => `<p>${c.clan === ME ? 'Your convoy is here' : `A ${cap(c.clan)} convoy is passing`}: ${[c.cargo.build ? `${c.cargo.build} Build` : '', c.cargo.coin ? `${c.cargo.coin} Coin` : ''].filter(Boolean).join(' and ')}.</p>${can.has(c.id) ? `<button data-g="raidconvoy" data-convoy="${esc(c.id)}">Raid it <span class="fine">1 action</span></button>` : ''}`).join('');
   }
+  /** What a rock town says: the dwarves cannot be conquered, only befriended (D158 to D161). */
+  function rockBlock(id, L) {
+    if (!untouchable(w(), G.board, id) || rank(L) < rank('rumoured')) return '';
+    const friend = w().dwarfFriends && w().dwarfFriends[ME] && w().dwarfFriends[ME].town === id;
+    const can = !friend && touchesMine(id) && rank(L) >= rank('familiar');
+    const rock = (G.board.regions.rock[id] || []).join(', ');
+    return `<p>The dwarves hold the rock here${rock ? ` (${esc(rock)})` : ''}. Nobody can take it. ${friend ? 'They are your friends: miners come to your township beside it.' : 'Rivals who push at it are answered. You can seek them out as friends.'}</p>${can ? `<button data-g="seek" data-town="${esc(id)}">Seek the dwarves <span class="fine">1 action</span></button>` : ''}`;
+  }
   function townCard(id) {
     const T = w().towns[id], b = G.board.town(id);
     const mine = T.owner === ME;
@@ -237,11 +246,11 @@ export function initGoblin(ctx) {
     const knownSome = cptn && (cptn.known[ME] || []).length;
     const fr = openFronts(w(), ME).find((f) => f.target === id);
     panel(`<div class="gob"><h3>${esc(b.name)} <small>${esc(b.county)} County</small></h3>
-      <p>${whatYouKnow(id, L)}</p>${captainBlock(T, L)}
+      <p>${whatYouKnow(id, L)}</p>${rockBlock(id, L)}${captainBlock(T, L)}
       ${convoyLines(id)}
       ${fr ? `<button class="primary" data-g="front" data-id="${fr.id}">Continue the front here</button>` : ''}
       ${near ? `<button data-g="scout" data-town="${esc(id)}">Scout the captain <span class="fine">1 action</span></button>${knownSome ? `<button data-g="talk" data-town="${esc(id)}">Talk to the captain <span class="fine">taunt, insult, parley or duel</span></button>` : ''}` : ''}
-      ${!cptn && !mine && T.owner && touchesMine(id) && rank(L) >= rank('familiar') && !(w().footholds || {})[id] ? `<button data-g="foothold" data-town="${esc(id)}">Try for a foothold <span class="fine">1 action; decided at the next tick</span></button>` : ''}
+      ${!cptn && !mine && T.owner && !untouchable(w(), G.board, id) && touchesMine(id) && rank(L) >= rank('familiar') && !(w().footholds || {})[id] ? `<button data-g="foothold" data-town="${esc(id)}">Try for a foothold <span class="fine">1 action; decided at the next tick</span></button>` : ''}
       ${mine && T.force >= 3 && !T.dugIn ? `<button data-g="fortify" data-town="${esc(id)}">Dig in now <span class="fine">${ecoActive(w().clans[ME]) ? `${K8.fortifyCost} Build` : '1 action'}; defenders fight better</span></button>` : ''}
       ${mine && T.force >= 2 ? '<p class="fine">Tap a township next to it to send units, or:</p><button class="primary" data-g="pick" data-id="' + esc(id) + '">Send units from here</button>' : mine ? '<p class="fine">One unit alone has to stay home.</p>' : ''}
       ${closeBtn}</div>`);
@@ -304,7 +313,7 @@ export function initGoblin(ctx) {
       if (F.owner !== ME || F.force < 3) continue;
       for (const n of G.board.neighbours(id)) {
         const T = world.towns[n];
-        if (!T || !T.owner || T.owner === ME || T.captain) continue;
+        if (!T || !T.owner || T.owner === ME || T.captain || untouchable(w(), G.board, n)) continue;
         const b = G.board.border(id, n) || {};
         const mods = modsFor({ dugIn: T.dugIn, captainLeads: !!F.captain, riverBorder: !!(b.river || b.ridge), highway: !!(b.highways && b.highways.length) });
         let won = 0; for (let i = 0; i < 300; i++) if (skirmish({ attackers: F.force - 1, defenders: T.force, ...mods }, rng).won) won++;   // used only to choose the move; never shown
@@ -414,8 +423,8 @@ export function initGoblin(ctx) {
     const en = entriesOf(events, ctxFor());
     const rej = events.find((e) => e.type === 'order_rejected');
     const sc = events.find((e) => e.type === 'scouted' || e.type === 'taunted' || e.type === 'insulted');
-    const other = events.find((e) => ['foothold_run', 'dueled', 'parleyed', 'ransomed', 'released', 'convoy_raided', 'guarded'].includes(e.type));
-    panel(`<div class="gob"><h3>${rej ? 'That did not work' : other ? ({ foothold_run: other.placed ? 'A foothold' : 'No foothold', dueled: other.won === null ? 'A standoff' : other.won ? 'You won the duel' : 'You lost the duel', parleyed: 'A truce', ransomed: 'Ransomed', released: 'Let go', convoy_raided: other.won ? 'The convoy is yours' : 'Beaten off', guarded: 'Guarded' })[other.type] : sc && sc.type === 'scouted' ? (sc.lost ? 'The scout is gone' : sc.learned.length ? 'Something learned' : 'Nothing new') : sc ? (sc.ok ? 'It worked' : 'It backfired') : 'Done'}</h3>
+    const other = events.find((e) => ['foothold_run', 'dueled', 'parleyed', 'ransomed', 'released', 'convoy_raided', 'guarded', 'dwarves_sought'].includes(e.type));
+    panel(`<div class="gob"><h3>${rej ? 'That did not work' : other ? ({ foothold_run: other.placed ? 'A foothold' : 'No foothold', dueled: other.won === null ? 'A standoff' : other.won ? 'You won the duel' : 'You lost the duel', parleyed: 'A truce', ransomed: 'Ransomed', released: 'Let go', convoy_raided: other.won ? 'The convoy is yours' : 'Beaten off', guarded: 'Guarded', dwarves_sought: other.ok ? 'The dwarves are friends' : 'Turned away' })[other.type] : sc && sc.type === 'scouted' ? (sc.lost ? 'The scout is gone' : sc.learned.length ? 'Something learned' : 'Nothing new') : sc ? (sc.ok ? 'It worked' : 'It backfired') : 'Done'}</h3>
       ${rej ? `<p>${esc(rej.reason)}</p>` : en.map((e) => `<p>${esc(e.text)}</p>`).join('')}
       ${sc && sc.dice ? `<p class="fine">Dice: ${sc.dice.join(' + ')}</p>` : ''}${closeBtn}</div>`);
   }
@@ -504,6 +513,7 @@ export function initGoblin(ctx) {
       for (const n of G.board.neighbours(id)) {
         const T = world.towns[n];
         if (!T || !T.owner || T.owner === ME) continue;
+        if (untouchable(world, G.board, n)) continue;
         if (rank(lv.get(n) || 'unknown') < rank('familiar')) { hidden++; continue; }   // you cannot weigh what you have not learned
         const ratio = (F.force - 1) / Math.max(1, T.force);
         cands.push({ from: id, to: n, ratio, captain: !!T.captain, F, T });
@@ -529,6 +539,10 @@ export function initGoblin(ctx) {
     const mine1 = convoysOf(world, ME)[0];
     if (mine1) { const gt = mine1.route.find((x) => world.towns[x].owner === ME); if (gt) out.push({ rank: 2, label: `Guard ${G.board.town(gt).name}`, sub: `1 action. Your convoy passes through; a guard makes it harder to take for a day.`, data: `data-g="guard" data-town="${esc(gt)}"` }); }
     const me = world.clans[ME];
+    if (!(world.dwarfFriends && world.dwarfFriends[ME])) {
+      const rockSeen = Object.keys(world.towns).find((t) => untouchable(world, G.board, t) && G.board.neighbours(t).some((n) => world.towns[n] && world.towns[n].owner === ME) && rank(lv.get(t) || 'unknown') >= rank('familiar'));
+      if (rockSeen) out.push({ rank: 2, label: `Seek the dwarves at ${G.board.town(rockSeen).name}`, sub: '1 action. If they take to you, miners come to your border each tick.', data: `data-g="seek" data-town="${esc(rockSeen)}"` });
+    }
     if (ecoActive(me)) {
       if (me.hireDay !== Math.floor((world.startHour + world.tick) / 24) && me.res.coin >= K8.hireCost) {
         const spot = Object.keys(world.towns).filter((t) => world.towns[t].owner === ME && G.board.neighbours(t).some((n) => world.towns[n] && world.towns[n].owner && world.towns[n].owner !== ME)).sort((a, b) => world.towns[a].force - world.towns[b].force)[0];
@@ -550,6 +564,7 @@ export function initGoblin(ctx) {
     const kit = kitById(G.board, kitOf(G.board, w().clans[ME].home)), se = seasonOf(w());
     panel(`<div class="gob">${messengerBlock()}<h3>What can I do?</h3>
       ${kit || se ? `<p class="fine">${kit ? esc(kit.ruleText) : ''} ${se ? esc(SEASONS[se].name + ': ' + SEASONS[se].text) : ''}</p>` : ''}
+      ${w().clans.dwarves ? '<p class="fine">The dwarves hold the rock towns. They cannot be conquered, they never strike first, and anyone who pushes at the rock is answered. That is a rule of this world, not a favour to anyone.</p>' : ''}
       <p class="fine">There is no end-turn button. You have <b>${ap()}</b> action${ap() === 1 ? '' : 's'} (attacks, fronts, scouting, digging in and taunts cost one; moving is free). The world moves by itself on the hour: at 09:00, 12:00 and 18:00 you get ${K6.apPerMajor} more (up to ${K6.apCap}), everyone gets recruits and the other clans act${nx ? `. Next: ${nx.hour}, in ${nx.left}` : ''}.</p>
       ${list.length ? list.map((o) => `<button ${o.data}><b>${esc(o.label)}</b><br><span class="fine">${esc(o.sub)}</span></button>`).join('') : '<p>Nothing worth doing right now. Your townships next to enemies are too thin to attack. Wait for recruits.</p>'}
       ${prisoners()}
@@ -568,7 +583,7 @@ export function initGoblin(ctx) {
     if (!save || !w().towns[id]) return ctx.toast('Outside the war');
     if (w().war && w().war.over) return warOverPanel();
     const T = w().towns[id];
-    if (sel && sel !== id && G.board.neighbours(sel).includes(id)) { if (T.owner === ME || T.owner) return orderPanel(sel, id); return ctx.toast('Nobody holds that'); }
+    if (sel && sel !== id && G.board.neighbours(sel).includes(id) && !untouchable(w(), G.board, id)) { if (T.owner === ME || T.owner) return orderPanel(sel, id); return ctx.toast('Nobody holds that'); }
     if (T.owner === ME && T.force >= 2) { sel = id; paint(); }
     else { sel = null; paint(); }
     townCard(id);
@@ -597,6 +612,10 @@ export function initGoblin(ctx) {
     }
     else if (a === 'front') frontPanel(b.dataset.id);
     else if (a === 'scout') scoutPanel(b.dataset.town);
+    else if (a === 'seek') {
+      const ev = run([{ type: 'present', clan: ME }, { type: 'seek', clan: ME, town: b.dataset.town }], 0);
+      markPlayed(b.dataset.town); paint(); hud(); sittingResult(ev);
+    }
     else if (a === 'raidconvoy' || a === 'guard' || a === 'gentle') {
       const o = a === 'raidconvoy' ? { type: a, clan: ME, convoy: b.dataset.convoy } : a === 'guard' ? { type: a, clan: ME, town: b.dataset.town } : { type: 'setting', clan: ME, key: 'gentle', value: !w().clans[ME].gentle };
       const ev = run([{ type: 'present', clan: ME }, o], 0);

@@ -101,14 +101,17 @@ export function ambushPlan(w, board, clanId) {
 }
 
 /** Per major tick, for each present human: maybe schedule an ambush. The clue is emitted now and the blow lands ambushLead ticks later. */
-export function ambushTurn(w, board, emit, wordOf) {
+export function ambushTurn(w, board, emit, dir) {
+  const wordOf = typeof dir === 'function' ? dir : dir.wordOf, budget = typeof dir === 'object' ? dir : null;   // a Director object shares the day's one peak
   for (const id of Object.keys(w.clans).sort(byId)) {
     if (!isHuman(w, id)) continue;
+    if (budget && !budget.peakFree(w, id)) continue;
     const word = wordOf(w, id);
     if (word === 'Heated' || word === 'Overwhelmed') continue;   // the Director's budget: no unwarned loss while the player is already under pressure
     const plan = ambushPlan(w, board, id);
     if (!plan) continue;
     (w.ambushes ||= []).push({ id: 'a' + w.nextId++, clan: id, convoy: plan.convoy, by: plan.by, from: plan.from, at: plan.at, lands: w.tick + K10.ambushLead });
+    if (budget) budget.spendPeak(w, id);
     (w.lossLog ||= {})[id] = { last: w.tick };   // the gap counts from the clue, so two never overlap
     emit('sighting', { clan: id, by: plan.by, near: plan.from });   // cryptic: it names the rival township the scouts were seen near, never the convoy
   }

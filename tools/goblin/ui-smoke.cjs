@@ -33,7 +33,7 @@ const { chromium } = require('playwright');
   const pairFor = (captain) => page.evaluate(async (cap) => {
     const bj = await fetch('data/goblin-board.json').then((r) => r.json());
     const w = JSON.parse(localStorage.getItem('njtf.goblin.save')).world;
-    for (const id of Object.keys(w.towns)) if (w.towns[id].owner === 'goblins' && w.towns[id].force >= 4) for (const n of bj.towns[id].nb) if (w.towns[n] && w.towns[n].owner && w.towns[n].owner !== 'goblins' && !!w.towns[n].captain === cap) return [id, n];
+    for (const id of Object.keys(w.towns)) if (w.towns[id].owner === 'goblins' && w.towns[id].force >= 4) for (const n of bj.towns[id].nb) if (w.towns[n] && w.towns[n].owner && w.towns[n].owner !== 'goblins' && w.towns[n].owner !== 'dwarves' && !!w.towns[n].captain === cap) return [id, n];
   }, captain);
   async function tapPair(pair) {
     await page.evaluate((id) => window.njtf.map.easeTo({ center: window.njtf.byKey.get(id).pt, zoom: 10, duration: 0 }), pair[0]);

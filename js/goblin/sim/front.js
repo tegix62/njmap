@@ -15,6 +15,8 @@ import { frontConfidence, maybeLegend, FOOTHOLD_METHODS, footholdMods, roomFor, 
 import { K9 } from './constants.js';
 import { active, hasBridge, maxMarch, canMarch, marchCost, bridgeCostFor } from './economy.js';
 import { ignoresRiver } from './kinds.js';
+import { untouchable } from './dwarves.js';
+import { K11 } from './constants.js';
 import { convoysOf, positionAt } from './convoys.js';
 import { K8 } from './constants.js';
 import { discoverOne, discover, knows, undiscovered, suitBonus, counterMod, hasConflict, injuryRoll, applyInjury, kill, capture, place, promote } from './chars.js';
@@ -274,6 +276,7 @@ export function legalOrders(board, w, clanId) {
       if (!T) continue;
       if (T.owner === clanId) { out.push({ type: 'move', clan: clanId, from, to, n: range }); continue; }
       if (!T.owner) continue;
+      if (untouchable(w, board, to)) { if (canHit && !(w.dwarfFriends && w.dwarfFriends[clanId]) && !(clan.seekAt !== undefined && clan.seekAt !== null && w.tick - clan.seekAt < K11.seekCooldown) && !out.some((o) => o.type === 'seek' && o.town === to)) out.push({ type: 'seek', clan: clanId, town: to }); continue; }
       if (!canHit) continue;
       if (T.captain) { if (mine.length < K4.frontMaxPerPlayer && !targeted.has(to)) out.push({ type: 'front_open', clan: clanId, from, to, n: range }); }
       else out.push({ type: 'attack', clan: clanId, from, to, n: range });
@@ -295,7 +298,7 @@ export function legalOrders(board, w, clanId) {
   if (board.content && canHit) {
     for (const town of Object.keys(w.towns).sort(byId)) {
       const T0 = w.towns[town];
-      if (T0 && T0.owner && T0.owner !== clanId && !T0.captain && board.neighbours(town).some((n) => w.towns[n] && w.towns[n].owner === clanId) && !(w.footholds && w.footholds[town])) {
+      if (T0 && T0.owner && T0.owner !== clanId && !T0.captain && !untouchable(w, board, town) && board.neighbours(town).some((n) => w.towns[n] && w.towns[n].owner === clanId) && !(w.footholds && w.footholds[town])) {
         for (const m of FOOTHOLD_METHODS) { const fm = footholdMods(w, board, clanId, town, m); if (m === 'swarm' || fm.mods.some((x) => x.v > 0)) out.push({ type: 'foothold', clan: clanId, town, method: m }); }
       }
       const T = w.towns[town], c = T.captain && w.chars[T.captain];
