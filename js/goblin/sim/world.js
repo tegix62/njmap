@@ -209,7 +209,10 @@ function applyOrder(w, board, rng, emit, o) {
   if (!board.border(o.from, o.to)) return reject('not neighbours');
   if (!Number.isInteger(o.n) || o.n < 1 || o.n > F.force - 1) return reject('n must be from 1 to the force minus 1');
   clan.lastActive = w.tick; clan.absentSince = null;
-  if (o.type === 'move') { if (T.owner !== o.clan) return reject('move needs your own township'); if (T.force + o.n > R(w).townForceCap) return reject('that township would be over the cap'); F.force -= o.n; T.force += o.n; return emit('units_moved', { clan: o.clan, from: o.from, to: o.to, n: o.n }); }
+  if (o.type === 'move') { if (T.owner !== o.clan) return reject('move needs your own township'); if (T.force + o.n > R(w).townForceCap) return reject('that township would be over the cap'); F.force -= o.n; T.force += o.n;
+    // a captain may go with the units (o.captain) when the township they move to has none
+    let went = null; if (o.captain && F.captain && !T.captain && w.chars[F.captain] && w.chars[F.captain].status === 'active') { went = F.captain; F.captain = null; T.captain = went; w.chars[went].at = o.to; }
+    return emit('units_moved', { clan: o.clan, from: o.from, to: o.to, n: o.n, ...(went ? { captain: went } : {}) }); }
   if (o.type === 'attack') {
     if (T.owner === o.clan) return reject('that is your own township');
     if (untouchable(w, board, o.to)) return reject('the dwarves hold the rock: they cannot be conquered, only befriended (seek them out)');

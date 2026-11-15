@@ -43,7 +43,7 @@ export function frontActions(w, f) {
   if (mayManeuver && canAct) out.push('probe', 'pressure');
   if (mayManeuver && hasWeakness(w, f)) out.push('lever');
   if (mayManeuver && f.behindByRiver && !f.bridgeUsed && f.standing === 0) out.push('bridge');
-  if (f.maneuvers >= K4.frontMinManeuvers) out.push('decision');
+  if (f.maneuvers >= (R(w).frontMinManeuvers ?? K4.frontMinManeuvers)) out.push('decision');   // a rule may let a front go straight to its decision (Council: one battle)
   out.push('disengage');
   return out;
 }

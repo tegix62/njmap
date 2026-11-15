@@ -3656,3 +3656,7 @@ body:not(.council-on) .cn-mk { display: none; }
 .cb-verdict p { margin: 0; font-size: clamp(34px, 10vw, 54px); letter-spacing: 0.06em; text-shadow: 0 0 8px rgba(255, 255, 255, 0.6); }
 .cb-verdict .good { color: #b8ff9a; } .cb-verdict .bad { color: #ff8a7a; }
 .cb-skip { text-align: center; color: #666; font-size: 16px; }
+
+.cn-card.plate p { font-family: Georgia, 'Times New Roman', serif; font-size: clamp(24px, 7.5vw, 38px); letter-spacing: 0.02em; line-height: 1.15; text-shadow: none; font-style: italic; }
+.cn-card.plate p:first-of-type { font-style: normal; font-size: clamp(30px, 9vw, 46px); margin-top: 14px; }
+.cn-plate { width: min(72vw, 300px); height: min(72vw, 300px); image-rendering: pixelated; border: 2px solid #f0f0f0; outline: 6px solid #000; box-shadow: 0 0 0 8px #f0f0f0; display: block; margin: 0 auto 8px; }

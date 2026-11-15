@@ -13,15 +13,17 @@ const { chromium } = require('playwright'); const fs = require('fs');
   await press('BEGIN'); await page.waitForTimeout(2600); await shot('begun');
   await press('CONTINUE'); await page.waitForTimeout(1400); await shot('order');
   const said = () => page.locator('.cn-say p').getAttribute('data-full');
-  let battles = 0, turns = 0, shotBattle = 0;
-  for (let step = 0; step < 60 && turns < 4; step++) {
+  let battles = 0, turns = 0, shotBattle = 0, marched = 0, moved = 0, plates = 0; const perTurn = [];
+  for (let step = 0; step < 400 && turns < 10; step++) {
     if (await page.locator('.cn-battle').count()) { battles++; if (shotBattle < 3) { await page.waitForTimeout(1500); await shot('battle'); shotBattle++; } await page.locator('.cn-battle').click().catch(() => {}); await page.waitForTimeout(400); await page.locator('.cn-battle').click({ timeout: 800 }).catch(() => {}); await page.waitForTimeout(300); continue; }
-    if (await page.locator('.cn-card').count()) { if (n < 14) await shot('card'); await page.locator('.cn-card').click({ timeout: 800 }).catch(() => {}); await page.waitForTimeout(200); continue; }
+    if (await page.locator('.cn-card').count()) { if (await page.locator('.cn-card.plate').count() && plates < 2) { plates++; await page.waitForTimeout(300); await shot('plate'); } else if (n < 9) await shot('card'); await page.locator('.cn-card').click({ timeout: 800 }).catch(() => {}); await page.waitForTimeout(200); continue; }
     const t = await said();
-    if (await press('END TURN')) { turns++; console.log('turn ended', turns); await page.waitForTimeout(600); continue; }
+    if (await press('END TURN')) { turns++; perTurn.push(marched); marched = 0; await page.waitForTimeout(600); continue; }
     if (await press('NEXT') || await press('CONTINUE')) { await page.waitForTimeout(900); continue; }
-    if (/March on which/.test(t)) { await shot('targets'); await page.locator('.cn-cmd button').first().click(); await page.waitForTimeout(700); continue; }
+    if (/Move to which/.test(t)) { moved++; await page.locator('.cn-cmd button').first().click(); await page.waitForTimeout(700); continue; }
+    if (/March on which/.test(t)) { marched++; if (n < 9) await shot('targets'); await page.locator('.cn-cmd button').first().click(); await page.waitForTimeout(700); continue; }
     if (await press('MARCH')) { await page.waitForTimeout(500); continue; }
+    if (/move toward the front/.test(t) && await press('MOVE')) { await page.waitForTimeout(500); continue; }
     if (await press('MUSTER')) { await page.waitForTimeout(600); continue; }
     if (await press('REST')) { await page.waitForTimeout(600); continue; }
     await page.waitForTimeout(500);
@@ -30,4 +32,4 @@ const { chromium } = require('playwright'); const fs = require('fs');
   const px2 = await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('njtf.goblin.council')); const ids = Object.keys(s.world.towns).filter((t) => s.world.towns[t].captain); for (const id of ids) { const p = window.njtf.map.project(window.njtf.byKey.get(id).pt); if (p.x > 30 && p.x < 360 && p.y > 90 && p.y < 460) return [p.x, p.y]; } return [195, 300]; });
   await page.mouse.click(px2[0], px2[1]); await page.waitForTimeout(500); await shot('info');
   const st = await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('njtf.goblin.council')); const w = s.world; return { tick: w.tick, mine: Object.values(w.towns).filter((t) => t.owner === 'goblins').length, ap: w.clans.goblins.ap }; });
-  console.log('battles', battles, 'turns', turns, JSON.stringify(st), 'said:', await said(), 'errors', errs.length); await b.close(); })();
+  console.log('marches per turn', perTurn.join(','), 'moves', moved, 'plates', plates); console.log('battles', battles, 'turns', turns, JSON.stringify(st), 'said:', await said(), 'errors', errs.length); await b.close(); })();
