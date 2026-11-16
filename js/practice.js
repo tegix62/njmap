@@ -27,6 +27,12 @@ const TYPES = {
   hwyfact: 'Highway ends & crossings',
   naturept: 'Point to the lake or mountain',
   findpt: 'Find the lake or mountain',
+  county: 'Which county is it in?',
+  nearest: 'Which is closest?',
+  howfar: 'How far apart?',
+  hwytown: 'Which highway runs through it?',
+  lmwhich: 'Which landmark is in this town?',
+  countynb: 'Which county borders it?',
   today: '☀ Today (2 min)',
   rapid: '⚡ Rapid round',
   gridmid: '🚕 Drive Midtown (new)',
@@ -71,8 +77,8 @@ const TILE_LABEL = {
 // How long the map takes to turn and move to the next question
 const QUESTION_MOVE_MS = 1200;
 // One-tap kinds that work against a clock
-const RAPID_TYPES = ['leftright', 'borders', 'north', 'find', 'name', 'avedir', 'addr', 'crossing', 'hwyfact', 'dir', 'findpt'];
-const WEIGHT = { addr: 2, find: 2, dir: 2, borders: 2, north: 2, point: 2, roadto: 3, leftright: 3, bigpoint: 2 };
+const RAPID_TYPES = ['leftright', 'borders', 'north', 'find', 'name', 'avedir', 'addr', 'crossing', 'hwyfact', 'dir', 'findpt', 'county', 'nearest', 'countynb'];
+const WEIGHT = { addr: 2, find: 2, dir: 2, borders: 2, north: 2, point: 2, roadto: 3, leftright: 3, bigpoint: 2, county: 2, nearest: 2, howfar: 2, hwytown: 2 };
 const DIR8 = ['NW', 'N', 'NE', 'W', '', 'E', 'SW', 'S', 'SE'];
 const DIR_DEG = { N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315 };
 
@@ -130,6 +136,11 @@ export function initPractice(ctx) {
   for (const k in countyCenter) countyCenter[k] = [countyCenter[k][0] / countyCenter[k][2], countyCenter[k][1] / countyCenter[k][2]];
 
   // ---- area / pool ----------------------------------------------------------
+  /** A focus area (js/places/*.js `focusAreas`) is a set of counties, or everything within some miles of a town, optionally only the well-known places. */
+  function focusTest(f) {
+    const c = f.counties ? new Set(f.counties) : null, o = f.town && ctx.byKey.get(f.town);
+    return (m) => (!c || c.has(m.c)) && (!o || distanceMi(o.pt, m.pt) <= f.mi) && (!f.known || m.wellKnown);
+  }
   function pool() {
     const a = cfg.area;
     let p = munis;
@@ -137,6 +148,9 @@ export function initPractice(ctx) {
     else if (a.startsWith('region:')) {
       const cs = (R.superGroups || {})[a.slice(7)] || [];
       p = munis.filter((m) => cs.includes(m.c));
+    } else if (a.startsWith('focus:')) {
+      const f = (R.focusAreas || []).find((x) => x.id === a.slice(6));
+      if (f) p = munis.filter(focusTest(f));
     } else if (a === 'known') p = munis.filter((m) => m.wellKnown);
     else if (a === 'mylist') {
       const keys = new Set(ctx.myList.keys());
@@ -158,6 +172,20 @@ export function initPractice(ctx) {
   const DAYS = [0, 1, 3, 7, 16, 35];
   const DAY = 864e5;
   const srs = () => store.get('srs', {});
+  /** A question that is not about one place (a county against counties) still counts toward how you do on that kind. */
+  function recordKind(ok) {
+    if (!lastType) return;
+    const ks = store.get('kindStats', {});
+    const [kn = 0, kr = 0] = ks[lastType] || [];
+    ks[lastType] = [kn + 1, kr + (ok ? 1 : 0)];
+    store.set('kindStats', ks);
+  }
+  // the highways of the highway game and the towns each passes, for "which highway runs through it?" (loaded once; the kind falls back until it is in)
+  let hwys = null; const hwyOf = new Map();
+  if (R.orbit && R.orbit.list && R.quizTypes.includes('hwytown')) fetch(R.orbit.list).then((r) => r.json()).then((list) => {
+    hwys = list.filter((x) => x.kind === 'highway' && x.towns);
+    for (const h of hwys) { const cs = new Set(h.counties || []); for (const m of munis) if (h.towns.includes(m.full) && (!cs.size || cs.has(m.c))) { if (!hwyOf.has(m.id)) hwyOf.set(m.id, []); hwyOf.get(m.id).push(h.n); } }
+  }).catch(() => {});
   function record(m, ok) {
     if (lastType) {                                   // how you do on each kind of question, so Play can lean on the kinds you miss
       const ks = store.get('kindStats', {});
@@ -302,6 +330,104 @@ export function initPractice(ctx) {
     const m = l.m;
     const others = [...shuffle([...m.neighbors]), ...shuffle(munis.filter((o) => o.c === m.c))].filter((o, i, a) => o !== m && a.indexOf(o) === i);
     return { kind: 'landmark', m, landmark: l, choices: shuffle([m, ...others.slice(0, 3)]) };
+  }
+
+  // ---- multiple-choice kinds that share one shape ({ kind: 'mc' }): each maker returns the question, its choices ({ id, label }), the right id,
+  // what to frame, and reveal(pickedId, ok) -> { html, items, fit, good, bad } for after the answer. One branch each in show / frame / answer.
+  const countyTowns = (c) => munis.filter((m) => m.c === c);
+  const countyPt = {};
+  for (const c of ctx.counties) { const ms = countyTowns(c); countyPt[c] = [ms.reduce((a, m) => a + m.pt[0], 0) / ms.length, ms.reduce((a, m) => a + m.pt[1], 0) / ms.length]; }
+  const countyNb = {};
+  for (const m of munis) for (const n of m.neighbors) if (n.c !== m.c) (countyNb[m.c] ||= new Set()).add(n.c);
+  const miles = (d) => (d < 10 ? Math.round(d) : Math.round(d / 5) * 5);
+  const known = (list) => { const k = list.filter((o) => o.wellKnown); return k.length >= 6 ? k : list; };
+
+  /** "Which county is Wayne in?": the wrong answers are the counties nearest to it. */
+  function makeCounty(p) {
+    const m = pick(p);
+    const others = ctx.counties.filter((c) => c !== m.c).sort((a, b) => distanceMi(m.pt, countyPt[a]) - distanceMi(m.pt, countyPt[b])).slice(0, 5);
+    const wrong = shuffle(others).slice(0, 3);
+    return { kind: 'mc', m, tag: R.groupPlural.replace(/ies$/, 'y').replace(/s$/, ''), ask: `Which ${R.groupPlural.replace(/ies$/, 'y').replace(/s$/, '').toLowerCase()} is ${prompt(m)} in?`,
+      choices: shuffle([m.c, ...wrong]).map((c) => ({ id: c, label: ctx.groupName(c) })), right: m.c, hl: [m], focus: [{ bbox: countyBox[m.c] }, ...wrong.map((c) => ({ bbox: countyBox[c] }))], z: 10.5,
+      reveal: (id, ok) => ({ html: `${ok ? '✓' : '✗'} ${prompt(m)} is in <b>${esc(ctx.groupName(m.c))}</b>${ok ? '' : `, not ${esc(ctx.groupName(id))}`}.`, items: [{ m, color: L.good }], good: [m], fit: [{ bbox: countyBox[m.c] }] }) };
+  }
+
+  /** "Which of these is closest to Paterson?": four places at clearly different distances, so it tests a sense of the map rather than a ruler. */
+  function makeNearest(p) {
+    for (let tries = 0; tries < 12; tries++) {
+      const m = pick(p);
+      const far = known(munis).filter((o) => o !== m && !m.neighbors.includes(o)).map((o) => ({ o, d: distanceMi(m.pt, o.pt) })).filter((x) => x.d >= 2.5 * SC && x.d <= 24 * SC).sort((a, b) => a.d - b.d);
+      if (far.length < 8) continue;
+      const first = far[Math.floor(Math.random() * Math.min(6, far.length / 3))];
+      const picks = [first];
+      for (const x of shuffle(far.filter((y) => y.d >= first.d * 1.3 && y.d <= Math.max(first.d * 4, 12 * SC)))) {
+        if (picks.length === 4) break;
+        if (picks.every((y) => Math.abs(y.d - x.d) >= first.d * 0.25)) picks.push(x);
+      }
+      if (picks.length < 4) continue;
+      const line = picks.slice().sort((a, b) => a.d - b.d).map((x) => `${esc(x.o.n)} ${miles(x.d / SC)} mi`).join(' · ');
+      return { kind: 'mc', m, tag: 'Closest', ask: `Which of these is closest to ${prompt(m)}?`, choices: shuffle(picks).map((x) => ({ id: String(x.o.id), label: ctx.name(x.o) })), right: String(first.o.id), hl: [m],
+        focus: [m, ...picks.map((x) => x.o)], z: 12,
+        reveal: (id, ok) => { const pk = munis[+id]; return { html: `${ok ? '✓' : '✗'} <b>${esc(first.o.n)}</b> is closest to ${esc(m.n)}. In a straight line: ${line}.`, items: [{ m, color: L.q }, { m: first.o, color: L.good }, ...(ok ? [] : [{ m: pk, color: L.bad }]), ...picks.filter((x) => x !== first && x.o !== pk).map((x) => ({ m: x.o, color: L.neutral }))], good: [first.o], bad: ok ? [] : [pk], fit: [m, ...picks.map((x) => x.o)] }; } };
+    }
+    return makeBorders(p);
+  }
+
+  /** "About how far is Hoboken from Morristown?": the true distance (rounded) against a half, and well over, of it. */
+  function makeHowFar(p) {
+    for (let tries = 0; tries < 12; tries++) {
+      const a = pick(p), b = rand(known(munis));
+      const d = distanceMi(a.pt, b.pt) / SC;
+      if (a === b || d < 4 || d > 70 || a.neighbors.includes(b)) continue;
+      const t = miles(d), opts = [...new Set([t, miles(d * 0.45), miles(d * 1.7), miles(d * 2.6)].filter((x) => x >= 1))];
+      if (opts.length < 4) continue;
+      const dir = ctx.relative(a.pt, b.pt).text;
+      return { kind: 'mc', m: a, tag: 'Distance', ask: `About how far is ${prompt(a)} from ${prompt(b)}, in a straight line?`, choices: opts.sort((x, y) => x - y).map((x) => ({ id: String(x), label: `about ${x} mi` })), right: String(t), hl: [a, b],
+        focus: [a, b], z: 12.5,
+        reveal: (id, ok) => ({ html: `${ok ? '✓' : '✗'} About <b>${t} miles</b>: ${esc(b.n)} is ${dir} of ${esc(a.n)}.`, items: [{ m: a, color: L.q }, { m: b, color: L.good }], good: [b], fit: [a, b] }) };
+    }
+    return makeBorders(p);
+  }
+
+  /** "Which highway runs through Paramus?": from the towns each highway of the highway game passes (data/nj-places.json). */
+  function makeHwyTown(p) {
+    if (!hwys) return makeBorders(p);
+    const withRoad = p.filter((m) => (hwyOf.get(m.id) || []).length);
+    if (!withRoad.length) return makeBorders(p);
+    const m = pick(withRoad), through = hwyOf.get(m.id), right = rand(through);
+    const nearby = new Set(munis.filter((o) => distanceMi(m.pt, o.pt) <= 14 * SC).flatMap((o) => hwyOf.get(o.id) || []));
+    const wrongNear = shuffle([...nearby].filter((h) => !through.includes(h))), wrongFar = shuffle(hwys.map((h) => h.n).filter((h) => !through.includes(h) && !nearby.has(h)));
+    const wrong = [...wrongNear, ...wrongFar].slice(0, 3);
+    if (wrong.length < 3) return makeBorders(p);
+    return { kind: 'mc', m, tag: 'Highways', ask: `Which of these runs through ${prompt(m)}?`, choices: shuffle([right, ...wrong]).map((h) => ({ id: h, label: h })), right, hl: [m], focus: [m, ...m.neighbors], z: 12,
+      reveal: (id, ok) => ({ html: `${ok ? '✓' : '✗'} <b>${esc(right)}</b> runs through ${esc(m.n)}${through.length > 1 ? `, and so ${through.length === 2 ? 'does' : 'do'} ${through.filter((h) => h !== right).map(esc).join(', ')}` : ''}.${ok ? '' : ` ${esc(id)} does not.`}`, items: [{ m, color: L.good }], good: [m], fit: [m, ...m.neighbors] }) };
+  }
+
+  /** "Which of these is in Newark?": the reverse of the landmark question; the wrong answers are landmarks in the towns round it. */
+  function makeLmWhich(p) {
+    const quizzable = ctx.landmarks.filter((l) => l.quiz !== false && !l.name.toLowerCase().includes(l.m.n.toLowerCase()));
+    const ids = new Set(p.map((m) => m.id));
+    const local = quizzable.filter((l) => ids.has(l.m.id));
+    const l = rand(local.length ? local : quizzable), m = l.m;
+    const wrong = quizzable.filter((o) => o.m !== m).map((o) => ({ o, d: distanceMi(m.pt, o.pt) })).sort((a, b) => a.d - b.d).slice(0, 8);
+    if (wrong.length < 3) return makeLandmark(p);
+    const picks = shuffle(wrong).slice(0, 3).map((x) => x.o);
+    return { kind: 'mc', m, tag: 'Landmarks', ask: `Which of these is in ${prompt(m)}?`, choices: shuffle([l, ...picks]).map((o) => ({ id: o.name, label: o.name })), right: l.name, hl: [m], focus: [m, ...picks.map((o) => o.m)], z: 12.5,
+      reveal: (id, ok) => { const pk = picks.find((o) => o.name === id); return { html: `${ok ? '✓' : '✗'} <b>${esc(l.name)}</b> (${esc(l.kind.toLowerCase())}) is in <b>${esc(m.full)}</b>.${pk ? ` ${esc(pk.name)} is in ${esc(pk.m.n)}, ${ctx.relative(m.pt, pk.m.pt).text} of it.` : ''}`,
+        items: [{ m, color: L.good }, { m, pt: l.pt, label: l.name, color: L.place, key: true }, ...(pk ? [{ m: pk.m, pt: pk.pt, label: pk.name, color: L.bad }] : [])], good: [m], bad: pk ? [pk.m] : [], fit: pk ? [m, pk.m] : [m] }; } };
+  }
+
+  /** "Which county borders Morris County?": wrong answers are the nearest counties that do not touch it. */
+  function makeCountyNb(p) {
+    const cs = [...new Set(p.map((m) => m.c))].filter((c) => countyNb[c] && countyNb[c].size);
+    const c = rand(cs.length ? cs : ctx.counties.filter((x) => countyNb[x]));
+    const nb = [...countyNb[c]], right = rand(nb);
+    const wrong = ctx.counties.filter((x) => x !== c && !countyNb[c].has(x)).sort((a, b) => distanceMi(countyPt[c], countyPt[a]) - distanceMi(countyPt[c], countyPt[b])).slice(0, 5);
+    if (wrong.length < 3) return makeCounty(p);
+    const picks = shuffle(wrong).slice(0, 3);
+    return { kind: 'mc', m: null, tag: R.groupPlural, ask: `Which of these borders <b>${esc(ctx.groupName(c))}</b>?`, choices: shuffle([right, ...picks]).map((x) => ({ id: x, label: ctx.groupName(x) })), right, hl: [], hlCounty: c,
+      focus: [{ bbox: countyBox[c] }, ...[right, ...picks].map((x) => ({ bbox: countyBox[x] }))], z: 10,
+      reveal: (id, ok) => ({ html: `${ok ? '✓' : '✗'} <b>${esc(ctx.groupName(right))}</b> borders ${esc(ctx.groupName(c))}. All its neighbours: ${nb.map((x) => esc(ctx.groupName(x))).join(' · ')}.`, items: [], good: [], fit: [{ bbox: countyBox[c] }, { bbox: countyBox[right] }] }) };
   }
 
   /**
@@ -656,6 +782,12 @@ export function initPractice(ctx) {
     hwyfact: makeHwyFact,
     naturept: makeNaturePoint,
     findpt: makeFindPt,
+    county: makeCounty,
+    nearest: makeNearest,
+    howfar: makeHowFar,
+    hwytown: makeHwyTown,
+    lmwhich: makeLmWhich,
+    countynb: makeCountyNb,
   };
 
   // ---- Today ----------------------------------------------------------------------
@@ -883,6 +1015,7 @@ export function initPractice(ctx) {
       areaOpt('all', `All of ${R.name}`) +
       (ctx.pos ? areaOpt('near', `Within ${R.nearMi} mi of me`) : '') +
       areaOpt('visited', `${R.units[0].toUpperCase() + R.units.slice(1)} I've been through (${nVisited})`) +
+      (R.focusAreas ? `<optgroup label="Focus areas">${R.focusAreas.map((f) => areaOpt('focus:' + f.id, `${f.name} (${munis.filter(focusTest(f)).length})`)).join('')}</optgroup>` : '') +
       (R.superGroups ? `<optgroup label="Regions">${Object.keys(R.superGroups).map((r) => areaOpt('region:' + r, r)).join('')}</optgroup>` : '') +
       `<optgroup label="${R.groupPlural}">${ctx.counties.map((c) => areaOpt('county:' + c, ctx.groupName(c))).join('')}</optgroup>`;
     const pct = score.total ? Math.round((100 * score.right) / score.total) : 0;
@@ -1071,6 +1204,12 @@ export function initPractice(ctx) {
       ctx.reveal([{ m, color: L.q }]);
       ctx.hud(`<div class="qkind">Borders${q.fallback ? ' <span class="muted">(no road question nearby)</span>' : ''}</div><div class="q">Which of these borders ${prompt(m)}?</div>`);
       body = choicesHtml(q.choices, { data: (o) => o.id, label: (o) => ctx.name(o) });
+    } else if (q.kind === 'mc') {
+      for (const o of q.hl) ctx.highlight(o.id, 'q');
+      if (q.hlCounty) for (const o of countyTowns(q.hlCounty)) ctx.highlight(o.id, 'q');
+      if (q.hl.length) ctx.reveal(q.hl.map((o) => ({ m: o, color: L.q })));
+      ctx.hud(`<div class="qkind">${esc(q.tag)}</div><div class="q">${q.ask}</div>`);
+      body = choicesHtml(q.choices, { attr: 'mc', data: (o) => o.id, label: (o) => o.label });
     } else if (q.kind === 'landmark') {
       ctx.hud(`<div class="qkind">Landmarks</div><div class="q"><b>${esc(q.landmark.name)}</b> is in which ${R.unit}?</div>`);
       body = choicesHtml(q.choices, { data: (o) => o.id, label: (o) => ctx.name(o) });
@@ -1252,6 +1391,7 @@ export function initPractice(ctx) {
         frame([q.p.length < 8 ? aroundBox(destinationPt(m.pt, Math.random() * 360, Math.random() * 8 * SC), 15 * SC) : areaBox(q.p)], 12);
       else if (q.kind === 'sec' || q.kind === 'landmark') frame([{ bbox: countyBox[m.c] }], 12);
       else if (q.kind === 'borders') frame([m, ...q.choices], 12.5);
+      else if (q.kind === 'mc') frame(q.focus, q.z || 12);
       else if (q.kind === 'north') frame(q.choices, 15);
       else if (q.kind === 'roadto' && !q.pending) frame([m, q.target], 12.5);
       else if (q.kind === 'crossing') frame([m, ...R.crossings.map((c) => c.pt)], 14);
@@ -1370,6 +1510,18 @@ export function initPractice(ctx) {
       ctx.reveal(items);
       feedback(ok, html);
       ctx.fit([m, ...m.neighbors, pickd], 13);
+    } else if (q.kind === 'mc') {
+      const id = btn.dataset.mc, ok = id === q.right;
+      if (m) record(m, ok); else recordKind(ok);
+      btn.classList.add(ok ? 'right' : 'wrong');
+      for (const b of document.querySelectorAll('#qbody .choice')) if (b.dataset.mc === q.right) b.classList.add('right');
+      const r = q.reveal(id, ok);
+      for (const o of r.good || []) ctx.highlight(o.id, 'good');
+      for (const o of r.bad || []) ctx.highlight(o.id, 'bad');
+      if (q.hlCounty) for (const o of countyTowns(q.right)) ctx.highlight(o.id, 'good');
+      ctx.reveal(r.items);
+      feedback(ok, r.html);
+      ctx.fit(r.fit, 12);
     } else if (q.kind === 'landmark') {
       const pickd = munis[+btn.dataset.id];
       const ok = pickd === m;
@@ -1750,6 +1902,9 @@ export function initPractice(ctx) {
   });
 
   return {
+    /** Start a quiz type directly (the picker does the same); used by the browser checks. */
+    choose: chooseType,
+    setArea(a) { cfg.area = a; store.set(CFG_KEY, cfg); },
     enter() {
       ctx.clearHighlights();
       // Play opens on its hub (Today, Mixed, Driving, the games), unless you are partway through a question: that resumes

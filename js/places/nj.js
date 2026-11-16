@@ -46,7 +46,21 @@ export default {
   gridAngle: null,
   driveZoom: 12.5,
   nearMi: 15,
-  quizTypes: ['find', 'roadto', 'leftright', 'name', 'dir', 'borders', 'confuse', 'section', 'landmark', 'north', 'point', 'bigpoint', 'hwydir', 'hwyfact', 'naturept', 'findpt'],
+  quizTypes: ['find', 'roadto', 'leftright', 'name', 'dir', 'borders', 'confuse', 'section', 'landmark', 'north', 'point', 'bigpoint', 'hwydir', 'hwyfact', 'naturept', 'findpt', 'county', 'nearest', 'howfar', 'hwytown', 'lmwhich', 'countynb'],
+  // Focus areas for Play (the Area menu): a set of counties, or everything within some miles of a town; `known` keeps only the well-known places.
+  // The north-east comes first because that is where this app is used most; the circles are measured from the app's own town points.
+  focusAreas: [
+    { id: 'ne', name: 'North-east Jersey', counties: ['Bergen', 'Hudson', 'Essex', 'Passaic', 'Union'] },
+    { id: 'ne-known', name: 'North-east: well-known', counties: ['Bergen', 'Hudson', 'Essex', 'Passaic', 'Union'], known: true },
+    { id: 'gwb', name: 'Within 10 mi of Fort Lee (GW Bridge)', town: 'Fort Lee Borough|Bergen', mi: 10 },
+    { id: 'newark', name: 'Within 10 mi of Newark', town: 'Newark City|Essex', mi: 10 },
+    { id: 'paterson', name: 'Within 10 mi of Paterson', town: 'Paterson City|Passaic', mi: 10 },
+    { id: 'hackensack', name: 'Within 6 mi of Hackensack', town: 'Hackensack City|Bergen', mi: 6 },
+    { id: 'bergen-passaic', name: 'Bergen & Passaic', counties: ['Bergen', 'Passaic'] },
+    { id: 'hudson-essex', name: 'Hudson & Essex', counties: ['Hudson', 'Essex'] },
+    { id: 'nw', name: 'North-west hills (Sussex, Warren, Morris)', counties: ['Sussex', 'Warren', 'Morris'] },
+    { id: 'north-known', name: 'North Jersey: well-known', counties: ['Bergen', 'Essex', 'Hudson', 'Morris', 'Passaic', 'Sussex', 'Union', 'Warren'], known: true },
+  ],
   crossings: [],
   highways: HIGHWAYS,
   junctions: JUNCTIONS,
