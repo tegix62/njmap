@@ -601,6 +601,7 @@ export function initOrbit(ctx) {
     const w = city.list.map((t) => {
       if (run.seen.includes(t.n)) return 0;
       if (run.opts.only ? !run.opts.only.includes(t.kind) : t.kind === 'highway') return 0;     // (highways have their own game)
+      if (run.opts.names && !run.opts.names.includes(t.n)) return 0;                             // (a fixed list, for the checks)
       const s = st[t.n] || { r: 0, w: 0 };
       const n = s.r + s.w;
       return (n === 0 ? 3 : 1 + 4 * (s.w / n)) * (t.kind === 'landmark' ? 0.3 : 1) * (run.opts.neBias ? neWeight(t.p) : 1);   // (a building landmark comes up now and then)
@@ -1017,9 +1018,9 @@ export function initOrbit(ctx) {
   const countiesOf = (t) => (t.counties && t.counties.length ? t.counties : [t.c]).filter(Boolean);
   const townsOf = (t) => (t.towns && t.towns.length ? t.towns : [t.at]).filter(Boolean);
   const HINTS = [
-    (t) => (t.k === 'nat' ? (countiesOf(t).length > 1 ? `It spans <b>${esc(listOf(countiesOf(t), 8))}</b> counties.` : `It's in <b>${esc(countiesOf(t)[0])} County</b>.`) : t.k === 'lm' ? `Opened in <b>${t.y}</b>.` : `<b>${t.h} m</b> (${ft(t.h)} ft), finished in <b>${t.y}</b>.`),
+    (t) => (t.st ? `It is outside New Jersey, in <b>${esc(t.st)}</b>.` : t.k === 'nat' ? (countiesOf(t).length > 1 ? `It spans <b>${esc(listOf(countiesOf(t), 8))}</b> counties.` : `It's in <b>${esc(countiesOf(t)[0])} County</b>.`) : t.k === 'lm' ? `Opened in <b>${t.y}</b>.` : `<b>${t.h} m</b> (${ft(t.h)} ft), finished in <b>${t.y}</b>.`),
     (t) => (t.k === 'nat' ? `${esc(t.line)}.` : cfg ? `It's in <b>${esc(t.at)}</b>.` : `You'd find it at <b>${esc(t.at)}</b>.`),
-    (t) => (t.k === 'nat' ? (t.elev ? `It stands <b>${t.elev.toLocaleString()} ft</b> high.` : townsOf(t).length > 1 && (lineKind(t.kind) || t.kind === 'mountain') ? `From <b>${esc(townsOf(t)[0])}</b> to <b>${esc(townsOf(t)[townsOf(t).length - 1])}</b>.` : `Mostly in <b>${esc(t.at)}</b>.`) : `${esc(t.line)}.`),
+    (t) => (t.st ? `${t.elev ? `It stands <b>${t.elev.toLocaleString()} ft</b> high, ` : 'It is '}about <b>${esc(t.from)}</b>.` : t.k === 'nat' ? (t.elev ? `It stands <b>${t.elev.toLocaleString()} ft</b> high.` : townsOf(t).length > 1 && (lineKind(t.kind) || t.kind === 'mountain') ? `From <b>${esc(townsOf(t)[0])}</b> to <b>${esc(townsOf(t)[townsOf(t).length - 1])}</b>.` : `Mostly in <b>${esc(t.at)}</b>.`) : `${esc(t.line)}.`),
   ];
   function hint() {
     if (!q || q.done || q.hints >= HINTS.length) return;
@@ -1163,7 +1164,7 @@ export function initOrbit(ctx) {
       return;
     }
     const hints = hintsHtml(HINTS.slice(0, q.hints).map((h) => h(q.t)));
-    const where = q.t.k === 'nat' ? (q.towns && q.towns.shown.length ? whereHtml(q.towns.shown.slice(0, 4).map((m) => m.n).join(' · ') + (q.towns.shown.length + q.towns.more > 4 ? ` · +${q.towns.shown.length + q.towns.more - 4} more` : '')) : '') : whereHtml(q.hood || '');
+    const where = q.t.st ? (q.done ? whereHtml(`${q.t.st} · ${q.t.from}`) : "") : q.t.k === 'nat' ? (q.towns && q.towns.shown.length ? whereHtml(q.towns.shown.slice(0, 4).map((m) => m.n).join(' · ') + (q.towns.shown.length + q.towns.more > 4 ? ` · +${q.towns.shown.length + q.towns.more - 4} more` : '')) : '') : whereHtml(q.hood || '');
     ctx.hud(`<div class="qkind">${ico()} ${ttl()} · ${run.n + (q.done ? 0 : 1)}/${rounds()} · ${run.pts} pts${run.streak >= 3 ? ` · 🔥${run.streak}` : ''}</div><div class="q">${q.done ? (q.ok ? 'Yes.' : 'Not quite.') : q.flying ? 'Swinging over…' : (cfg ? `Which ${NOUN[q.t.kind] || 'place'} is this?` : q.t.k === 'lm' ? 'Which landmark is this?' : 'Which tower is this?')}</div>${q.flying ? '' : where}${q.flying ? '' : hints}`);
     ctx.toolbar.set([...(q.t.flyF ? [{ id: 'flow', label: '↻ Flow', pressed: false, title: 'Fly down the river again', onClick: () => { if (q && !q.flying) flyDown(q.t); } }] : []), { id: 'spin', label: spinOn ? '↻ Orbit' : '✋ Drag', pressed: spinOn, title: 'Camera circles by itself, or holds still so you can turn it', onClick: () => { spinOn = !spinOn; ctx.store.set('orbit.spin', spinOn); render(); } }]);
     ctx.sheet(`${run.opts.header()}<div id="qbody">

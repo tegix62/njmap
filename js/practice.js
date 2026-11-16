@@ -39,6 +39,9 @@ const TYPES = {
   gridup: '🚕 Drive Uptown (new)',
   orbit: '🏙 Name that tower (new)',
   highways: '🛣 Name that highway',
+  mountains: '⛰ Name that mountain',
+  waters: '💧 Name that lake or river',
+  lmorbit: '🏛 Name that landmark',
   drivemix: '🛣 Driving mix',
   gridgame: '🚕 Drive Downtown (new)',
   gridclassic: '🚕 Drive Midtown (classic grid)',
@@ -56,6 +59,9 @@ const DESC = {
   gridclassic: 'The original: a straightened grid, 14th to 110th St.',
   frames: 'Left, right and compass: face every direction.',
   drivemix: 'Just the road questions: which road gets you there, left or right, which way a highway runs, where highways end and cross.',
+  mountains: 'Only the mountains and ranges: the Watchungs, the Ramapos, the Kittatinny Ridge, and the ones over the line you can see from North Jersey (the Hudson Highlands, the Catskills, the Poconos).',
+  waters: 'Only the lakes, reservoirs and rivers.',
+  lmorbit: 'Only the building landmarks, each standing in a ghost of the streets round it.',
   highways: 'The camera flies along a New Jersey highway: which one is it? Interstates, routes, the Turnpike and the Parkway, with the ones that meet it as the wrong answers.',
   orbit: 'The camera circles a skyscraper, alone in a ghost of the city: which one is it? Ten a round, hints cost a point.',
   trip: 'Quiz yourself on your last drive.',
@@ -64,7 +70,8 @@ const DESC = {
 const GROUPS = [
   ['Timed', ['rapid']],
   ['Driving practice', ['gridup', 'gridgame', 'gridclassic', 'frames']],
-  ['Landmarks', ['orbit']],
+  ['Landmarks', ['orbit', 'lmorbit']],
+  ['Mountains & water', ['mountains', 'waters']],
   ['Roads', ['highways']],
 ];
 // The modes that get a tile at the top of Practice (the rest are under "More")
@@ -82,6 +89,15 @@ const WEIGHT = { addr: 2, find: 2, dir: 2, borders: 2, north: 2, point: 2, roadt
 const DIR8 = ['NW', 'N', 'NE', 'W', '', 'E', 'SW', 'S', 'SE'];
 const DIR_DEG = { N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315 };
 
+// The map games that run on the orbit engine with a filter on the kind of place
+const ORBIT_ONLY = {
+  highways: { only: ['highway'], title: 'Name that highway', icon: '🛣' },
+  mountains: { only: ['mountain'], title: 'Name that mountain', icon: '⛰', neBias: true },
+  waters: { only: ['lake', 'river'], title: 'Name that lake or river', icon: '💧', neBias: true },
+  lmorbit: { only: ['landmark'], title: 'Name that landmark', icon: '🏛' },
+};
+const isOrbitType = (t) => t === 'orbit' || !!ORBIT_ONLY[t];
+
 export function initPractice(ctx) {
   const { map, store, munis } = ctx;
   const R = ctx.region;
@@ -93,7 +109,7 @@ export function initPractice(ctx) {
     TYPES.orbit = `${R.orbit.icon || '🏙'} ${R.orbit.title} (new)`;
     DESC.orbit = R.orbit.desc;
   }
-  const allowed = ['today', 'mix', 'rapid', ...(R.gridAngle ? ['gridmid', 'gridup', 'gridgame', 'gridclassic', 'orbit'] : R.orbit ? ['orbit', 'highways', 'drivemix'] : []), 'frames', ...R.quizTypes, 'trip'];
+  const allowed = ['today', 'mix', 'rapid', ...(R.gridAngle ? ['gridmid', 'gridup', 'gridgame', 'gridclassic', 'orbit'] : R.orbit ? ['orbit', 'highways', 'mountains', 'waters', 'lmorbit', 'drivemix'] : []), 'frames', ...R.quizTypes, 'trip'];
   if (cfg.type === 'dropin') cfg.type = 'today'; // (the county puzzle is gone)
   if (!allowed.includes(cfg.type)) cfg.type = 'mix';
   // the whole-island game isn't reliable yet: anyone on it moves to the classic once
@@ -657,7 +673,7 @@ export function initPractice(ctx) {
   }
   /** "Tap Lake Hopatcong": scored by how close the tap is. */
   function makeFindPt() {
-    const n = rand(R.nature);
+    const n = rand(R.nature.filter((x) => !x.out));   // (the map for this question is framed on the region, so places outside it are left to the pointing question)
     return { kind: 'findpt', n, m: { key: `nat:${n.name}` } };
   }
 
@@ -721,7 +737,7 @@ export function initPractice(ctx) {
   }
   function next() {
     stopRapidTimer();
-    if (cfg.type !== 'orbit' && cfg.type !== 'highways') ctx.orbit?.stop();
+    if (!isOrbitType(cfg.type)) ctx.orbit?.stop();
     if (cfg.type === 'today') return nextToday();
     if (cfg.type === 'rapid') return nextRapid();
     if (cfg.type !== 'gridgame') ctx.gridgame.stop();
@@ -732,7 +748,7 @@ export function initPractice(ctx) {
     if (cfg.type === 'gridmid') return startGridGame(ctx.gridmid);
     if (cfg.type === 'gridup') return startGridGame(ctx.gridup);
     if (cfg.type === 'orbit') return startOrbit();
-    if (cfg.type === 'highways') return startOrbit({ only: ['highway'], title: 'Name that highway', icon: '🛣' });
+    if (ORBIT_ONLY[cfg.type]) return startOrbit(ORBIT_ONLY[cfg.type]);
     if (cfg.type === 'gridclassic') return startGridClassic();
     if (cfg.type === 'frames') {
       q = { kind: 'frames', m: null, answered: false };
@@ -1023,7 +1039,7 @@ export function initPractice(ctx) {
     // One header for every type: the game's name, its area (a compact menu), the game's chips and the look chip on a single line; the score only when
     // there is one. (The Today / Mixed tiles live in the picker's "Start here" group now.)
     const areaSel = `<select id="qArea" class="chip areasel" aria-label="Area">${area}</select>`;
-    if (cfg.type === 'gridgame' || cfg.type === 'gridmid' || cfg.type === 'gridup' || cfg.type === 'gridclassic' || cfg.type === 'orbit' || cfg.type === 'highways' || cfg.type === 'frames')
+    if (cfg.type === 'gridgame' || cfg.type === 'gridmid' || cfg.type === 'gridup' || cfg.type === 'gridclassic' || isOrbitType(cfg.type) || cfg.type === 'frames')
       // these have no use for the neighborhood/town list
       return `${gameBar()}<div class="score"></div>`;
     if (cfg.type === 'today') {
@@ -1081,6 +1097,8 @@ export function initPractice(ctx) {
     const games = [
       allowed.includes('orbit') ? ['orbit', R.gridAngle ? 'Name that tower' : 'Name that place'] : null,
       nj ? ['highways', 'Name that highway'] : null,
+      nj ? ['mountains', 'Mountains'] : null,
+      nj ? ['lmorbit', 'Landmarks'] : null,
       allowed.includes('rapid') ? ['rapid', 'Rapid round'] : null,
       R.gridAngle ? ['gridup', 'Drive Uptown'] : null,
       R.gridAngle ? ['gridgame', 'Drive Downtown'] : null,
