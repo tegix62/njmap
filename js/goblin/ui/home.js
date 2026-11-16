@@ -16,8 +16,8 @@ export function askHome({ force = false } = {}) {
     document.body.classList.add('welcoming');
     w.innerHTML = `<div class="wcard"><h1>Townfinder</h1><p class="wsub">What would you like to do?</p>
       <div class="wchoices">
-        <button class="wopt wopt-main" data-entry="normal"><span class="wi" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26"><path d="M4 6.5l5-2 6 2 5-2v13l-5 2-6-2-5 2z M9 4.5v13 M15 6.5v13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="wtx"><span class="wt">Learn the map</span><span class="wd">Quizzes, 3D map games, Drive and your progress.</span></span></button>
-        <button class="wopt" data-entry="goblin"><span class="wi" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26"><path d="M6 20V4 M6 5h11l-2.5 3.5L17 12H6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg></span><span class="wtx"><span class="wt">Goblin Council</span><span class="wd">A small strategy game on real New Jersey townships. An early build.</span></span></button>
+        <button class="wopt wopt-main" data-entry="normal"><span class="wi" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26"><path d="M4 6.5l5-2 6 2 5-2v13l-5 2-6-2-5 2z M9 4.5v13 M15 6.5v13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="wtx"><span class="wt">Normal mode</span><span class="wd">The quiz, Drive and Progress, as always.</span></span></button>
+        <button class="wopt" data-entry="goblin"><span class="wi" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26"><path d="M6 20V4 M6 5h11l-2.5 3.5L17 12H6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg></span><span class="wtx"><span class="wt">Goblin mode</span><span class="wd">Clans of small creatures fight over real New Jersey townships. An early build.</span></span></button>
       </div></div>`;
     for (const b of w.querySelectorAll('[data-entry]')) b.addEventListener('click', () => {
       remember(b.dataset.entry);

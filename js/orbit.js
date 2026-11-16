@@ -828,6 +828,9 @@ export function initOrbit(ctx) {
     }
     const cam = { center, zoom, pitch: t.k === 'nat' ? t.pitch : PITCH, bearing, padding: { top, bottom: pad.bottom, left: 0, right: 0 } };
     let spinT0 = performance.now(), lastSpin = spinT0, touched = false, swayT = 0;
+    const RAMP_MS = 1800;                                     // the orbit or sway eases in after the camera arrives, instead of starting at full speed
+    const ramp = (now) => { const x = Math.max(0, Math.min(1, (now - (arriveAt || now)) / RAMP_MS)); return x * x * (3 - 2 * x); };
+    let arriveAt = 0;
     const tick = (now) => {
       if (!run || q.t !== t) return;
       const dt = Math.min(0.1, (now - last) / 1000);
@@ -843,8 +846,8 @@ export function initOrbit(ctx) {
           lastSpin = now;
           if (cfg && t.k === 'nat') {                           // a place on the map: sway a little round its north-ish bearing, never a full turn
             swayT += sdt * (ctx.reduceMotion ? 0.3 : 1);
-            bearing = cam.bearing + 16 * Math.sin((swayT * 2 * Math.PI) / 14);
-          } else bearing = (bearing + SPIN * sdt * (ctx.reduceMotion ? 0.3 : 1)) % 360;
+            bearing = cam.bearing + 16 * ramp(now) * Math.sin((swayT * 2 * Math.PI) / 14);
+          } else bearing = (bearing + SPIN * ramp(now) * sdt * (ctx.reduceMotion ? 0.3 : 1)) % 360;
           map.setBearing(bearing);
         }
         if (now - lastOcc > 90) {
@@ -862,6 +865,7 @@ export function initOrbit(ctx) {
       if (!run || q.t !== t || !q.flying) return;
       q.flying = false;
       last = performance.now();
+      arriveAt = last; swayT = 0;
       updateOcclusion(bearing);
       render();
       raf = requestAnimationFrame(tick);
@@ -872,51 +876,46 @@ export function initOrbit(ctx) {
     const from = map.getCenter();
     const km = mDist([from.lng, from.lat], cam.center) / 1000;
     if (cfg && km > 2) {
-      // Far apart (New Jersey's landmarks are a state away from each other). In phases, so you can follow it: RISE straight up (no sideways
-      // travel while still low, turning north-up), CRUISE across at height, drop to a wide ORIENTING view and hold there a beat with the
-      // target in the middle (so you can see where you are), then settle into the orbit.
+      // Far apart (New Jersey's places are a state away from each other). One continuous flight, never a dead stop: the camera lifts and
+      // levels toward north-up as it starts across, arcs up over the middle high enough to see both ends, comes down into a wide orienting
+      // view where it slows right down (the town flashes there, so you can see where you are) and then glides on into the orbit, turning to
+      // the orbit's bearing on the way in. Pan, height, turn and tilt each follow their own smooth curve over the same clock, overlapping, so
+      // one is always moving as another eases off (the old version eased each phase to rest: rise, stop, cruise, stop, drop, stop, settle).
       cancelAnimationFrame(arcRaf);
       const z0 = map.getZoom(), b0 = map.getBearing(), p0 = map.getPitch(), pd0 = map.getPadding();
       const W = map.getContainer().clientWidth || 400;
       const zFit = Math.log2((0.6 * W * 78271.5 * Math.cos((cam.center[1] * Math.PI) / 180)) / (km * 1000));
       const zTop = Math.max(7.2, Math.min(zFit, z0 - 1, cam.zoom - 1));             // high enough to see both ends
       const zOri = Math.min(cam.zoom - 1.8, 12.4);                                   // the orienting view: regional, terrain readable
-      const f = (ctx.reduceMotion ? 0.5 : 1) * Math.max(0.5, Math.min(1, km / 30)); // short hops are quicker
-      const seg = [500 * f, Math.min(1150, 380 + km * 9) * f, 400 * f, 250 * f, 600 * f]; // rise, cruise, drop, hold, settle (about 2.9 s across the state)
-      const total = seg.reduce((x, y) => x + y, 0);
-      const ease = (x) => x * x * (3 - 2 * x);
+      const f = (ctx.reduceMotion ? 0.5 : 1) * Math.max(0.55, Math.min(1, km / 30)); // short hops are quicker
+      const total = (1500 + Math.min(1300, km * 14)) * f;                            // about 2.8 s across the state
+      const clamp = (x) => Math.max(0, Math.min(1, x));
+      const smooth = (x) => { x = clamp(x); return x * x * x * (x * (x * 6 - 15) + 10); };   // smootherstep: no jolt at either end
+      const lerp = (x, y, e) => x + (y - x) * e;
       const dB0 = ((((0 - b0) % 360) + 540) % 360) - 180;                          // to north-up
       const dB1 = ((((cam.bearing - 0) % 360) + 540) % 360) - 180;                 // north-up to the orbit's start
       const pTop = Math.min(p0, 30), pOri = 45;
-      const lerp = (x, y, e) => x + (y - x) * e;
+      // the height curve: from where it is, up over the top, down to the orienting view (where the camera slows: the beat to see where
+      // you are, while the turn and tilt carry on), then in to the orbit zoom; each piece meets the next at the same (zero) speed
+      const zAt = (s) => (s < 0.42 ? lerp(z0, zTop, smooth(s / 0.42)) : s < 0.66 ? lerp(zTop, zOri, smooth((s - 0.42) / 0.24)) : lerp(zOri, cam.zoom, smooth((s - 0.66) / 0.34)));
       const t0 = performance.now();
       const step = (now) => {
         if (!run || q.t !== t) return;
-        let tau = Math.min(total, now - t0);
-        const st = { c: [from.lng, from.lat], z: z0, b: b0, p: p0, pad: 0 };
-        if (tau < seg[0]) {                                                         // rise: up, level, north
-          const e = ease(tau / seg[0]);
-          st.z = lerp(z0, zTop, e); st.b = b0 + dB0 * e; st.p = lerp(p0, pTop, e);
-        } else if ((tau -= seg[0]) < seg[1]) {                                      // cruise: across at height
-          const e = ease(tau / seg[1]);
-          st.c = [lerp(from.lng, cam.center[0], e), lerp(from.lat, cam.center[1], e)]; st.z = zTop; st.b = b0 + dB0; st.p = pTop;
-        } else if ((tau -= seg[1]) < seg[2]) {                                      // drop to the orienting view
-          const e = ease(tau / seg[2]);
-          st.c = cam.center; st.z = lerp(zTop, zOri, e); st.b = b0 + dB0; st.p = lerp(pTop, pOri, e);
-        } else if ((tau -= seg[2]) < seg[3]) {                                      // hold: look (and flash the town)
-          if (!flashed) flashTown(t, true);
-          st.c = cam.center; st.z = zOri + 0.15 * (tau / seg[3]); st.b = b0 + dB0; st.p = pOri;
-        } else {                                                                    // settle into the orbit
-          tau -= seg[3];
-          const e = ease(Math.min(1, tau / seg[4]));
-          if (flashed && tau > seg[4] * 0.35) flashTown(t, false);                     // (gone a third of the way down)
-          st.c = cam.center; st.z = lerp(zOri + 0.15, cam.zoom, e); st.b = b0 + dB0 + dB1 * e; st.p = lerp(pOri, cam.pitch, e); st.pad = e;
-        }
+        const sLin = clamp((now - t0) / total);
+        // across: starts a moment after the lift begins and is over before the descent ends
+        const c = smooth((sLin - 0.04) / 0.68);
+        const center = [lerp(from.lng, cam.center[0], c), lerp(from.lat, cam.center[1], c)];
+        const zoom = zAt(sLin);
+        const bearing = b0 + dB0 * smooth(sLin / 0.45) + dB1 * smooth((sLin - 0.55) / 0.45);
+        const pitch = sLin < 0.42 ? lerp(p0, pTop, smooth(sLin / 0.42)) : sLin < 0.6 ? lerp(pTop, pOri, smooth((sLin - 0.42) / 0.18)) : lerp(pOri, cam.pitch, smooth((sLin - 0.6) / 0.4));
+        const pad = smooth((sLin - 0.6) / 0.4);
+        if (!flashed && sLin > 0.58 && sLin < 0.76) flashTown(t, true);                 // the town flashes while the view is wide and slow
+        if (flashed && sLin > 0.86) flashTown(t, false);
         map.jumpTo({
-          center: st.c, zoom: st.z, pitch: st.p, bearing: st.b,
-          padding: { top: lerp(pd0.top, cam.padding.top, st.pad), bottom: lerp(pd0.bottom, cam.padding.bottom, st.pad), left: 0, right: 0 },
+          center, zoom, pitch, bearing,
+          padding: { top: lerp(pd0.top, cam.padding.top, pad), bottom: lerp(pd0.bottom, cam.padding.bottom, pad), left: 0, right: 0 },
         });
-        if (now - t0 < total) arcRaf = requestAnimationFrame(step);
+        if (sLin < 1) arcRaf = requestAnimationFrame(step);
         else { if (flashed) flashTown(t, false); go(); }
       };
       arcRaf = requestAnimationFrame(step);
