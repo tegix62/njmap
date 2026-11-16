@@ -87,6 +87,7 @@ def main():
         recipe, opt = RECIPES.get(name, DEFAULT)
         H = opt.get('top', l['h'])
         parts = []
+        focus = None
         def add(poly, base, top):
             if poly is None or poly.is_empty:
                 return
@@ -218,6 +219,9 @@ def main():
             add(rect(tc[0], tc[1], tw, tw), 0, H * 0.72)
             add(rect(tc[0], tc[1], tw * 1.12, tw * 1.12), H * 0.72, H * 0.8)     # the clock stage
             spire(tc[0], tc[1], tw * 0.9, H * 0.8, H, 6)
+            if L > 200:                                      # a long shed behind it: the camera frames the tower end, not the whole shed
+                fc = tc - ax * 55
+                focus = ((fc[0], fc[1]), 170)
         elif recipe == 'castle':
             body = H * opt['body']
             add(F, 0, body)
@@ -250,6 +254,9 @@ def main():
         bx0 = min(g.bounds[0] for g in allp); by0 = min(g.bounds[1] for g in allp); bx1 = max(g.bounds[2] for g in allp); by1 = max(g.bounds[3] for g in allp)
         cll = to_ll(((bx0 + bx1) / 2, (by0 + by1) / 2))
         fit[name] = {'p': [round(cll[0], 6), round(cll[1], 6)], 'h': round(max(t for _, _, t in parts), 1), 'w': round(max(bx1 - bx0, by1 - by0))}
+        if focus:
+            fll = to_ll(focus[0])
+            fit[name].update({'p': [round(fll[0], 6), round(fll[1], 6)], 'w': focus[1]})
         print(f'  {name:36s} {recipe:10s} {len(parts):3d} parts, top {max(t for _, _, t in parts):.0f} m')
     d['g'] = [groups[k] for k in sorted(groups)]
     for fn in ('data/nj-landmarks.json', 'data/nj-places.json'):

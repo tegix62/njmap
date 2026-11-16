@@ -3705,3 +3705,65 @@ body.holo .hub-today, body.holo .hub-card { border: 1px solid rgba(95, 243, 255,
 .hub-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .hub-today, .hub-card, .hub-area { min-width: 0; }
 #sheet.hubsheet { overflow-x: hidden; }
+
+/* ---- UI round 2: tab bar, quiz header, feedback -------------------------------------------------------------------- */
+#tabs { grid-template-columns: repeat(4, minmax(0, 1fr)) 64px 48px; align-items: stretch; padding-left: 4px; padding-right: 4px; background: #14161c; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+#tabs button[role='tab'] { position: relative; gap: 3px; font-size: 11px; font-weight: 650; letter-spacing: 0.01em; color: #8a93a3; transition: color 0.15s; }
+#tabs button[role='tab'] .ti { display: grid; place-items: center; width: 52px; height: 28px; border-radius: 14px; transition: background 0.18s, color 0.18s; }
+#tabs button[role='tab'] .ti svg { display: block; }
+#tabs button[role='tab'][aria-selected='true'], body.ink #tabs button[role='tab'][aria-selected='true'] { color: #fff; box-shadow: none; }
+#tabs button[role='tab'][aria-selected='true'] .ti { background: rgba(255, 255, 255, 0.16); color: #fff; }
+#tabs button[role='tab']:active .ti { background: rgba(255, 255, 255, 0.24); }
+#tabs #settingsBtn { color: #8a93a3; }
+#tabs #settingsBtn .ti { display: grid; place-items: center; }
+#regionTog { padding: 8px 4px; gap: 3px; }
+#tabs #regionTog button { border-radius: 7px; font-size: 10.5px; letter-spacing: 0.04em; color: #8a93a3; background: rgba(255, 255, 255, 0.06); }
+#tabs #regionTog button.on { color: #fff; background: #2b4fb3; }
+/* quiz header: back to the menu, the game's name, then the area and look chips */
+.gamerow { gap: 6px; padding-bottom: 2px; }
+.gamerow .gamebar { display: flex; align-items: center; justify-content: flex-start; gap: 6px; padding: 0; }
+.gb-back { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: rgba(127, 127, 127, 0.14); font-style: normal; }
+.gamerow .gamebar b { font-size: 14px; letter-spacing: -0.01em; }
+.gamerow .gamebar:active .gb-back { background: rgba(127, 127, 127, 0.3); }
+.chip.areasel { max-width: 44%; padding: 5px 20px 5px 10px; border-radius: 999px; font-weight: 600;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%); background-position: calc(100% - 11px) 55%, calc(100% - 7px) 55%; background-size: 4px 4px; background-repeat: no-repeat; }
+.gamerow #lookChip { max-width: 30px; padding: 5px 8px; overflow: hidden; text-overflow: clip; white-space: nowrap; border-radius: 999px; }
+.score { margin-top: 6px; font-variant-numeric: tabular-nums; }
+/* choices and feedback */
+.choice { border-radius: 14px; transition: transform 0.1s, background 0.15s, border-color 0.15s; }
+.choice:not(:disabled):active { transform: scale(0.97); }
+.choice.right { animation: choiceok 0.35s ease-out; }
+.choice.wrong { animation: choiceno 0.3s linear; }
+@keyframes choiceok { 40% { transform: scale(1.04); } }
+@keyframes choiceno { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+#sheet .fb { margin-top: 10px; padding: 10px 12px; border-radius: 14px; font-size: 15px; line-height: 1.42; border-left: 4px solid currentColor; }
+#sheet .fb.ok { background: rgba(34, 160, 90, 0.1); }
+#sheet .fb.no { background: rgba(220, 60, 50, 0.08); }
+#sheet .fb .around { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(127, 127, 127, 0.22); color: var(--panel-ink); }
+#sheet #nextQ { margin-top: 10px; border-radius: 14px; min-height: 50px; font-size: 16px; }
+@media (prefers-reduced-motion: reduce) { .choice, .choice.right, .choice.wrong { animation: none; transition: none; } }
+
+.chip.areasel { max-width: 40%; }
+.gamerow #lookChip { font-size: 0; width: 30px; max-width: 30px; height: 28px; padding: 0; text-align: center; }
+.gamerow #lookChip::first-letter { font-size: 14px; }
+
+/* home page */
+#welcome .wopt:has(.wi) { display: flex; align-items: center; gap: 14px; text-align: left; }
+#welcome .wi { flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: rgba(255, 255, 255, 0.1); }
+#welcome .wtx { display: grid; gap: 3px; min-width: 0; }
+#welcome .wopt-main { background: linear-gradient(135deg, #2b4fb3, #1d3a8a); border-color: transparent; box-shadow: 0 8px 22px rgba(29, 58, 138, 0.35); }
+#welcome .wopt-main .wd { opacity: 0.9; }
+/* Progress */
+.pg-head h2 { letter-spacing: -0.02em; }
+.pg-bar { height: 18px; border-radius: 9px; }
+.pg-stats { gap: 6px; }
+.pg-stats > div { padding: 9px 4px 8px; border-radius: 12px; background: rgba(127, 127, 127, 0.1); }
+.pg-stats b { font-size: 21px; font-variant-numeric: tabular-nums; }
+#pgPlay { border-radius: 14px; min-height: 50px; font-size: 16px; }
+.pg-chip { padding: 6px 11px; }
+.pg-area { font-variant-numeric: tabular-nums; }
+/* Settings */
+#settings label.row:has(> select) { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; }
+#settings select { min-width: 0; max-width: 100%; width: 100%; border-radius: 10px; padding: 9px 10px; text-overflow: ellipsis; }
+#settings h2 { letter-spacing: -0.02em; }
+#settings #homeBtn { border-radius: 12px; min-height: 44px; }

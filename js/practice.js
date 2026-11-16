@@ -89,6 +89,9 @@ const WEIGHT = { addr: 2, find: 2, dir: 2, borders: 2, north: 2, point: 2, roadt
 const DIR8 = ['NW', 'N', 'NE', 'W', '', 'E', 'SW', 'S', 'SE'];
 const DIR_DEG = { N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315 };
 
+// Short names for the quiz header and the hub's chips (the full question is in the card above the map)
+const SHORT_NAME = { county: 'Which county?', nearest: 'Closest', howfar: 'How far?', hwytown: 'Highway through it', lmwhich: 'Landmark in town', countynb: 'County borders', borders: 'Borders', find: 'Find it', north: 'Farther north?',
+  name: 'Name the town', dir: 'Which direction?', section: 'Village in which town?', landmark: 'Where is the landmark?', roadto: 'Which road?', leftright: 'Left or right?', bigpoint: 'Point to big places', hwydir: 'Highway direction', hwyfact: 'Highway ends', naturept: 'Point to nature', findpt: 'Find lake or mountain', point: 'Point to it', confuse: 'Sound-alikes' };
 // The map games that run on the orbit engine with a filter on the kind of place
 const ORBIT_ONLY = {
   highways: { only: ['highway'], title: 'Name that highway', icon: '🛣' },
@@ -1056,8 +1059,8 @@ export function initPractice(ctx) {
   /** The main modes as tiles (New York: Drive Midtown first), and a "More" button for everything else. */
   /** While a game is running: one line saying which, with the way to another. (The quick tiles come back on the other screens.) */
   function gameBar(areaSel = '') {
-    const name = TYPES[cfg.type] || (TILE_LABEL[cfg.type] ? TILE_LABEL[cfg.type][0] : cfg.type);
-    return `<div class="gamerow"><button id="qType" class="gamebar" aria-haspopup="dialog" aria-label="Change what you practice"><b>${esc(name)}</b><span>change ▾</span></button>${areaSel}${ctx.toolbar ? ctx.toolbar.html() : ''}<button id="lookChip" class="chip toggle" aria-label="Map look">${ctx.looks ? ctx.looks.label : ''}</button></div>`;
+    const name = SHORT_NAME[cfg.type] || TYPES[cfg.type] || (TILE_LABEL[cfg.type] ? TILE_LABEL[cfg.type][0] : cfg.type);
+    return `<div class="gamerow"><button id="qType" class="gamebar" aria-label="Back to the Play menu"><i class="gb-back" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></i><b>${esc(name.replace(/^[^\w(]+\s*/, ''))}</b></button>${areaSel}${ctx.toolbar ? ctx.toolbar.html() : ''}<button id="lookChip" class="chip toggle" aria-label="Map look">${ctx.looks ? ctx.looks.label : ''}</button></div>`;
   }
   function typeBtn() {
     const tiles = (R.gridAngle ? ['gridmid', 'today', 'mix'] : ['today', 'mix']).filter((k) => allowed.includes(k));
@@ -1118,7 +1121,7 @@ export function initPractice(ctx) {
       ['rapid', '⚡', 'Rapid round', 'Timed, three lives'],
     ];
     const quick = ['county', 'nearest', 'howfar', 'hwytown', 'lmwhich', 'countynb', 'borders', 'find', 'north'].filter((k) => allowed.includes(k)).slice(0, 7);
-    const short = { county: 'Which county?', nearest: 'Closest', howfar: 'How far?', hwytown: 'Highway through it', lmwhich: 'Landmark in town', countynb: 'County borders', borders: 'Borders', find: 'Find it', north: 'Farther north?' };
+    const short = SHORT_NAME;
     ctx.hud(`<div class="qkind">Play · ${esc(R.name)}</div><div class="q">What do you want to do?</div>`);
     ctx.sheet(`<div class="hub">
       <button class="hub-today${t.done ? ' done' : ''}" data-go="today"><span class="ht-txt"><b>${t.done ? 'Today is done' : t.i ? 'Carry on today' : 'Start today'}</b><small>${esc(today)}</small></span>${ring(tdone, t.done ? '✓' : `${t.i || 0}/${t.items ? t.items.length : 0}`)}</button>
