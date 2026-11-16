@@ -69,6 +69,8 @@ def main():
     d = json.load(open(p))
     O, S = d['o'], d['s']
     lms = json.load(open(os.path.join(ROOT, 'data/nj-landmarks.json')))
+    lp = os.path.join(ROOT, 'data/nj-landmark-lidar.json')
+    LIDAR = json.load(open(lp)) if os.path.exists(lp) else {}   # measured shapes (tools/lidar_parts.py) win over the drawn recipes
     idx = [i for i, b in enumerate(d['b']) if b[1]]
     rings = {i: decode(d['b'][i], O, S) for i in idx}
     groups = {g[0]: g for g in d['g']}
@@ -84,7 +86,7 @@ def main():
         if F.geom_type != 'Polygon' or F.area < 20:
             continue
         name = l['n']
-        recipe, opt = RECIPES.get(name, DEFAULT)
+        recipe, opt = ('lidar', {}) if name in LIDAR else RECIPES.get(name, DEFAULT)
         H = opt.get('top', l['h'])
         parts = []
         focus = None
@@ -134,7 +136,10 @@ def main():
         def spire(cx, cy, w, base, top, n=8):
             for k in range(n):
                 add(rect(cx, cy, w * (1 - k / n), w * (1 - k / n)), base + (top - base) * k / n, base + (top - base) * (k + 1) / n)
-        if recipe == 'cathedral':
+        if recipe == 'lidar':
+            for pt in LIDAR[name]['parts']:
+                add(Polygon([to_m(q) for q in pt['ring']]).buffer(0), pt['b'], pt['t'])
+        elif recipe == 'cathedral':
             nave = opt['nave']
             gable(F, nave * 0.62, nave)
             tw = min(W * 0.3, 16)
