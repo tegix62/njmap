@@ -137,30 +137,101 @@ def build(name):
     top = float(np.percentile(Hf[inside], 99.7))
     if top < 3:
         print(f'  {name}: nothing standing ({top:.1f} m)'); return None
-    step = max(1.5, top / 45)
-    levels = np.arange(step, top + step * 0.5, step)
-    parts, prev_poly, base = [], None, 0.0
-    def outline(mask):
-        polys = []
-        for c in measure.find_contours(np.pad(mask.astype(float), 1), 0.5):
-            if len(c) < 4:
-                continue
-            p = Polygon([(x0 + (cx - 1 + 0.5) * cell, y0 + (cy - 1 + 0.5) * cell) for cy, cx in c]).buffer(0)
-            if p.area >= max(4, 3 * cell * cell):
-                polys.append(p)
-        if not polys:
-            return None
-        u = unary_union(polys).simplify(cell * 0.6)
-        return u if not u.is_empty else None
-    for L in levels:
-        poly = outline(Hf >= L)
-        if poly is None:
-            break
-        if prev_poly is not None and poly.symmetric_difference(prev_poly).area / max(prev_poly.area, 1) < 0.05:
-            parts[-1][2] = float(L)                                        # the same outline as the level below: one taller part
-        else:
-            parts.append([poly, base, float(L)])
-        prev_poly, base = poly, float(L)
+    # --- from a measured surface to a clean building: tiers, squared outlines, round towers ---------------------------------------------
+    # 1. the roof heights fall into a few tiers (a main roof, a lower wing, a tower, a spire): one-dimensional k-means on the cell heights,
+    #    tiers closer than max(2 m, 7% of the top) merged
+    hs = Hf[inside & (Hf >= 2)]
+    if len(hs) < 10:
+        print(f'  {name}: too little roof'); return None
+    centers = np.percentile(hs, np.linspace(10, 99, 6))
+    for _ in range(30):
+        lab = np.argmin(np.abs(hs[:, None] - centers[None, :]), axis=1)
+        centers = np.array([hs[lab == k].mean() if (lab == k).any() else centers[k] for k in range(len(centers))])
+    centers = np.sort(centers)
+    merged = [centers[0]]
+    for c in centers[1:]:
+        if c - merged[-1] < max(2.0, 0.07 * top): merged[-1] = (merged[-1] + c) / 2
+        else: merged.append(c)
+    tiers = []                                                   # (threshold to belong, height the tier is drawn to)
+    for i, c in enumerate(merged):
+        lo_ = (merged[i - 1] + c) / 2 if i else 2.0
+        hi_ = (c + merged[i + 1]) / 2 if i + 1 < len(merged) else top + 1
+        sel = hs[(hs >= lo_) & (hs < hi_)]
+        if len(sel) < 3: continue
+        tiers.append((lo_, float(np.percentile(sel, 80)) if i + 1 < len(merged) else top))
+    # 2. a grid turned to the building's own long side, so outlines come out square to it
+    rr = F.minimum_rotated_rectangle
+    cs = list(rr.exterior.coords)[:4]
+    e = max([np.subtract(cs[1], cs[0]), np.subtract(cs[2], cs[1])], key=np.linalg.norm)
+    ang = math.atan2(e[1], e[0])
+    ca, sa = math.cos(ang), math.sin(ang)
+    c0 = np.array(F.centroid.coords[0])
+    span = max(x1 - x0, y1 - y0) * 0.8
+    g = 1.0
+    us = np.arange(-span, span, g) + g / 2
+    U, V = np.meshgrid(us, us)
+    Xr, Yr = c0[0] + U * ca - V * sa, c0[1] + U * sa + V * ca            # rotated grid points in the local frame
+    ci, cj = ((Xr - x0) / cell).astype(int), ((Yr - y0) / cell).astype(int)
+    okr = (ci >= 0) & (ci < nx) & (cj >= 0) & (cj < ny)
+    Hr = np.zeros_like(U)
+    Hr[okr] = Hf[cj[okr], ci[okr]]
+    inr = np.zeros_like(U, dtype=bool)
+    inr[okr] = inside[cj[okr], ci[okr]]
+    Hr[~inr] = 0
+    import shapely
+    from shapely.geometry import box as sbox
+    def cells_to_poly(mask):
+        rects = []
+        for r in range(mask.shape[0]):
+            row = mask[r]; c = 0
+            while c < len(row):
+                if row[c]:
+                    c2 = c
+                    while c2 + 1 < len(row) and row[c2 + 1]: c2 += 1
+                    rects.append(sbox(us[c] - g / 2, us[r] - g / 2, us[c2] + g / 2, us[r] + g / 2)); c = c2 + 1
+                else: c += 1
+        if not rects: return None
+        u = unary_union(rects)
+        u = u.buffer(1.2, join_style=2).buffer(-2.4, join_style=2).buffer(1.2, join_style=2)   # off the 1 m stair-steps and slivers, corners kept square
+        return None if u.is_empty else u.simplify(0.6)
+    def to_local(poly):                                          # rotated (u, v) back to the east/north frame
+        return shapely.affinity.affine_transform(poly, [ca, -sa, sa, ca, c0[0], c0[1]])
+    foot = F.buffer(1.0, join_style=2)
+    parts, base = [], 0.0
+    for lo_, h_ in tiers:
+        m = ndimage.binary_opening(Hr >= lo_, iterations=1)
+        m = ndimage.binary_fill_holes(ndimage.binary_closing(m, iterations=2))
+        lab_, n_ = ndimage.label(m)
+        for k in range(1, n_ + 1):
+            if (lab_ == k).sum() < 6: m[lab_ == k] = False       # specks
+        poly = cells_to_poly(m)
+        if poly is None: continue
+        poly = to_local(poly).intersection(foot)
+        pieces = []
+        for gg in (poly.geoms if hasattr(poly, 'geoms') else [poly]):
+            if gg.geom_type != 'Polygon' or gg.area < 4: continue
+            circ = 4 * math.pi * gg.area / gg.length ** 2
+            if circ > 0.8 and gg.area < 900:                         # a round tower, a lantern, a dome: a circle of the same area
+                cx_, cy_ = gg.centroid.coords[0]; r_ = math.sqrt(gg.area / math.pi)
+                gg = Polygon([(cx_ + r_ * math.cos(2 * math.pi * t / 20), cy_ + r_ * math.sin(2 * math.pi * t / 20)) for t in range(20)])
+            elif gg.area / gg.minimum_rotated_rectangle.area > 0.88:  # nearly a rectangle: a rectangle
+                gg = gg.minimum_rotated_rectangle
+            pieces.append(gg)
+        if not pieces: continue
+        parts.append([unary_union(pieces), base, h_])
+        base = h_
+    # a lighthouse: the scan is too sparse to see roundness on a 6 m tower, so it is drawn round, its radius measured at the foot and near the top
+    # of the shaft and tapered between, with the gallery and lantern the scan shows as the top few metres
+    if (lm.get('kind') or '').lower() == 'lighthouse':
+        high = Hr >= 0.6 * top
+        if high.sum() >= 3:
+            cu, cv = U[high].mean(), V[high].mean()
+            rad_at = lambda h: math.sqrt(max((Hr >= h).sum() * g * g, 4) / math.pi)
+            r0, r1 = min(rad_at(0.25 * top), 7.0), min(rad_at(0.85 * top), rad_at(0.25 * top))
+            shaft = top * 0.86
+            circle = lambda r: to_local(Polygon([(cu + r * math.cos(2 * math.pi * t / 20), cv + r * math.sin(2 * math.pi * t / 20)) for t in range(20)]))
+            parts = [[circle(r0 * 1.35), 0, 2.0]] + [[circle(r0 + (r1 - r0) * k / 12), max(2.0, shaft * k / 12), shaft * (k + 1) / 12] for k in range(12)]
+            parts += [[circle(r1 * 1.25), shaft, shaft + 1.0], [circle(r1 * 0.75), shaft + 1.0, top - 1.5], [circle(r1 * 0.45), top - 1.5, top]]
     out = []
     for poly, b, t in parts:
         for g in (poly.geoms if hasattr(poly, 'geoms') else [poly]):
