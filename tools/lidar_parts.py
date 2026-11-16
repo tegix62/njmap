@@ -70,10 +70,15 @@ def laz_points(lon, lat, R):
             h = fh.header
             crs = h.parse_crs()
             if crs is None:
-                continue
-            tr = Transformer.from_crs(4326, crs.to_epsg() or crs, always_xy=True)
+                # the 2014 Sandy tiles carry GeoTIFF keys laspy does not read; their names (18TWL...) and coordinates are UTM zone 18N, metres
+                if 1e5 < h.mins[0] < 1e6 and 4e6 < h.mins[1] < 5e6:
+                    tr, unit = Transformer.from_crs(4326, 26918, always_xy=True), 1.0
+                else:
+                    continue
+            else:
+                tr = Transformer.from_crs(4326, crs.to_epsg() or crs, always_xy=True)
+                unit = 0.3048 if 'foot' in (crs.axis_info[0].unit_name or '').lower() else 1.0
             x0, y0 = tr.transform(lon, lat)
-            unit = 0.3048 if 'foot' in (crs.axis_info[0].unit_name or '').lower() else 1.0
             r = R / unit
             if x0 + r < h.mins[0] or x0 - r > h.maxs[0] or y0 + r < h.mins[1] or y0 - r > h.maxs[1]:
                 continue
@@ -111,7 +116,7 @@ def build(name):
     X, Y, Z, C = X[keep], Y[keep], Z[keep], C[keep]
     ground = Z[C == 2]
     g0 = float(np.median(ground)) if len(ground) > 30 else float(np.percentile(Z, 5))
-    zone = F.buffer(4)
+    zone = F.buffer(6)
     x0, y0, x1, y1 = zone.bounds
     dens = len(X) / ((2 * R) ** 2)
     cell = 1.0 if dens >= 6 else 1.5
@@ -134,7 +139,7 @@ def build(name):
     Hf[~inside] = 0
     Hf = np.where(np.isfinite(Hf), Hf, 0)
     Hf = ndimage.median_filter(Hf, size=3) if cell == 1.0 else Hf          # (single wild returns: a bird, a crane)
-    top = float(np.percentile(Hf[inside], 99.7))
+    top = float(np.sort(Hf[inside])[-4])        # the fourth-highest cell: keeps a spire (a few cells), drops a single stray return
     if top < 3:
         print(f'  {name}: nothing standing ({top:.1f} m)'); return None
     # --- from a measured surface to a clean building: tiers, squared outlines, round towers ---------------------------------------------

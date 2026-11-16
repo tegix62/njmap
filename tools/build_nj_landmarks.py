@@ -56,6 +56,9 @@ PICK2 = {
     'Newark Broad Street Station': 'Broad Street Station', 'NJPAC': None, 'Newark Museum': None, 'Goldman Sachs Tower': None, '99 Hudson Street': '99 Hudson',
     'Willowbrook Mall': 'Willowbrook', 'Newark City Hall': None, 'National Newark Building': None, 'Cathedral Basilica (Newark)': None, 'Lambert Castle': None,
 }
+# where the scan showed a landmark is not at the listed point (the lidar heightmap of the Cathedral Basilica, its cross plan and two front towers,
+# stands 150 m east of the point in LANDMARKS, which had put the 3D landmark on a neighbouring building): the point the building is looked for at
+AT = {}
 RADIUS = 480           # metres of buildings and streets kept round each landmark
 O = [-75.6, 38.8]
 S = 100000
@@ -87,6 +90,8 @@ def main():
         done = {x['n'] for x in listing}
         for i, cand in enumerate(CANDS):
             name, lo0, la0, year, line, at = cand[:6]
+        if name in AT:
+            lo0, la0 = AT[name]
             if name in done:
                 continue
             if bi_ == 0:
@@ -110,7 +115,11 @@ def main():
                 nm_of = lambda t: ((t[0]['names'] or {}).get('primary') or '').lower()
                 cand = [t for t in near if nm_of(t) == match.lower()] or [t for t in near if match.lower() in nm_of(t)]    # (the exact name first: "Barnegat Lighthouse", not its Interpretive Center)
             else:
-                cand = [t for t in near if t[2] < 150]
+                # no name to match: the building the point stands in, else the biggest within 60 m, else within 150 m (the biggest within 150 m
+                # alone once put the cathedral on the school beside it)
+                from shapely.geometry import Point as _P
+                pin = _P(lo0, la0)
+                cand = [t for t in near if t[1].contains(pin)] or [t for t in near if t[2] < 60] or [t for t in near if t[2] < 150]
             if not cand:
                 print('  NO building for', name); continue
             tr, tg, _ = max(cand, key=lambda t: t[1].area)
@@ -189,6 +198,9 @@ def main():
                 segs.append([nid[nm], *enc(list(g.simplify(1.0 / kx).coords))])
             listing.append({'n': name, 'p': [round(lon, 6), round(lat, 6)], 'h': h, 'y': year, 'line': line, 'at': at, 'hood': at, 'k': 'lm', 'kind': kind, 'town': town, 'w': round(math.sqrt(tg.area * kx * ky))})
             print(f'  {name}: building {tg.area * kx * ky:.0f} m2, h {h}, {len(idx_of)} buildings round it')
+    missing = [c for c in BATCHES if not os.path.exists(os.path.join(c, 'building.pkl'))]
+    if missing:                                   # a batch whose scan is gone (a fresh machine) would silently drop its landmarks: write nothing
+        raise SystemExit(f'scan caches missing: {missing}; run tools/overture_scan.py for them first. Nothing written.')
     json.dump({'o': O, 's': S, 'b': bld, 'g': parts, 'names': names, 'segs': segs}, open(os.path.join(ROOT, 'data/nj-landmark-city.json'), 'w'), separators=(',', ':'))
     json.dump(listing, open(os.path.join(ROOT, 'data/nj-landmarks.json'), 'w'), ensure_ascii=False, separators=(',', ':'))
     print(len(listing), 'landmarks;', len(bld), 'buildings,', len(parts), 'drawn from parts,', len(segs), 'street blocks ->', os.path.getsize(os.path.join(ROOT, 'data/nj-landmark-city.json')) // 1024, 'KB')
