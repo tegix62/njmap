@@ -1018,7 +1018,7 @@ export function initOrbit(ctx) {
   const countiesOf = (t) => (t.counties && t.counties.length ? t.counties : [t.c]).filter(Boolean);
   const townsOf = (t) => (t.towns && t.towns.length ? t.towns : [t.at]).filter(Boolean);
   const HINTS = [
-    (t) => (t.st ? `It is outside New Jersey, in <b>${esc(t.st)}</b>.` : t.k === 'nat' ? (countiesOf(t).length > 1 ? `It spans <b>${esc(listOf(countiesOf(t), 8))}</b> counties.` : `It's in <b>${esc(countiesOf(t)[0])} County</b>.`) : t.k === 'lm' ? `Opened in <b>${t.y}</b>.` : `<b>${t.h} m</b> (${ft(t.h)} ft), finished in <b>${t.y}</b>.`),
+    (t) => (t.st ? `It is outside New Jersey, in <b>${esc(t.st)}</b>.` : t.k === 'nat' ? (countiesOf(t).length > 1 ? `It spans <b>${esc(listOf(countiesOf(t), 8))}</b> counties.` : `It's in <b>${esc(countiesOf(t)[0])} County</b>.`) : t.k === 'lm' ? (t.y ? `Opened in <b>${t.y}</b>.` : `It is a <b>${esc((t.what || 'landmark').toLowerCase())}</b>${t.c ? ` in ${esc(t.c)} County` : ''}.`) : `<b>${t.h} m</b> (${ft(t.h)} ft), finished in <b>${t.y}</b>.`),
     (t) => (t.k === 'nat' ? `${esc(t.line)}.` : cfg ? `It's in <b>${esc(t.at)}</b>.` : `You'd find it at <b>${esc(t.at)}</b>.`),
     (t) => (t.st ? `${t.elev ? `It stands <b>${t.elev.toLocaleString()} ft</b> high, ` : 'It is '}about <b>${esc(t.from)}</b>.` : t.k === 'nat' ? (t.elev ? `It stands <b>${t.elev.toLocaleString()} ft</b> high.` : townsOf(t).length > 1 && (lineKind(t.kind) || t.kind === 'mountain') ? `From <b>${esc(townsOf(t)[0])}</b> to <b>${esc(townsOf(t)[townsOf(t).length - 1])}</b>.` : `Mostly in <b>${esc(t.at)}</b>.`) : `${esc(t.line)}.`),
   ];

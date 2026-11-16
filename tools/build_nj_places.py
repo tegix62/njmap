@@ -136,7 +136,7 @@ def main():
         out.append({'n': name, 'kind': 'park', 'k': 'nat', 'p': [lon, lat], 'z': 12.3, 'pitch': 60, 'line': f'{kind.lower()}' + (f' in {p["full"]}' if p else ''), 'at': p['full'] if p else '', 'c': p['c'] if p else ''})
     # --- the building landmarks, as they were
     for l in json.load(open(os.path.join(ROOT, 'data/nj-landmarks.json'))):
-        out.append({**l, 'kind': 'landmark', 'c': l['town'].split('|')[1] if '|' in l.get('town', '') else '', 'at': l['at']})
+        out.append({**l, 'kind': 'landmark', 'what': l['kind'], 'c': l['town'].split('|')[1] if '|' in l.get('town', '') else '', 'at': l['at']})
     json.dump(out, open(os.path.join(ROOT, 'data/nj-places.json'), 'w'), ensure_ascii=False, separators=(',', ':'))
     import collections
     print(collections.Counter(o['kind'] for o in out), len(out), 'places ->', os.path.getsize(os.path.join(ROOT, 'data/nj-places.json')) // 1024, 'KB')
