@@ -73,6 +73,7 @@ def main():
     rings = {i: decode(d['b'][i], O, S) for i in idx}
     groups = {g[0]: g for g in d['g']}
     made = 0
+    fit = {}
     for l in lms:
         lon0, lat0 = l['p']
         kx, ky = 111320 * math.cos(math.radians(lat0)), 110574
@@ -244,8 +245,20 @@ def main():
             ent.append([base, top, *flat])
         groups[best] = ent
         made += 1
+        # the camera frames a landmark by its point, height and width: make them those of the shape just built
+        allp = [poly for poly, _, _ in parts]
+        bx0 = min(g.bounds[0] for g in allp); by0 = min(g.bounds[1] for g in allp); bx1 = max(g.bounds[2] for g in allp); by1 = max(g.bounds[3] for g in allp)
+        cll = to_ll(((bx0 + bx1) / 2, (by0 + by1) / 2))
+        fit[name] = {'p': [round(cll[0], 6), round(cll[1], 6)], 'h': round(max(t for _, _, t in parts), 1), 'w': round(max(bx1 - bx0, by1 - by0))}
         print(f'  {name:36s} {recipe:10s} {len(parts):3d} parts, top {max(t for _, _, t in parts):.0f} m')
     d['g'] = [groups[k] for k in sorted(groups)]
+    for fn in ('data/nj-landmarks.json', 'data/nj-places.json'):
+        fp = os.path.join(ROOT, fn)
+        lst = json.load(open(fp))
+        for x in lst:
+            if x.get('k') == 'lm' and x['n'] in fit:
+                x.update(fit[x['n']])
+        json.dump(lst, open(fp, 'w'), ensure_ascii=False, separators=(',', ':'))
     json.dump(d, open(p, 'w'), separators=(',', ':'))
     print(made, 'landmarks shaped;', os.path.getsize(p) // 1024, 'KB')
 

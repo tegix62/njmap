@@ -794,7 +794,7 @@ export function initOrbit(ctx) {
     const mpp0 = 78271.5 * Math.cos((t.p[1] * Math.PI) / 180);
     const sinP = Math.sin((PITCH * Math.PI) / 180);
     const hh = t.k === 'lm' ? Math.max(t.h, cfg ? 40 : 85) : t.h; // a landmark is low: frame it as if it stood a little taller
-    let zoom = Math.max(14.4, Math.min(cfg ? 16.0 : 16.9, Math.log2((mpp0 * 0.86 * free) / (1.15 * sinP * hh))));
+    let zoom = Math.max(14.4, Math.min(cfg ? 17.4 : 16.9, Math.log2((mpp0 * 0.86 * free) / (1.15 * sinP * hh))));
     // a wide one (a stadium, a mall) must fit across the screen too: its width, with a margin for the turn
     if (t.w) zoom = Math.min(zoom, Math.max(14.2, Math.log2((0.8 * (map.getContainer().clientWidth || 400) * mpp0) / (t.w * 1.45))));
     const pxTall = (1.15 * sinP * hh * Math.pow(2, zoom)) / mpp0;

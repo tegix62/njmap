@@ -11,7 +11,7 @@ const { chromium } = require('playwright'); const fs = require('fs');
     await page.waitForSelector('#sheet .choice, #qbody .choice', { timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(+process.env.WAIT || 6000); console.log('asked', name);
     const slug = name.replace(/\W+/g, '-').toLowerCase();
-    await page.screenshot({ path: `${out}/${slug}-ask.png` });
+    await page.screenshot({ path: `${out}/${slug}-ask.png` }); console.log('   on screen at', JSON.stringify(await page.evaluate((n) => { const m = window.njtf.map; const ls = window.__lmPts || {}; return { zoom: m.getZoom().toFixed(2) }; }, name)));
     for (let i = 0; i < 3; i++) { const h = page.locator('button', { hasText: /hint/i }).first(); if (await h.count()) await h.click().catch(() => {}); await page.waitForTimeout(150); }
     const hints = (await page.locator('#hud').innerText()).replace(/\n/g, ' | ').slice(0, 330);
     const choices = await page.locator('.choice').allInnerTexts();
