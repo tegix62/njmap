@@ -36,7 +36,7 @@ OUT = os.path.join(ROOT, 'data/nj-landmark-lidar.json')
 EPT = {
     'Lambert Castle': 'NJ_NW6Co_2017',
     'Boardwalk Hall': 'ARRA-NJ_3Counties_2010', 'Absecon Lighthouse': 'ARRA-NJ_3Counties_2010', 'Great Auditorium': 'ARRA-NJ_3Counties_2010',
-    'Barnegat Lighthouse': 'ARRA-NJ_3Counties_2010', 'Cape May Lighthouse': 'ARRA-NJ_3Counties_2010',
+    'Barnegat Lighthouse': 'ARRA-NJ_3Counties_2010', 'Cape May Lighthouse': 'NJ_CapeMayCo_2008', 'High Point Monument': 'NJ_NW6Co_2017',
 }
 NOISE = {7, 18}
 
