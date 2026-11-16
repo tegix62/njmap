@@ -1093,24 +1093,47 @@ export function initPractice(ctx) {
     const nj = !!R.orbit && !R.gridAngle;
     const today = t.done ? `Done today ✓${sk ? ` · ${sk}-day streak` : ''}` : t.i ? `${t.i} of ${t.items.length} done` : `${t.items.length} stops · ${nj ? 'places, highways, towns' : 'neighborhoods, towers, directions'}`;
     const drive = nj ? ['drivemix', '🛣 Driving', 'Roads, highways, directions'] : R.gridAngle ? ['gridmid', '🚕 Drive Midtown', 'Plan the route, then ride it'] : null;
-    const tile = (type, title, sub, cls = '') => `<button class="hub-tile ${cls}" data-go="${type}"><b>${esc(title)}</b><small>${esc(sub)}</small></button>`;
-    const games = [
-      allowed.includes('orbit') ? ['orbit', R.gridAngle ? 'Name that tower' : 'Name that place'] : null,
-      nj ? ['highways', 'Name that highway'] : null,
-      nj ? ['mountains', 'Mountains'] : null,
-      nj ? ['lmorbit', 'Landmarks'] : null,
-      allowed.includes('rapid') ? ['rapid', 'Rapid round'] : null,
-      R.gridAngle ? ['gridup', 'Drive Uptown'] : null,
-      R.gridAngle ? ['gridgame', 'Drive Downtown'] : null,
-    ].filter(Boolean);
+    const ring = (frac, label) => { const C = 2 * Math.PI * 21; return `<svg class="hub-ring" viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="21" class="hr-bg"/><circle cx="26" cy="26" r="21" class="hr-fg" stroke-dasharray="${(C * frac).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 26 26)"/><text x="26" y="30.5" text-anchor="middle">${label}</text></svg>`; };
+    const tdone = t.done ? 1 : t.items && t.items.length ? (t.i || 0) / t.items.length : 0;
+    // what you know, from the same review data Progress uses
+    const s0 = srs(), areaP = pool(), known0 = R.wellKnown ? munis.filter((m) => m.wellKnown) : munis;
+    const learned = known0.filter((m) => s0[m.key] && s0[m.key].b >= 3).length, due = dueCount(areaP);
+    // the area every quiz is drawn from, chosen here as well as in each quiz's header
+    const opt = (v, label) => `<option value="${v}"${cfg.area === v ? ' selected' : ''}>${esc(label)}</option>`;
+    const areaOpts = (R.wellKnown ? opt('known', `Well-known ${R.units}`) : '') + opt('all', `All of ${R.name}`) +
+      (R.focusAreas ? `<optgroup label="Focus areas">${R.focusAreas.map((f) => opt('focus:' + f.id, f.name)).join('')}</optgroup>` : '') +
+      (R.superGroups ? `<optgroup label="Regions">${Object.keys(R.superGroups).map((r) => opt('region:' + r, r)).join('')}</optgroup>` : '') +
+      `<optgroup label="${R.groupPlural}">${ctx.counties.map((c) => opt('county:' + c, ctx.groupName(c))).join('')}</optgroup>`;
+    const card = (type, icon, title, sub) => `<button class="hub-card" data-go="${type}"><span class="hc-ico" aria-hidden="true">${icon}</span><span class="hc-txt"><b>${esc(title)}</b><small>${esc(sub)}</small></span></button>`;
+    const mapGames = nj ? [
+      ['orbit', '🗺', 'Name that place', 'Everything, flown over in 3D'],
+      ['mountains', '⛰', 'Mountains', 'Ridges and peaks, near and over the line'],
+      ['waters', '💧', 'Lakes & rivers', 'Reservoirs, lakes, the rivers they feed'],
+      ['lmorbit', '🏛', 'Landmarks', 'Buildings in a ghost of their streets'],
+      ['highways', '🛣', 'Highways', 'Fly along it: which road is this?'],
+      ['rapid', '⚡', 'Rapid round', 'Timed, three lives'],
+    ] : [
+      ...(allowed.includes('orbit') ? [['orbit', '🏙', R.gridAngle ? 'Name that tower' : 'Name that place', 'Circle it in 3D']] : []),
+      ...(R.gridAngle ? [['gridup', '🚕', 'Drive Uptown', 'Plan it, then ride it'], ['gridgame', '🚕', 'Drive Downtown', 'The tangle below 14th']] : []),
+      ['rapid', '⚡', 'Rapid round', 'Timed, three lives'],
+    ];
+    const quick = ['county', 'nearest', 'howfar', 'hwytown', 'lmwhich', 'countynb', 'borders', 'find', 'north'].filter((k) => allowed.includes(k)).slice(0, 7);
+    const short = { county: 'Which county?', nearest: 'Closest', howfar: 'How far?', hwytown: 'Highway through it', lmwhich: 'Landmark in town', countynb: 'County borders', borders: 'Borders', find: 'Find it', north: 'Farther north?' };
     ctx.hud(`<div class="qkind">Play · ${esc(R.name)}</div><div class="q">What do you want to do?</div>`);
     ctx.sheet(`<div class="hub">
-      ${tile('today', t.done ? '☀ Today' : '☀ Start today', today, 'hub-big')}
-      <div class="hub-row">${tile('mix', '∞ Mixed for you', 'endless, from what you miss')}${drive ? tile(drive[0], drive[1], drive[2]) : ''}</div>
-      <div class="hub-chips">${games.map(([k, n]) => `<button class="chip" data-go="${k}">${esc(n)}</button>`).join('')}<button class="chip" data-all="1">All types ▸</button></div>
+      <button class="hub-today${t.done ? ' done' : ''}" data-go="today"><span class="ht-txt"><b>${t.done ? 'Today is done' : t.i ? 'Carry on today' : 'Start today'}</b><small>${esc(today)}</small></span>${ring(tdone, t.done ? '✓' : `${t.i || 0}/${t.items ? t.items.length : 0}`)}</button>
+      <div class="hub-stats"><span><b>${learned}</b> learned</span><span><b>${due}</b> due here</span><span><b>${sk || 0}</b> day streak</span></div>
+      <label class="hub-area"><span>Practising</span><select id="hubArea" aria-label="Area to practise">${areaOpts}</select></label>
+      <div class="hub-row">${card('mix', '∞', 'Mixed for you', 'Endless, from what you miss')}${drive ? card(drive[0], drive[1].split(' ')[0], drive[1].replace(/^\S+\s/, ''), drive[2]) : ''}</div>
+      <h4 class="hub-h">Map games</h4>
+      <div class="hub-grid">${mapGames.map(([k, i, n, d]) => card(k, i, n, d)).join('')}</div>
+      <h4 class="hub-h">Quick questions</h4>
+      <div class="hub-chips">${quick.map((k) => `<button class="chip" data-go="${k}">${esc(short[k])}</button>`).join('')}<button class="chip more" data-all="1">All types ▸</button></div>
     </div>`);
-    for (const b of document.querySelectorAll('#sheet [data-go]')) b.addEventListener('click', () => chooseType(b.dataset.go));
-    document.querySelector('#sheet [data-all]')?.addEventListener('click', openPicker);
+    document.getElementById('sheet').classList.add('hubsheet');
+    document.getElementById('hubArea')?.addEventListener('change', (e) => { cfg.area = e.target.value; store.set(CFG_KEY, cfg); showHub(); });
+    for (const b of document.querySelectorAll('#sheet [data-go]')) b.addEventListener('click', () => { document.getElementById('sheet').classList.remove('hubsheet'); chooseType(b.dataset.go); });
+    document.querySelector('#sheet [data-all]')?.addEventListener('click', () => { document.getElementById('sheet').classList.remove('hubsheet'); openPicker(); });
     ctx.updateEdges();
   }
   ctx.playHub = () => showHub();

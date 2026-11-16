@@ -316,6 +316,7 @@ async function main() {
       requestAnimationFrame(updateEdges);
     },
     sheet(html) {
+      sheetEl.classList.remove('hubsheet');   // (the Play hub adds it back after drawing)
       sheetEl.innerHTML = html;
       sheetEl.hidden = !html;
       requestAnimationFrame(updateEdges);
