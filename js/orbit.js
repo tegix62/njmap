@@ -742,7 +742,7 @@ export function initOrbit(ctx) {
         const d = mDist(city.cx[i], mc);
         // a surveyed or modelled tower is many pieces: take every piece standing in its place; a plain one is just itself
         // (a region landmark drawn as shaped parts: every part flagged as a landmark round it is the landmark)
-        if (i === main || (modelled && f.properties.c !== undefined && d < 38) || (cfg && f.properties.lm === 1 && d < 140)) {
+        if (i === main || (modelled && f.properties.c !== undefined && d < 38) || (cfg && f.properties.lm === 1 && d < Math.max(140, (t.w || 0) * 0.8))) {
           ids.push(i);
           mine.push(f);
         }

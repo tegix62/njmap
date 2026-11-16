@@ -122,7 +122,7 @@ def build(name):
     cell = 1.0 if dens >= 6 else 1.5
     nx, ny = int((x1 - x0) / cell) + 1, int((y1 - y0) / cell) + 1
     ix, iy = ((X - x0) / cell).astype(int), ((Y - y0) / cell).astype(int)
-    ok = (ix >= 0) & (ix < nx) & (iy >= 0) & (iy < ny) & (C != 2)
+    ok = (ix >= 0) & (ix < nx) & (iy >= 0) & (iy < ny)          # ground points too: an open field or courtyard reads as low, not as a gap
     H = np.full((ny, nx), -np.inf)
     np.maximum.at(H, (iy[ok], ix[ok]), Z[ok] - g0)
     # the footprint as a cell mask
@@ -134,8 +134,9 @@ def build(name):
     empty = ~np.isfinite(H) & inside
     if (~empty & inside).sum() < 10:
         print(f'  {name}: too few roof points'); return None
-    idx = ndimage.distance_transform_edt(empty | ~inside, return_distances=False, return_indices=True)
+    dist, idx = ndimage.distance_transform_edt(empty | ~inside, return_distances=True, return_indices=True)
     Hf = H[idx[0], idx[1]]
+    Hf[empty & (dist > 3)] = 0                                   # only small gaps are filled from their neighbours
     Hf[~inside] = 0
     Hf = np.where(np.isfinite(Hf), Hf, 0)
     Hf = ndimage.median_filter(Hf, size=3) if cell == 1.0 else Hf          # (single wild returns: a bird, a crane)
@@ -205,7 +206,11 @@ def build(name):
     parts, base = [], 0.0
     for lo_, h_ in tiers:
         m = ndimage.binary_opening(Hr >= lo_, iterations=1)
-        m = ndimage.binary_fill_holes(ndimage.binary_closing(m, iterations=2))
+        m = ndimage.binary_closing(m, iterations=2)
+        holes = ndimage.binary_fill_holes(m) & ~m                  # fill only small holes (gaps in the scan), not a stadium's open middle
+        hl, hn = ndimage.label(holes)
+        for k in range(1, hn + 1):
+            if (hl == k).sum() < 60: m[hl == k] = True
         lab_, n_ = ndimage.label(m)
         for k in range(1, n_ + 1):
             if (lab_ == k).sum() < 6: m[lab_ == k] = False       # specks
@@ -241,7 +246,8 @@ def build(name):
     for poly, b, t in parts:
         for g in (poly.geoms if hasattr(poly, 'geoms') else [poly]):
             if g.geom_type == 'Polygon' and g.area >= 2:
-                out.append({'b': round(b, 1), 't': round(t, 1), 'ring': [[round(lon + x / kx, 6), round(lat + y / ky, 6)] for x, y in list(g.exterior.coords)[:-1]]})
+                ll = lambda cs: [[round(lon + x / kx, 6), round(lat + y / ky, 6)] for x, y in list(cs)[:-1]]
+                out.append({'b': round(b, 1), 't': round(t, 1), 'ring': ll(g.exterior.coords), **({'holes': [ll(h.coords) for h in g.interiors if Polygon(h).area > 20]} if g.interiors else {})})
     print(f'  {name}: {len(X)} points ({dens:.1f}/m²), ground {g0:.1f} m, top {top:.1f} m over it, {cell} m cells, {len(out)} parts')
     return {'parts': out, 'top': round(top, 1), 'src': EPT.get(name, 'NJ_New_Jersey_SANDY_LiDAR_15 (2014)'), 'density': round(dens, 1)}
 

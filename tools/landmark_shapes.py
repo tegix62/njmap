@@ -138,7 +138,7 @@ def main():
                 add(rect(cx, cy, w * (1 - k / n), w * (1 - k / n)), base + (top - base) * k / n, base + (top - base) * (k + 1) / n)
         if recipe == 'lidar':
             for pt in LIDAR[name]['parts']:
-                add(Polygon([to_m(q) for q in pt['ring']]).buffer(0), pt['b'], pt['t'])
+                add(Polygon([to_m(q) for q in pt['ring']], [[to_m(q) for q in h] for h in pt.get('holes', [])]).buffer(0), pt['b'], pt['t'])   # (a stadium's open middle is a hole)
         elif recipe == 'cathedral':
             nave = opt['nave']
             gable(F, nave * 0.62, nave)
