@@ -179,3 +179,27 @@ export function leafSvg(id, cls = '') {
   return `<svg viewBox="0 0 100 120" class="leafsvg ${cls}" aria-hidden="true">${body}</svg>`;
 }
 export const HAS_LEAF = (id) => !!LEAVES[id] || id in NEEDLES || ['hemlock', 'red-cedar', 'white-cedar'].includes(id);
+
+/** A sketch of a twig of this tree with its leaves set on it the way they grow: in pairs ('opposite') or one at a time ('alternate'), with
+ *  a small bud where each leaf's stalk meets the twig (the bud is what marks a whole leaf, not a leaflet). `n` is how many leaves (alternate)
+ *  or pairs (opposite) to draw. Broad-leaved trees only. */
+export function twigSvg(id, { arr = 'alternate', n, cls = '' } = {}) {
+  const L = LEAVES[id];
+  if (!L) return leafSvg(id, cls);
+  const compound = ['black-locust', 'tree-of-heaven', 'shagbark-hickory', 'black-walnut'].includes(id);
+  const opp = arr === 'opposite';
+  const k = n || (opp ? 3 : compound ? 2 : 4);
+  const W = compound ? 250 : 160, X = W / 2, s = compound ? 0.92 : opp ? 0.58 : 0.52, cid = 'tw-' + id + '-' + (++uid);
+  const top = 22, bottom = 214, span = bottom - top - (compound ? 70 : 30);
+  const nodes = Array.from({ length: k }, (_, i) => bottom - 14 - (span * i) / Math.max(1, k - (opp ? 1 : compound ? 1 : 0.6)));
+  const leafAt = (x, y, a) => `<g transform="translate(${x} ${y}) rotate(${a}) scale(${s}) translate(-50 -120)"><path d="${L.d}" class="lf-fill"/>${L.v ? `<path d="${L.v}" class="lf-vein" clip-path="url(#${cid})"/>` : ''}<path d="M49 122L51 122L51.5 100L48.5 100Z" class="lf-fill"/></g>`;
+  const bud = (x, y, a) => `<ellipse cx="0" cy="-5" rx="3.6" ry="6.2" class="lf-bud" transform="translate(${x} ${y}) rotate(${a})"/>`;
+  let leaves = '', buds = '';
+  nodes.forEach((y, i) => {
+    const sides = opp ? [-1, 1] : [i % 2 ? 1 : -1];
+    const a = compound ? 64 : 54;
+    for (const sd of sides) { leaves += leafAt(X + sd * 2, y, sd * a); buds += bud(X + sd * 2.5, y - 3, sd * 22); }
+  });
+  return `<svg viewBox="0 0 ${W} 230" class="leafsvg twigsvg ${cls}" aria-hidden="true"><defs><clipPath id="${cid}" clipPathUnits="userSpaceOnUse"><path d="${L.d}"/></clipPath></defs>
+    <path d="M${X - 2.5} ${bottom + 12}L${X + 2.5} ${bottom + 12}L${X + 1} ${top}L${X - 1} ${top}Z" class="lf-stem"/>${leaves}${buds}${bud(X, top + 4, 0)}</svg>`;
+}

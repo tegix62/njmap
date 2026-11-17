@@ -3,37 +3,49 @@
 // to each group, the one thing that tells each member from the others in its group, and small drawings for every question.
 // Checked in November 2026 against each species' English Wikipedia article (and the Marcescence article for beech); a field guide is still the authority.
 
-/** The learning groups, in the order they are met. `why` is what puts a tree in the group; `tell` tells each member from the others in it. */
+/** The learning groups, in the order they are met (see PATH). `why` is what puts a tree in the group; `tell` tells each member from the others in it. */
 export const GROUPS = [
-  { id: 'maples', name: 'Maples', why: 'Leaves in pairs on the twig, each a lobed hand of a leaf; seeds in winged pairs ("helicopters").',
-    tell: { 'red-maple': 'Three main lobes, toothed edges, narrow V-shaped notches; red twigs and stalks.', 'sugar-maple': 'Five lobes, a few big teeth, rounded U-shaped notches.', 'norway-maple': 'A snapped stalk bleeds milky sap (a sugar maple’s is clear); planted along streets.' } },
-  { id: 'oaks', name: 'Oaks', why: 'Many lobes down both sides of the leaf, one at a time on the twig; acorns. Two kinds: the white oaks with rounded lobes, the red oaks with bristle-tipped points.',
+  { id: 'needles', name: 'Needles', why: 'Green all year, with needles thin as pins. Count how many grow out together from one spot on the twig.',
+    tell: { 'white-pine': 'Soft needles, five growing together.', 'pitch-pine': 'Stiff needles, three growing together; some sprout straight from the trunk.', 'hemlock': 'Short flat needles, one by one, with two white lines underneath.' } },
+  { id: 'scales', name: 'Scales and evergreen leaves', why: 'Green all winter, but not needles: tiny scales pressed flat along the twig, or (holly) a thick, spiny leaf that never drops.',
+    tell: { 'red-cedar': 'Tight scales, prickly on young shoots; blue berry-like cones; old fields.', 'white-cedar': 'Flat sprays of scales, tiny round cones; wet cedar swamps.', 'holly': 'A thick, spiny leaf that stays green; red berries on female trees.' } },
+  { id: 'maples', name: 'Maples', why: 'Leaves grow in pairs, and each leaf is shaped like a hand with pointed lobes. The seeds hang in winged pairs ("helicopters").',
+    tell: { 'red-maple': 'Three main lobes, toothed edges, narrow V-shaped notches; red twigs and leaf stalks.', 'sugar-maple': 'Five lobes, a few big teeth, rounded U-shaped notches.', 'norway-maple': 'A snapped leaf stalk bleeds milky sap (a sugar maple’s is clear); planted along streets.' } },
+  { id: 'opp-plain', name: 'In pairs, no lobes', why: 'Leaves in pairs like a maple, but each one is a plain oval with no lobes.',
+    tell: { 'dogwood': 'Veins curve to follow the leaf’s edge; four white petal-like leaves around the flowers in spring.' } },
+  { id: 'compound', name: 'Leaves made of leaflets', why: 'What looks like a row of small leaves on one stalk is a single leaf, made of leaflets. One of these big leaves at a time on the twig.',
+    tell: { 'black-locust': 'Small oval leaflets with smooth edges; thorns in pairs on young trees.', 'tree-of-heaven': 'Very long leaf; two to four small teeth at each leaflet’s base; a rank smell.', 'shagbark-hickory': 'Five leaflets, the end three biggest; grown trees peel in long shaggy strips.', 'black-walnut': '15 to 23 narrow leaflets, biggest in the middle; round green husks.' } },
+  { id: 'oaks', name: 'Oaks', why: 'A row of lobes down both sides of the leaf, one leaf at a time on the twig, and acorns. Rounded lobes: the white oak side of the family. Pointed lobes with a tiny bristle at each tip: the red oak side.',
     tell: { 'white-oak': 'Rounded lobes, no bristles; pale, flaky grey bark.', 'red-oak': 'Pointed lobes with bristle tips, cut about halfway in; bark with long shiny stripes.', 'pin-oak': 'Pointed lobes cut almost to the middle; lower branches droop down.' } },
-  { id: 'lobed', name: 'Lobed, but not oaks', why: 'Leaves one at a time and lobed, but in a few big shapes instead of an oak’s row of lobes.',
-    tell: { 'tulip-tree': 'Four lobes and a flat, notched tip: a tulip.', 'sweetgum': 'A five-pointed star; spiky gumballs.', 'sycamore': 'Big maple-like leaf, but one at a time; bark peeling in camouflage patches.', 'sassafras': 'Mittens, three-lobed ghosts and plain ovals on one tree.' } },
-  { id: 'plain', name: 'Plain leaves', why: 'One unlobed leaf at a time: here the bark is often the quickest tell.',
+  { id: 'lobed', name: 'Lobed, but not oaks', why: 'One leaf at a time, with a few big lobes: a star, a tulip, a mitten, a hand. Not an oak’s long row of lobes.',
+    tell: { 'tulip-tree': 'Four lobes and a flat, cut-off tip: the outline of a tulip.', 'sweetgum': 'A five-pointed star; spiky gumballs.', 'sycamore': 'Big hand-shaped leaf like a maple, but one at a time; bark peeling in camouflage patches.', 'sassafras': 'Mittens, three-lobed leaves and plain ovals, all on one tree.' } },
+  { id: 'plain', name: 'Plain leaves', why: 'One leaf at a time, no lobes: just an outline with small teeth or none. The leaves look alike, so the bark is often the quickest clue.',
     tell: { 'beech': 'Smooth grey bark; long cigar-shaped buds; young trees keep dry leaves in winter.', 'black-cherry': 'Dark bark in flakes like burnt potato chips; narrow, finely toothed leaves.', 'gray-birch': 'Chalky white bark with dark chevrons; triangular leaves.' } },
-  { id: 'compound', name: 'Compound leaves', why: 'Each “leaf” is really a stalk of many leaflets, one stalk at a time on the twig.',
-    tell: { 'black-locust': 'Small oval leaflets with smooth edges; thorns in pairs on young trees.', 'tree-of-heaven': 'Very long leaf; two to four small teeth at each leaflet’s base; rank smell.', 'shagbark-hickory': 'Five leaflets, the end three biggest; grown trees peel in long shaggy strips.', 'black-walnut': '15 to 23 narrow leaflets, biggest in the middle; round green husks.' } },
-  { id: 'opp-plain', name: 'Pairs, not lobed', why: 'Leaves in pairs like a maple, but whole and unlobed.',
-    tell: { 'dogwood': 'Veins curve to follow the leaf’s edge; four white bracts in spring.' } },
-  { id: 'needles', name: 'Needles', why: 'Evergreen needles: count how many come out together.',
-    tell: { 'white-pine': 'Soft needles in bundles of five.', 'pitch-pine': 'Stiff needles in bundles of three, some from the trunk itself.', 'hemlock': 'Single short flat needles with two white lines underneath.' } },
-  { id: 'scales', name: 'Scales and evergreen leaves', why: 'Evergreen, but not needles: tiny overlapping scales, or a broad leaf that stays green all winter.',
-    tell: { 'red-cedar': 'Tight scales, prickly on young shoots; blue berry-like cones; old fields.', 'white-cedar': 'Flat scaly sprays, tiny round cones; wet cedar swamps.', 'holly': 'A broad, spiny, evergreen leaf; red berries on female trees.' } },
 ];
 export const GROUP_OF = Object.fromEntries(GROUPS.flatMap((g) => Object.keys(g.tell).map((id) => [id, g.id])));
 
-/** The key: a question, its answers (each with a drawing), and where each answer leads (another question, or a group). */
+/** The way through: each skill of looking is learned just before the first group that needs it. */
+export const PATH = [{ skill: 'look' }, { group: 'needles' }, { skill: 'winter' }, { group: 'scales' }, { skill: 'pairs' }, { group: 'maples' }, { group: 'opp-plain' },
+  { skill: 'leaflets' }, { group: 'compound' }, { skill: 'lobes' }, { group: 'oaks' }, { group: 'lobed' }, { group: 'plain' }];
+
+/** The key: a question, how to check it on a real tree, the skill lesson that teaches it, its answers (each with a drawing) and where each leads. */
 export const KEY = {
-  start: { q: 'What does it have?', a: [['Needles', 'needles', { to: 'bundle' }], ['Tiny scales', 'scales', { group: 'scales' }], ['Broad leaves', 'broad', { to: 'winter' }]] },
-  bundle: { q: 'How do the needles come?', a: [['Bundles of 5', 'n5', { group: 'needles' }], ['Bundles of 3', 'n3', { group: 'needles' }], ['One by one, flat', 'n1', { group: 'needles' }]] },
-  winter: { q: 'Green all winter?', a: [['Yes, evergreen', 'ever', { group: 'scales' }], ['No, they drop', 'drop', { to: 'arr' }]] },
-  arr: { q: 'On the twig, leaves (or buds) come…', a: [['In pairs', 'opp', { to: 'opplobe' }], ['One at a time', 'alt', { to: 'cmpd' }]] },
-  opplobe: { q: 'Is the leaf lobed?', a: [['Lobed, like a hand', 'lobed', { group: 'maples' }], ['Not lobed', 'plainleaf', { group: 'opp-plain' }]] },
-  cmpd: { q: 'One blade, or many leaflets?', a: [['One blade', 'simple', { to: 'lobe' }], ['Many leaflets', 'compound', { group: 'compound' }]] },
-  lobe: { q: 'Is the leaf lobed?', a: [['Lobed', 'lobed', { to: 'oak' }], ['Not lobed', 'plainleaf', { group: 'plain' }]] },
-  oak: { q: 'What kind of lobes?', a: [['A row of lobes down both sides', 'oakleaf', { group: 'oaks' }], ['A few big ones: a star, a tulip, a mitten', 'star', { group: 'lobed' }]] },
+  start: { q: 'Needles, scales or leaves?', skill: 'look', how: 'Needles are thin as pins. Scales are tiny and pressed flat along the twig, like a braided cord. Leaves are flat and wide.',
+    a: [['Needles', 'needles', { to: 'bundle' }], ['Tiny scales', 'scales', { group: 'scales' }], ['Flat leaves', 'broad', { to: 'winter' }]] },
+  bundle: { q: 'How many needles grow from one spot?', how: 'Pull a few needles off where they join the twig: pine needles come away together in a little bundle. Count them.',
+    a: [['Five together', 'n5', { group: 'needles' }], ['Three together', 'n3', { group: 'needles' }], ['One by one, short and flat', 'n1', { group: 'needles' }]] },
+  winter: { q: 'Does it stay green all winter?', skill: 'winter', how: 'In summer, a thick, shiny, stiff leaf is the clue. Dry brown leaves hanging on in winter (young beech) do not count: they are dead.',
+    a: [['Yes, green all winter', 'ever', { group: 'scales' }], ['No, the leaves drop in fall', 'drop', { to: 'arr' }]] },
+  arr: { q: 'Where leaves join the twig: in pairs, or one at a time?', skill: 'pairs', how: 'Pick a twig away from the very tip. Find where each leaf stalk starts. Two from the same spot, facing each other, means pairs.',
+    a: [['In pairs', 'opp', { to: 'opplobe' }], ['One at a time', 'alt', { to: 'cmpd' }]] },
+  opplobe: { q: 'Does the leaf have lobes?', skill: 'lobes', how: 'Lobes are big bulges with deep notches between, like fingers. Small saw-teeth along the edge are not lobes.',
+    a: [['Lobes, like a hand', 'lobed', { group: 'maples' }], ['No lobes', 'plainleaf', { group: 'opp-plain' }]] },
+  cmpd: { q: 'One leaf, or a leaf made of leaflets?', skill: 'leaflets', how: 'Follow the stalk back to the twig. A whole leaf has a small bud where its stalk meets the twig; a leaflet does not.',
+    a: [['One leaf', 'simple', { to: 'lobe' }], ['Leaflets on one stalk', 'compound', { group: 'compound' }]] },
+  lobe: { q: 'Does the leaf have lobes?', skill: 'lobes', how: 'Lobes are big bulges with deep notches between, like fingers. Small saw-teeth along the edge are not lobes.',
+    a: [['Lobes', 'lobed', { to: 'oak' }], ['No lobes', 'plainleaf', { group: 'plain' }]] },
+  oak: { q: 'What kind of lobes?', skill: 'lobes', how: 'An oak leaf has lobes all along a middle vein, like a feather. The others have a few big lobes, like a hand or a star.',
+    a: [['A row down both sides', 'oakleaf', { group: 'oaks' }], ['A few big ones: a star, a tulip, a mitten', 'star', { group: 'lobed' }]] },
 };
 
 /** The path the key takes to a tree's group: [[question node, answer index], ...]. */

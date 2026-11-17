@@ -3875,6 +3875,7 @@ body.trees-on #tabs, body.trees-on #fabs, body.trees-on #lookFab, body.trees-on 
 .leafsvg { display: block; width: 100%; height: 100%; }
 .lf-fill { fill: #2f8f5b; } .lf-vein { fill: none; stroke: #d4ecdd; stroke-width: 1.3; stroke-linecap: round; }
 .lf-twig { stroke: #6b4a2b; stroke-width: 3; stroke-linecap: round; fill: none; }
+.lf-stem { fill: #7a5634; } .lf-bud { fill: #b5562a; stroke: #fff; stroke-width: 1.4; }
 .lf-ndl { stroke: #2f8f5b; stroke-width: 1.7; fill: none; stroke-linecap: round; } .lf-ndl.stiff { stroke-width: 2.5; } .lf-ndl.flat { stroke-width: 3.6; }
 .lf-scale { stroke: #2f8f5b; stroke-width: 5; stroke-linecap: round; fill: none; stroke-dasharray: 3 1.2; } .lf-scale.flat { stroke-width: 7; stroke-dasharray: 2 0.8; }
 .tk-sil { height: 96px; padding: 6px 0 2px; } .tk-col .tk-sil { background: #f1f6ef; border-radius: 10px; }
@@ -3888,3 +3889,48 @@ body.trees-on #tabs, body.trees-on #fabs, body.trees-on #lookFab, body.trees-on 
 .tk-silpick button:active { transform: scale(0.97); }
 .tk-silpick button.right { border-color: #2f8f5b; background: #e2f3e8; } .tk-silpick button.wrong { border-color: #d24a3a; background: #fbe6e2; }
 .tk-silpick em { position: absolute; left: 0; right: 0; bottom: 4px; font: 600 12.5px system-ui, sans-serif; font-style: normal; color: #17251c; }
+/* trees: learning to look */
+.sk-path { display: grid; gap: 6px; margin-bottom: 14px; }
+.sk-step { display: flex; align-items: center; gap: 10px; border: 2px solid transparent; border-radius: 16px; padding: 8px 12px 8px 8px; background: #fff; color: inherit; font: inherit; text-align: left; cursor: pointer; box-shadow: 0 1px 3px rgba(23, 37, 28, 0.1); transition: transform 0.12s; }
+.sk-step:active { transform: scale(0.98); }
+.sk-step.next { border-color: #2f8f5b; }
+.sk-step.later { opacity: 0.55; box-shadow: none; background: rgba(255, 255, 255, 0.55); }
+.sk-step.later .tk-thumbs img { filter: grayscale(1) blur(2px); }
+.sk-step.skill { background: #f1f8f3; }
+.sk-dot { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 700 12.5px system-ui, sans-serif; background: #e4ebe5; color: #17251c; }
+.sk-step.done .sk-dot { background: #2f8f5b; color: #fff; }
+.sk-step.next .sk-dot { background: #17251c; color: #fff; }
+.sk-ic { flex: none; width: 46px; height: 46px; display: grid; place-items: center; color: #2f8f5b; }
+.sk-ic .tk-ico { width: 40px; height: 40px; }
+.sk-step .tk-gt small { display: block; font-size: 11.5px; opacity: 0.6; }
+.sk-step .tk-gt b { font-size: 15.5px; }
+.sk-h { margin: 10px 0 0; }
+.sk-p { margin: 8px 0 12px; font-size: 17px; line-height: 1.45; }
+.sk-panelart { margin: 4px 0 8px; }
+.sk-panelart .tr-ph { margin: 0; }
+.sk-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.sk-art { margin: 0; padding: 10px 8px 8px; border-radius: 16px; background: #fff; box-shadow: 0 1px 3px rgba(23, 37, 28, 0.1); text-align: center; }
+.sk-art .leafsvg { height: 170px; }
+.sk-art figcaption { margin-top: 6px; font: 650 14px system-ui, sans-serif; }
+.sk-three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.sk-three div { display: grid; justify-items: center; gap: 4px; padding: 12px 6px; border-radius: 16px; background: #fff; color: #2f8f5b; box-shadow: 0 1px 3px rgba(23, 37, 28, 0.1); }
+.sk-three b { color: #17251c; font-size: 14px; } .sk-three .tk-ico { width: 54px; height: 54px; }
+.sk-nav { display: flex; gap: 8px; align-items: stretch; margin-top: 6px; }
+.sk-nav .tr-go { flex: 1; margin-top: 0; }
+.sk-nav .sk-prev { flex: none; width: 96px; margin: 0; display: grid; place-items: center; }
+.sk-big { height: min(36vh, 280px); padding: 10px; border-radius: 20px; background: #fff; box-shadow: 0 1px 3px rgba(23, 37, 28, 0.1); }
+.sk-cap { margin: 6px 2px 0; font-size: 12.5px; opacity: 0.6; }
+.sk-tiles.tall button { height: 210px; }
+.sk-tiles img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
+.sk-tiles button { padding: 6px; }
+.sk-how { margin: -2px 0 10px; font-size: 14.5px; line-height: 1.4; padding: 10px 12px; border-radius: 14px; background: #f1f8f3; }
+.sk-link { border: 0; background: none; padding: 0; color: #2f8f5b; font: 700 14.5px system-ui, sans-serif; text-decoration: underline; cursor: pointer; }
+.sk-hint { margin: 8px 2px 0; font-size: 14px; line-height: 1.4; }
+.sk-hint summary { cursor: pointer; color: #2f8f5b; font-weight: 700; }
+.sk-about { opacity: 0.65; font-size: 13.5px; }
+.sk-twigchip { width: 34px; height: 46px; padding: 0 !important; background: none !important; }
+.sk-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sk-tiles button { height: 120px; }
+.sk-tiles.tall button { height: 200px; }
+.sk-panelart .tr-ph img { max-height: 34vh; object-fit: cover; }
+.sk-pair .twigsvg { height: 170px; }
