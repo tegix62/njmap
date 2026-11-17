@@ -1,0 +1,13 @@
+{
+ "red-maple": [[5,"leaf"],[42,"bark"],[6,"form"],[3,"flower"],[9,"fall"],[1,"twig"],[21,"fruit"]],
+ "sugar-maple": [[35,"leaf"],[40,"bark"],[46,"form"],[2,"fall"],[5,"fruit"]],
+ "norway-maple": [[42,"leaf"],[47,"bark"],[36,"form"],[3,"fall"],[0,"flower"],[14,"fruit"]],
+ "white-oak": [[43,"leaf"],[33,"bark"],[4,"form"],[0,"fall"],[9,"leaf"]],
+ "red-oak": [[6,"leaf"],[37,"bark"],[11,"form"],[31,"fruit"],[10,"fall"]],
+ "pin-oak": [[17,"leaf"],[46,"bark"],[2,"form"],[39,"fruit"],[15,"fall"],[35,"twig"]],
+ "tulip-tree": [[14,"leaf"],[37,"bark"],[5,"form"],[33,"flower"],[2,"fall"],[20,"twig"],[6,"fruit"]],
+ "sweetgum": [[28,"leaf"],[3,"bark"],[18,"form"],[16,"fruit"],[45,"fall"],[36,"twig"]],
+ "sycamore": [[13,"leaf"],[16,"bark"],[9,"form"],[27,"fruit"],[2,"bark"]],
+ "beech": [[14,"leaf"],[2,"bark"],[11,"form"],[34,"twig"],[44,"fall"]],
+ "sassafras": [[21,"leaf"],[10,"bark"],[45,"form"],[15,"fall"],[0,"flower"],[1,"fall"]]
+}
