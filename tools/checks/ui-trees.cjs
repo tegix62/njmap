@@ -7,6 +7,8 @@ const { chromium } = require('playwright'); const fs = require('fs');
   const bad = []; page.on('response', (r) => { if (r.status() >= 400 && /img\/trees|trees\.json/.test(r.url())) bad.push(r.url()); });
   await page.goto('http://localhost:8077/index.html?debug=1&region=nj'); await page.waitForSelector('#welcome [data-entry]');
   await page.screenshot({ path: `${out}/0-home.png` });
+  // as someone who has passed the lessons of looking (ui-trees-learn.cjs covers those): Today goes straight to meeting trees
+  await page.evaluate(() => { const v = {}; for (const k of ['look', 'winter', 'pairs', 'leaflets', 'lobes']) v[k] = { done: true, best: 6 }; localStorage.setItem('njtf.trees.skills', JSON.stringify(v)); });
   await page.click('[data-entry=trees]'); await page.waitForSelector('#trees .tr-today'); await page.waitForTimeout(800);
   await page.screenshot({ path: `${out}/1-hub.png` });
   await page.click('[data-t=today]'); await page.waitForTimeout(500);
@@ -14,9 +16,10 @@ const { chromium } = require('playwright'); const fs = require('fs');
   for (; steps < 40; steps++) {
     if (await page.locator('.tr-done').count()) break;
     if (await page.locator('.tr-kick', { hasText: 'New group' }).count()) { await page.waitForTimeout(500); await page.screenshot({ path: `${out}/2-group.png` }); await page.click('[data-t=next]'); await page.waitForTimeout(250); continue; }
+    if (await page.locator('.sk-nav').count()) { await page.locator('.sk-nav [data-t=lstep]:not(.sk-prev), .sk-nav [data-t=next]').first().click(); await page.waitForTimeout(200); continue; }
     if (await page.locator('.tr-kick', { hasText: 'New tree' }).count()) { meets++; if (meets === 1) { await page.waitForTimeout(600); await page.screenshot({ path: `${out}/2-meet.png` }); } await page.click('[data-t=next]'); await page.waitForTimeout(250); continue; }
     const ask = await page.locator('.tr-ask').innerText();
-    const kind = /has this leaf/.test(ask) ? 'shape' : /leaf of the/.test(ask) ? 'shapepick' : /Which tree/.test(ask) ? 'photo' : /^Tap/.test(ask) ? 'pick' : /same kind/.test(ask) ? 'same' : /Which group/.test(ask) ? 'group' : /has this leaf/.test(ask) ? 'shape' : /leaf of the/.test(ask) ? 'shapepick' : 'key';
+    const kind = (await page.locator('.tr-kick', { hasText: 'Learn to look' }).count()) ? 'drill' : /has this leaf/.test(ask) ? 'shape' : /leaf of the/.test(ask) ? 'shapepick' : /Which tree/.test(ask) ? 'photo' : /^Tap/.test(ask) ? 'pick' : /same kind/.test(ask) ? 'same' : /Which group/.test(ask) ? 'group' : /has this leaf/.test(ask) ? 'shape' : /leaf of the/.test(ask) ? 'shapepick' : 'key';
     kinds[kind] = (kinds[kind] || 0) + 1;
     if (kinds[kind] === 1) { await page.waitForTimeout(500); await page.screenshot({ path: `${out}/3-${kind}.png` }); }
     await page.locator('[data-t=ans]').nth(steps % 2).click(); await page.waitForTimeout(250);
