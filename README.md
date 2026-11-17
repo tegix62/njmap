@@ -612,7 +612,7 @@ A third entry on the home page (Goblin mode is now a small link under it). The s
 - **Each tree from several sides**: named from a photo (leaf, bark, whole tree, fruit, flower, autumn, twig: a different side than last time), picked out of four photos, "are these two photos the same tree?" (a leaf against bark or fruit), and one leaf fact (opposite or alternate; simple or compound). Wrong answers are its look-alikes first.
 - **Field guide** and **Where it has been seen**: the screen slides away and the map shows the sightings.
 - **Data** (`tools/build_trees.py`, `data/trees.json`, `img/trees/`): research-grade iNaturalist observations in New Jersey with openly licensed photos (credit and licence under each photo); for each tree I looked at a numbered contact sheet of 48 candidates and chose a photo per side by eye (`tools/tree_picks.json`). Sightings are the 200 best-documented per tree, so the map shows where people photograph it, not its true range.
-- **Not verified**: the list of trees, the one-line tells and the leaf facts are my general knowledge, not read from a source for this build. The app says so on its front page. Check them against a field guide; `FACTS` in the build script is one table.
+- **Checked** (see *Trees: the facts checked* below): the tells and leaf facts were read against each species' Wikipedia article in November 2026.
 - 24 trees, 131 photos: three maples, three oaks, tulip tree, sweetgum, sycamore, beech, sassafras, black cherry, white and pitch pine, red cedar, dogwood, gray birch, black locust, tree of heaven, holly, Atlantic white cedar, hemlock, shagbark hickory, black walnut. A few picks are weak and worth replacing (dogwood and holly bark, tree-of-heaven bark, black walnut whole tree). Check: `tools/checks/ui-trees.cjs`.
 
 ### Trees, rebuilt around how people learn them (`js/treekey.js`)
@@ -622,5 +622,22 @@ People learn trees by narrowing (the yes/no questions every field guide's key is
 - **Identify a tree**: the key, one question at a time, each answer drawn (needles in fives or threes, scales, pairs or one at a time on the twig, one blade or many leaflets, lobed or not, an oak's row of lobes or a few big ones), with the trees it still leaves; it ends on the group's side-by-side card.
 - **Today meets a whole group**: its card first (leaf and bark of every member side by side, with the tell for each), then each tree, then questions. Wrong answers come from the same group first.
 - **Two new questions**: a step of the key ("Is the leaf lobed?" on a photo of the tree, answered with the drawings) and "Which group is this tree in?". Each tree's card shows its path through the key.
-- The groups, the key and the tells are general knowledge, not checked against a source: a field guide is the authority.
+- The groups, the key and the tells were checked against Wikipedia in November 2026 (below); a field guide is still the authority.
 - **Leaf silhouettes** (`js/treeleaf.js`): every tree's typical leaf drawn in code in one clean style (built from lobes, leaflets, needles and scale sprays, veins clipped to the leaf), so the differences that matter read side by side: three lobes or five, toothed or smooth, rounded or bristle-tipped, five leaflets or fifteen, needles in fives or threes. They lead each tree's column on the group card, sit beside the tell on the tree's card, fill the key's "still possible" list and the field guide, and drive two new questions ("Which tree has this leaf?", "Tap the leaf of …"). Diagrams of the typical leaf, from general knowledge: check them against a field guide.
+
+
+### Trees: the facts checked
+
+Every tell, leaf arrangement, simple/compound call, group tell, key path and leaf silhouette was read against the species' English Wikipedia article (raw text, November 2026; beech's winter leaves against *Marcescence*). Each tree in `data/trees.json` now carries `checked.src` (the article) and the tree's page links to it. What changed:
+- **Black walnut**: "fifteen or so leaflets" → 15 to 23, the biggest in the middle; "tennis-ball husks" dropped (no size in the source) for "round green husks with a spicy smell". Its silhouette now has 17 leaflets.
+- **Black locust**: the paired thorns are mostly on young trees and sprouts; mature trees often lack them. Leaflet count 9 to 19 added.
+- **Tree of heaven**: "a notch or two" at the leaflet base → two to four small teeth, each with a gland; the smell is likened to rotting peanuts or cashews.
+- **Holly** and **red cedar**: berries / berry-like cones only on female trees (both are dioecious). Holly bark is light grey with small warty bumps, not plain smooth. Red cedar is prickly only on young shoots; grown foliage is tight scales.
+- **Norway maple**: "wider than long" removed (not in the source); the tell is now the milky sap against sugar maple's clear sap. Added: New Jersey has banned its sale.
+- **Red maple**: three to five lobes (three main, often two small at the base); the buds are greenish to reddish, so "red buds" was dropped.
+- **Sugar maple**: lobes carry a few big teeth, so "smooth edges" became "smooth edges between a few big teeth".
+- **Shagbark hickory**: shaggy bark only on grown trees; young ones are smooth.
+- **Beech**: winter leaves hang on mostly on young trees.
+- **White oak** silhouette: 7 lobes (the source: seven to nine, usually seven), was 9.
+- Confirmed as written: the other trees' tells, every opposite/alternate and simple/compound call, all eight groups and every key path (maples and dogwood opposite; sweetgum and sycamore alternate; white pine 5 needles, pitch pine 3 with trunk sprouts, hemlock two white bands, gray birch's black chevrons, sassafras' three leaf shapes, tulip tree's four lobes and cut-off tip, pin oak's drooping lower branches, red oak's striped bark).
+- **Not in the source, kept and flagged on the tree's page**: dogwood's veins following the edge and blocky bark; black cherry's "burnt potato chips" (the article says "very broken, dark grey to black"). Both are field-guide staples.

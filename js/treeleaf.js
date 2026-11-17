@@ -1,6 +1,6 @@
 // Leaf silhouettes for the 24 trees, drawn in code: solid shapes in one style, so the differences that matter (three lobes or five, toothed or
 // smooth, V or U notches, rounded or bristle-tipped lobes, five leaflets or fifteen, needles in fives or threes) read at a glance, side by side.
-// They are diagrams of the typical leaf, not portraits of one: drawn from general knowledge of the shapes, to be checked against a field guide.
+// They are diagrams of the typical leaf, not portraits of one: lobe and leaflet counts checked against each species' Wikipedia article (November 2026); a field guide is still the authority.
 // viewBox 0 0 100 120; the stalk at the bottom, the tip up.
 
 const P = (pts) => 'M' + pts.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join('L') + 'Z';
@@ -118,7 +118,7 @@ const LEAVES = {
   'sugar-maple': hand({ body: 20, lobes: [[0, 50, 17], [-52, 46, 16], [52, 46, 16], [-108, 30, 12], [108, 30, 12]], shape: 'elliptic' }),
   'norway-maple': hand({ body: 22, cy: 64, lobes: [[0, 42, 18, 'coarse'], [-56, 46, 18, 'coarse'], [56, 46, 18, 'coarse'], [-112, 36, 14], [112, 36, 14]], shape: 'elliptic' }),
   // oaks: lobes down both sides. White: rounded lobes. Red: pointed, bristle-tipped, cut halfway. Pin: pointed, cut nearly to the midrib.
-  'white-oak': oak({ pairs: 4, body: 11, lobeLen: 30, lobeW: 9, shape: 'oval', angle: 58 }),
+  'white-oak': oak({ pairs: 3, body: 11, lobeLen: 30, lobeW: 9, shape: 'oval', angle: 58 }),
   'red-oak': oak({ pairs: 4, body: 14, lobeLen: 28, lobeW: 8, shape: 'lance', bristle: true, angle: 54 }),
   'pin-oak': oak({ pairs: 3, body: 6, lobeLen: 38, lobeW: 6, shape: 'lance', bristle: true, angle: 62 }),
   // lobed but not oaks
@@ -134,7 +134,7 @@ const LEAVES = {
   'black-locust': { d: compound({ pairs: 5, leaf: { shape: 'oval', w: 7 }, size: 0.75 }) + stalk(), v: VEIN.mid(118, 8) },
   'tree-of-heaven': { d: compound({ pairs: 6, leaf: { shape: 'lance', w: 6 }, size: 0.95, top: 2 }) + stalk(), v: VEIN.mid(118, 4) },
   'shagbark-hickory': { d: lobe([50, 96], -62, 30, 9, { shape: 'elliptic', edge: 'fine' }) + lobe([50, 96], 62, 30, 9, { shape: 'elliptic', edge: 'fine' }) + lobe([50, 62], -55, 42, 12, { shape: 'elliptic', edge: 'fine' }) + lobe([50, 62], 55, 42, 12, { shape: 'elliptic', edge: 'fine' }) + lobe([50, 56], 0, 52, 13, { shape: 'elliptic', edge: 'fine' }) + stalk(120, 56), v: VEIN.mid(118, 8) },
-  'black-walnut': { d: compound({ pairs: 7, leaf: { shape: 'lance', edge: 'fine', w: 5 }, size: 0.85, top: 4 }) + stalk(), v: VEIN.mid(118, 6) },
+  'black-walnut': { d: compound({ pairs: 8, leaf: { shape: 'lance', edge: 'fine', w: 5 }, size: 0.8, top: 4 }) + stalk(), v: VEIN.mid(118, 6) },
   // pairs, not lobed
   'dogwood': { d: simple({ shape: 'oval', w: 25, tip: 14 }), v: VEIN.mid(108, 18) + [0, 1, 2, 3].map((i) => { const y = 98 - i * 17; return [-1, 1].map((sd) => `M50 ${y}C${50 + sd * 14} ${y - 4} ${50 + sd * 20} ${y - 20} ${50 + sd * (17 - i * 3)} ${y - 38}`).join(''); }).join('') },
   // evergreen broad leaf

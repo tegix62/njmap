@@ -7,7 +7,8 @@ Stage 2 (sheets):  python3 tools/build_trees.py sheets    one numbered contact s
 Stage 3 (build):   python3 tools/build_trees.py build     the photos chosen in PICKS (tools/tree_picks.json: slug -> [[candidate number, context], ...]),
                                                           downloaded at medium size, with credits; where each tree was seen (points and by county)
 
-The list of trees and the one-line "tell" for each are mine (from general knowledge: check them against a field guide); names, photos, credits,
+The list of trees and the one-line "tell" for each are mine, checked in November 2026 against each species' English Wikipedia article
+(CHECKED below notes what the article does not state); names, photos, credits,
 counts and locations are iNaturalist's. Photos keep their licence and credit (shown under each photo in the app).
 """
 import json, math, os, sys, time, urllib.parse, urllib.request
@@ -104,33 +105,38 @@ def sheets():
         print('sheet', slug, len(cs), flush=True)
 
 
-# What I say about each tree, from general knowledge (NOT from a source read for this build): check against a field guide. `arr` and `leaf`
+# What I say about each tree, checked against its English Wikipedia article (November 2026; see CHECKED). `arr` and `leaf`
 # feed two-choice questions; `tell` is the line shown after every answer; `like` are the trees it is confused with (the wrong answers).
 FACTS = {
-    'red-maple': ('opposite', 'simple', 'Three main lobes with toothed edges and sharp V-shaped notches; twigs, buds and leaf stalks are red.', ['sugar-maple', 'norway-maple', 'sweetgum']),
-    'sugar-maple': ('opposite', 'simple', 'Five lobes with smooth edges and rounded U-shaped notches: the leaf on Canada’s flag.', ['norway-maple', 'red-maple', 'sycamore']),
-    'norway-maple': ('opposite', 'simple', 'Like sugar maple but wider than long; a snapped leaf stalk bleeds milky sap. A planted street tree that spreads into woods.', ['sugar-maple', 'red-maple', 'sycamore']),
+    'red-maple': ('opposite', 'simple', 'Three main lobes (often two small ones at the base) with toothed edges and narrow V-shaped notches; leaf stalks, twigs and flowers are red.', ['sugar-maple', 'norway-maple', 'sweetgum']),
+    'sugar-maple': ('opposite', 'simple', 'Five lobes with a few big teeth and smooth edges between them, and rounded U-shaped notches; clear sap in the leaf stalk. A stylised sugar maple leaf is on Canada’s flag.', ['norway-maple', 'red-maple', 'sycamore']),
+    'norway-maple': ('opposite', 'simple', 'Like sugar maple, but a snapped leaf stalk bleeds milky white sap (sugar maple’s is clear). A planted street tree that spreads into woods; New Jersey has banned its sale.', ['sugar-maple', 'red-maple', 'sycamore']),
     'white-oak': ('alternate', 'simple', 'Rounded, finger-like lobes with no bristle tips; pale grey bark in loose plates.', ['red-oak', 'pin-oak', 'sassafras']),
     'red-oak': ('alternate', 'simple', 'Pointed lobes ending in bristle tips; bark with long, flat, shiny stripes like ski tracks.', ['pin-oak', 'white-oak', 'black-cherry']),
     'pin-oak': ('alternate', 'simple', 'Deep U-shaped cuts nearly to the midrib, bristle-tipped; the lowest branches droop toward the ground.', ['red-oak', 'white-oak', 'sweetgum']),
     'tulip-tree': ('alternate', 'simple', 'A four-lobed leaf with a notched, cut-off tip, shaped like a tulip; a very tall, straight trunk.', ['sycamore', 'sweetgum', 'sassafras']),
     'sweetgum': ('alternate', 'simple', 'A five-pointed star of a leaf; spiky gumball seed pods on the tree and under it.', ['red-maple', 'sycamore', 'tulip-tree']),
     'sycamore': ('alternate', 'simple', 'Bark that flakes off in patches to cream and olive, like camouflage; big maple-like leaves; likes water.', ['tulip-tree', 'sweetgum', 'norway-maple']),
-    'beech': ('alternate', 'simple', 'Smooth grey bark like elephant skin; long, pointed, cigar-shaped buds; papery tan leaves hang on through winter.', ['gray-birch', 'black-cherry', 'dogwood']),
-    'sassafras': ('alternate', 'simple', 'Three leaf shapes on one tree: an oval, a mitten and a three-lobed ghost; spicy smell when crushed.', ['tulip-tree', 'white-oak', 'dogwood']),
-    'black-cherry': ('alternate', 'simple', 'Old bark in dark flakes like burnt potato chips; narrow, finely toothed leaves.', ['beech', 'gray-birch', 'red-oak']),
+    'beech': ('alternate', 'simple', 'Smooth silver-grey bark like elephant skin; long, thin, cigar-shaped buds; dry tan leaves often hang on through winter, mostly on young trees.', ['gray-birch', 'black-cherry', 'dogwood']),
+    'sassafras': ('alternate', 'simple', 'Three leaf shapes on one tree, even one branch: a plain oval, a two-lobed mitten and a three-lobed ghost; every part smells spicy.', ['tulip-tree', 'white-oak', 'dogwood']),
+    'black-cherry': ('alternate', 'simple', 'Old bark dark and broken into flakes like burnt potato chips (young bark is smooth and banded, like a birch); narrow, finely toothed, shiny leaves.', ['beech', 'gray-birch', 'red-oak']),
     'white-pine': ('needles', 'needles', 'Soft needles in bundles of five; branches in whorls, like the spokes of a wheel.', ['pitch-pine', 'hemlock', 'red-cedar']),
     'pitch-pine': ('needles', 'needles', 'Stiff needles in bundles of three, some sprouting straight from the trunk: the pine of the Pine Barrens.', ['white-pine', 'red-cedar', 'white-cedar']),
-    'red-cedar': ('scales', 'scales', 'Prickly, scaly evergreen foliage; blue berry-like cones; shreddy red-brown bark; old fields and roadsides.', ['white-cedar', 'hemlock', 'pitch-pine']),
+    'red-cedar': ('scales', 'scales', 'Tight scaly foliage, prickly needles on young shoots; blue berry-like cones on female trees; bark peeling in narrow red-brown strips; one of the first trees in old fields.', ['white-cedar', 'hemlock', 'pitch-pine']),
     'dogwood': ('opposite', 'simple', 'Leaf veins curve to follow the leaf edge; four white bracts like petals in spring; bark in small square blocks.', ['black-cherry', 'sassafras', 'beech']),
     'gray-birch': ('alternate', 'simple', 'Chalky white bark that barely peels, with a dark chevron under each branch; triangular, long-pointed leaves.', ['beech', 'black-cherry', 'sycamore']),
-    'black-locust': ('alternate', 'compound', 'Compound leaves of small oval leaflets; paired thorns at the leaf bases; deeply furrowed, ropy bark.', ['tree-of-heaven', 'black-walnut', 'shagbark-hickory']),
-    'tree-of-heaven': ('alternate', 'compound', 'Very long compound leaves, each leaflet with a notch or two near its base; a rank smell when crushed. Invasive.', ['black-walnut', 'black-locust', 'shagbark-hickory']),
-    'holly': ('alternate', 'simple', 'Evergreen leaves with spines; red berries in winter; smooth grey bark.', ['red-cedar', 'beech', 'dogwood']),
+    'black-locust': ('alternate', 'compound', 'Compound leaves of 9 to 19 small oval leaflets; thorns in pairs at the leaf bases, mostly on young trees and sprouts; deeply furrowed, ropy bark.', ['tree-of-heaven', 'black-walnut', 'shagbark-hickory']),
+    'tree-of-heaven': ('alternate', 'compound', 'Very long compound leaves; each leaflet has two to four small teeth at its base, each with a gland; a rank smell, like rotting peanuts, when crushed. Invasive.', ['black-walnut', 'black-locust', 'shagbark-hickory']),
+    'holly': ('alternate', 'simple', 'Evergreen leaves with spines; red berries in winter, on female trees only; light grey bark, rough with small warty bumps.', ['red-cedar', 'beech', 'dogwood']),
     'white-cedar': ('scales', 'scales', 'Flat, scaly sprays and tiny round cones; straight trunks crowded in the dark cedar swamps of the Pine Barrens.', ['red-cedar', 'hemlock', 'pitch-pine']),
     'hemlock': ('needles', 'needles', 'Short, flat needles with two white lines underneath; tiny cones; shady ravines in the north.', ['white-pine', 'red-cedar', 'white-cedar']),
-    'shagbark-hickory': ('alternate', 'compound', 'Bark peeling in long shaggy strips; a compound leaf of five leaflets, the end three the largest.', ['black-walnut', 'black-locust', 'tree-of-heaven']),
-    'black-walnut': ('alternate', 'compound', 'Long compound leaves of fifteen or so leaflets; green husks the size of tennis balls; dark bark in diamond furrows.', ['tree-of-heaven', 'shagbark-hickory', 'black-locust']),
+    'shagbark-hickory': ('alternate', 'compound', 'Bark peeling in long shaggy strips, on grown trees (young ones are smooth); a compound leaf of five leaflets, the end three much the largest.', ['black-walnut', 'black-locust', 'tree-of-heaven']),
+    'black-walnut': ('alternate', 'compound', 'Long compound leaves of 15 to 23 narrow, toothed leaflets, the biggest in the middle; round green husks with a spicy smell; dark bark in diamond furrows.', ['tree-of-heaven', 'shagbark-hickory', 'black-locust']),
+}
+# Claims kept although the Wikipedia article does not state them (field-guide staples); shown on the tree's page.
+CHECKED = {
+    'dogwood': 'Veins curving to follow the edge, and bark in small square blocks, are field-guide staples not stated in the article.',
+    'black-cherry': '“Burnt potato chips” is the usual field-guide picture; the article says only “very broken, dark grey to black”.',
 }
 CONTEXTS = ['leaf', 'bark', 'form', 'fruit', 'flower', 'fall', 'twig']
 
@@ -177,9 +183,9 @@ def build():
         arr, leaf, tell, like = FACTS[slug]
         name = rec['common'] or sci
         out.append({'id': slug, 'name': name[0].upper() + name[1:], 'sci': sci, 'count': rec['count'], 'arr': arr, 'leaf': leaf, 'tell': tell, 'like': [x for x in like if x in picks],
-                    'photos': photos, 'pts': pts, 'counties': dict(sorted(counties.items(), key=lambda kv: -kv[1]))})
+                    'photos': photos, 'checked': {'src': 'https://en.wikipedia.org/wiki/' + sci.replace(' ', '_'), 'on': '2026-11', **({'note': CHECKED[slug]} if slug in CHECKED else {})}, 'pts': pts, 'counties': dict(sorted(counties.items(), key=lambda kv: -kv[1]))})
         print(f"{slug:18s} {len(photos)} photos, {len(pts)} points, top counties {list(out[-1]['counties'])[:3]}")
-    json.dump({'v': 1, 'source': 'iNaturalist research-grade observations in New Jersey (photos under their own CC licences, credited); the tells and leaf facts are unverified general knowledge', 'trees': out},
+    json.dump({'v': 1, 'source': 'iNaturalist research-grade observations in New Jersey (photos under their own CC licences, credited); tells and leaf facts checked against each species’ English Wikipedia article in November 2026 (see checked.src)', 'trees': out},
               open(os.path.join(ROOT, 'data/trees.json'), 'w'), ensure_ascii=False, separators=(',', ':'))
     print(len(out), 'trees;', sum(len(t['photos']) for t in out), 'photos')
 

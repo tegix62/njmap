@@ -1,7 +1,7 @@
 // Trees of New Jersey: the app's way of teaching places, pointed at trees. A few minutes a day; a tree is met once (its photos and its tell),
 // then comes back spaced out over days, each time from a different side: its leaf, its bark, its shape, its fruit; named from a photo, picked
 // out of four photos, matched across two photos, and one fact about its leaves. Where it has been seen in New Jersey is shown on the map.
-// Data: data/trees.json (tools/build_trees.py: iNaturalist photos and sightings; the tells are unverified general knowledge, see the README).
+// Data: data/trees.json (tools/build_trees.py: iNaturalist photos and sightings; the tells were checked against Wikipedia in November 2026, see the README).
 import { GROUPS, GROUP_OF, KEY, ICON, pathTo, treesUnder } from './treekey.js';
 import { leafSvg } from './treeleaf.js';
 const DAYS = [0, 1, 3, 7, 16, 35];
@@ -100,7 +100,7 @@ export function initTrees(ctx) {
       <h4>The groups</h4>
       <div class="tk-groups">${GROUPS.map((g) => { const ids = Object.keys(g.tell), k = ids.filter((id) => m.includes(id)).length; return `<button class="tk-grp${k ? '' : ' new'}" data-t="groupcard" data-g="${g.id}"><span class="tk-thumbs">${ids.map((id) => `<img src="${esc(photoOf(by.get(id), ['leaf']).f)}" alt="" loading="lazy">`).join('')}</span><span class="tk-gt"><b>${esc(g.name)}</b><small>${k ? `${k} of ${ids.length} met` : 'not met yet'}</small></span></button>`; }).join('')}</div>
       <button class="tr-card wide" data-t="guide"><b>Field guide</b><small>every tree, its photos and where it grows</small></button>
-      <p class="tr-note">Photos and sightings: iNaturalist, each under its own licence. The identifying tips are general knowledge and not yet checked against a field guide: if your book disagrees, the book is right.</p>`);
+      <p class="tr-note">Photos and sightings: iNaturalist, each under its own licence. The identifying tips were checked against each tree’s Wikipedia article (November 2026); if your field guide disagrees, trust the book.</p>`);
   }
 
   /** A tree's page: all its photos, its tell, and where it has been seen. */
@@ -113,6 +113,7 @@ export function initTrees(ctx) {
       <button class="tk-ingroup" data-t="groupcard" data-g="${groupOf(t.id).id}"><small>One of the <b>${esc(groupOf(t.id).name.toLowerCase())}</b>: ${esc(groupOf(t.id).tell[t.id])}</small></button>
       ${pathHtml(t.id)}
       <div class="tr-facts">${t.arr === 'opposite' || t.arr === 'alternate' ? `<span>Leaves <b>${t.arr}</b> on the twig</span><span><b>${t.leaf === 'compound' ? 'Compound' : 'Simple'}</b> leaf</span>` : `<span>An evergreen with <b>${t.arr}</b></span>`}</div>
+      ${t.checked ? `<p class="tr-src">Checked against <a href="${esc(t.checked.src)}" target="_blank" rel="noopener">Wikipedia</a>${t.checked.note ? `. ${esc(t.checked.note)}` : ''}</p>` : ''}
       <button class="tr-where" data-t="where" data-id="${t.id}"><b>Where it has been seen</b><small>${top3.length ? `Most in ${esc(top3.join(', '))}` : ''} · show on the map</small></button>
       ${opts.meet ? '<button class="tr-go" data-t="next">Got it</button>' : ''}`);
     q = { kind: 'card', t, opts };
