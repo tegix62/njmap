@@ -1,0 +1,11 @@
+{
+ "sugar-maple": [8, 180, {"trim": 35}],
+ "white-oak": [25, 0],
+ "red-oak": [212, 0],
+ "pin-oak": [167, 0],
+ "tulip-tree": [41, 0],
+ "sweetgum": [283, 0],
+ "sycamore": [335, 0],
+ "black-cherry": [710, 0],
+ "gray-birch": [44, 0, {"smooth": 3}]
+}

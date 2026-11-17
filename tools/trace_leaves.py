@@ -7,7 +7,7 @@ Stage 1 (score):  python3 tools/trace_leaves.py score   every photo of every bro
                                                         a background that is not green
 Stage 2 (sheet):  python3 tools/trace_leaves.py sheet   a numbered contact sheet per tree of the best 24, each with its cut-out outline drawn in red,
                                                         to choose from by eye (/tmp/leaves/sheet-<slug>.jpg)
-Stage 3 (trace):  python3 tools/trace_leaves.py trace   the picks in tools/leaf_picks.json (slug -> [candidate, turn in degrees]), downloaded at
+Stage 3 (trace):  python3 tools/trace_leaves.py trace   the picks in tools/leaf_picks.json (slug -> [candidate, turn in degrees, {seed, tol, trim, smooth}]), downloaded at
                                                         medium size, cut out again, smoothed, turned stalk-down and written as SVG paths to
                                                         data/leafoutlines.json and js/treeoutlines.js (viewBox 0 0 100 120, stalk at the bottom), with the photo's credit
 """
@@ -55,6 +55,66 @@ def leaf_mask(im):
     info = {'frac': area / (W * H), 'share': area / max(1, green.sum()), 'edge': int(x <= 1 or y <= 1 or x + w >= W - 1 or y + hh >= H - 1),
             'bg_green': float(green[comp == 0].mean()) if (comp == 0).any() else 1.0}
     return comp, info
+
+
+def leaf_mask_seeded(im, seed=(0.5, 0.5), tol=14, trim=50):
+    """For tracing: the leaf's own colour, learned from around the seed point (the middle of the photo unless told), the piece of that
+    colour that holds the seed, holes filled, thin stems and stalks trimmed off (`trim`: opening kernel = width / trim)."""
+    a = np.asarray(im); H, W = a.shape[:2]
+    hsv = cv2.cvtColor(a, cv2.COLOR_RGB2HSV).astype(int)
+    cx, cy = int(seed[0] * W), int(seed[1] * H); r = max(4, W // 25)
+    patch = hsv[max(0, cy - r):cy + r, max(0, cx - r):cx + r].reshape(-1, 3)
+    patch = patch[patch[:, 1] > 40]
+    if not len(patch):
+        return None
+    hm, sm = np.median(patch[:, 0]), np.median(patch[:, 1])
+    m = ((np.abs(hsv[..., 0] - hm) <= tol) & (hsv[..., 1] >= max(30, sm * 0.45)) & (hsv[..., 2] >= 30)).astype(np.uint8) * 255
+    m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+    k = max(3, W // trim) | 1
+    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+    n, lab = cv2.connectedComponents(m, 8)
+    i = lab[cy, cx]
+    if i == 0:
+        box = lab[max(0, cy - r):cy + r, max(0, cx - r):cx + r]; vals = box[box > 0]
+        if not len(vals):
+            return None
+        i = np.bincount(vals).argmax()
+    comp = (lab == i).astype(np.uint8) * 255
+    ff = comp.copy(); cv2.floodFill(ff, np.zeros((H + 2, W + 2), np.uint8), (0, 0), 255)
+    return comp | cv2.bitwise_not(ff)
+
+
+def leaf_mask_gc(im, trim=50, iters=6):
+    """For tracing: the rough cut-out made on a small copy (the one that scored the photo) refined on the full photo with GrabCut,
+    which learns the leaf and the background from it; then thin stems trimmed and holes filled."""
+    W, H = im.size
+    sm = im.copy(); sm.thumbnail((240, 240))
+    m0, _ = leaf_mask(sm)
+    if m0 is None:
+        return None
+    m0 = cv2.resize(m0, (W, H), interpolation=cv2.INTER_NEAREST)
+    k = max(3, W // 60)
+    sure = cv2.erode(m0, np.ones((k, k), np.uint8)); maybe = cv2.dilate(m0, np.ones((k * 2, k * 2), np.uint8))
+    g = np.full((H, W), cv2.GC_BGD, np.uint8); g[maybe > 0] = cv2.GC_PR_BGD; g[m0 > 0] = cv2.GC_PR_FGD; g[sure > 0] = cv2.GC_FGD
+    bg, fg = np.zeros((1, 65), np.float64), np.zeros((1, 65), np.float64)
+    cv2.grabCut(cv2.cvtColor(np.asarray(im), cv2.COLOR_RGB2BGR), g, None, bg, fg, iters, cv2.GC_INIT_WITH_MASK)
+    m = np.where((g == cv2.GC_FGD) | (g == cv2.GC_PR_FGD), 255, 0).astype(np.uint8)
+    t = max(3, W // trim) | 1
+    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (t, t)))
+    n, lab, st, _ = cv2.connectedComponentsWithStats(m, 8)
+    if n < 2:
+        return None
+    comp = (lab == 1 + int(np.argmax(st[1:, cv2.CC_STAT_AREA]))).astype(np.uint8) * 255
+    ff = comp.copy(); cv2.floodFill(ff, np.zeros((H + 2, W + 2), np.uint8), (0, 0), 255)
+    return comp | cv2.bitwise_not(ff)
+
+
+def smooth_contour(c, sigma):
+    """Smooth a closed outline along its length (keeps lobes and teeth bigger than sigma, drops pixel steps)."""
+    n = len(c); k = int(3 * sigma) or 1
+    w = np.exp(-0.5 * (np.arange(-k, k + 1) / sigma) ** 2); w /= w.sum()
+    pad = np.vstack([c[-k:], c, c[:k]])
+    return np.stack([np.convolve(pad[:, j], w, 'valid') for j in (0, 1)], 1)
 
 
 def score_one(slug, k, p):
@@ -131,13 +191,14 @@ def sheet():
 def trace():
     picks = json.load(open(os.path.join(ROOT, 'tools/leaf_picks.json')))
     out = {}
-    for slug, (k, turn) in picks.items():
+    for slug, pk in picks.items():
+        k, turn = pk[:2]; opt = pk[2] if len(pk) > 2 else {}
         p = pool(slug)[k]
         im = fetch_img(p['url'].replace('square', 'medium'))
-        m, _ = leaf_mask(im)
-        m = cv2.GaussianBlur(m, (0, 0), max(1.0, im.width / 300)); m = (m > 127).astype(np.uint8) * 255
+        m = leaf_mask_seeded(im, tuple(opt['seed']), opt.get('tol', 14), opt.get('trim', 50)) if 'seed' in opt else leaf_mask_gc(im, opt.get('trim', 50))
         cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         c = max(cs, key=cv2.contourArea).reshape(-1, 2).astype(float)
+        c = smooth_contour(c, opt.get('smooth', max(1.5, len(c) / 400)))
         th = math.radians(turn)
         c = c @ np.array([[math.cos(th), math.sin(th)], [-math.sin(th), math.cos(th)]])
         x0, y0 = c.min(0); x1, y1 = c.max(0)
@@ -146,6 +207,7 @@ def trace():
         eps = 0.35
         c = cv2.approxPolyDP(c.astype(np.float32).reshape(-1, 1, 2), eps, True).reshape(-1, 2)
         d = 'M' + 'L'.join(f'{x:.1f} {y:.1f}' for x, y in c) + 'Z'
+        os.makedirs(f'{TMP}/traced', exist_ok=True); im.save(f'{TMP}/traced/{slug}.jpg')
         out[slug] = {'d': d, 'photo': p['url'].replace('square', 'medium'), 'credit': p['attr'], 'lic': p['lic'], 'obs_photo': k}
         print(f'{slug:18s} {len(c)} points', flush=True)
     json.dump(out, open(os.path.join(ROOT, 'data/leafoutlines.json'), 'w'), ensure_ascii=False, separators=(',', ':'))

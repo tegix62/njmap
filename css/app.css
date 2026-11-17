@@ -3934,3 +3934,5 @@ body.trees-on #tabs, body.trees-on #fabs, body.trees-on #lookFab, body.trees-on 
 .sk-tiles.tall button { height: 200px; }
 .sk-panelart .tr-ph img { max-height: 34vh; object-fit: cover; }
 .sk-pair .twigsvg { height: 170px; }
+.tk-leafph { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
+.tk-left .tk-leafph, .tk-li-sil .tk-leafph { border-radius: 8px; }
