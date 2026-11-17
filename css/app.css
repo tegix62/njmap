@@ -3838,3 +3838,34 @@ body.trees-on #tabs, body.trees-on #fabs, body.trees-on #lookFab, body.trees-on 
 .tr-done { text-align: center; padding-top: 12vh; }
 .tr-peekback { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 22px); transform: translateX(-50%); z-index: 40; border: 0; border-radius: 999px; padding: 14px 22px; background: #17251c; color: #fff; font: 700 15px system-ui, sans-serif; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3); pointer-events: auto; }
 @media (prefers-reduced-motion: reduce) { #trees, .tr-today, .tr-card, .tr-tile, .tr-go { transition: none; } }
+/* trees: the key and the groups */
+.tk-ico { width: 44px; height: 44px; display: block; color: #1f6b42; }
+.tr-why { margin: 4px 0 10px; font-size: 16px; line-height: 1.4; }
+.tr-sub { margin: -6px 0 8px; font-weight: 700; color: #2f8f5b; }
+.tk-path { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 2px; margin: 10px 0; padding: 8px; border-radius: 14px; background: #e8efe5; }
+.tk-path span { display: grid; justify-items: center; width: 64px; text-align: center; }
+.tk-path .tk-ico { width: 30px; height: 30px; }
+.tk-path small { font-size: 10px; line-height: 1.15; opacity: 0.75; }
+.tk-path i { font-style: normal; opacity: 0.4; font-size: 18px; }
+.tk-cmp { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.tk-col { display: grid; gap: 4px; align-content: start; text-align: left; border: 0; border-radius: 16px; padding: 6px 6px 10px; background: #fff; color: inherit; font: inherit; cursor: pointer; box-shadow: 0 1px 3px rgba(23, 37, 28, 0.1); }
+.tk-pics { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; } .tk-pics img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; }
+.tk-col b { font-size: 15px; padding: 2px 4px 0; } .tk-col small { font-size: 13px; line-height: 1.35; padding: 0 4px; opacity: 0.85; }
+.tk-opts { display: grid; gap: 8px; margin-top: 8px; }
+.tk-opts button { display: grid; grid-template-columns: 56px 1fr auto; align-items: center; gap: 10px; border: 2px solid transparent; border-radius: 16px; padding: 10px 14px 10px 10px; background: #fff; color: inherit; font: inherit; text-align: left; cursor: pointer; box-shadow: 0 1px 3px rgba(23, 37, 28, 0.1); transition: transform 0.1s; }
+.tk-opts button:active { transform: scale(0.97); }
+.tk-opts .tk-ico { width: 52px; height: 52px; } .tk-opts b { font-size: 16px; } .tk-opts small { opacity: 0.55; font-size: 12px; }
+.tk-opts.sm button { grid-template-columns: 40px 1fr; padding: 8px 12px 8px 8px; } .tk-opts.sm .tk-ico { width: 38px; height: 38px; }
+.tk-opts button.right { border-color: #2f8f5b; background: #e2f3e8; } .tk-opts button.wrong { border-color: #d24a3a; background: #fbe6e2; }
+.tk-trail { margin-top: 10px; font-size: 13px; opacity: 0.7; }
+.tk-left { display: flex; flex-wrap: wrap; gap: 4px; } .tk-left img { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; }
+.tk-groups { display: grid; gap: 8px; }
+.tk-grp { display: flex; align-items: center; gap: 10px; border: 0; border-radius: 16px; padding: 8px 12px 8px 8px; background: #fff; color: inherit; font: inherit; text-align: left; cursor: pointer; box-shadow: 0 1px 3px rgba(23, 37, 28, 0.1); transition: transform 0.12s; }
+.tk-grp:active { transform: scale(0.98); }
+.tk-thumbs { display: flex; flex: none; } .tk-thumbs img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #fff; margin-right: -12px; }
+.tk-gt { display: grid; margin-left: 14px; } .tk-gt b { font-size: 16px; } .tk-gt small { font-size: 12.5px; opacity: 0.6; }
+.tk-grp.new .tk-thumbs img { filter: grayscale(1) blur(2px); opacity: 0.6; }
+.tk-ingroup { display: block; width: 100%; margin: 0 0 6px; text-align: left; border: 0; border-radius: 12px; padding: 10px 12px; background: #fff; color: inherit; font: inherit; cursor: pointer; box-shadow: 0 1px 3px rgba(23, 37, 28, 0.1); }
+.tk-ingroup small { font-size: 14px; line-height: 1.4; }
+.tk-gh { display: flex; justify-content: space-between; width: 100%; margin: 16px 0 6px; border: 0; background: none; padding: 0 2px; color: inherit; font: 700 15px system-ui, sans-serif; cursor: pointer; }
+.tk-gh span { font-weight: 600; font-size: 13px; color: #2f8f5b; }

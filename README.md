@@ -614,3 +614,12 @@ A third entry on the home page (Goblin mode is now a small link under it). The s
 - **Data** (`tools/build_trees.py`, `data/trees.json`, `img/trees/`): research-grade iNaturalist observations in New Jersey with openly licensed photos (credit and licence under each photo); for each tree I looked at a numbered contact sheet of 48 candidates and chose a photo per side by eye (`tools/tree_picks.json`). Sightings are the 200 best-documented per tree, so the map shows where people photograph it, not its true range.
 - **Not verified**: the list of trees, the one-line tells and the leaf facts are my general knowledge, not read from a source for this build. The app says so on its front page. Check them against a field guide; `FACTS` in the build script is one table.
 - 24 trees, 131 photos: three maples, three oaks, tulip tree, sweetgum, sycamore, beech, sassafras, black cherry, white and pitch pine, red cedar, dogwood, gray birch, black locust, tree of heaven, holly, Atlantic white cedar, hemlock, shagbark hickory, black walnut. A few picks are weak and worth replacing (dogwood and holly bark, tree-of-heaven bark, black walnut whole tree). Check: `tools/checks/ui-trees.cjs`.
+
+### Trees, rebuilt around how people learn them (`js/treekey.js`)
+
+People learn trees by narrowing (the yes/no questions every field guide's key is built on) and by group (all the maples at once), not one tree at a time. The tree side now works that way:
+- **Eight groups**: maples; oaks; lobed but not oaks; plain leaves; compound leaves; pairs but not lobed (dogwood); needles; scales and evergreen leaves. Each has what puts a tree in it and, for each member, the one thing that tells it from the others.
+- **Identify a tree**: the key, one question at a time, each answer drawn (needles in fives or threes, scales, pairs or one at a time on the twig, one blade or many leaflets, lobed or not, an oak's row of lobes or a few big ones), with the trees it still leaves; it ends on the group's side-by-side card.
+- **Today meets a whole group**: its card first (leaf and bark of every member side by side, with the tell for each), then each tree, then questions. Wrong answers come from the same group first.
+- **Two new questions**: a step of the key ("Is the leaf lobed?" on a photo of the tree, answered with the drawings) and "Which group is this tree in?". Each tree's card shows its path through the key.
+- The groups, the key and the tells are general knowledge, not checked against a source: a field guide is the authority.

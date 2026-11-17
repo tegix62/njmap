@@ -2,6 +2,7 @@
 // then comes back spaced out over days, each time from a different side: its leaf, its bark, its shape, its fruit; named from a photo, picked
 // out of four photos, matched across two photos, and one fact about its leaves. Where it has been seen in New Jersey is shown on the map.
 // Data: data/trees.json (tools/build_trees.py: iNaturalist photos and sightings; the tells are unverified general knowledge, see the README).
+import { GROUPS, GROUP_OF, KEY, ICON, pathTo, treesUnder } from './treekey.js';
 const DAYS = [0, 1, 3, 7, 16, 35];
 const DAY = 864e5;
 const NEW_PER_DAY = 3, SET = 10;
@@ -54,20 +55,50 @@ export function initTrees(ctx) {
   const frame = (top, body) => { root.innerHTML = `<div class="tr-top">${top}</div><div class="tr-body">${body}</div>`; root.scrollTop = 0; root.classList.remove('peek'); ctx.hud(''); };
   const back = (label = 'Trees') => `<button class="tr-back" data-t="hub"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>${esc(label)}</button>`;
 
+  const groupOf = (id) => GROUPS.find((g) => g.id === GROUP_OF[id]);
+  /** The key's path to a tree, as a row of small drawings with their answers. */
+  const pathHtml = (id, upTo) => `<div class="tk-path">${pathTo(id).slice(0, upTo).map(([n, i]) => { const [label, ic] = KEY[n].a[i]; return `<span>${ICON[ic]}<small>${esc(label)}</small></span>`; }).join('<i>›</i>')}</div>`;
+  /** A group side by side: what puts a tree in it, how the key gets there, and each member's leaf and bark with the one thing that tells it apart. */
+  function groupCard(g, opts = {}) {
+    const ms = Object.keys(g.tell).map((id) => by.get(id)).filter(Boolean);
+    frame(opts.meet ? `<span class="tr-kick">New group</span>` : back(opts.from === 'guide' ? 'Field guide' : 'Trees'),
+      `<h2>${esc(g.name)}</h2><p class="tr-why">${esc(g.why)}</p>${pathHtml(ms[0].id, ms.every((t) => pathTo(t.id).length === pathTo(ms[0].id).length) ? undefined : -1)}
+      <h4>How to tell them apart</h4>
+      <div class="tk-cmp">${ms.map((t) => `<button class="tk-col" data-t="card" data-id="${t.id}"><div class="tk-pics"><img src="${esc(photoOf(t, ['leaf']).f)}" alt=""><img src="${esc(photoOf(t, ['bark']).f)}" alt=""></div><b>${esc(t.name)}</b><small>${esc(g.tell[t.id])}</small></button>`).join('')}</div>
+      ${opts.meet ? '<button class="tr-go" data-t="next">Meet them one by one</button>' : ''}`);
+    q = { kind: 'group', g };
+  }
+  /** Identify: the key, one question at a time, with the trees it still leaves; at a group, its side-by-side card. */
+  function identify(node = 'start', trail = []) {
+    const n = KEY[node];
+    const left = trail.length ? treesUnder(...trail[trail.length - 1]) : Object.keys(GROUP_OF);
+    frame(back(), `<span class="tr-kick">Identify a tree</span><p class="tr-ask">${esc(n.q)}</p>
+      <div class="tk-opts">${n.a.map(([label, ic], i) => `<button data-t="keypick" data-node="${node}" data-i="${i}" data-trail='${esc(JSON.stringify(trail))}'>${ICON[ic]}<b>${esc(label)}</b><small>${treesUnder(node, i).length} tree${treesUnder(node, i).length === 1 ? '' : 's'}</small></button>`).join('')}</div>
+      ${trail.length ? `<div class="tk-trail">${trail.map(([tn, ti]) => `<span>${esc(KEY[tn].a[ti][0])}</span>`).join(' › ')}</div>` : ''}
+      <h4>Still possible: ${left.length}</h4><div class="tk-left">${left.map((id) => `<img src="${esc(photoOf(by.get(id), ['leaf']).f)}" alt="" title="${esc(by.get(id).name)}">`).join('')}</div>`);
+  }
+  function keyPick(b) {
+    const node = b.dataset.node, i = +b.dataset.i, trail = [...JSON.parse(b.dataset.trail), [node, i]];
+    const t = KEY[node].a[i][2];
+    if (t.to) return identify(t.to, trail);
+    groupCard(GROUPS.find((g) => g.id === t.group));
+  }
+
   function hub() {
     q = null; run = null;
     const m = met(), t = store.get('trees.today', {}), doneToday = t.d === today() && t.done;
     const due = m.filter((id) => isDue(id)).length, left = D.trees.length - m.length;
     const C = 2 * Math.PI * 21, frac = doneToday ? 1 : t.d === today() && t.n ? t.i / t.n : 0;
-    const plan = doneToday ? `Done today ✓${streak() ? ` · ${streak()}-day streak` : ''}` : m.length ? `${due} to review${left ? ` · ${Math.min(NEW_PER_DAY, left)} new tree${Math.min(NEW_PER_DAY, left) === 1 ? '' : 's'}` : ''}` : `Meet your first ${Math.min(NEW_PER_DAY, left)} trees`;
+    const plan = doneToday ? `Done today ✓${streak() ? ` · ${streak()}-day streak` : ''}` : m.length ? `${due} to review${left ? ` · a new group` : ''}` : `Meet your first group: the ${esc(GROUPS[0].name.toLowerCase())}`;
     frame(`<button class="tr-back" data-t="home"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Home</button><h1>Trees of New Jersey</h1>`,
       `<button class="tr-today${doneToday ? ' done' : ''}" data-t="today"><span><b>${doneToday ? 'Today is done' : t.d === today() && t.i ? 'Carry on today' : 'Start today'}</b><small>${esc(plan)}</small></span>
         <svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="21" class="bg"/><circle cx="26" cy="26" r="21" class="fg" stroke-dasharray="${(C * frac).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 26 26)"/></svg></button>
       <div class="tr-stats"><span><b>${m.length}</b> of ${D.trees.length} met</span><span><b>${learned()}</b> learned</span><span><b>${streak()}</b> day streak</span></div>
-      <div class="tr-row"><button class="tr-card" data-t="practise"${m.length < 2 ? ' disabled' : ''}><b>Practise</b><small>${m.length < 2 ? 'after you meet two trees' : 'endless, the trees you know'}</small></button>
-        <button class="tr-card" data-t="guide"><b>Field guide</b><small>every tree, its photos and where it grows</small></button></div>
-      <h4>Your trees</h4>
-      <div class="tr-grid">${D.trees.map((x) => { const k = m.includes(x.id), s = srs()[x.id]; return `<button class="tr-tile${k ? '' : ' new'}" data-t="card" data-id="${x.id}"><img src="${esc(photoOf(x, ['leaf']).f)}" alt="" loading="lazy"><span>${k ? esc(x.name) : 'Not met yet'}</span>${k ? `<i class="b${s ? s.b : 0}"></i>` : ''}</button>`; }).join('')}</div>
+      <div class="tr-row"><button class="tr-card" data-t="identify"><b>Identify a tree</b><small>a few yes/no questions, with pictures</small></button>
+        <button class="tr-card" data-t="practise"${m.length < 2 ? ' disabled' : ''}><b>Practise</b><small>${m.length < 2 ? 'after you meet two trees' : 'endless, the trees you know'}</small></button></div>
+      <h4>The groups</h4>
+      <div class="tk-groups">${GROUPS.map((g) => { const ids = Object.keys(g.tell), k = ids.filter((id) => m.includes(id)).length; return `<button class="tk-grp${k ? '' : ' new'}" data-t="groupcard" data-g="${g.id}"><span class="tk-thumbs">${ids.map((id) => `<img src="${esc(photoOf(by.get(id), ['leaf']).f)}" alt="" loading="lazy">`).join('')}</span><span class="tk-gt"><b>${esc(g.name)}</b><small>${k ? `${k} of ${ids.length} met` : 'not met yet'}</small></span></button>`; }).join('')}</div>
+      <button class="tr-card wide" data-t="guide"><b>Field guide</b><small>every tree, its photos and where it grows</small></button>
       <p class="tr-note">Photos and sightings: iNaturalist, each under its own licence. The identifying tips are general knowledge and not yet checked against a field guide: if your book disagrees, the book is right.</p>`);
   }
 
@@ -78,13 +109,15 @@ export function initTrees(ctx) {
       `<h2>${esc(t.name)}</h2><p class="tr-sci">${esc(t.sci)}</p>
       <div class="tr-strip">${t.photos.map((p) => img(p)).join('')}</div>
       <p class="tr-tell">${esc(t.tell)}</p>
+      <button class="tk-ingroup" data-t="groupcard" data-g="${groupOf(t.id).id}"><small>One of the <b>${esc(groupOf(t.id).name.toLowerCase())}</b>: ${esc(groupOf(t.id).tell[t.id])}</small></button>
+      ${pathHtml(t.id)}
       <div class="tr-facts">${t.arr === 'opposite' || t.arr === 'alternate' ? `<span>Leaves <b>${t.arr}</b> on the twig</span><span><b>${t.leaf === 'compound' ? 'Compound' : 'Simple'}</b> leaf</span>` : `<span>An evergreen with <b>${t.arr}</b></span>`}</div>
       <button class="tr-where" data-t="where" data-id="${t.id}"><b>Where it has been seen</b><small>${top3.length ? `Most in ${esc(top3.join(', '))}` : ''} · show on the map</small></button>
       ${opts.meet ? '<button class="tr-go" data-t="next">Got it</button>' : ''}`);
     q = { kind: 'card', t, opts };
   }
   function guide() {
-    frame(back(), `<h2>Field guide</h2><div class="tr-list">${D.trees.map((t) => `<button class="tr-li" data-t="card" data-id="${t.id}" data-from="guide"><img src="${esc(photoOf(t, ['leaf']).f)}" alt="" loading="lazy"><span><b>${esc(t.name)}</b><small>${esc(t.sci)}</small></span></button>`).join('')}</div>`);
+    frame(back(), `<h2>Field guide</h2>${GROUPS.map((g) => `<button class="tk-gh" data-t="groupcard" data-g="${g.id}" data-from="guide">${esc(g.name)} <span>compare ›</span></button><div class="tr-list">${Object.keys(g.tell).map((id) => by.get(id)).map((t) => `<button class="tr-li" data-t="card" data-id="${t.id}" data-from="guide"><img src="${esc(photoOf(t, ['leaf']).f)}" alt="" loading="lazy"><span><b>${esc(t.name)}</b><small>${esc(g.tell[t.id])}</small></span></button>`).join('')}</div>`).join('')}`);
   }
   /** The map, with every sighting of one tree; the screen steps aside. */
   function where(t) {
@@ -105,12 +138,26 @@ export function initTrees(ctx) {
 
   // ---- questions
   function choicesFor(t, pool) {
-    const ids = [...new Set([...t.like.filter((x) => pool.includes(x)), ...shuffle(pool.filter((x) => x !== t.id)), ...shuffle(D.trees.map((x) => x.id).filter((x) => x !== t.id))])].filter((x) => x !== t.id).slice(0, 3);
+    const sameG = Object.keys(groupOf(t.id).tell).filter((x) => x !== t.id && pool.includes(x));
+    const ids = [...new Set([...sameG, ...t.like.filter((x) => pool.includes(x)), ...shuffle(pool.filter((x) => x !== t.id)), ...shuffle(D.trees.map((x) => x.id).filter((x) => x !== t.id))])].filter((x) => x !== t.id).slice(0, 3);
     return shuffle([t.id, ...ids]).map((id) => by.get(id));
   }
   function ask(t, kind, pool) {
     const head = run ? `${back()}<span class="tr-prog">${run.steps.map((s, i) => `<i class="${i < run.i ? 'd' : i === run.i ? 'c' : ''}"></i>`).join('')}</span>` : `${back()}<span class="tr-kick">Practise</span>`;
-    if (kind === 'trait' && !(t.arr === 'opposite' || t.arr === 'alternate')) kind = 'photo';
+    if (kind === 'trait' && !(t.arr === 'opposite' || t.arr === 'alternate')) kind = 'key';
+    if (kind === 'key') {
+      const steps = pathTo(t.id), [node, ans] = rand(steps.length > 1 ? steps.slice(1) : steps), n = KEY[node];
+      frame(head, `<p class="tr-ask">${esc(n.q)}</p><p class="tr-sub">${esc(t.name)}</p>${img(photoOf(t, ['leaf', 'twig']), 'big')}<div class="tk-opts sm">${n.a.map(([label, ic], i) => `<button data-t="ans" data-id="${i}">${ICON[ic]}<b>${esc(label)}</b></button>`).join('')}</div><div class="tr-fb"></div>`);
+      q = { kind, t, right: String(ans), node };
+      return;
+    }
+    if (kind === 'groupq') {
+      const others = shuffle(GROUPS.filter((g) => g.id !== GROUP_OF[t.id])).slice(0, 3);
+      const gs = shuffle([groupOf(t.id), ...others]);
+      frame(head, `<p class="tr-ask">Which group is this tree in?</p>${img(photoOf(t, ['leaf', 'fall', 'fruit']), 'big')}<div class="tr-choices">${gs.map((g) => `<button data-t="ans" data-id="${g.id}">${esc(g.name)}</button>`).join('')}</div><div class="tr-fb"></div>`);
+      q = { kind, t, right: GROUP_OF[t.id] };
+      return;
+    }
     if (kind === 'photo') {
       const last = (store.get('trees.lastctx', {}))[t.id];
       const ps = t.photos.filter((p) => p.ctx !== last), p = rand(ps.length ? ps : t.photos);
@@ -144,26 +191,35 @@ export function initTrees(ctx) {
     for (const b of root.querySelectorAll('[data-t=ans]')) { b.disabled = true; if (b.dataset.id === q.right) b.classList.add('right'); }
     if (!ok) btn.classList.add('wrong');
     let line = '';
-    if (q.kind === 'same') line = q.right === 'yes' ? `Both are <b>${esc(t.name)}</b>.` : `The first is <b>${esc(t.name)}</b>; the second is <b>${esc(q.other.name)}</b>.`;
+    if (q.kind === 'key') line = `${esc(KEY[q.node].a[+q.right][0])}. The key for it: ${pathTo(t.id).map(([n, i]) => esc(KEY[n].a[i][0])).join(' › ')}.`;
+    else if (q.kind === 'groupq') line = `One of the <b>${esc(groupOf(t.id).name.toLowerCase())}</b>: ${esc(groupOf(t.id).why)}`;
+    else if (q.kind === 'same') line = q.right === 'yes' ? `Both are <b>${esc(t.name)}</b>.` : `The first is <b>${esc(t.name)}</b>; the second is <b>${esc(q.other.name)}</b>.`;
     else if (q.kind === 'pick' && !ok) line = `You tapped <b>${esc(by.get(btn.dataset.id).name)}</b>.`;
-    else if (q.kind === 'photo' && !ok) { const w = by.get(btn.dataset.id); line = `Not ${esc(w.name)}: ${esc(w.tell.split(';')[0].toLowerCase())}.`; }
+    else if (q.kind === 'photo' && !ok) { const w = by.get(btn.dataset.id); line = `That was ${esc(w.name)}: ${esc(groupOf(w.id).tell[w.id])}`; }
     if (q.kind === 'pick') for (const b of root.querySelectorAll('.tr-pick button')) b.insertAdjacentHTML('beforeend', `<em>${esc(by.get(b.dataset.id).name)}</em>`);
-    root.querySelector('.tr-fb').innerHTML = `<div class="tr-res ${ok ? 'ok' : 'no'}"><b>${ok ? '✓' : '✗'} ${esc(t.name)}</b>${line ? `<p>${line}</p>` : ''}<p>${esc(t.tell)}</p></div><button class="tr-go" data-t="next">Next</button>`;
+    root.querySelector('.tr-fb').innerHTML = `<div class="tr-res ${ok ? 'ok' : 'no'}"><b>${ok ? '✓' : '✗'} ${esc(t.name)}</b>${line ? `<p>${line}</p>` : ''}<p>${esc(groupOf(t.id).tell[t.id])}</p></div><button class="tr-go" data-t="next">Next</button>`;
     root.querySelector('.tr-go').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
   // ---- today: meet a few new trees, then questions on them and on what is due
   function buildToday() {
     const m = met(), s = srs();
-    const fresh = D.trees.map((t) => t.id).filter((id) => !m.includes(id)).slice(0, NEW_PER_DAY);
-    const due = shuffle(m.filter((id) => isDue(id, s))).slice(0, SET - fresh.length * 2);
-    const steps = fresh.map((id, k) => ({ meet: id, k: k + 1, n: fresh.length }));
+    // the next group not yet met (and the one after it when a group is a single tree), each tree of it met in turn, after the group's side-by-side card
+    const fresh = [], gsNew = [];
+    for (const g of GROUPS) {
+      const ids = Object.keys(g.tell).filter((id) => by.has(id) && !m.includes(id));
+      if (!ids.length) continue;
+      gsNew.push(g.id); fresh.push(...ids);
+      if (fresh.length >= 2) break;
+    }
+    const due = shuffle(m.filter((id) => isDue(id, s))).slice(0, Math.max(4, SET - fresh.length * 2));
+    const steps = [];
+    for (const gid of gsNew) { const ids = fresh.filter((id) => GROUP_OF[id] === gid); steps.push({ group: gid }); ids.forEach((id, k) => steps.push({ meet: id, k: k + 1, n: ids.length })); }
     const qs = [];
-    for (const id of fresh) qs.push({ id, kind: 'photo' }, { id, kind: 'pick' });
-    for (const id of due) qs.push({ id, kind: rand(['photo', 'photo', 'pick', 'same', 'trait']) });
+    for (const id of fresh) qs.push({ id, kind: 'photo' }, { id, kind: rand(['pick', 'key']) });
+    for (const id of due) qs.push({ id, kind: rand(['photo', 'photo', 'pick', 'same', 'key', 'groupq']) });
     const extra = shuffle(m.filter((id) => !due.includes(id)));
-    while (qs.length < Math.min(SET, (m.length + fresh.length) * 2) && extra.length) qs.push({ id: extra.pop(), kind: rand(['photo', 'pick', 'same']) });
-    // never the same tree twice running
+    while (qs.length < Math.min(SET + 2, (m.length + fresh.length) * 2) && extra.length) qs.push({ id: extra.pop(), kind: rand(['photo', 'pick', 'same', 'groupq']) });
     const mixed = shuffle(qs); for (let i = 1; i < mixed.length; i++) if (mixed[i].id === mixed[i - 1].id) { const j = mixed.findIndex((x, k) => k > i && x.id !== mixed[i].id); if (j > 0) [mixed[i], mixed[j]] = [mixed[j], mixed[i]]; }
     return [...steps, ...mixed];
   }
@@ -179,6 +235,7 @@ export function initTrees(ctx) {
     if (run.i >= run.steps.length) return finish();
     saveRun();
     const s = run.steps[run.i];
+    if (s.group) return groupCard(GROUPS.find((g) => g.id === s.group), { meet: true });
     if (s.meet) return card(by.get(s.meet), { meet: true, k: s.k, n: s.n });
     const pool = [...new Set([...met(), s.id])];
     ask(by.get(s.id), pool.length < 2 ? 'trait' : s.kind, pool);
@@ -203,11 +260,12 @@ export function initTrees(ctx) {
     const m = met(); if (m.length < 2) return hub();
     const s = srs(), due = m.filter((id) => isDue(id, s));
     const id = rand(due.length ? due : m);
-    ask(by.get(id), rand(['photo', 'photo', 'pick', 'same', 'trait']), m);
+    ask(by.get(id), rand(['photo', 'photo', 'pick', 'same', 'key', 'groupq']), m);
   }
 
   const actions = {
     // (the home page is drawn under this screen: step aside for it, and come back if Trees is chosen again)
+    identify: () => identify(), keypick: keyPick, groupcard: (b) => groupCard(GROUPS.find((g) => g.id === b.dataset.g), { from: b.dataset.from }),
     home: async () => { root.hidden = true; if (ctx.showHome) await ctx.showHome(); if (ctx.mode === 'trees') { root.hidden = false; hub(); } }, hub, today: startToday, practise, guide, next, ans: answer,
     card: (b) => card(by.get(b.dataset.id), { from: b.dataset.from }),
     where: (b) => where(by.get(b.dataset.id)),
