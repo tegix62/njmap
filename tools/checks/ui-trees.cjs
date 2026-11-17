@@ -16,7 +16,7 @@ const { chromium } = require('playwright'); const fs = require('fs');
     if (await page.locator('.tr-kick', { hasText: 'New group' }).count()) { await page.waitForTimeout(500); await page.screenshot({ path: `${out}/2-group.png` }); await page.click('[data-t=next]'); await page.waitForTimeout(250); continue; }
     if (await page.locator('.tr-kick', { hasText: 'New tree' }).count()) { meets++; if (meets === 1) { await page.waitForTimeout(600); await page.screenshot({ path: `${out}/2-meet.png` }); } await page.click('[data-t=next]'); await page.waitForTimeout(250); continue; }
     const ask = await page.locator('.tr-ask').innerText();
-    const kind = /Which tree/.test(ask) ? 'photo' : /^Tap/.test(ask) ? 'pick' : /same kind/.test(ask) ? 'same' : /Which group/.test(ask) ? 'group' : 'key';
+    const kind = /has this leaf/.test(ask) ? 'shape' : /leaf of the/.test(ask) ? 'shapepick' : /Which tree/.test(ask) ? 'photo' : /^Tap/.test(ask) ? 'pick' : /same kind/.test(ask) ? 'same' : /Which group/.test(ask) ? 'group' : /has this leaf/.test(ask) ? 'shape' : /leaf of the/.test(ask) ? 'shapepick' : 'key';
     kinds[kind] = (kinds[kind] || 0) + 1;
     if (kinds[kind] === 1) { await page.waitForTimeout(500); await page.screenshot({ path: `${out}/3-${kind}.png` }); }
     await page.locator('[data-t=ans]').nth(steps % 2).click(); await page.waitForTimeout(250);

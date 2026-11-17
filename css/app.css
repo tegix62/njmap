@@ -3869,3 +3869,20 @@ body.trees-on #tabs, body.trees-on #fabs, body.trees-on #lookFab, body.trees-on 
 .tk-ingroup small { font-size: 14px; line-height: 1.4; }
 .tk-gh { display: flex; justify-content: space-between; width: 100%; margin: 16px 0 6px; border: 0; background: none; padding: 0 2px; color: inherit; font: 700 15px system-ui, sans-serif; cursor: pointer; }
 .tk-gh span { font-weight: 600; font-size: 13px; color: #2f8f5b; }
+/* trees: leaf silhouettes (js/treeleaf.js) */
+.leafsvg { display: block; width: 100%; height: 100%; }
+.lf-fill { fill: #2f8f5b; } .lf-vein { fill: none; stroke: #d4ecdd; stroke-width: 1.3; stroke-linecap: round; }
+.lf-twig { stroke: #6b4a2b; stroke-width: 3; stroke-linecap: round; fill: none; }
+.lf-ndl { stroke: #2f8f5b; stroke-width: 1.7; fill: none; stroke-linecap: round; } .lf-ndl.stiff { stroke-width: 2.5; } .lf-ndl.flat { stroke-width: 3.6; }
+.lf-scale { stroke: #2f8f5b; stroke-width: 5; stroke-linecap: round; fill: none; stroke-dasharray: 3 1.2; } .lf-scale.flat { stroke-width: 7; stroke-dasharray: 2 0.8; }
+.tk-sil { height: 96px; padding: 6px 0 2px; } .tk-col .tk-sil { background: #f1f6ef; border-radius: 10px; }
+.tk-tellrow { display: grid; grid-template-columns: 84px 1fr; gap: 12px; align-items: center; margin: 12px 0 8px; }
+.tk-tellrow .tk-sil { height: 100px; padding: 0; } .tk-tellrow .tr-tell { margin: 0; }
+.tk-left span { display: block; width: 40px; height: 48px; padding: 2px; border-radius: 8px; background: #fff; }
+.tk-li-sil { width: 56px; height: 56px; flex: none; padding: 3px; border-radius: 10px; background: #f1f6ef; }
+.tk-bigsil { height: min(40vh, 300px); padding: 16px; border-radius: 20px; background: #fff; box-shadow: 0 1px 3px rgba(23, 37, 28, 0.1); }
+.tk-silpick { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.tk-silpick button { position: relative; height: 150px; padding: 10px 10px 24px; border: 3px solid transparent; border-radius: 18px; background: #fff; cursor: pointer; box-shadow: 0 1px 3px rgba(23, 37, 28, 0.1); transition: transform 0.1s; }
+.tk-silpick button:active { transform: scale(0.97); }
+.tk-silpick button.right { border-color: #2f8f5b; background: #e2f3e8; } .tk-silpick button.wrong { border-color: #d24a3a; background: #fbe6e2; }
+.tk-silpick em { position: absolute; left: 0; right: 0; bottom: 4px; font: 600 12.5px system-ui, sans-serif; font-style: normal; color: #17251c; }
