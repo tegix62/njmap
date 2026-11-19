@@ -2,7 +2,7 @@
 // then comes back spaced out over days, each time from a different side: its leaf, its bark, its shape, its fruit; named from a photo, picked
 // out of four photos, matched across two photos, and one fact about its leaves. Where it has been seen in New Jersey is shown on the map.
 // Data: data/trees.json (tools/build_trees.py: iNaturalist photos and sightings; the tells were checked against Wikipedia in November 2026, see the README).
-import { GROUPS, GROUP_OF, KEY, ICON, PATH, pathTo, treesUnder } from './treekey.js';
+import { GROUPS, GROUP_OF, KEY, ICON, pathTo, treesUnder } from './treekey.js';
 import { leafSvg, twigSvg, HAS_LEAF, HAS_OUTLINE, outlineSource } from './treeleaf.js';
 import { SKILLS, DRILL_N, PASS } from './treeskills.js';
 const DAYS = [0, 1, 3, 7, 16, 35];
@@ -16,11 +16,11 @@ const today = () => new Date().toLocaleDateString('en-CA');
 
 export function initTrees(ctx) {
   const { map, store } = ctx;
-  let D = null, by = null, root = null, q = null, run = null, layer = false, H = null;
+  let D = null, by = null, root = null, q = null, run = null, layer = false, H = null, G = null, POOL = null, quick = null, picking = false;
 
   async function load() {
     if (D) return;
-    D = await fetch('data/trees.json').then((r) => r.json());
+    [D, G, POOL] = await Promise.all(['data/trees.json', 'data/treegrid.json', 'data/treepool.json'].map((f) => fetch(f).then((r) => r.json())));
     by = new Map(D.trees.map((t) => [t.id, t]));
     H = { trees: D.trees, by, photoOf, img, esc };
   }
@@ -33,18 +33,6 @@ export function initTrees(ctx) {
     store.set('trees.skills', all);
     return all[sk].done;
   }
-  /** Where you are on the way through: each step of PATH with done / next / later. */
-  function pathState() {
-    const m = met(); let seenNext = false;
-    return PATH.map((p) => {
-      const done = p.skill ? skillDone(p.skill) : Object.keys(GROUPS.find((g) => g.id === p.group).tell).every((id) => m.includes(id));
-      const st = done ? 'done' : seenNext ? 'later' : 'next';
-      if (!done) seenNext = true;
-      return { ...p, st };
-    });
-  }
-  const nextStep = () => pathState().find((p) => p.st === 'next');
-  const stepName = (p) => (p.skill ? SKILLS[p.skill].name : GROUPS.find((g) => g.id === p.group).name);
   // ---- what you know: the same boxes as the town quiz, one per tree
   const srs = () => store.get('trees.srs', {});
   const met = () => store.get('trees.met', []).filter((id) => by.has(id));
@@ -62,6 +50,49 @@ export function initTrees(ctx) {
     if (!days.includes(today())) d.setDate(d.getDate() - 1);
     while (days.includes(d.toLocaleDateString('en-CA'))) { n++; d.setDate(d.getDate() - 1); }
     return n;
+  }
+
+  // ---- trees near you: the sightings grid around your spot, ranked on this device (the spot never leaves it)
+  const spot = () => store.get('trees.spot', null);
+  function nearCounts(pt) {
+    const { cell, lon0, lat0 } = G, cx = (pt[0] - lon0) / cell, cy = (pt[1] - lat0) / cell, R = 4, sig = 1.6;
+    const out = {};
+    for (const [id, cells] of Object.entries(G.trees)) {
+      let w = 0, n = 0;
+      for (let dx = -R; dx <= R; dx++) for (let dy = -R; dy <= R; dy++) {
+        const k = `${Math.floor(cx) + dx},${Math.floor(cy) + dy}`, c = cells[k]; if (!c) continue;
+        const d2 = (Math.floor(cx) + dx + 0.5 - cx) ** 2 + (Math.floor(cy) + dy + 0.5 - cy) ** 2;
+        w += c * Math.exp(-d2 / (2 * sig * sig)); if (d2 <= 4) n += c;
+      }
+      out[id] = { w, n };
+    }
+    return out;
+  }
+  /** Every tree, most-seen near your spot first (statewide sightings when no spot is set or few are nearby). */
+  function ranked() {
+    const sp = spot(), nc = sp ? nearCounts(sp.pt) : null;
+    const local = nc && Object.values(nc).reduce((a, b) => a + b.n, 0) >= 40;
+    const score = (t) => (local ? nc[t.id].n + nc[t.id].w / 1e4 : 0) * 1000 + t.count / 1000;
+    return { list: [...D.trees].sort((a, b) => score(b) - score(a)), nc: local ? nc : null };
+  }
+  const LOCAL_N = 10;
+  // the season, from today's date: what you can see on the trees this week
+  const season = () => ({ 12: 'winter', 1: 'winter', 2: 'winter', 3: 'spring', 4: 'spring', 5: 'spring', 6: 'summer', 7: 'summer', 8: 'summer', 9: 'fall', 10: 'fall', 11: 'fall' })[new Date().getMonth() + 1];
+  const SEASON_LINE = {
+    spring: 'Spring: flowers and new leaves. Red maples flower red before their leaves; dogwoods bloom white.',
+    summer: 'Summer: full leaves. A good time for leaf shapes, and for pairs or one at a time.',
+    fall: 'Fall: leaves turning and dropping. Look at the colour, and at the leaves on the ground under each tree.',
+    winter: 'Winter: bare branches. Look at bark, buds and the shape of the tree; evergreens stand out.',
+  };
+  const SEASON_CTX = { spring: ['flower', 'leaf'], summer: ['leaf', 'fruit'], fall: ['fall', 'leaf', 'fruit'], winter: ['bark', 'form', 'twig'] };
+  const hidden = () => store.get('trees.hidden', []);
+  /** A photo from a tree's big pool, preferring this season, never one you hid: [url, credit, file]. */
+  function poolPhoto(id, avoid) {
+    const ps = (POOL.trees[id] || []).filter((p) => !hidden().includes(p[0]) && p[0] !== avoid);
+    if (!ps.length) { const p = photoOf(by.get(id)); return [p.f, p.credit, null]; }
+    const now = ps.filter((p) => p[1] === season()), p = rand(now.length && Math.random() < 0.7 ? now : ps);
+    const [pid, ext] = p[0].split('.');
+    return [`${POOL.base}${pid}/${POOL.size}.${ext}`, p[2], p[0]];
   }
 
   // ---- the screen
@@ -112,24 +143,83 @@ export function initTrees(ctx) {
   }
 
   function hub() {
-    q = null; run = null;
+    q = null; run = null; quick = null;
     const m = met(), t = store.get('trees.today', {}), doneToday = t.d === today() && t.done;
-    const due = m.filter((id) => isDue(id)).length, left = D.trees.length - m.length;
+    const due = m.filter((id) => isDue(id)).length;
     const C = 2 * Math.PI * 21, frac = doneToday ? 1 : t.d === today() && t.n ? t.i / t.n : 0;
-    const nx = nextStep(), ps = pathState();
-    const plan = doneToday ? `Done today ✓${streak() ? ` · ${streak()}-day streak` : ''}` : `${nx ? `${nx.skill ? 'Learn' : 'Meet'}: ${esc(stepName(nx))}` : 'Review what you know'}${due ? ` · ${due} to review` : ''}`;
+    const { list, nc } = ranked(), local = list.slice(0, LOCAL_N), sp = spot();
+    const fresh = list.filter((x) => !m.includes(x.id)).slice(0, 2);
+    const plan = doneToday ? `Done today ✓${streak() ? ` · ${streak()}-day streak` : ''}` : `${fresh.length ? `Meet: ${fresh.map((x) => esc(x.name)).join(' and ')}` : 'Review what you know'}${due ? ` · ${due} to review` : ''}`;
+    const learnt = Object.keys(SKILLS).filter(skillDone);
     frame(`<button class="tr-back" data-t="home"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Home</button><h1>Trees of New Jersey</h1>`,
-      `<button class="tr-today${doneToday ? ' done' : ''}" data-t="today"><span><b>${doneToday ? 'Today is done' : t.d === today() && t.i ? 'Carry on today' : 'Start today'}</b><small>${esc(plan)}</small></span>
+      `<button class="tr-today${doneToday ? ' done' : ''}" data-t="today"><span><b>${doneToday ? 'Today is done' : t.d === today() && t.i ? 'Carry on today' : 'Start today'}</b><small>${plan}</small></span>
         <svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="21" class="bg"/><circle cx="26" cy="26" r="21" class="fg" stroke-dasharray="${(C * frac).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 26 26)"/></svg></button>
+      <p class="tn-season">${esc(SEASON_LINE[season()])}</p>
       <div class="tr-stats"><span><b>${m.length}</b> of ${D.trees.length} met</span><span><b>${learned()}</b> learned</span><span><b>${streak()}</b> day streak</span></div>
-      <h4>Your way through</h4>
-      <div class="sk-path">${ps.map((p, i) => { const g = p.group && GROUPS.find((x) => x.id === p.group); return `<button class="sk-step ${p.st}${p.skill ? ' skill' : ''}" data-t="${p.skill ? 'lesson' : 'groupcard'}" ${p.skill ? `data-sk="${p.skill}"` : `data-g="${p.group}"`}${p.st === 'later' && p.group ? ' disabled' : ''}>
-        <span class="sk-dot">${p.st === 'done' ? '✓' : i + 1}</span>${p.skill ? `<span class="sk-ic">${ICON[KEY[Object.keys(KEY).find((k) => KEY[k].skill === p.skill)].a[0][1]]}</span>` : `<span class="tk-thumbs">${Object.keys(g.tell).slice(0, 3).map((id) => `<img src="${esc(photoOf(by.get(id), ['leaf']).f)}" alt="" loading="lazy">`).join('')}</span>`}
-        <span class="tk-gt"><small>${p.skill ? 'Learn to look' : 'Meet the trees'}${p.st === 'next' ? ' · next' : ''}</small><b>${esc(stepName(p))}</b></span></button>`; }).join('')}</div>
-      <div class="tr-row"><button class="tr-card" data-t="identify"><b>Name a tree</b><small>in front of you: a few questions, with pictures</small></button>
-        <button class="tr-card" data-t="practise"${m.length < 2 && !Object.keys(SKILLS).some(skillDone) ? ' disabled' : ''}><b>Practise</b><small>${m.length < 2 && !Object.keys(SKILLS).some(skillDone) ? 'after your first lesson' : 'endless: what you have learned'}</small></button></div>
-      <button class="tr-card wide" data-t="guide"><b>Field guide</b><small>every tree, its photos and where it grows</small></button>
-      <p class="tr-note">Photos and sightings: iNaturalist, each under its own licence. The identifying tips were checked against each tree’s Wikipedia article (November 2026); if your field guide disagrees, trust the book.</p>`);
+      <div class="tn-head"><h4>${sp ? `Trees near ${esc(sp.name)}` : 'The most-seen trees in New Jersey'}</h4><button class="sk-link" data-t="spot">${sp ? 'Change' : 'Set your spot'}</button></div>
+      ${sp ? '' : '<p class="tn-hint">Set the place you are outdoors most (home, work, a park) and these become the trees most often seen around it.</p>'}
+      <div class="tn-list">${local.map((x, i) => `<button class="tn-row${m.includes(x.id) ? ' met' : ''}" data-t="card" data-id="${x.id}"><span class="tn-n">${m.includes(x.id) ? '✓' : i + 1}</span><span class="tn-leaf">${leafArt(x.id)}</span><span class="tk-gt"><b>${esc(x.name)}</b><small>${nc ? `seen ${nc[x.id].n.toLocaleString()} times within about 10 km` : `${x.count.toLocaleString()} sightings in New Jersey`}${!m.includes(x.id) && fresh.some((f) => f.id === x.id) ? ' · next to meet' : ''}</small></span></button>`).join('')}</div>
+      <div class="tr-row"><button class="tr-card" data-t="quick"${m.length < 2 ? ' disabled' : ''}><b>Quick look</b><small>${m.length < 2 ? 'after you meet two trees' : '20 photos, fast: which tree?'}</small></button>
+        <button class="tr-card" data-t="identify"><b>Name a tree</b><small>in front of you: a few questions</small></button></div>
+      <button class="tr-card wide" data-t="practise"${m.length < 2 && !learnt.length ? ' disabled' : ''}><b>Practise</b><small>${m.length < 2 && !learnt.length ? 'after you meet two trees' : 'endless, every kind of question'}</small></button>
+      <h4>Learn to look</h4><p class="tn-hint">Optional short lessons: what field guides ask about any tree. Each tree's page links to the one it needs.</p>
+      <div class="tn-skills">${Object.entries(SKILLS).map(([k, S]) => `<button class="tn-skill${skillDone(k) ? ' done' : ''}" data-t="lesson" data-sk="${k}">${ICON[KEY[Object.keys(KEY).find((n) => KEY[n].skill === k)].a[0][1]]}<b>${esc(S.name)}</b>${skillDone(k) ? '<small>✓ learned</small>' : ''}</button>`).join('')}</div>
+      <button class="tr-card wide" data-t="guide"><b>Field guide</b><small>every tree, by group, with side-by-side comparisons</small></button>
+      <p class="tr-note">Photos and sightings: iNaturalist, each under its own licence; your spot stays on this device. The identifying tips were checked against each tree’s Wikipedia article (November 2026); if your field guide disagrees, trust the book.</p>`);
+  }
+
+  // ---- your spot: one of your places from the town side, or a tap on the map
+  function spotPicker() {
+    const anchors = store.get('anchors', []);
+    frame(back(), `<h2>Your spot</h2><p class="sk-p">Where are you outdoors most? The trees most often seen within about 10 km of it come first. It stays on this device.</p>
+      ${anchors.length ? `<h4>Your places</h4><div class="tn-list">${anchors.map((a, i) => `<button class="tn-row" data-t="spotset" data-i="${i}"><span class="tn-n">📍</span><span class="tk-gt"><b>${esc(a.name)}</b><small>from your places on the town side</small></span></button>`).join('')}</div>` : ''}
+      <button class="tr-go" data-t="spotmap">Tap a spot on the map</button>
+      ${spot() ? '<button class="tr-card wide" data-t="spotclear"><b>Clear my spot</b><small>use the most-seen trees in all of New Jersey</small></button>' : ''}`);
+  }
+  function spotFromMap() {
+    picking = true; root.classList.add('peek');
+    const b = ctx.region.bounds; map.fitBounds(b, { padding: { top: 120, bottom: 110, left: 20, right: 20 }, bearing: 0, pitch: 0, duration: 700 });
+    ctx.hud('<div class="qkind">Your spot</div><div class="q"><b>Tap where you are outdoors most</b></div><div class="meta">Zoom in if you like. It stays on this device.</div>');
+    const pb = document.createElement('button'); pb.className = 'tr-peekback'; pb.textContent = 'Cancel'; pb.addEventListener('click', () => { picking = false; actions.unpeek(); spotPicker(); }); document.body.appendChild(pb);
+    map.once('click', (e) => {
+      if (!picking) return; picking = false;
+      store.set('trees.spot', { name: 'your spot', pt: [+e.lngLat.lng.toFixed(4), +e.lngLat.lat.toFixed(4)] });
+      actions.unpeek(); hub();
+    });
+  }
+
+  // ---- quick look: 20 photos from the big pools, two names each, fast
+  function quickStart() {
+    const m = met(); if (m.length < 2) return hub();
+    quick = { i: 0, n: 20, right: 0, mix: {}, ids: m };
+    quickAsk();
+  }
+  function quickAsk() {
+    if (quick.i >= quick.n) return quickEnd();
+    const id = rand(quick.ids), t = by.get(id);
+    const near = [...t.like, ...Object.keys(groupOf(id).tell)].filter((x) => x !== id && quick.ids.includes(x));
+    const other = rand(near.length && Math.random() < 0.7 ? near : quick.ids.filter((x) => x !== id));
+    const [u, credit, file] = poolPhoto(id);
+    frame(`${back()}<span class="tr-prog">${Array.from({ length: quick.n }, (_, i) => `<i class="${i < quick.i ? 'd' : i === quick.i ? 'c' : ''}"></i>`).join('')}</span>`,
+      `<span class="tr-kick">Quick look</span><figure class="tr-ph big tn-quick"><img src="${esc(u)}" alt=""><figcaption><span>${esc(credit)} · iNaturalist</span></figcaption></figure>
+      <div class="tr-choices two">${shuffle([id, other]).map((x) => `<button data-t="qans" data-id="${x}">${esc(by.get(x).name)}</button>`).join('')}</div>
+      ${file ? `<button class="sk-link tn-hide" data-t="hidephoto" data-f="${esc(file)}">Bad photo? Hide it</button>` : ''}`);
+    q = { kind: 'quick', id, other };
+  }
+  function quickAnswer(b) {
+    if (!q || q.done) return; q.done = true;
+    const ok = b.dataset.id === q.id;
+    if (ok) quick.right++; else { const k = [q.id, q.other].sort().join('|'); quick.mix[k] = (quick.mix[k] || 0) + 1; }
+    for (const x of root.querySelectorAll('[data-t=qans]')) { x.disabled = true; if (x.dataset.id === q.id) x.classList.add('right'); }
+    if (!ok) b.classList.add('wrong');
+    setTimeout(() => { if (quick) { quick.i++; quickAsk(); } }, ok ? 550 : 1300);
+  }
+  function quickEnd() {
+    const mix = Object.entries(quick.mix).sort((a, b) => b[1] - a[1]).slice(0, 2);
+    const r = quick.right, n = quick.n; quick = null;
+    frame(back(), `<div class="tr-done"><h2>${r} of ${n}</h2><p>${r >= 18 ? 'Sharp eyes.' : r >= 14 ? 'Getting there.' : 'These take many looks: that is how everyone learns them.'}</p>
+      ${mix.map(([k]) => { const [a, c] = k.split('|').map((x) => by.get(x)); return `<div class="tr-res no"><b>You mixed up ${esc(a.name)} and ${esc(c.name)}</b><p>${esc(a.name)}: ${esc(groupOf(a.id).tell[a.id])}</p><p>${esc(c.name)}: ${esc(groupOf(c.id).tell[c.id])}</p></div>`; }).join('')}
+      <button class="tr-go" data-t="quick">Another 20</button><button class="tr-card wide" data-t="hub"><b>Back to the trees</b></button></div>`);
   }
 
   /** A tree's page: all its photos, its tell, and where it has been seen. */
@@ -141,7 +231,7 @@ export function initTrees(ctx) {
       <div class="tk-tellrow"><div class="tk-sil">${leafArt(t.id)}</div><p class="tr-tell">${esc(t.tell)}</p></div>
       <button class="tk-ingroup" data-t="groupcard" data-g="${groupOf(t.id).id}"><small>One of the <b>${esc(groupOf(t.id).name.toLowerCase())}</b>: ${esc(groupOf(t.id).tell[t.id])}</small></button>
       ${pathHtml(t.id)}
-      <div class="tr-facts">${t.arr === 'opposite' || t.arr === 'alternate' ? `${HAS_OUTLINE(t.id) ? `<span class="sk-twigchip">${twigSvg(t.id, { arr: t.arr, n: t.arr === 'opposite' ? 2 : 3 })}</span>` : ''}<span>Leaves <b>${t.arr === 'opposite' ? 'in pairs' : 'one at a time'}</b> on the twig</span><span><b>${t.leaf === 'compound' ? 'A leaf made of leaflets' : 'One leaf'}</b> on each stalk</span>` : `<span>Green all year, with <b>${t.arr}</b></span>`}</div>
+      <div class="tr-facts">${t.arr === 'opposite' || t.arr === 'alternate' ? `${HAS_OUTLINE(t.id) ? `<span class="sk-twigchip">${twigSvg(t.id, { arr: t.arr, n: t.arr === 'opposite' ? 2 : 3 })}</span>` : ''}<button class="tn-fact" data-t="lesson" data-sk="pairs">Leaves <b>${t.arr === 'opposite' ? 'in pairs' : 'one at a time'}</b> on the twig <i>what's that?</i></button><button class="tn-fact" data-t="lesson" data-sk="leaflets"><b>${t.leaf === 'compound' ? 'A leaf made of leaflets' : 'One leaf'}</b> on each stalk <i>what's that?</i></button>` : `<button class="tn-fact" data-t="lesson" data-sk="look">Green all year, with <b>${t.arr}</b> <i>what's that?</i></button>`}</div>
       ${HAS_OUTLINE(t.id) ? `<p class="tr-src">Leaf outline traced from a photo: ${esc(outlineSource(t.id).credit.replace(/^\(c\)/, '©').replace(/,? some rights reserved/, ''))} · iNaturalist</p>` : ''}
       ${t.checked ? `<p class="tr-src">Checked against <a href="${esc(t.checked.src)}" target="_blank" rel="noopener">Wikipedia</a>${t.checked.note ? `. ${esc(t.checked.note)}` : ''}</p>` : ''}
       <button class="tr-where" data-t="where" data-id="${t.id}"><b>Where it has been seen</b><small>${top3.length ? `Most in ${esc(top3.join(', '))}` : ''} · show on the map</small></button>
@@ -204,6 +294,12 @@ export function initTrees(ctx) {
       q = { kind, t, right: String(ans), node };
       return;
     }
+    if (kind === 'flash') {
+      const ch = choicesFor(t, pool), [u, credit, file] = poolPhoto(t.id);
+      frame(head, `<p class="tr-ask">Which tree is this?</p><figure class="tr-ph big"><img src="${esc(u)}" alt=""><figcaption><span>${esc(credit)} · iNaturalist</span></figcaption></figure><div class="tr-choices">${ch.map((c) => `<button data-t="ans" data-id="${c.id}">${esc(c.name)}</button>`).join('')}</div>${file ? `<button class="sk-link tn-hide" data-t="hidephoto" data-f="${esc(file)}">Bad photo? Hide it</button>` : ''}<div class="tr-fb"></div>`);
+      q = { kind: 'photo', t, right: t.id };
+      return;
+    }
     if ((kind === 'shape' || kind === 'shapepick') && !HAS_LEAF(t.id)) kind = 'photo';
     if (kind === 'shapepick' && pool.filter(HAS_LEAF).length < 3) kind = 'shape';
     if (kind === 'shape') {
@@ -227,7 +323,7 @@ export function initTrees(ctx) {
     }
     if (kind === 'photo') {
       const last = (store.get('trees.lastctx', {}))[t.id];
-      const ps = t.photos.filter((p) => p.ctx !== last), p = rand(ps.length ? ps : t.photos);
+      const ps = t.photos.filter((p) => p.ctx !== last), sp = ps.filter((p) => SEASON_CTX[season()].includes(p.ctx)), p = rand(sp.length && Math.random() < 0.6 ? sp : ps.length ? ps : t.photos);
       const lc = store.get('trees.lastctx', {}); lc[t.id] = p.ctx; store.set('trees.lastctx', lc);
       const ch = choicesFor(t, pool);
       frame(head, `<p class="tr-ask">Which tree is this?</p>${img(p, 'big')}<div class="tr-choices">${ch.map((c) => `<button data-t="ans" data-id="${c.id}">${esc(c.name)}</button>`).join('')}</div><div class="tr-fb"></div>`);
@@ -281,34 +377,20 @@ export function initTrees(ctx) {
 
   // ---- today: meet a few new trees, then questions on them and on what is due
   function buildToday() {
-    const m = met(), s = srs(), ps = pathState(), nx = ps.findIndex((p) => p.st === 'next');
+    const m = met(), s = srs();
     const learnt = Object.keys(SKILLS).filter(skillDone);
-    const revSkill = learnt.length ? [{ drill: rand(learnt), review: true }] : [];
+    const revSkill = learnt.length && Math.random() < 0.5 ? [{ drill: rand(learnt), review: true }] : [];
     const mix = (qs) => { const x = shuffle(qs); for (let i = 1; i < x.length; i++) if (x[i].id && x[i].id === x[i - 1].id) { const j = x.findIndex((y, k) => k > i && y.id !== x[i].id); if (j > 0) [x[i], x[j]] = [x[j], x[i]]; } return x; };
-    const kinds = ['photo', 'photo', 'pick', 'same', 'key', 'groupq', 'shape', 'shapepick'];
-    // a skill of looking is next: its lesson, its practice, then a little review
-    if (nx >= 0 && ps[nx].skill) {
-      const sk = ps[nx].skill, due = shuffle(m.filter((id) => isDue(id, s))).slice(0, 4);
-      return [{ lesson: sk }, ...Array.from({ length: DRILL_N }, () => ({ drill: sk })), ...mix([...due.map((id) => ({ id, kind: rand(kinds) })), ...revSkill])];
-    }
-    // otherwise the next group(s) along the way, up to the next skill still to learn
-    const fresh = [], gsNew = [];
-    for (let i = Math.max(0, nx); nx >= 0 && i < ps.length; i++) {
-      const p = ps[i];
-      if (p.skill) { if (!skillDone(p.skill)) break; continue; }
-      const ids = Object.keys(GROUPS.find((g) => g.id === p.group).tell).filter((id) => by.has(id) && !m.includes(id));
-      if (!ids.length) continue;
-      gsNew.push(p.group); fresh.push(...ids);
-      if (fresh.length >= 2) break;
-    }
+    const kinds = ['flash', 'flash', 'photo', 'pick', 'same', 'key', 'groupq', 'shape', 'shapepick'];
+    // the next trees on your local list (two a day; three on the very first day)
+    const fresh = ranked().list.filter((t) => !m.includes(t.id)).slice(0, m.length ? 2 : 3).map((t) => t.id);
     const due = shuffle(m.filter((id) => isDue(id, s))).slice(0, Math.max(4, SET - fresh.length * 2));
-    const steps = [];
-    for (const gid of gsNew) { const ids = fresh.filter((id) => GROUP_OF[id] === gid); steps.push({ group: gid }); ids.forEach((id, k) => steps.push({ meet: id, k: k + 1, n: ids.length })); }
+    const steps = fresh.map((id, k) => ({ meet: id, k: k + 1, n: fresh.length }));
     const qs = [];
-    for (const id of fresh) qs.push({ id, kind: rand(['shape', 'shapepick']) }, { id, kind: 'photo' }, { id, kind: rand(['pick', 'key']) });
+    for (const id of fresh) qs.push({ id, kind: 'flash' }, { id, kind: rand(['shape', 'photo']) }, { id, kind: rand(['pick', 'flash', 'key']) });
     for (const id of due) qs.push({ id, kind: rand(kinds) });
     const extra = shuffle(m.filter((id) => !due.includes(id)));
-    while (qs.length < Math.min(SET + 2, (m.length + fresh.length) * 2) && extra.length) qs.push({ id: extra.pop(), kind: rand(['photo', 'pick', 'same', 'groupq']) });
+    while (qs.length < Math.min(SET + 2, (m.length + fresh.length) * 2) && extra.length) qs.push({ id: extra.pop(), kind: rand(['flash', 'photo', 'pick', 'same']) });
     return [...steps, ...mix([...qs, ...revSkill])];
   }
   function startToday() {
@@ -346,11 +428,11 @@ export function initTrees(ctx) {
     }).join('');
     if (wasToday) { saveRun(true); const days = store.get('trees.days', []); if (!days.includes(today())) { days.push(today()); store.set('trees.days', days.slice(-400)); } }
     run = null;
-    const nx = nextStep();
+    const nx = ranked().list.find((x) => !met().includes(x.id));
     frame(back(), `<div class="tr-done"><h2>${wasToday ? 'Done for today' : 'Practice done'}</h2><p><b>${r}</b> of ${n} right · ${met().length} of ${D.trees.length} trees met${streak() ? ` · ${streak()}-day streak` : ''}</p>${skl}
-      ${nx ? `<p class="tr-sci">Next on the way: <b>${esc(stepName(nx))}</b>.</p>` : ''}
+      ${nx ? `<p class="tr-sci">Next on your list: <b>${esc(nx.name)}</b>.</p>` : ''}
       ${wasToday ? '<p class="tr-sci">The trees you have met come back tomorrow, in three days, in a week: each time from a different side.</p>' : ''}
-      <button class="tr-go" data-t="hub">Back to the trees</button>${nx && wasToday ? `<button class="tr-card wide" data-t="more"><b>Keep going</b><small>${nx.skill ? 'learn' : 'meet'}: ${esc(stepName(nx))}</small></button>` : '<button class="tr-card wide" data-t="practise">Keep practising</button>'}</div>`);
+      <button class="tr-go" data-t="hub">Back to the trees</button>${nx && wasToday ? `<button class="tr-card wide" data-t="more"><b>Keep going</b><small>meet the ${esc(nx.name.toLowerCase())}</small></button>` : '<button class="tr-card wide" data-t="practise">Keep practising</button>'}</div>`);
   }
   function practise() {
     run = null;
@@ -359,7 +441,7 @@ export function initTrees(ctx) {
     const s = srs(), due = m.filter((id) => isDue(id, s));
     if (learnt.length && (m.length < 2 || Math.random() < 0.25)) return drillAsk(rand(learnt));
     const id = rand(due.length ? due : m);
-    ask(by.get(id), rand(['photo', 'photo', 'pick', 'same', 'key', 'groupq', 'shape', 'shapepick']), m);
+    ask(by.get(id), rand(['flash', 'flash', 'photo', 'pick', 'same', 'key', 'groupq', 'shape', 'shapepick']), m);
   }
 
   const actions = {
@@ -367,7 +449,11 @@ export function initTrees(ctx) {
     identify: () => identify(), keypick: keyPick, groupcard: (b) => groupCard(GROUPS.find((g) => g.id === b.dataset.g), { from: b.dataset.from }),
     home: async () => { root.hidden = true; if (ctx.showHome) await ctx.showHome(); if (ctx.mode === 'trees') { root.hidden = false; hub(); } }, hub, today: startToday, practise, guide, next, ans: answer,
     card: (b) => card(by.get(b.dataset.id), { from: b.dataset.from }),
-    lesson: (b) => { run = null; lesson(b.dataset.sk); }, lstep: (b) => lesson(b.dataset.sk, +b.dataset.i),
+    lesson: (b) => { run = null; lesson(b.dataset.sk); },
+    spot: spotPicker, spotmap: spotFromMap, spotclear: () => { store.set('trees.spot', null); hub(); },
+    spotset: (b) => { const a = store.get('anchors', [])[+b.dataset.i]; if (a) store.set('trees.spot', { name: a.name, pt: a.pt }); hub(); },
+    quick: quickStart, qans: quickAnswer,
+    hidephoto: (b) => { const h = hidden(); if (!h.includes(b.dataset.f)) { h.push(b.dataset.f); store.set('trees.hidden', h.slice(-500)); } b.textContent = 'Hidden: you won’t see it again'; b.disabled = true; }, lstep: (b) => lesson(b.dataset.sk, +b.dataset.i),
     drillrun: (b) => { run = { steps: Array.from({ length: DRILL_N }, () => ({ drill: b.dataset.sk })), i: 0, right: 0, today: false }; step(); },
     more: () => { run = { steps: buildToday(), i: 0, right: 0, today: true }; step(); },
     where: (b) => where(by.get(b.dataset.id)),

@@ -7,7 +7,6 @@ const { chromium } = require('playwright'); const fs = require('fs');
   const bad = []; page.on('response', (r) => { if (r.status() >= 400 && /img\/trees|trees\.json/.test(r.url())) bad.push(r.url()); });
   await page.goto('http://localhost:8077/index.html?debug=1&region=nj'); await page.waitForSelector('#welcome [data-entry]');
   await page.screenshot({ path: `${out}/0-home.png` });
-  // as someone who has passed the lessons of looking (ui-trees-learn.cjs covers those): Today goes straight to meeting trees
   await page.evaluate(() => { const v = {}; for (const k of ['look', 'winter', 'pairs', 'leaflets', 'lobes']) v[k] = { done: true, best: 6 }; localStorage.setItem('njtf.trees.skills', JSON.stringify(v)); });
   await page.click('[data-entry=trees]'); await page.waitForSelector('#trees .tr-today'); await page.waitForTimeout(800);
   await page.screenshot({ path: `${out}/1-hub.png` });

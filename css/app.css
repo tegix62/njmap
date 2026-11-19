@@ -3936,3 +3936,23 @@ body.trees-on #tabs, body.trees-on #fabs, body.trees-on #lookFab, body.trees-on 
 .sk-pair .twigsvg { height: 170px; }
 .tk-leafph { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
 .tk-left .tk-leafph, .tk-li-sil .tk-leafph { border-radius: 8px; }
+/* trees: near you, quick look */
+.tn-season { margin: 10px 2px 2px; padding: 10px 12px; border-radius: 14px; background: #fbf3e4; font-size: 14px; line-height: 1.4; }
+.tn-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.tn-hint { margin: -4px 2px 8px; font-size: 13.5px; line-height: 1.4; opacity: 0.65; }
+.tn-list { display: grid; gap: 6px; margin-bottom: 14px; }
+.tn-row { display: flex; align-items: center; gap: 10px; border: 0; border-radius: 16px; padding: 8px 12px 8px 8px; background: #fff; color: inherit; font: inherit; text-align: left; cursor: pointer; box-shadow: 0 1px 3px rgba(23, 37, 28, 0.1); transition: transform 0.12s; }
+.tn-row:active { transform: scale(0.98); }
+.tn-n { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 700 12.5px system-ui, sans-serif; background: #e4ebe5; }
+.tn-row.met .tn-n { background: #2f8f5b; color: #fff; }
+.tn-leaf { flex: none; width: 40px; height: 48px; }
+.tn-leaf .tk-leafph { border-radius: 8px; }
+.tn-row .tk-gt b { display: block; font-size: 15.5px; } .tn-row .tk-gt small { font-size: 12px; opacity: 0.6; }
+.tn-skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 14px; }
+.tn-skill { display: grid; grid-template-columns: 34px 1fr; grid-template-rows: auto auto; align-items: center; column-gap: 8px; border: 0; border-radius: 14px; padding: 8px 10px; background: #f1f8f3; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.tn-skill .tk-ico { grid-row: span 2; width: 32px; height: 32px; color: #2f8f5b; }
+.tn-skill b { font-size: 13.5px; line-height: 1.25; } .tn-skill small { font-size: 11.5px; color: #2f8f5b; font-weight: 700; }
+.tn-fact { border: 0; padding: 6px 11px; border-radius: 999px; background: #e3ebe0; font: 13px system-ui, sans-serif; color: inherit; cursor: pointer; }
+.tn-fact i { font-style: normal; color: #2f8f5b; font-weight: 700; margin-left: 4px; }
+.tn-hide { display: block; margin: 8px auto 0; font-size: 12.5px; opacity: 0.7; }
+.tn-quick img { max-height: 52vh; }
