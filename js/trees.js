@@ -72,7 +72,7 @@ export function initTrees(ctx) {
   function ranked() {
     const sp = spot(), nc = sp ? nearCounts(sp.pt) : null;
     const local = nc && Object.values(nc).reduce((a, b) => a + b.n, 0) >= 40;
-    const score = (t) => (local ? nc[t.id].w : 0) * 1000 + t.count / 1000;
+    const score = (t) => (local ? nc[t.id].n + nc[t.id].w / 1e4 : 0) * 1000 + t.count / 1000;
     return { list: [...D.trees].sort((a, b) => score(b) - score(a)), nc: local ? nc : null };
   }
   const LOCAL_N = 10;
