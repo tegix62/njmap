@@ -1,0 +1,32 @@
+// Tree walk and your own photos: a walk from a (pretend) phone location in Montclair, the nearest list, picking a tree, Found it, adding a
+// photo (a test image through the file chooser), that photo on the tree's page, removing it, and a walk from a map tap. Frames in $OUT.
+const { chromium } = require('playwright'); const fs = require('fs'); const path = require('path');
+(async () => { const out = process.env.OUT || 'frames/walk'; fs.mkdirSync(out, { recursive: true });
+  const b = await chromium.launch();
+  const c = await b.newContext({ viewport: { width: 390, height: 780 }, geolocation: { latitude: 40.8259, longitude: -74.2090 }, permissions: ['geolocation'] });
+  const page = await c.newPage();
+  const errs = []; page.on('pageerror', (e) => { errs.push(e.message); console.log('PAGEERR', e.message); });
+  page.on('console', (m) => { if (m.type() === 'error' && !/Failed to (load resource|fetch)|AJAXError/.test(m.text())) { errs.push(m.text()); console.log('CONSOLE', m.text().slice(0, 200)); } });
+  await page.goto('http://localhost:8077/index.html?debug=1&region=nj'); await page.waitForSelector('#welcome [data-entry]');
+  await page.click('[data-entry=trees]'); await page.waitForSelector('#trees .tr-today'); await page.waitForTimeout(600);
+  await page.click('[data-t=walk]'); await page.waitForTimeout(300); await page.screenshot({ path: `${out}/0-intro.png` });
+  await page.click('[data-t=walkgps]'); await page.waitForTimeout(3500); await page.screenshot({ path: `${out}/1-walk.png` });
+  console.log('nearest:', (await page.locator('.tw-list button').allInnerTexts()).map((t) => t.replace(/\n/g, ' ')).join(' / '));
+  await page.locator('.tw-list button').first().click(); await page.waitForTimeout(400); await page.screenshot({ path: `${out}/2-sel.png` });
+  console.log('selected:', (await page.locator('#hud').innerText()).replace(/\n/g, ' | ').slice(0, 160));
+  await page.click('[data-walk=found]'); await page.waitForTimeout(300); await page.screenshot({ path: `${out}/3-found.png` });
+  console.log('found:', (await page.locator('#hud .q').innerText()));
+  const img = path.resolve('img/trees', fs.readdirSync('img/trees').find((f) => f.endsWith('.jpg')));
+  const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.click('[data-walk=snap]')]); await fc.setFiles(img); await page.waitForTimeout(1200);
+  await page.click('.tr-peekback'); await page.waitForTimeout(500);
+  console.log('hub walk card:', (await page.locator('.tw-card small').innerText()));
+  const foundId = await page.evaluate(() => JSON.parse(localStorage.getItem('njtf.trees.found'))[0].id);
+  await page.click('[data-t=guide]'); await page.waitForTimeout(250); await page.click(`.tr-li[data-id=${foundId}]`); await page.waitForTimeout(500);
+  await page.screenshot({ path: `${out}/4-card-mine.png` });
+  console.log('your photos on the page:', await page.locator('.tr-ph.mine').count());
+  await page.click('[data-t=unsnap]'); await page.waitForTimeout(500); console.log('after remove:', await page.locator('.tr-ph.mine').count());
+  await page.click('[data-t=hub]'); await page.click('[data-t=walk]'); await page.click('[data-t=walkmap]'); await page.waitForTimeout(1200);
+  await page.evaluate(() => {}); const box = await page.locator('#map').boundingBox(); await page.mouse.click(box.x + box.width * 0.55, box.y + box.height * 0.3); await page.waitForTimeout(2500);
+  await page.screenshot({ path: `${out}/5-walk-map.png` }); console.log('map walk:', (await page.locator('#hud').innerText()).replace(/\n/g, ' | ').slice(0, 160));
+  await page.click('.tr-peekback'); await page.waitForTimeout(300);
+  console.log('errors', errs.length); await b.close(); })();

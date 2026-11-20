@@ -5,6 +5,7 @@
 import { GROUPS, GROUP_OF, KEY, ICON, pathTo, treesUnder } from './treekey.js';
 import { leafSvg, twigSvg, HAS_LEAF, HAS_OUTLINE, outlineSource } from './treeleaf.js';
 import { SKILLS, DRILL_N, PASS } from './treeskills.js';
+import { distanceMi, bearing, compass8 } from './geo.js';
 const DAYS = [0, 1, 3, 7, 16, 35];
 const DAY = 864e5;
 const NEW_PER_DAY = 3, SET = 10;
@@ -16,6 +17,7 @@ const today = () => new Date().toLocaleDateString('en-CA');
 
 export function initTrees(ctx) {
   const { map, store } = ctx;
+  let walk = null, PTS = null, mine = {};
   let D = null, by = null, root = null, q = null, run = null, layer = false, H = null, G = null, POOL = null, quick = null, picking = false;
 
   async function load() {
@@ -23,6 +25,7 @@ export function initTrees(ctx) {
     [D, G, POOL] = await Promise.all(['data/trees.json', 'data/treegrid.json', 'data/treepool.json'].map((f) => fetch(f).then((r) => r.json())));
     by = new Map(D.trees.map((t) => [t.id, t]));
     H = { trees: D.trees, by, photoOf, img, esc };
+    mine = await myPhotos();
   }
   // ---- the skills of looking: learned once (a lesson, then a short practice that must go well), and asked again now and then
   const skills = () => store.get('trees.skills', {});
@@ -95,6 +98,138 @@ export function initTrees(ctx) {
     return [`${POOL.base}${pid}/${POOL.size}.${ext}`, p[2], p[0]];
   }
 
+  // ---- your own photos: kept in this browser only (IndexedDB), never uploaded
+  const idb = () => new Promise((ok, no) => { const r = indexedDB.open('njtf-trees', 1); r.onupgradeneeded = () => r.result.createObjectStore('photos', { keyPath: 'k', autoIncrement: true }); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+  async function myPhotos() {
+    try {
+      const db = await idb();
+      const all = await new Promise((ok) => { const r = db.transaction('photos').objectStore('photos').getAll(); r.onsuccess = () => ok(r.result || []); r.onerror = () => ok([]); });
+      const out = {}; for (const p of all) (out[p.id] = out[p.id] || []).push(p); return out;
+    } catch { return {}; }
+  }
+  async function addPhoto(id, file) {
+    const url = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsDataURL(file); });
+    const im = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = url; });
+    const sc = Math.min(1, 900 / Math.max(im.width, im.height)), c = document.createElement('canvas');
+    c.width = Math.round(im.width * sc); c.height = Math.round(im.height * sc); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+    const rec = { id, t: Date.now(), src: c.toDataURL('image/jpeg', 0.8), pt: walk && walk.pos ? walk.pos : null };
+    const db = await idb();
+    await new Promise((ok, no) => { const tx = db.transaction('photos', 'readwrite'); tx.objectStore('photos').add(rec); tx.oncomplete = ok; tx.onerror = () => no(tx.error); });
+    mine = await myPhotos();
+  }
+  async function removePhoto(k) {
+    const db = await idb();
+    await new Promise((ok) => { const tx = db.transaction('photos', 'readwrite'); tx.objectStore('photos').delete(k); tx.oncomplete = ok; tx.onerror = ok; });
+    mine = await myPhotos();
+  }
+  /** Ask for a photo of a tree (the camera on a phone), then come back to `then`. */
+  function snap(id, then) {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment';
+    inp.addEventListener('change', async () => { if (inp.files[0]) { try { await addPhoto(id, inp.files[0]); } catch { /* unreadable image */ } } then(); });
+    inp.click();
+  }
+  const myImg = (p, cls = '') => `<figure class="tr-ph ${cls} mine"><img src="${p.src}" alt=""><figcaption><b>Your photo</b><span>${new Date(p.t).toLocaleDateString()}</span></figcaption></figure>`;
+
+  // ---- tree walk: the trees recorded around where you are (or any place you pick), found in person
+  async function loadPoints() {
+    if (PTS) return;
+    const raw = await fetch('data/treepoints.json').then((r) => r.json());
+    PTS = {};
+    for (const [id, flat] of Object.entries(raw.trees)) {
+      const a = []; let x = 0, y = 0;
+      for (let i = 0; i < flat.length; i += 2) { x += flat[i]; y += flat[i + 1]; a.push([x / raw.scale, y / raw.scale]); }
+      PTS[id] = a;
+    }
+  }
+  const WALK_R = 600;   // metres
+  function nearby(pt) {
+    const out = [], dLat = WALK_R / 111000, dLon = dLat / Math.cos((pt[1] * Math.PI) / 180);
+    for (const [id, a] of Object.entries(PTS)) for (const p of a) {
+      if (Math.abs(p[1] - pt[1]) > dLat || Math.abs(p[0] - pt[0]) > dLon) continue;
+      const m = distanceMi(pt, p) * 1609.34; if (m <= WALK_R) out.push({ id, p, m });
+    }
+    return out.sort((a, b) => a.m - b.m);
+  }
+  function walkIntro() {
+    const sp = spot();
+    frame(back(), `<h2>Tree walk</h2><p class="sk-p">The trees people have recorded around you, on the map, nearest first. Walk to one, look for it, and tap <b>Found it</b>: finding a tree in person is the best way to know it.</p>
+      <p class="tn-hint">Your location is used only on this device while the walk is on; nothing is sent anywhere. Records are iNaturalist sightings, so a tree may have been cut down, or be one of several nearby.</p>
+      ${navigator.geolocation ? '<button class="tr-go" data-t="walkgps">Use my location</button>' : ''}
+      ${sp ? `<button class="tr-card wide" data-t="walkspot"><b>Around ${esc(sp.name)}</b><small>plan a walk from your spot</small></button>` : ''}
+      <button class="tr-card wide" data-t="walkmap"><b>Pick a place on the map</b><small>a park, a street you know</small></button>`);
+  }
+  async function walkBegin(src, pt) {
+    await loadPoints();
+    walkEnd(true);
+    walk = { src, pos: pt || null, center: null, sel: null, watch: null, last: 0 };
+    root.classList.add('peek');
+    if (!map.getSource('trees-walk')) {
+      map.addSource('trees-walk', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({ id: 'trees-walk', type: 'circle', source: 'trees-walk', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, ['case', ['get', 'sel'], 8, 4], 18, ['case', ['get', 'sel'], 14, 9]], 'circle-color': ['case', ['get', 'met'], '#2f8f5b', '#c9822b'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5, 'circle-opacity': ['case', ['get', 'sel'], 1, 0.8] } });
+      map.addSource('trees-me', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({ id: 'trees-me', type: 'circle', source: 'trees-me', paint: { 'circle-radius': 8, 'circle-color': '#2b6fd6', 'circle-stroke-color': '#fff', 'circle-stroke-width': 3 } });
+      map.on('click', 'trees-walk', (e) => { if (walk && e.features[0]) { walk.sel = e.features[0].properties.id; walkDraw(); } });
+    }
+    for (const l of ['trees-walk', 'trees-me']) map.setLayoutProperty(l, 'visibility', 'visible');
+    const pb = document.createElement('button'); pb.className = 'tr-peekback'; pb.textContent = 'End walk'; pb.addEventListener('click', () => { walkEnd(); hub(); }); document.body.appendChild(pb);
+    if (src === 'gps') {
+      ctx.hud('<div class="qkind">Tree walk</div><div class="q"><b>Finding where you are…</b></div>');
+      walk.watch = navigator.geolocation.watchPosition((g) => {
+        if (!walk) return;
+        walk.pos = [g.coords.longitude, g.coords.latitude];
+        if (Date.now() - walk.last > 4000) walkDraw();
+      }, () => { if (walk) ctx.hud('<div class="qkind">Tree walk</div><div class="q"><b>Location is off or not allowed</b></div><div class="meta">Use your spot or pick a place on the map instead.</div>'); }, { enableHighAccuracy: true, maximumAge: 5000 });
+    } else walkDraw();
+  }
+  function walkDraw() {
+    if (!walk || !walk.pos) return;
+    walk.last = Date.now();
+    const pos = walk.pos, near = nearby(pos), m = met();
+    map.getSource('trees-walk').setData({ type: 'FeatureCollection', features: near.slice(0, 400).map((n) => ({ type: 'Feature', properties: { id: n.id, met: m.includes(n.id), sel: n.id === walk.sel }, geometry: { type: 'Point', coordinates: n.p } })) });
+    map.getSource('trees-me').setData({ type: 'FeatureCollection', features: walk.src === 'gps' ? [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: pos } }] : [] });
+    const first = new Map(); for (const n of near) if (!first.has(n.id)) first.set(n.id, n);
+    const list = [...first.values()].slice(0, 6);
+    if (!walk.center || distanceMi(walk.center, pos) * 1609 > 120) {
+      // fit the view to you and the nearest trees on the list
+      walk.center = pos;
+      const xs = [pos[0], ...list.map((n) => n.p[0])], ys = [pos[1], ...list.map((n) => n.p[1])];
+      if (list.length) map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: { top: 290, bottom: 170, left: 40, right: 40 }, maxZoom: 17.5, bearing: 0, pitch: 0, duration: 900 });
+      else map.flyTo({ center: pos, zoom: 15.5, bearing: 0, pitch: 0, duration: 900 });
+    }
+    const dir = (n) => `${Math.round(n.m / 10) * 10} m ${compass8(bearing(pos, n.p))}`;
+    if (walk.sel && first.has(walk.sel)) {
+      const n = first.get(walk.sel), t = by.get(n.id);
+      ctx.hud(`<div class="qkind">Tree walk · ${esc(dir(n))}</div><div class="tw-sel"><img src="${esc(photoOf(t, ['leaf', 'bark']).f)}" alt=""><div><div class="q"><b>${esc(t.name)}</b></div><div class="meta">${esc(groupOf(t.id).tell[t.id])}</div></div></div>
+        <div class="tw-btns"><button data-walk="found" data-id="${t.id}">Found it</button><button data-walk="list">Back</button></div>`);
+    } else {
+      walk.sel = null;
+      ctx.hud(`<div class="qkind">Tree walk · recorded within ${WALK_R} m</div>${list.length ? `<div class="tw-list">${list.map((n) => `<button data-walk="sel" data-id="${n.id}"><b>${esc(by.get(n.id).name)}</b><span>${esc(dir(n))}${m.includes(n.id) ? '' : ' · new'}</span></button>`).join('')}</div>` : '<div class="meta">No trees from this app recorded here yet. Try a park nearby.</div>'}`);
+    }
+  }
+  function walkClick(e) {
+    const b = e.target.closest('[data-walk]'); if (!b || !walk) return;
+    const k = b.dataset.walk;
+    if (k === 'sel') { walk.sel = b.dataset.id; walkDraw(); }
+    else if (k === 'list') { walk.sel = null; walkDraw(); }
+    else if (k === 'found') {
+      const id = b.dataset.id, t = by.get(id), was = met().includes(id);
+      record(id, true);
+      if (!was) { const mm = store.get('trees.met', []); mm.push(id); store.set('trees.met', mm); }
+      const f = store.get('trees.found', []); f.push({ id, t: Date.now() }); store.set('trees.found', f.slice(-500));
+      ctx.hud(`<div class="qkind">Tree walk</div><div class="q"><b>${was ? 'Found' : 'Met in person'}: ${esc(t.name)} ✓</b></div><div class="meta">${was ? 'It counts as a review.' : 'It joins your trees and comes back in reviews.'}</div>
+        <div class="tw-btns"><button data-walk="snap" data-id="${id}">Add your photo</button><button data-walk="list">Next tree</button></div>`);
+    } else if (k === 'snap') snap(b.dataset.id, () => { walk && (walk.sel = null); walkDraw(); });
+  }
+  function walkEnd(quiet) {
+    if (!walk) return;
+    if (walk.watch != null) navigator.geolocation.clearWatch(walk.watch);
+    walk = null;
+    for (const l of ['trees-walk', 'trees-me']) if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', 'none');
+    document.querySelector('.tr-peekback')?.remove(); root.classList.remove('peek');
+    if (!quiet) ctx.hud('');
+  }
+  document.addEventListener('click', walkClick);
+
   // ---- the screen
   function mount() {
     if (root) return;
@@ -143,7 +278,7 @@ export function initTrees(ctx) {
   }
 
   function hub() {
-    q = null; run = null; quick = null;
+    q = null; run = null; quick = null; if (walk) walkEnd();
     const m = met(), t = store.get('trees.today', {}), doneToday = t.d === today() && t.done;
     const due = m.filter((id) => isDue(id)).length;
     const C = 2 * Math.PI * 21, frac = doneToday ? 1 : t.d === today() && t.n ? t.i / t.n : 0;
@@ -161,6 +296,7 @@ export function initTrees(ctx) {
       <div class="tn-list">${local.map((x, i) => `<button class="tn-row${m.includes(x.id) ? ' met' : ''}" data-t="card" data-id="${x.id}"><span class="tn-n">${m.includes(x.id) ? '✓' : i + 1}</span><span class="tn-leaf">${leafArt(x.id)}</span><span class="tk-gt"><b>${esc(x.name)}</b><small>${nc ? `seen ${nc[x.id].n.toLocaleString()} times within about 10 km` : `${x.count.toLocaleString()} sightings in New Jersey`}${!m.includes(x.id) && fresh.some((f) => f.id === x.id) ? ' · next to meet' : ''}</small></span></button>`).join('')}</div>
       <div class="tr-row"><button class="tr-card" data-t="quick"${m.length < 2 ? ' disabled' : ''}><b>Quick look</b><small>${m.length < 2 ? 'after you meet two trees' : '20 photos, fast: which tree?'}</small></button>
         <button class="tr-card" data-t="identify"><b>Name a tree</b><small>in front of you: a few questions</small></button></div>
+      <button class="tr-card wide tw-card" data-t="walk"><b>Tree walk</b><small>the trees recorded around you, on the map: go and find them${store.get('trees.found', []).length ? ` · ${store.get('trees.found', []).length} found so far` : ''}</small></button>
       <button class="tr-card wide" data-t="practise"${m.length < 2 && !learnt.length ? ' disabled' : ''}><b>Practise</b><small>${m.length < 2 && !learnt.length ? 'after you meet two trees' : 'endless, every kind of question'}</small></button>
       <h4>Learn to look</h4><p class="tn-hint">Optional short lessons: what field guides ask about any tree. Each tree's page links to the one it needs.</p>
       <div class="tn-skills">${Object.entries(SKILLS).map(([k, S]) => `<button class="tn-skill${skillDone(k) ? ' done' : ''}" data-t="lesson" data-sk="${k}">${ICON[KEY[Object.keys(KEY).find((n) => KEY[n].skill === k)].a[0][1]]}<b>${esc(S.name)}</b>${skillDone(k) ? '<small>✓ learned</small>' : ''}</button>`).join('')}</div>
@@ -175,6 +311,14 @@ export function initTrees(ctx) {
       ${anchors.length ? `<h4>Your places</h4><div class="tn-list">${anchors.map((a, i) => `<button class="tn-row" data-t="spotset" data-i="${i}"><span class="tn-n">📍</span><span class="tk-gt"><b>${esc(a.name)}</b><small>from your places on the town side</small></span></button>`).join('')}</div>` : ''}
       <button class="tr-go" data-t="spotmap">Tap a spot on the map</button>
       ${spot() ? '<button class="tr-card wide" data-t="spotclear"><b>Clear my spot</b><small>use the most-seen trees in all of New Jersey</small></button>' : ''}`);
+  }
+  function walkFromMap() {
+    root.classList.add('peek');
+    map.fitBounds(ctx.region.bounds, { padding: { top: 120, bottom: 110, left: 20, right: 20 }, bearing: 0, pitch: 0, duration: 700 });
+    ctx.hud('<div class="qkind">Tree walk</div><div class="q"><b>Tap where you want to walk</b></div><div class="meta">Zoom in to a park or a street first.</div>');
+    const pb = document.createElement('button'); pb.className = 'tr-peekback'; pb.textContent = 'Cancel'; pb.addEventListener('click', () => { picking = false; actions.unpeek(); walkIntro(); }); document.body.appendChild(pb);
+    picking = true;
+    map.once('click', (e) => { if (!picking) return; picking = false; document.querySelector('.tr-peekback')?.remove(); walkBegin('map', [e.lngLat.lng, e.lngLat.lat]); });
   }
   function spotFromMap() {
     picking = true; root.classList.add('peek');
@@ -227,7 +371,8 @@ export function initTrees(ctx) {
     const top3 = Object.keys(t.counties).slice(0, 3);
     frame(opts.meet ? `<span class="tr-kick">New tree · ${opts.k} of ${opts.n}</span>` : back(opts.from === 'guide' ? 'Field guide' : 'Trees'),
       `<h2>${esc(t.name)}</h2><p class="tr-sci">${esc(t.sci)}</p>
-      <div class="tr-strip">${t.photos.map((p) => img(p)).join('')}</div>
+      <div class="tr-strip">${(mine[t.id] || []).map((p) => myImg(p)).join('')}${t.photos.map((p) => img(p)).join('')}</div>
+      <div class="tw-mine"><button class="sk-link" data-t="snap" data-id="${t.id}">${(mine[t.id] || []).length ? 'Add another photo of yours' : 'Add your own photo of this tree'}</button>${(mine[t.id] || []).length ? ` · <button class="sk-link" data-t="unsnap" data-k="${mine[t.id][mine[t.id].length - 1].k}" data-id="${t.id}">remove your latest</button>` : ''}<small>Your photos stay on this device and come back in your reviews.</small></div>
       <div class="tk-tellrow"><div class="tk-sil">${leafArt(t.id)}</div><p class="tr-tell">${esc(t.tell)}</p></div>
       <button class="tk-ingroup" data-t="groupcard" data-g="${groupOf(t.id).id}"><small>One of the <b>${esc(groupOf(t.id).name.toLowerCase())}</b>: ${esc(groupOf(t.id).tell[t.id])}</small></button>
       ${pathHtml(t.id)}
@@ -294,6 +439,13 @@ export function initTrees(ctx) {
       q = { kind, t, right: String(ans), node };
       return;
     }
+    if (kind === 'mine' && (mine[t.id] || []).length) {
+      const ch = choicesFor(t, pool), p = rand(mine[t.id]);
+      frame(head, `<p class="tr-ask">Your photo: which tree is this?</p>${myImg(p, 'big')}<div class="tr-choices">${ch.map((c) => `<button data-t="ans" data-id="${c.id}">${esc(c.name)}</button>`).join('')}</div><div class="tr-fb"></div>`);
+      q = { kind: 'photo', t, right: t.id };
+      return;
+    }
+    if (kind === 'mine') kind = 'flash';
     if (kind === 'flash') {
       const ch = choicesFor(t, pool), [u, credit, file] = poolPhoto(t.id);
       frame(head, `<p class="tr-ask">Which tree is this?</p><figure class="tr-ph big"><img src="${esc(u)}" alt=""><figcaption><span>${esc(credit)} · iNaturalist</span></figcaption></figure><div class="tr-choices">${ch.map((c) => `<button data-t="ans" data-id="${c.id}">${esc(c.name)}</button>`).join('')}</div>${file ? `<button class="sk-link tn-hide" data-t="hidephoto" data-f="${esc(file)}">Bad photo? Hide it</button>` : ''}<div class="tr-fb"></div>`);
@@ -391,6 +543,8 @@ export function initTrees(ctx) {
     for (const id of due) qs.push({ id, kind: rand(kinds) });
     const extra = shuffle(m.filter((id) => !due.includes(id)));
     while (qs.length < Math.min(SET + 2, (m.length + fresh.length) * 2) && extra.length) qs.push({ id: extra.pop(), kind: rand(['flash', 'photo', 'pick', 'same']) });
+    const withMine = m.filter((id) => (mine[id] || []).length);
+    if (withMine.length) qs.push({ id: rand(withMine), kind: 'mine' });
     return [...steps, ...mix([...qs, ...revSkill])];
   }
   function startToday() {
@@ -453,6 +607,9 @@ export function initTrees(ctx) {
     spot: spotPicker, spotmap: spotFromMap, spotclear: () => { store.set('trees.spot', null); hub(); },
     spotset: (b) => { const a = store.get('anchors', [])[+b.dataset.i]; if (a) store.set('trees.spot', { name: a.name, pt: a.pt }); hub(); },
     quick: quickStart, qans: quickAnswer,
+    walk: walkIntro, walkgps: () => walkBegin('gps'), walkspot: () => walkBegin('spot', spot().pt), walkmap: walkFromMap,
+    snap: (b) => snap(b.dataset.id, () => card(by.get(b.dataset.id))),
+    unsnap: async (b) => { await removePhoto(+b.dataset.k); card(by.get(b.dataset.id)); },
     hidephoto: (b) => { const h = hidden(); if (!h.includes(b.dataset.f)) { h.push(b.dataset.f); store.set('trees.hidden', h.slice(-500)); } b.textContent = 'Hidden: you won’t see it again'; b.disabled = true; }, lstep: (b) => lesson(b.dataset.sk, +b.dataset.i),
     drillrun: (b) => { run = { steps: Array.from({ length: DRILL_N }, () => ({ drill: b.dataset.sk })), i: 0, right: 0, today: false }; step(); },
     more: () => { run = { steps: buildToday(), i: 0, right: 0, today: true }; step(); },
@@ -468,6 +625,7 @@ export function initTrees(ctx) {
       hub();
     },
     leave() {
+      walkEnd(true);
       document.body.classList.remove('trees-on');
       if (root) root.hidden = true;
       if (layer) map.setLayoutProperty('trees-pts', 'visibility', 'none');
