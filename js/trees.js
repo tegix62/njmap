@@ -165,7 +165,7 @@ export function initTrees(ctx) {
     root.classList.add('peek');
     if (!map.getSource('trees-walk')) {
       map.addSource('trees-walk', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-      map.addLayer({ id: 'trees-walk', type: 'circle', source: 'trees-walk', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 3, 18, 9], 'circle-color': ['case', ['get', 'met'], '#2f8f5b', '#c9822b'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5, 'circle-opacity': ['case', ['get', 'sel'], 1, 0.8] } });
+      map.addLayer({ id: 'trees-walk', type: 'circle', source: 'trees-walk', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, ['case', ['get', 'sel'], 8, 4], 18, ['case', ['get', 'sel'], 14, 9]], 'circle-color': ['case', ['get', 'met'], '#2f8f5b', '#c9822b'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5, 'circle-opacity': ['case', ['get', 'sel'], 1, 0.8] } });
       map.addSource('trees-me', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       map.addLayer({ id: 'trees-me', type: 'circle', source: 'trees-me', paint: { 'circle-radius': 8, 'circle-color': '#2b6fd6', 'circle-stroke-color': '#fff', 'circle-stroke-width': 3 } });
       map.on('click', 'trees-walk', (e) => { if (walk && e.features[0]) { walk.sel = e.features[0].properties.id; walkDraw(); } });
@@ -185,11 +185,17 @@ export function initTrees(ctx) {
     if (!walk || !walk.pos) return;
     walk.last = Date.now();
     const pos = walk.pos, near = nearby(pos), m = met();
-    if (!walk.center || distanceMi(walk.center, pos) * 1609 > 120) { walk.center = pos; map.flyTo({ center: pos, zoom: 16.2, bearing: 0, pitch: 0, duration: 900 }); }
     map.getSource('trees-walk').setData({ type: 'FeatureCollection', features: near.slice(0, 400).map((n) => ({ type: 'Feature', properties: { id: n.id, met: m.includes(n.id), sel: n.id === walk.sel }, geometry: { type: 'Point', coordinates: n.p } })) });
     map.getSource('trees-me').setData({ type: 'FeatureCollection', features: walk.src === 'gps' ? [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: pos } }] : [] });
     const first = new Map(); for (const n of near) if (!first.has(n.id)) first.set(n.id, n);
     const list = [...first.values()].slice(0, 6);
+    if (!walk.center || distanceMi(walk.center, pos) * 1609 > 120) {
+      // fit the view to you and the nearest trees on the list
+      walk.center = pos;
+      const xs = [pos[0], ...list.map((n) => n.p[0])], ys = [pos[1], ...list.map((n) => n.p[1])];
+      if (list.length) map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: { top: 290, bottom: 170, left: 40, right: 40 }, maxZoom: 17.5, bearing: 0, pitch: 0, duration: 900 });
+      else map.flyTo({ center: pos, zoom: 15.5, bearing: 0, pitch: 0, duration: 900 });
+    }
     const dir = (n) => `${Math.round(n.m / 10) * 10} m ${compass8(bearing(pos, n.p))}`;
     if (walk.sel && first.has(walk.sel)) {
       const n = first.get(walk.sel), t = by.get(n.id);

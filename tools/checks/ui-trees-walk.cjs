@@ -6,6 +6,7 @@ const { chromium } = require('playwright'); const fs = require('fs'); const path
   const c = await b.newContext({ viewport: { width: 390, height: 780 }, geolocation: { latitude: 40.8259, longitude: -74.2090 }, permissions: ['geolocation'] });
   const page = await c.newPage();
   const errs = []; page.on('pageerror', (e) => { errs.push(e.message); console.log('PAGEERR', e.message); });
+  page.on('console', (m) => { if (m.type() === 'error' && !/Failed to (load resource|fetch)|AJAXError/.test(m.text())) { errs.push(m.text()); console.log('CONSOLE', m.text().slice(0, 200)); } });
   await page.goto('http://localhost:8077/index.html?debug=1&region=nj'); await page.waitForSelector('#welcome [data-entry]');
   await page.click('[data-entry=trees]'); await page.waitForSelector('#trees .tr-today'); await page.waitForTimeout(600);
   await page.click('[data-t=walk]'); await page.waitForTimeout(300); await page.screenshot({ path: `${out}/0-intro.png` });
