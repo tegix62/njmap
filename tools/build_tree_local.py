@@ -4,6 +4,9 @@
 Stage 1 (grid):  python3 tools/build_tree_local.py grid    every research-grade iNaturalist observation of each tree in New Jersey (place 51),
                                                            counted on a 0.05-degree grid (about 4 x 5.5 km), into data/treegrid.json. The app
                                                            ranks "trees near you" from it on the device: your spot never leaves it.
+Stage 3 (points): python3 tools/build_tree_local.py points  each sighting's own place (open, not obscured, located to within 100 m), for tree
+                                                           walks, into data/treepoints.json: per tree, coordinates in 1e-4 degree steps (about 10 m),
+                                                           sorted and delta-coded. Loaded only when a walk starts.
 Stage 2 (pool):  python3 tools/build_tree_local.py pool    up to 80 openly licensed photos per tree from the cached New Jersey observations
                                                            (/tmp/trees/<slug>.json, from build_trees.py fetch, most-faved first), each tagged with a
                                                            season from the observation's annotations (coloured leaves: fall; no live leaves: winter;
@@ -79,5 +82,36 @@ def pool():
               open(os.path.join(ROOT, 'data/treepool.json'), 'w'), ensure_ascii=False, separators=(',', ':'))
 
 
+def points():
+    out = {'scale': 1e4, 'trees': {}}
+    for sci, slug in BT.TREES:
+        cache = f'/tmp/trees/points-{slug}.json'
+        if os.path.exists(cache):
+            pts = json.load(open(cache))
+        else:
+            t = BT.get('taxa', q=sci, rank='species', per_page=1)['results'][0]
+            pts, last = [], 0
+            while True:
+                r = BT.get('observations', taxon_id=t['id'], place_id=BT.NJ, quality_grade='research', per_page=200, order_by='id', order='asc', id_above=last)
+                res = r['results']
+                if not res:
+                    break
+                for o in res:
+                    last = o['id']
+                    acc = o.get('positional_accuracy')
+                    if o.get('obscured') or not o.get('geojson') or (acc is not None and acc > 100):
+                        continue
+                    lon, lat = o['geojson']['coordinates']
+                    pts.append([round(lon * 1e4), round(lat * 1e4)])
+            json.dump(pts, open(cache, 'w'))
+        pts = sorted(set(map(tuple, pts)))
+        flat, px, py = [], 0, 0
+        for x, y in pts:
+            flat += [x - px, y - py]; px, py = x, y
+        out['trees'][slug] = flat
+        print(f'{slug:18s} {len(pts):6d} places', flush=True)
+    json.dump(out, open(os.path.join(ROOT, 'data/treepoints.json'), 'w'), separators=(',', ':'))
+
+
 if __name__ == '__main__':
-    {'grid': grid, 'pool': pool}[sys.argv[1]]()
+    {'grid': grid, 'pool': pool, 'points': points}[sys.argv[1]]()
