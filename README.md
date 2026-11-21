@@ -685,3 +685,8 @@ Feedback: starting from a field guide's key (needles or leaves, drops in fall, p
 - **First batch**: red maple, dogwood, black cherry, beech, black locust, black walnut, gray birch, hemlock: 58 photos (each credited with author, licence and "Wikimedia Commons"; captions where they teach something: young and old black cherry bark, young beech holding dry leaves in winter, the white lines under hemlock needles) and 7 botanists' drawings (Britton & Brown's *Illustrated Flora*, 1913, and plates from Michaux's *North American Sylva*; all public domain). Each tree's page shows its drawing; a new question asks "Which tree is this botanist's drawing of?".
 - **Leaves with detail.** The traced leaves were flat silhouettes, which hid the veins and teeth you need to learn a leaf. Each is now the leaf itself from its photo in four greens: local contrast evened out (CLAHE), then cut into four steps by the leaf's own quartiles, with a dark edge, in the frame of its traced outline (`img/trees/leaf/<tree>.png`). The twig sketches use the same pictures.
 - **Four more leaves traced**, from the pictures in `incoming/` with a plain background: red maple, dogwood, beech, and black locust (the first compound leaf). Thirteen trees now have a traced leaf.
+
+
+### Home page: New Jersey, New York City, Trees of New Jersey
+
+The home page now opens each map directly: **New Jersey** (towns, counties, highways, lakes and mountains), **New York City** (Manhattan's neighborhoods, avenues and one-way streets) and **Trees of New Jersey**, with Goblin mode still a small link. Choosing a map saves it as your map, as the NJ / NYC switch inside the app does; Home inside the app goes back to this page. Check: `tools/checks/ui-home.cjs`.
