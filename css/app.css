@@ -3974,3 +3974,11 @@ body.trees-on #tabs, body.trees-on #fabs, body.trees-on #lookFab, body.trees-on 
 .tn-plate img { display: block; max-width: 100%; max-height: 52vh; margin: 0 auto; }
 .tn-plate figcaption { margin-top: 6px; font-size: 12px; opacity: 0.7; }
 .tn-plate.big img { max-height: 46vh; }
+/* trees: 3D */
+.t3-wrap { margin-bottom: 12px; }
+.t3-stage { height: 300px; border-radius: 18px; background: linear-gradient(#e8f1f8, #f6f8f2); box-shadow: 0 1px 3px rgba(23, 37, 28, 0.1); overflow: hidden; touch-action: none; }
+.t3-stage.big { height: min(48vh, 380px); }
+.t3-seasons { display: flex; gap: 6px; margin-top: 8px; }
+.t3-seasons button { flex: 1; border: 0; border-radius: 999px; padding: 8px 0; background: #e3ebe0; font: 650 13px system-ui, sans-serif; color: inherit; cursor: pointer; }
+.t3-seasons button.on { background: #17251c; color: #fff; }
+.t3-card { background: #f3eefb; }

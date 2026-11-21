@@ -101,6 +101,38 @@ export function initTrees(ctx) {
     return [`${POOL.base}${pid}/${POOL.size}.${ext}`, p[2], p[0]];
   }
 
+  // ---- trees in 3D (js/tree3d.js, loaded only when first needed: three.js is large)
+  let T3 = null, st3 = null;
+  const has3d = (id) => ['white-pine', 'pin-oak', 'sweetgum', 'red-maple'].includes(id);
+  async function stage3d(el) { T3 = T3 || await import('./tree3d.js'); if (st3) st3.dispose(); st3 = T3.stage(el); return st3; }
+  function drop3d() { if (st3) { st3.dispose(); st3 = null; } }
+  const SEASON_WORD = { spring: 'Spring', summer: 'Summer', fall: 'Fall', winter: 'Winter' };
+  async function show3d(id, season) {
+    const el = root.querySelector('.t3-stage'); if (!el) return;
+    for (const b of root.querySelectorAll('[data-t=t3season]')) b.classList.toggle('on', b.dataset.s === season);
+    const s3 = st3 && el.contains(st3.el) ? st3 : await stage3d(el); s3.el = el.querySelector('canvas'); s3.set(id, season);
+  }
+  // Name that tree: a 3D tree turning on the stage, in a season; four names
+  let n3 = null;
+  function nameStart() { n3 = { i: 0, n: 8, right: 0 }; nameAsk(); }
+  async function nameAsk() {
+    if (n3.i >= n3.n) { const r = n3.right; n3 = null; drop3d(); frame(back(), `<div class="tr-done"><h2>${r} of 8</h2><p>${r >= 7 ? 'You know them by their shape.' : 'Shape takes time: watch how the branches sit, and the outline of the crown.'}</p><button class="tr-go" data-t="name3d">Again</button><button class="tr-card wide" data-t="hub"><b>Back to the trees</b></button></div>`); return; }
+    const ids = ['white-pine', 'pin-oak', 'sweetgum', 'red-maple'], id = rand(ids), season = rand(['winter', 'winter', 'summer', 'fall']);
+    frame(`${back()}<span class="tr-prog">${Array.from({ length: n3.n }, (_, i) => `<i class="${i < n3.i ? 'd' : i === n3.i ? 'c' : ''}"></i>`).join('')}</span>`,
+      `<span class="tr-kick">Name that tree · ${esc(SEASON_WORD[season])}</span><p class="tr-ask">Which tree has this shape?</p><div class="t3-stage big"></div><p class="sk-cap">Drag to turn it. A model of the tree's habit, not a portrait of one tree.</p>
+      <div class="tr-choices">${shuffle(ids).map((x) => `<button data-t="n3ans" data-id="${x}">${esc(by.get(x).name)}</button>`).join('')}</div><div class="tr-fb"></div>`);
+    q = { kind: 'name3d', id };
+    const s3 = await stage3d(root.querySelector('.t3-stage')); s3.set(id, season);
+  }
+  const SHAPE_TELL = { 'white-pine': 'Level tiers of branches, ring above ring, with soft tufts of needles.', 'pin-oak': 'One straight trunk; upper branches rise, middle ones stand out level, the lowest droop.', sweetgum: 'One central trunk and a cone-shaped crown, widest low down.', 'red-maple': 'A rounded crown; branches in pairs, so twigs fork in Ys.' };
+  function nameAnswer(b) {
+    if (!q || q.done) return; q.done = true;
+    const ok = b.dataset.id === q.id; if (ok) n3.right++;
+    for (const x of root.querySelectorAll('[data-t=n3ans]')) { x.disabled = true; if (x.dataset.id === q.id) x.classList.add('right'); }
+    if (!ok) b.classList.add('wrong');
+    root.querySelector('.tr-fb').innerHTML = `<div class="tr-res ${ok ? 'ok' : 'no'}"><b>${ok ? '✓' : '✗'} ${esc(by.get(q.id).name)}</b><p>${esc(SHAPE_TELL[q.id])}</p></div><button class="tr-go" data-t="n3next">Next</button>`;
+  }
+
   // ---- your own photos: kept in this browser only (IndexedDB), never uploaded
   const idb = () => new Promise((ok, no) => { const r = indexedDB.open('njtf-trees', 1); r.onupgradeneeded = () => r.result.createObjectStore('photos', { keyPath: 'k', autoIncrement: true }); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
   async function myPhotos() {
@@ -246,7 +278,7 @@ export function initTrees(ctx) {
   const photoOf = (t, ctxs) => { const ps = t.photos.filter((p) => !ctxs || ctxs.includes(p.ctx)); return rand(ps.length ? ps : t.photos); };
   const img = (p, cls = '') => `<figure class="tr-ph ${cls}"><img src="${esc(p.f)}" alt="" loading="lazy"><figcaption><b>${esc(p.cap || CTX[p.ctx] || p.ctx)}</b><span>${esc(p.credit.replace(/^\(c\)/, '©').replace(/,? some rights reserved/, ''))}${p.lic && p.via ? ` · ${esc(p.lic)}` : ''} · ${esc(p.via || 'iNaturalist')}</span></figcaption></figure>`;
   const drawingHtml = (dr, cls = '') => `<figure class="tn-plate ${cls}"><img src="${esc(dr.f)}" alt="" loading="lazy"><figcaption>${/Britton/.test(dr.credit) ? 'Britton &amp; Brown, <i>Illustrated Flora</i> (1913)' : /Michaux/.test(dr.credit) ? 'Michaux, <i>The North American Sylva</i>' : esc(dr.credit)} · public domain</figcaption></figure>`;
-  const frame = (top, body) => { root.innerHTML = `<div class="tr-top">${top}</div><div class="tr-body">${body}</div>`; root.scrollTop = 0; root.classList.remove('peek'); ctx.hud(''); };
+  const frame = (top, body) => { drop3d(); root.innerHTML = `<div class="tr-top">${top}</div><div class="tr-body">${body}</div>`; root.scrollTop = 0; root.classList.remove('peek'); ctx.hud(''); };
   const back = (label = 'Trees') => `<button class="tr-back" data-t="hub"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>${esc(label)}</button>`;
 
   const groupOf = (id) => GROUPS.find((g) => g.id === GROUP_OF[id]);
@@ -282,7 +314,7 @@ export function initTrees(ctx) {
   }
 
   function hub() {
-    q = null; run = null; quick = null; if (walk) walkEnd();
+    q = null; run = null; quick = null; n3 = null; drop3d(); if (walk) walkEnd();
     const m = met(), t = store.get('trees.today', {}), doneToday = t.d === today() && t.done;
     const due = m.filter((id) => isDue(id)).length;
     const C = 2 * Math.PI * 21, frac = doneToday ? 1 : t.d === today() && t.n ? t.i / t.n : 0;
@@ -300,6 +332,7 @@ export function initTrees(ctx) {
       <div class="tn-list">${local.map((x, i) => `<button class="tn-row${m.includes(x.id) ? ' met' : ''}" data-t="card" data-id="${x.id}"><span class="tn-n">${m.includes(x.id) ? '✓' : i + 1}</span><span class="tn-leaf">${leafArt(x.id)}</span><span class="tk-gt"><b>${esc(x.name)}</b><small>${nc ? `seen ${nc[x.id].n.toLocaleString()} times within about 10 km` : `${x.count.toLocaleString()} sightings in New Jersey`}${!m.includes(x.id) && fresh.some((f) => f.id === x.id) ? ' · next to meet' : ''}</small></span></button>`).join('')}</div>
       <div class="tr-row"><button class="tr-card" data-t="quick"${m.length < 2 ? ' disabled' : ''}><b>Quick look</b><small>${m.length < 2 ? 'after you meet two trees' : '20 photos, fast: which tree?'}</small></button>
         <button class="tr-card" data-t="identify"><b>Name a tree</b><small>in front of you: a few questions</small></button></div>
+      <button class="tr-card wide t3-card" data-t="name3d"><b>Name that tree</b><small>a tree in 3D, turning, in any season: which is it? (4 trees so far)</small></button>
       <button class="tr-card wide tw-card" data-t="walk"><b>Tree walk</b><small>the trees recorded around you, on the map: go and find them${store.get('trees.found', []).length ? ` · ${store.get('trees.found', []).length} found so far` : ''}</small></button>
       <button class="tr-card wide" data-t="practise"${m.length < 2 && !learnt.length ? ' disabled' : ''}><b>Practise</b><small>${m.length < 2 && !learnt.length ? 'after you meet two trees' : 'endless, every kind of question'}</small></button>
       <h4>Learn to look</h4><p class="tn-hint">Optional short lessons: what field guides ask about any tree. Each tree's page links to the one it needs.</p>
@@ -378,6 +411,7 @@ export function initTrees(ctx) {
       <div class="tr-strip">${(mine[t.id] || []).map((p) => myImg(p)).join('')}${t.photos.map((p) => img(p)).join('')}</div>
       <div class="tw-mine"><button class="sk-link" data-t="snap" data-id="${t.id}">${(mine[t.id] || []).length ? 'Add another photo of yours' : 'Add your own photo of this tree'}</button>${(mine[t.id] || []).length ? ` · <button class="sk-link" data-t="unsnap" data-k="${mine[t.id][mine[t.id].length - 1].k}" data-id="${t.id}">remove your latest</button>` : ''}<small>Your photos stay on this device and come back in your reviews.</small></div>
       <div class="tk-tellrow"><div class="tk-sil">${leafArt(t.id)}</div><p class="tr-tell">${esc(t.tell)}</p></div>
+      ${has3d(t.id) ? `<h4>In 3D</h4><div class="t3-wrap"><div class="t3-stage"></div><div class="t3-seasons">${['spring', 'summer', 'fall', 'winter'].map((x) => `<button data-t="t3season" data-id="${t.id}" data-s="${x}">${SEASON_WORD[x]}</button>`).join('')}</div><p class="sk-cap">Drag to turn. A model of how this tree grows, from its branching and outline, with its own traced leaf.</p></div>` : ''}
       ${(t.drawings || []).length ? `<h4>A botanist's drawing</h4>${t.drawings.map((d) => drawingHtml(d)).join('')}` : ''}
       <button class="tk-ingroup" data-t="groupcard" data-g="${groupOf(t.id).id}"><small>One of the <b>${esc(groupOf(t.id).name.toLowerCase())}</b>: ${esc(groupOf(t.id).tell[t.id])}</small></button>
       ${pathHtml(t.id)}
@@ -387,6 +421,7 @@ export function initTrees(ctx) {
       <button class="tr-where" data-t="where" data-id="${t.id}"><b>Where it has been seen</b><small>${top3.length ? `Most in ${esc(top3.join(', '))}` : ''} · show on the map</small></button>
       ${opts.meet ? '<button class="tr-go" data-t="next">Got it</button>' : ''}`);
     q = { kind: 'card', t, opts };
+    drop3d(); if (has3d(t.id)) show3d(t.id, season());
   }
   function guide() {
     frame(back(), `<h2>Field guide</h2>${GROUPS.map((g) => `<button class="tk-gh" data-t="groupcard" data-g="${g.id}" data-from="guide">${esc(g.name)} <span>compare ›</span></button><div class="tr-list">${Object.keys(g.tell).map((id) => by.get(id)).map((t) => `<button class="tr-li" data-t="card" data-id="${t.id}" data-from="guide"><span class="tk-li-sil">${leafArt(t.id)}</span><span><b>${esc(t.name)}</b><small>${esc(g.tell[t.id])}</small></span></button>`).join('')}</div>`).join('')}`);
@@ -619,6 +654,7 @@ export function initTrees(ctx) {
     spot: spotPicker, spotmap: spotFromMap, spotclear: () => { store.set('trees.spot', null); hub(); },
     spotset: (b) => { const a = store.get('anchors', [])[+b.dataset.i]; if (a) store.set('trees.spot', { name: a.name, pt: a.pt }); hub(); },
     quick: quickStart, qans: quickAnswer,
+    t3season: (b) => show3d(b.dataset.id, b.dataset.s), name3d: nameStart, n3ans: nameAnswer, n3next: () => { if (n3) { n3.i++; nameAsk(); } },
     walk: walkIntro, walkgps: () => walkBegin('gps'), walkspot: () => walkBegin('spot', spot().pt), walkmap: walkFromMap,
     snap: (b) => snap(b.dataset.id, () => card(by.get(b.dataset.id))),
     unsnap: async (b) => { await removePhoto(+b.dataset.k); card(by.get(b.dataset.id)); },
@@ -637,7 +673,7 @@ export function initTrees(ctx) {
       hub();
     },
     leave() {
-      walkEnd(true);
+      walkEnd(true); drop3d();
       document.body.classList.remove('trees-on');
       if (root) root.hidden = true;
       if (layer) map.setLayoutProperty('trees-pts', 'visibility', 'none');
