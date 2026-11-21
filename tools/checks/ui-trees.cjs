@@ -38,5 +38,5 @@ const { chromium } = require('playwright'); const fs = require('fs');
   console.log('where:', (await page.locator('#hud').innerText()).replace(/\n/g, ' | ').slice(0, 200));
   await page.click('.tr-peekback'); await page.waitForTimeout(500);
   console.log('back on card:', await page.locator('#trees:not(.peek) .tr-tell').count(), '| practise works:', await (async () => { await page.click('[data-t=hub]'); await page.click('[data-t=practise]'); await page.waitForTimeout(300); return page.locator('.tr-ask').count(); })());
-  await page.click('[data-t=hub]'); await page.click('[data-t=home]'); await page.waitForSelector('#welcome [data-entry]'); await page.click('[data-entry=normal]'); await page.waitForTimeout(1500);
+  await page.click('[data-t=hub]'); await page.click('[data-t=home]'); await page.waitForSelector('#welcome [data-entry]'); await page.click('[data-entry=nj]'); await page.waitForTimeout(1500);
   console.log('back in normal mode:', await page.locator('.hub-today').count(), 'trees hidden:', await page.locator('#trees[hidden]').count(), '| missing files', bad.length, '| errors', errs.length); await b.close(); })();

@@ -6,7 +6,7 @@ const { chromium } = require('playwright'); const fs = require('fs');
   const b = await chromium.launch(); const page = await b.newPage({ viewport: { width: 390, height: 780 } });
   const errs = []; page.on('pageerror', (e) => errs.push(e.message));
   await page.goto('http://localhost:8077/index.html?debug=1&region=nj'); await page.waitForSelector('#welcome [data-entry]');
-  await page.click('[data-entry=normal]'); await page.waitForTimeout(2500);
+  await page.click('[data-entry=nj]'); await page.waitForTimeout(2500);
   const start = (n) => page.evaluate((n) => window.njtf.orbit.start({ header: () => '<div class="score"></div>', bindHeader: () => {}, names: [n], only: undefined, rounds: 1, title: 'probe' }), n);
   await start(A); await page.waitForTimeout(9000);
   await page.evaluate(() => { const m = window.njtf.map; window.__cam = []; const t0 = performance.now(); m.on('render', () => { const c = m.getCenter(); window.__cam.push([performance.now() - t0, c.lng, c.lat, m.getZoom(), m.getBearing(), m.getPitch()]); }); });

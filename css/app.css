@@ -3769,6 +3769,7 @@ body.holo .hub-today, body.holo .hub-card { border: 1px solid rgba(95, 243, 255,
 #settings #homeBtn { border-radius: 12px; min-height: 44px; }
 
 #welcome .wopt-trees { background: linear-gradient(135deg, #2f8f5b, #1f6b42); border-color: transparent; box-shadow: 0 8px 22px rgba(31, 107, 66, 0.32); }
+#welcome .wopt-nyc { background: linear-gradient(135deg, #c2571f, #8e3a14); border-color: transparent; box-shadow: 0 8px 22px rgba(142, 58, 20, 0.32); }
 #welcome .wsmall { margin-top: 18px; background: none; border: 0; color: #8a93a3; font: 13px system-ui, sans-serif; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 8px 4px; }
 
 /* ---- Trees of New Jersey ------------------------------------------------------------------------------------------ */

@@ -5,7 +5,7 @@ const { chromium } = require('playwright');
     const page = await b.newPage({ viewport: { width: 390, height: 780 } });
     const errs = []; page.on('pageerror', (e) => errs.push(e.message));
     await page.goto(`http://localhost:8077/index.html?debug=1&region=${region}`); await page.waitForSelector('#welcome [data-entry]');
-    await page.click('[data-entry=normal]'); await page.waitForTimeout(2500);
+    await page.click('[data-entry=nj]'); await page.waitForTimeout(2500);
     const hub = await page.locator('.hub-today').count();
     await page.evaluate(() => window.njtf.modes.practice.choose('name')); await page.waitForTimeout(1600);
     const choices = await page.locator('#qbody .choice').count();

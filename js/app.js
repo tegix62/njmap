@@ -85,6 +85,10 @@ function askRegion() {
 async function main() {
   // the home page: Goblin mode or Normal mode (remembered for this session)
   const entry = await askHome();
+  // the two maps on the home page: open the one chosen (saved as your map, as the in-app switcher does)
+  const MAP_ENTRY = { nj: 'nj', nyc: 'manhattan' };
+  if (MAP_ENTRY[entry] && activeRegion().id !== MAP_ENTRY[entry]) { switchRegion(MAP_ENTRY[entry]); return; }
+  if (MAP_ENTRY[entry]) setRegion(MAP_ENTRY[entry]);
   if (SIDE_MODES.includes(entry) && activeRegion().id !== 'nj') {   // Goblin mode is New Jersey only: open the NJ map for this visit without changing the saved map
     const u = new URL(location.href); u.searchParams.set('region', 'nj'); location.replace(u.toString()); return;
   }
@@ -629,6 +633,8 @@ async function main() {
   const normalMode = () => { const m = store.get('mode', 'practice'); return modes[m] && !SIDE_MODES.includes(m) ? m : 'practice'; };
   ctx.showHome = async () => {
     const e = await askHome({ force: true });
+    const want = { nj: 'nj', nyc: 'manhattan' }[e];
+    if (want && ctx.region.id !== want) { switchRegion(want); return; }
     if (SIDE_MODES.includes(e)) {
       if (ctx.region.id !== 'nj') { const u = new URL(location.href); u.searchParams.set('region', 'nj'); location.replace(u.toString()); return; }
       setMode(e);
