@@ -1,0 +1,8 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tree models</title>
+<style>body{margin:0;font:13px system-ui;background:#eef2ea}.g{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:6px}.c{background:#fff;border-radius:10px;overflow:hidden}.c div{height:300px}.c p{margin:4px 8px}</style></head>
+<body><div class="g" id="g"></div><script type="module">
+import { SPECIES, stage } from './js/tree3d.js';
+const q = new URLSearchParams(location.search), season = q.get('season') || 'summer', ids = (q.get('ids') || Object.keys(SPECIES).join(',')).split(',');
+for (const id of ids) { const c = document.createElement('div'); c.className = 'c'; c.innerHTML = `<div></div><p>${id} · ${season}</p>`; document.getElementById('g').appendChild(c); stage(c.firstChild, { auto: false }).set(id, season); }
+window.ready = true;
+</script></body></html>

@@ -690,3 +690,11 @@ Feedback: starting from a field guide's key (needles or leaves, drops in fall, p
 ### Home page: New Jersey, New York City, Trees of New Jersey
 
 The home page now opens each map directly: **New Jersey** (towns, counties, highways, lakes and mountains), **New York City** (Manhattan's neighborhoods, avenues and one-way streets) and **Trees of New Jersey**, with Goblin mode still a small link. Choosing a map saves it as your map, as the NJ / NYC switch inside the app does; Home inside the app goes back to this page. Check: `tools/checks/ui-home.cjs`.
+
+
+### Trees in 3D (`js/tree3d.js`, `lib/ez-tree/`, `lib/three/`)
+
+A generated 3D tree for four species so far (eastern white pine, pin oak, sweetgum, red maple), built with **ez-tree** (Daniel Greenheck, MIT) on **three.js** (MIT), both vendored and loaded only when a 3D view first opens. ez-tree places side branches at random; it was extended (`lib/ez-tree/tree.js`, `generateChildBranches`) with the arrangements species are told by: **opposite** (pairs, each a quarter turn from the last: maples), **whorl** (rings at one height: white pine), **alternate** (one at a time, spiralling: oaks, sweetgum), a branch angle that changes with height (`angleLow`: pin oak's drooping lower branches) and a **cone** crown (`cone`: sweetgum's pyramid). Its leaves are each tree's own traced four-tone leaf, recoloured into the species' fall colours for fall; winter is bare (no terminal leaves either). Bark textures are ez-tree's (CC0, Poly Haven and TextureCan).
+- **On the tree's page**: *In 3D*, turning, with Spring / Summer / Fall / Winter (opens on the current season). Drag to turn.
+- **Name that tree**: eight rounds of a 3D tree turning in a season (mostly winter, where the branching shows); four names; the answer says what in the shape tells it.
+- They are models of each tree's habit, not portraits. Each was compared with photos of whole trees before it was added; `tree3d.html?season=winter` shows them side by side for that. Check: `tools/checks/ui-trees-3d.cjs`.
