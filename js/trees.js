@@ -9,7 +9,7 @@ import { distanceMi, bearing, compass8 } from './geo.js';
 const DAYS = [0, 1, 3, 7, 16, 35];
 const DAY = 864e5;
 const NEW_PER_DAY = 3, SET = 10;
-const CTX = { leaf: 'leaf', bark: 'bark', form: 'whole tree', fruit: 'fruit', flower: 'flower', fall: 'autumn', twig: 'twig and buds' };
+const CTX = { leaf: 'leaf', bark: 'bark', form: 'whole tree', fruit: 'fruit', flower: 'flower', fall: 'autumn', twig: 'twig and buds', winter: 'winter' };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const rand = (a) => a[Math.floor(Math.random() * a.length)];
 const shuffle = (a) => a.map((v) => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map((p) => p[1]);
@@ -22,8 +22,11 @@ export function initTrees(ctx) {
 
   async function load() {
     if (D) return;
-    [D, G, POOL] = await Promise.all(['data/trees.json', 'data/treegrid.json', 'data/treepool.json'].map((f) => fetch(f).then((r) => r.json())));
+    let X;
+    [D, G, POOL, X] = await Promise.all(['data/trees.json', 'data/treegrid.json', 'data/treepool.json', 'data/treeextra.json'].map((f) => fetch(f).then((r) => r.json())));
     by = new Map(D.trees.map((t) => [t.id, t]));
+    // pictures added by hand from Wikimedia Commons (tools/build_incoming.py): more photos, and botanists' drawings
+    for (const [id, x] of Object.entries(X)) { const t = by.get(id); if (!t) continue; t.photos.push(...x.photos.map((p) => ({ ...p, via: 'Wikimedia Commons' }))); t.drawings = x.drawings; }
     H = { trees: D.trees, by, photoOf, img, esc };
     mine = await myPhotos();
   }
@@ -241,7 +244,8 @@ export function initTrees(ctx) {
     });
   }
   const photoOf = (t, ctxs) => { const ps = t.photos.filter((p) => !ctxs || ctxs.includes(p.ctx)); return rand(ps.length ? ps : t.photos); };
-  const img = (p, cls = '') => `<figure class="tr-ph ${cls}"><img src="${esc(p.f)}" alt="" loading="lazy"><figcaption><b>${esc(CTX[p.ctx] || p.ctx)}</b><span>${esc(p.credit.replace(/^\(c\)/, '©').replace(/,? some rights reserved/, ''))} · iNaturalist</span></figcaption></figure>`;
+  const img = (p, cls = '') => `<figure class="tr-ph ${cls}"><img src="${esc(p.f)}" alt="" loading="lazy"><figcaption><b>${esc(p.cap || CTX[p.ctx] || p.ctx)}</b><span>${esc(p.credit.replace(/^\(c\)/, '©').replace(/,? some rights reserved/, ''))}${p.lic && p.via ? ` · ${esc(p.lic)}` : ''} · ${esc(p.via || 'iNaturalist')}</span></figcaption></figure>`;
+  const drawingHtml = (dr, cls = '') => `<figure class="tn-plate ${cls}"><img src="${esc(dr.f)}" alt="" loading="lazy"><figcaption>${/Britton/.test(dr.credit) ? 'Britton &amp; Brown, <i>Illustrated Flora</i> (1913)' : /Michaux/.test(dr.credit) ? 'Michaux, <i>The North American Sylva</i>' : esc(dr.credit)} · public domain</figcaption></figure>`;
   const frame = (top, body) => { root.innerHTML = `<div class="tr-top">${top}</div><div class="tr-body">${body}</div>`; root.scrollTop = 0; root.classList.remove('peek'); ctx.hud(''); };
   const back = (label = 'Trees') => `<button class="tr-back" data-t="hub"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>${esc(label)}</button>`;
 
@@ -374,10 +378,11 @@ export function initTrees(ctx) {
       <div class="tr-strip">${(mine[t.id] || []).map((p) => myImg(p)).join('')}${t.photos.map((p) => img(p)).join('')}</div>
       <div class="tw-mine"><button class="sk-link" data-t="snap" data-id="${t.id}">${(mine[t.id] || []).length ? 'Add another photo of yours' : 'Add your own photo of this tree'}</button>${(mine[t.id] || []).length ? ` · <button class="sk-link" data-t="unsnap" data-k="${mine[t.id][mine[t.id].length - 1].k}" data-id="${t.id}">remove your latest</button>` : ''}<small>Your photos stay on this device and come back in your reviews.</small></div>
       <div class="tk-tellrow"><div class="tk-sil">${leafArt(t.id)}</div><p class="tr-tell">${esc(t.tell)}</p></div>
+      ${(t.drawings || []).length ? `<h4>A botanist's drawing</h4>${t.drawings.map((d) => drawingHtml(d)).join('')}` : ''}
       <button class="tk-ingroup" data-t="groupcard" data-g="${groupOf(t.id).id}"><small>One of the <b>${esc(groupOf(t.id).name.toLowerCase())}</b>: ${esc(groupOf(t.id).tell[t.id])}</small></button>
       ${pathHtml(t.id)}
       <div class="tr-facts">${t.arr === 'opposite' || t.arr === 'alternate' ? `${HAS_OUTLINE(t.id) ? `<span class="sk-twigchip">${twigSvg(t.id, { arr: t.arr, n: t.arr === 'opposite' ? 2 : 3 })}</span>` : ''}<button class="tn-fact" data-t="lesson" data-sk="pairs">Leaves <b>${t.arr === 'opposite' ? 'in pairs' : 'one at a time'}</b> on the twig <i>what's that?</i></button><button class="tn-fact" data-t="lesson" data-sk="leaflets"><b>${t.leaf === 'compound' ? 'A leaf made of leaflets' : 'One leaf'}</b> on each stalk <i>what's that?</i></button>` : `<button class="tn-fact" data-t="lesson" data-sk="look">Green all year, with <b>${t.arr}</b> <i>what's that?</i></button>`}</div>
-      ${HAS_OUTLINE(t.id) ? `<p class="tr-src">Leaf outline traced from a photo: ${esc(outlineSource(t.id).credit.replace(/^\(c\)/, '©').replace(/,? some rights reserved/, ''))} · iNaturalist</p>` : ''}
+      ${HAS_OUTLINE(t.id) ? `<p class="tr-src">Leaf picture traced from a photo: ${esc(outlineSource(t.id).credit.replace(/^\(c\)/, '©').replace(/,? some rights reserved/, ''))} · iNaturalist</p>` : ''}
       ${t.checked ? `<p class="tr-src">Checked against <a href="${esc(t.checked.src)}" target="_blank" rel="noopener">Wikipedia</a>${t.checked.note ? `. ${esc(t.checked.note)}` : ''}</p>` : ''}
       <button class="tr-where" data-t="where" data-id="${t.id}"><b>Where it has been seen</b><small>${top3.length ? `Most in ${esc(top3.join(', '))}` : ''} · show on the map</small></button>
       ${opts.meet ? '<button class="tr-go" data-t="next">Got it</button>' : ''}`);
@@ -439,6 +444,13 @@ export function initTrees(ctx) {
       q = { kind, t, right: String(ans), node };
       return;
     }
+    if (kind === 'plate' && (t.drawings || []).length) {
+      const ch = choicesFor(t, pool);
+      frame(head, `<p class="tr-ask">Which tree is this botanist's drawing of?</p>${drawingHtml(rand(t.drawings), 'big')}<div class="tr-choices">${ch.map((c) => `<button data-t="ans" data-id="${c.id}">${esc(c.name)}</button>`).join('')}</div><div class="tr-fb"></div>`);
+      q = { kind: 'photo', t, right: t.id };
+      return;
+    }
+    if (kind === 'plate') kind = 'flash';
     if (kind === 'mine' && (mine[t.id] || []).length) {
       const ch = choicesFor(t, pool), p = rand(mine[t.id]);
       frame(head, `<p class="tr-ask">Your photo: which tree is this?</p>${myImg(p, 'big')}<div class="tr-choices">${ch.map((c) => `<button data-t="ans" data-id="${c.id}">${esc(c.name)}</button>`).join('')}</div><div class="tr-fb"></div>`);
@@ -533,7 +545,7 @@ export function initTrees(ctx) {
     const learnt = Object.keys(SKILLS).filter(skillDone);
     const revSkill = learnt.length && Math.random() < 0.5 ? [{ drill: rand(learnt), review: true }] : [];
     const mix = (qs) => { const x = shuffle(qs); for (let i = 1; i < x.length; i++) if (x[i].id && x[i].id === x[i - 1].id) { const j = x.findIndex((y, k) => k > i && y.id !== x[i].id); if (j > 0) [x[i], x[j]] = [x[j], x[i]]; } return x; };
-    const kinds = ['flash', 'flash', 'photo', 'pick', 'same', 'key', 'groupq', 'shape', 'shapepick'];
+    const kinds = ['flash', 'flash', 'photo', 'pick', 'same', 'key', 'groupq', 'shape', 'shapepick', 'plate'];
     // the next trees on your local list (two a day; three on the very first day)
     const fresh = ranked().list.filter((t) => !m.includes(t.id)).slice(0, m.length ? 2 : 3).map((t) => t.id);
     const due = shuffle(m.filter((id) => isDue(id, s))).slice(0, Math.max(4, SET - fresh.length * 2));
@@ -595,7 +607,7 @@ export function initTrees(ctx) {
     const s = srs(), due = m.filter((id) => isDue(id, s));
     if (learnt.length && (m.length < 2 || Math.random() < 0.25)) return drillAsk(rand(learnt));
     const id = rand(due.length ? due : m);
-    ask(by.get(id), rand(['flash', 'flash', 'photo', 'pick', 'same', 'key', 'groupq', 'shape', 'shapepick']), m);
+    ask(by.get(id), rand(['flash', 'flash', 'photo', 'pick', 'same', 'key', 'groupq', 'shape', 'shapepick', 'plate']), m);
   }
 
   const actions = {

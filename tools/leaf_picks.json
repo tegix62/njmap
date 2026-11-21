@@ -7,5 +7,9 @@
  "sweetgum": [283, 0],
  "sycamore": [335, 0],
  "black-cherry": [710, 0],
- "gray-birch": [44, 0, {"smooth": 3}]
+ "gray-birch": [44, 0, {"smooth": 3}],
+ "red-maple": ["incoming/red-maple/Acer_rubrum.jpg", 0, {"crop": [0, 0, 0.56, 0.53]}],
+ "dogwood": ["incoming/dogwood/Cornus_florida_leaf.jpg", 42, {"crop": [0, 0, 0.48, 0.6]}],
+ "beech": ["incoming/beech/American_Beech.jpg", 0],
+ "black-locust": ["incoming/black-locust/Robinia_pseudoacacia_-_black_locust_-_Robinie_-_robinier_faux-acacia_04.jpg", -59]
 }

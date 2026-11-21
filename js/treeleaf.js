@@ -1,5 +1,5 @@
-// Leaf pictures for the trees. Broad leaves: outlines traced from real photos (tools/trace_leaves.py -> js/treeoutlines.js, each with its photo's
-// credit), drawn as solid shapes in one style. A broad-leaved tree with no traced outline gets none here (the screens show a photo of its leaf
+// Leaf pictures for the trees. Broad leaves: traced from real photos (tools/trace_leaves.py -> js/treeoutlines.js, each with its photo's
+// credit): the leaf itself in four greens (veins, teeth and edges kept), in the frame of its traced outline. A broad-leaved tree with no traced outline gets none here (the screens show a photo of its leaf
 // instead): the earlier shapes drawn from memory were not accurate and are gone. Needles and scales are simple stroke diagrams (needles in fives,
 // threes or one by one; scale sprays), counts checked against Wikipedia.
 // viewBox 0 0 100 120; the stalk at the bottom, the tip up.
@@ -42,7 +42,7 @@ let uid = 0;
 /** The leaf picture of a tree as an inline SVG, or '' when there is no accurate one. */
 export function leafSvg(id, cls = '') {
   const L = OUTLINES[id];
-  if (L) return `<svg viewBox="0 0 100 120" class="leafsvg ${cls}" aria-hidden="true"><path d="${L.d}" class="lf-fill"/></svg>`;
+  if (L) return `<svg viewBox="0 0 100 120" class="leafsvg ${cls}" aria-hidden="true">${L.img ? `<image href="${L.img}" x="0" y="0" width="100" height="120"/>` : `<path d="${L.d}" class="lf-fill"/>`}</svg>`;
   if (NEEDLE_IDS.includes(id)) return `<svg viewBox="0 0 100 120" class="leafsvg ${cls}" aria-hidden="true">${needleSvg(id)}</svg>`;
   return '';
 }
@@ -61,7 +61,7 @@ export function twigSvg(id, { arr = 'alternate', n, cls = '' } = {}) {
   const W = compound ? 250 : 160, X = W / 2, s = compound ? 0.92 : opp ? 0.58 : 0.52, cid = 'tw-' + id + '-' + (++uid);
   const top = 22, bottom = 214, span = bottom - top - (compound ? 70 : 30);
   const nodes = Array.from({ length: k }, (_, i) => bottom - 14 - (span * i) / Math.max(1, k - (opp ? 1 : compound ? 1 : 0.6)));
-  const leafAt = (x, y, a) => `<g transform="translate(${x} ${y}) rotate(${a}) scale(${s}) translate(-50 -120)"><path d="${L.d}" class="lf-fill"/><path d="M49 122L51 122L51.5 100L48.5 100Z" class="lf-fill"/></g>`;
+  const leafAt = (x, y, a) => `<g transform="translate(${x} ${y}) rotate(${a}) scale(${s}) translate(-50 -120)"><path d="M49 122L51 122L51.5 100L48.5 100Z" class="lf-fill"/>${L.img ? `<image href="${L.img}" x="0" y="0" width="100" height="120"/>` : `<path d="${L.d}" class="lf-fill"/>`}</g>`;
   const bud = (x, y, a) => `<ellipse cx="0" cy="-5" rx="3.6" ry="6.2" class="lf-bud" transform="translate(${x} ${y}) rotate(${a})"/>`;
   let leaves = '', buds = '';
   nodes.forEach((y, i) => {

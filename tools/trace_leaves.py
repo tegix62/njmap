@@ -188,13 +188,49 @@ def sheet():
         print('sheet', slug, flush=True)
 
 
+PALETTE = [(24, 78, 48), (40, 128, 80), (92, 172, 122), (190, 226, 200)]
+
+
+def tone(slug, a, m, M):
+    """The leaf in four greens: the photo's light and dark within the leaf (local contrast evened out, so veins and teeth show), cut into four
+    steps by its own quartiles, with a dark edge; transparent around it. Written to img/trees/leaf/<slug>.png (400 x 480, the 100 x 120 frame)."""
+    os.makedirs(os.path.join(ROOT, 'img/trees/leaf'), exist_ok=True)
+    W, H = 400, 480
+    g = cv2.cvtColor(a, cv2.COLOR_RGB2GRAY)
+    g = cv2.warpAffine(g, M, (W, H), flags=cv2.INTER_AREA, borderValue=0)
+    mk = cv2.warpAffine(m, M, (W, H), flags=cv2.INTER_LINEAR, borderValue=0) > 127
+    mk = cv2.morphologyEx(mk.astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8)) > 0
+    g = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(6, 6)).apply(g)
+    g = cv2.medianBlur(g, 3)
+    vals = g[mk]
+    if not len(vals):
+        return
+    q = np.quantile(vals, [0.22, 0.55, 0.85])
+    lvl = np.digitize(g, q)
+    rgba = np.zeros((H, W, 4), np.uint8)
+    for i, col in enumerate(PALETTE):
+        sel = mk & (lvl == i); rgba[sel, :3] = col; rgba[sel, 3] = 255
+    edge = mk & ~cv2.erode(mk.astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool)
+    rgba[edge, :3] = (16, 56, 34)
+    Image.fromarray(rgba, 'RGBA').save(os.path.join(ROOT, f'img/trees/leaf/{slug}.png'), optimize=True)
+
+
 def trace():
     picks = json.load(open(os.path.join(ROOT, 'tools/leaf_picks.json')))
     out = {}
     for slug, pk in picks.items():
         k, turn = pk[:2]; opt = pk[2] if len(pk) > 2 else {}
-        p = pool(slug)[k]
-        im = fetch_img(p['url'].replace('square', 'medium'))
+        if isinstance(k, str):      # a local picture (incoming/...), credited from tools/incoming_meta.json
+            meta = json.load(open(os.path.join(ROOT, 'tools/incoming_meta.json'))).get(os.path.basename(k), {})
+            import build_incoming
+            p = {'url': meta.get('page', ''), 'attr': build_incoming.credit(meta) + ' · ' + meta.get('lic', ''), 'lic': meta.get('lic', '')}
+            im = Image.open(os.path.join(ROOT, k)).convert('RGB')
+            if 'crop' in opt:      # a box around the one leaf to trace, as fractions of the picture
+                x0, y0, x1, y1 = opt['crop']; im = im.crop((int(x0 * im.width), int(y0 * im.height), int(x1 * im.width), int(y1 * im.height)))
+            im.thumbnail((700, 700))
+        else:
+            p = pool(slug)[k]
+            im = fetch_img(p['url'].replace('square', 'medium'))
         m = leaf_mask_seeded(im, tuple(opt['seed']), opt.get('tol', 14), opt.get('trim', 50)) if 'seed' in opt else leaf_mask_gc(im, opt.get('trim', 50))
         cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         c = max(cs, key=cv2.contourArea).reshape(-1, 2).astype(float)
@@ -203,12 +239,18 @@ def trace():
         c = c @ np.array([[math.cos(th), math.sin(th)], [-math.sin(th), math.cos(th)]])
         x0, y0 = c.min(0); x1, y1 = c.max(0)
         sc = min(92 / (x1 - x0), 116 / (y1 - y0))
-        c = (c - [(x0 + x1) / 2, y1]) * sc + [50, 118]
+        cx = (x0 + x1) / 2
+        # the same turn, scale and shift for the photo itself: a 4x picture of the leaf in four tones, in the outline's own frame
+        R = np.array([[math.cos(th), math.sin(th)], [-math.sin(th), math.cos(th)]])
+        A = 4 * sc * R.T; b = 4 * (np.array([50, 118]) - sc * np.array([cx, y1]))
+        M = np.hstack([A, b.reshape(2, 1)])
+        tone(slug, np.asarray(im), m, M)
+        c = (c - [cx, y1]) * sc + [50, 118]
         eps = 0.35
         c = cv2.approxPolyDP(c.astype(np.float32).reshape(-1, 1, 2), eps, True).reshape(-1, 2)
         d = 'M' + 'L'.join(f'{x:.1f} {y:.1f}' for x, y in c) + 'Z'
         os.makedirs(f'{TMP}/traced', exist_ok=True); im.save(f'{TMP}/traced/{slug}.jpg')
-        out[slug] = {'d': d, 'photo': p['url'].replace('square', 'medium'), 'credit': p['attr'], 'lic': p['lic'], 'obs_photo': k}
+        out[slug] = {'img': f'img/trees/leaf/{slug}.png', 'd': d, 'photo': p['url'].replace('square', 'medium'), 'credit': p['attr'], 'lic': p['lic'], 'obs_photo': k}
         print(f'{slug:18s} {len(c)} points', flush=True)
     json.dump(out, open(os.path.join(ROOT, 'data/leafoutlines.json'), 'w'), ensure_ascii=False, separators=(',', ':'))
     with open(os.path.join(ROOT, 'js/treeoutlines.js'), 'w') as f:
