@@ -1,0 +1,7 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tree lives</title>
+<style>body{margin:0;font:12px system-ui;background:#eef2ea}.g{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;padding:4px}.c{background:#fff;border-radius:8px;overflow:hidden}.c div{height:260px}.c p{margin:3px 6px}</style></head>
+<body><div class="g" id="g"></div><script type="module">
+import { lifeStage } from './js/tree3d.js';
+const q = new URLSearchParams(location.search), id = q.get('id') || 'pin-oak', ages = (q.get('ages') || '1,5,10,25,60,118').split(',').map(Number);
+for (const a of ages) { const c = document.createElement('div'); c.className = 'c'; c.innerHTML = `<div></div><p></p>`; document.getElementById('g').appendChild(c); const s = lifeStage(c.firstChild, id); s.setAge(a); const i = s.info(); c.lastChild.textContent = `${id} · year ${a} · ${i.season} · ${i.height.toFixed(1)} m`; }
+</script></body></html>

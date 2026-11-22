@@ -105,13 +105,51 @@ export function initTrees(ctx) {
   let T3 = null, st3 = null;
   const has3d = (id) => ['white-pine', 'pin-oak', 'sweetgum', 'red-maple'].includes(id);
   async function stage3d(el) { T3 = T3 || await import('./tree3d.js'); if (st3) st3.dispose(); st3 = T3.stage(el); return st3; }
-  function drop3d() { if (st3) { st3.dispose(); st3 = null; } }
+  function drop3d() { if (st3) { st3.dispose(); st3 = null; } grow = null; }
   const SEASON_WORD = { spring: 'Spring', summer: 'Summer', fall: 'Fall', winter: 'Winter' };
   async function show3d(id, season) {
     const el = root.querySelector('.t3-stage'); if (!el) return;
     for (const b of root.querySelectorAll('[data-t=t3season]')) b.classList.toggle('on', b.dataset.s === season);
     const s3 = st3 && el.contains(st3.el) ? st3 : await stage3d(el); s3.el = el.querySelector('canvas'); s3.set(id, season);
   }
+  // Watch it grow: one tree from seed to old age and death, seasons turning each year (js/tree3d.js lifeStage)
+  let grow = null;
+  const STAGE = (L, a, h) => a >= L.life + 4 ? 'Fallen: a log, feeding the soil' : a >= L.life ? 'Dead, still standing (a snag)' : a < 2 ? 'Seedling' : h < 4 ? 'Sapling' : a < L.decline * 0.35 ? 'Young tree' : a < L.decline ? 'Mature tree' : 'Old tree';
+  async function growScreen(id) {
+    const t = by.get(id);
+    frame(`<button class="tr-back" data-t="card" data-id="${id}"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>${esc(t.name)}</button>`,
+      `<span class="tr-kick">Watch it grow</span><h2>The life of a ${esc(t.name.toLowerCase())}</h2>
+      <div class="t3-stage big gr-stage"><div class="gr-hud"><b class="gr-year">Year 0</b><span class="gr-sub"></span></div><div class="gr-fact" hidden></div></div>
+      <input class="gr-slider" type="range" min="0" step="0.01" value="0" aria-label="Age in years">
+      <div class="gr-ctl"><button class="tr-go gr-play" data-t="grplay">Pause</button>${[[1, 'Slow: see the seasons'], [4, 'Faster'], [15, 'Fastest']].map(([v, l]) => `<button class="gr-speed${v === 4 ? ' on' : ''}" data-t="grspeed" data-v="${v}">${l}</button>`).join('')}</div>
+      <h4>Along the way</h4><div class="gr-facts"></div>
+      <p class="tn-hint">Height for each age follows the growth figures in the tree's Wikipedia article, as a typical tree in the open; the shape is a model of how this species grows, not a portrait of one tree. Drag the tree to turn it; drag the slider to any year.</p>`);
+    T3 = T3 || await import('./tree3d.js');
+    if (!root.querySelector('.gr-stage')) return;
+    drop3d();
+    st3 = T3.lifeStage(root.querySelector('.gr-stage'), id);
+    const L = st3.L, sl = root.querySelector('.gr-slider');
+    sl.max = String(L.life + 12);
+    root.querySelector('.gr-facts').innerHTML = L.facts.map(([a, f]) => `<button class="gr-fi" data-t="grjump" data-a="${a}"><b>Year ${a}</b><span>${esc(f)}</span></button>`).join('');
+    grow = { id, age: 0, speed: 4, playing: true, last: performance.now(), shown: -1, st: st3 };
+    sl.addEventListener('input', () => { grow.age = +sl.value; grow.playing = false; root.querySelector('.gr-play').textContent = 'Play'; });
+    const tick = (now) => {
+      if (!grow || grow.st !== st3 || !st3) return;
+      const dt = Math.min(0.1, (now - grow.last) / 1000); grow.last = now;
+      if (grow.playing) { grow.age += dt * grow.speed; if (grow.age >= L.life + 12) { grow.age = L.life + 12; grow.playing = false; root.querySelector('.gr-play').textContent = 'Again'; } }
+      st3.setAge(grow.age);
+      const i = st3.info();
+      root.querySelector('.gr-year').textContent = `Year ${Math.floor(grow.age)}`;
+      root.querySelector('.gr-sub').textContent = `${STAGE(L, grow.age, i.height)} · ${SEASON_WORD[i.season]}${i.height ? ` · ${i.height.toFixed(i.height < 3 ? 1 : 0)} m tall` : ''}`;
+      if (document.activeElement !== sl) sl.value = String(grow.age);
+      const f = L.facts.findIndex(([a]) => grow.age >= a && grow.age < a + Math.max(4, grow.speed * 2.2));
+      const box = root.querySelector('.gr-fact');
+      if (f !== grow.shown) { grow.shown = f; box.hidden = f < 0; if (f >= 0) box.textContent = L.facts[f][1]; for (const [k, b] of [...root.querySelectorAll('.gr-fi')].entries()) b.classList.toggle('on', k === f); }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
   // Name that tree: a 3D tree turning on the stage, in a season; four names
   let n3 = null;
   function nameStart() { n3 = { i: 0, n: 8, right: 0 }; nameAsk(); }
@@ -333,6 +371,7 @@ export function initTrees(ctx) {
       <div class="tr-row"><button class="tr-card" data-t="quick"${m.length < 2 ? ' disabled' : ''}><b>Quick look</b><small>${m.length < 2 ? 'after you meet two trees' : '20 photos, fast: which tree?'}</small></button>
         <button class="tr-card" data-t="identify"><b>Name a tree</b><small>in front of you: a few questions</small></button></div>
       <button class="tr-card wide t3-card" data-t="name3d"><b>Name that tree</b><small>a tree in 3D, turning, in any season: which is it? (4 trees so far)</small></button>
+      <div class="tr-row">${['red-maple', 'pin-oak', 'sweetgum', 'white-pine'].map((x) => `<button class="tr-card gr-mini" data-t="grow" data-id="${x}"><b>Watch it grow</b><small>${esc(by.get(x).name)}</small></button>`).join('')}</div>
       <button class="tr-card wide tw-card" data-t="walk"><b>Tree walk</b><small>the trees recorded around you, on the map: go and find them${store.get('trees.found', []).length ? ` · ${store.get('trees.found', []).length} found so far` : ''}</small></button>
       <button class="tr-card wide" data-t="practise"${m.length < 2 && !learnt.length ? ' disabled' : ''}><b>Practise</b><small>${m.length < 2 && !learnt.length ? 'after you meet two trees' : 'endless, every kind of question'}</small></button>
       <h4>Learn to look</h4><p class="tn-hint">Optional short lessons: what field guides ask about any tree. Each tree's page links to the one it needs.</p>
@@ -411,7 +450,7 @@ export function initTrees(ctx) {
       <div class="tr-strip">${(mine[t.id] || []).map((p) => myImg(p)).join('')}${t.photos.map((p) => img(p)).join('')}</div>
       <div class="tw-mine"><button class="sk-link" data-t="snap" data-id="${t.id}">${(mine[t.id] || []).length ? 'Add another photo of yours' : 'Add your own photo of this tree'}</button>${(mine[t.id] || []).length ? ` · <button class="sk-link" data-t="unsnap" data-k="${mine[t.id][mine[t.id].length - 1].k}" data-id="${t.id}">remove your latest</button>` : ''}<small>Your photos stay on this device and come back in your reviews.</small></div>
       <div class="tk-tellrow"><div class="tk-sil">${leafArt(t.id)}</div><p class="tr-tell">${esc(t.tell)}</p></div>
-      ${has3d(t.id) ? `<h4>In 3D</h4><div class="t3-wrap"><div class="t3-stage"></div><div class="t3-seasons">${['spring', 'summer', 'fall', 'winter'].map((x) => `<button data-t="t3season" data-id="${t.id}" data-s="${x}">${SEASON_WORD[x]}</button>`).join('')}</div><p class="sk-cap">Drag to turn. A model of how this tree grows, from its branching and outline, with its own traced leaf.</p></div>` : ''}
+      ${has3d(t.id) ? `<h4>In 3D</h4><div class="t3-wrap"><div class="t3-stage"></div><div class="t3-seasons">${['spring', 'summer', 'fall', 'winter'].map((x) => `<button data-t="t3season" data-id="${t.id}" data-s="${x}">${SEASON_WORD[x]}</button>`).join('')}</div><p class="sk-cap">Drag to turn. A model of how this tree grows, from its branching and outline, with its own traced leaf.</p><button class="tr-card wide gr-card" data-t="grow" data-id="${t.id}"><b>Watch it grow</b><small>from a seed to old age, the seasons turning every year</small></button></div>` : ''}
       ${(t.drawings || []).length ? `<h4>A botanist's drawing</h4>${t.drawings.map((d) => drawingHtml(d)).join('')}` : ''}
       <button class="tk-ingroup" data-t="groupcard" data-g="${groupOf(t.id).id}"><small>One of the <b>${esc(groupOf(t.id).name.toLowerCase())}</b>: ${esc(groupOf(t.id).tell[t.id])}</small></button>
       ${pathHtml(t.id)}
@@ -654,7 +693,11 @@ export function initTrees(ctx) {
     spot: spotPicker, spotmap: spotFromMap, spotclear: () => { store.set('trees.spot', null); hub(); },
     spotset: (b) => { const a = store.get('anchors', [])[+b.dataset.i]; if (a) store.set('trees.spot', { name: a.name, pt: a.pt }); hub(); },
     quick: quickStart, qans: quickAnswer,
-    t3season: (b) => show3d(b.dataset.id, b.dataset.s), name3d: nameStart, n3ans: nameAnswer, n3next: () => { if (n3) { n3.i++; nameAsk(); } },
+    t3season: (b) => show3d(b.dataset.id, b.dataset.s),
+    grow: (b) => growScreen(b.dataset.id),
+    grplay: (b) => { if (!grow) return; if (b.textContent === 'Again') grow.age = 0; grow.playing = !grow.playing || b.textContent === 'Again'; grow.last = performance.now(); b.textContent = grow.playing ? 'Pause' : 'Play'; },
+    grspeed: (b) => { if (!grow) return; grow.speed = +b.dataset.v; for (const x of root.querySelectorAll('.gr-speed')) x.classList.toggle('on', x === b); },
+    grjump: (b) => { if (!grow) return; grow.age = +b.dataset.a + 0.5; grow.shown = -1; grow.playing = false; const p = root.querySelector('.gr-play'); if (p) p.textContent = 'Play'; }, name3d: nameStart, n3ans: nameAnswer, n3next: () => { if (n3) { n3.i++; nameAsk(); } },
     walk: walkIntro, walkgps: () => walkBegin('gps'), walkspot: () => walkBegin('spot', spot().pt), walkmap: walkFromMap,
     snap: (b) => snap(b.dataset.id, () => card(by.get(b.dataset.id))),
     unsnap: async (b) => { await removePhoto(+b.dataset.k); card(by.get(b.dataset.id)); },

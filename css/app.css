@@ -3982,3 +3982,21 @@ body.trees-on #tabs, body.trees-on #fabs, body.trees-on #lookFab, body.trees-on 
 .t3-seasons button { flex: 1; border: 0; border-radius: 999px; padding: 8px 0; background: #e3ebe0; font: 650 13px system-ui, sans-serif; color: inherit; cursor: pointer; }
 .t3-seasons button.on { background: #17251c; color: #fff; }
 .t3-card { background: #f3eefb; }
+/* trees: watch it grow */
+.gr-stage { position: relative; height: min(56vh, 460px); }
+.gr-hud { position: absolute; left: 10px; top: 8px; display: grid; gap: 1px; pointer-events: none; text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8); }
+.gr-year { font: 800 26px system-ui, sans-serif; letter-spacing: -0.02em; }
+.gr-sub { font-size: 13px; opacity: 0.8; }
+.gr-fact { position: absolute; left: 10px; right: 10px; bottom: 10px; padding: 10px 12px; border-radius: 14px; background: rgba(23, 37, 28, 0.85); color: #fff; font-size: 14px; line-height: 1.35; pointer-events: none; animation: grfact 0.3s ease-out; }
+@keyframes grfact { from { opacity: 0; transform: translateY(6px); } }
+.gr-slider { width: 100%; margin: 10px 0 4px; accent-color: #2f8f5b; }
+.gr-ctl { display: flex; gap: 6px; align-items: stretch; flex-wrap: wrap; }
+.gr-ctl .tr-go { flex: none; width: 100px; margin: 0; min-height: 44px; }
+.gr-speed { flex: 1; border: 0; border-radius: 12px; background: #e3ebe0; font: 650 12.5px system-ui, sans-serif; color: inherit; cursor: pointer; min-height: 44px; }
+.gr-speed.on { background: #2f8f5b; color: #fff; }
+.gr-facts { display: grid; gap: 6px; margin-bottom: 10px; }
+.gr-fi { display: grid; grid-template-columns: 70px 1fr; gap: 8px; text-align: left; border: 0; border-radius: 12px; padding: 8px 10px; background: #fff; color: inherit; font: 13.5px system-ui, sans-serif; cursor: pointer; box-shadow: 0 1px 3px rgba(23, 37, 28, 0.08); }
+.gr-fi.on { background: #e2f3e8; }
+.gr-card { margin-top: 8px; background: #eaf5ee; }
+.gr-mini { flex: 1 1 45%; }
+.gr-mini small { font-size: 12px; }
