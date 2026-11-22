@@ -4000,3 +4000,10 @@ body.trees-on #tabs, body.trees-on #fabs, body.trees-on #lookFab, body.trees-on 
 .gr-card { margin-top: 8px; background: #eaf5ee; }
 .gr-mini { flex: 1 1 45%; }
 .gr-mini small { font-size: 12px; }
+.gr-beats { display: flex; gap: 5px; overflow-x: auto; padding: 2px 0 8px; scrollbar-width: none; }
+.gr-beat { flex: none; border: 0; border-radius: 999px; padding: 7px 11px; background: #e3ebe0; font: 650 12.5px system-ui, sans-serif; color: inherit; cursor: pointer; white-space: nowrap; }
+.gr-beat.on { background: #17251c; color: #fff; }
+.gr-step { flex: none; width: 52px; border: 0; border-radius: 14px; background: #e3ebe0; font: 700 22px system-ui, sans-serif; color: inherit; cursor: pointer; }
+.gr-ctl .tr-go.gr-play { flex: 1; width: auto; }
+.gr-any { margin: 10px 2px 4px; font-size: 14px; }
+.gr-any summary { cursor: pointer; color: #2f8f5b; font-weight: 700; }

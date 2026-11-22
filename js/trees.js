@@ -115,36 +115,62 @@ export function initTrees(ctx) {
   // Watch it grow: one tree from seed to old age and death, seasons turning each year (js/tree3d.js lifeStage)
   let grow = null;
   const STAGE = (L, a, h) => a >= L.life + 4 ? 'Fallen: a log, feeding the soil' : a >= L.life ? 'Dead, still standing (a snag)' : a < 2 ? 'Seedling' : h < 4 ? 'Sapling' : a < L.decline * 0.35 ? 'Young tree' : a < L.decline ? 'Mature tree' : 'Old tree';
+  // the story, beat by beat: each beat maps its own progress p (0..1) to an age, a season (held, or turning), the seed or sprout, a camera, a line
+  function beatsFor(st, story) {
+    const L = st.L, Hm = L.Hmax, hAt = (a) => st.height(a);
+    let prime = 1; while (prime < L.decline * 0.6 && hAt(prime) < 0.92 * Hm) prime++;
+    const sap = L.evergreen ? 6 : 4, cr = st.crown();
+    const fit = (a) => { const h = Math.max(0.5, hAt(a)), c = Math.max(0.5, cr * Math.min(1, h / Hm)); return { look: h * 0.45, dist: Math.max(2.4, h * 1.6 + c * 0.6), up: Math.max(1, h * 0.5), lx: 0 }; };
+    const Ln = story.lines;
+    return [
+      { id: 'seed', name: 'Seed', dur: 6.5, line: Ln.seed, at: (p) => ({ age: 0, sf: story.seedSeason, seed: p, view: { look: 0.45, dist: 1.5, up: 0.9, lx: 0, man: false } }) },
+      { id: 'sprout', name: 'Sprout', dur: 6, line: Ln.sprout, at: (p) => ({ age: 0, sf: 0.5, sprout: { x: 0, z: 0, s: 0.35 + 0.65 * Math.min(1, p * 1.6) }, view: { look: 0.16, dist: 1.25, up: 0.55, lx: 0, man: false } }) },
+      { id: 'sapling', name: 'Sapling', dur: 10, line: Ln.sapling, at: (p) => ({ age: sap + 0.15 + p * 0.85, view: { ...fit(sap + 1), man: true } }) },
+      { id: 'growing', name: 'Growing up', dur: 7, line: Ln.growing, at: (p) => { const a = sap + 1 + p * (prime - sap - 1); return { age: a, sf: 0.55, view: fit(a) }; } },
+      { id: 'prime', name: 'A year in its prime', dur: 14, line: Ln.prime, at: (p) => ({ age: prime + 0.12 + p * 0.86, view: fit(prime) }) },
+      { id: 'old', name: 'Old age', dur: 8, line: Ln.old, at: (p) => { const a = L.decline + p * (L.life - L.decline); return { age: a, sf: 0.1, view: fit(a) }; } },
+      { id: 'death', name: 'Death and after', dur: 11, line: 'Dead, it stands for a few years as a snag, then falls. The log slowly goes back into the soil, and new seedlings start beside it. (This part is modelled, not timed from a source.)',
+        at: (p) => p < 0.3 ? { age: L.life + 0.5 + (p / 0.3) * 3, sf: 0.1, view: fit(L.life) } : p < 0.62 ? { age: L.life + 4 + ((p - 0.3) / 0.32) * 1.3, sf: 0.1, view: fit(L.life) }
+          : { age: L.life + 8, sf: 0.5, view: null, sprout: { x: Hm * 0.25, z: 1.2, s: 0.8 + 14 * (p - 0.62) } } },
+    ];
+  }
   async function growScreen(id) {
     const t = by.get(id);
     frame(`<button class="tr-back" data-t="card" data-id="${id}"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>${esc(t.name)}</button>`,
       `<span class="tr-kick">Watch it grow</span><h2>The life of a ${esc(t.name.toLowerCase())}</h2>
-      <div class="t3-stage big gr-stage"><div class="gr-hud"><b class="gr-year">Year 0</b><span class="gr-sub"></span></div><div class="gr-fact" hidden></div></div>
-      <input class="gr-slider" type="range" min="0" step="0.01" value="0" aria-label="Age in years">
-      <div class="gr-ctl"><button class="tr-go gr-play" data-t="grplay">Pause</button>${[[1, 'Slow: see the seasons'], [4, 'Faster'], [15, 'Fastest']].map(([v, l]) => `<button class="gr-speed${v === 4 ? ' on' : ''}" data-t="grspeed" data-v="${v}">${l}</button>`).join('')}</div>
-      <h4>Along the way</h4><div class="gr-facts"></div>
-      <p class="tn-hint">Height for each age follows the growth figures in the tree's Wikipedia article, as a typical tree in the open; the shape is a model of how this species grows, not a portrait of one tree. Drag the tree to turn it; drag the slider to any year.</p>`);
+      <div class="gr-beats"></div>
+      <div class="t3-stage big gr-stage"><div class="gr-hud"><b class="gr-year">Year 0</b><span class="gr-sub"></span></div><div class="gr-fact"></div></div>
+      <div class="gr-ctl"><button class="gr-step" data-t="grprev" aria-label="Previous">‹</button><button class="tr-go gr-play" data-t="grplay">Pause</button><button class="gr-step" data-t="grnext" aria-label="Next">›</button></div>
+      <details class="gr-any"><summary>Any year</summary><input class="gr-slider" type="range" min="0" step="0.01" value="0" aria-label="Age in years"><p class="tn-hint">Drag to any year; the seasons follow the date in the year.</p></details>
+      <p class="tn-hint">The lines are from the tree's Wikipedia article, and its height at each age follows the growth figures there, for a typical tree in the open. The shape at each age is a model of how this species grows, not a portrait of one tree. Drag the tree to turn it.</p>`);
     T3 = T3 || await import('./tree3d.js');
     if (!root.querySelector('.gr-stage')) return;
     drop3d();
     st3 = T3.lifeStage(root.querySelector('.gr-stage'), id);
-    const L = st3.L, sl = root.querySelector('.gr-slider');
-    sl.max = String(L.life + 12);
-    root.querySelector('.gr-facts').innerHTML = L.facts.map(([a, f]) => `<button class="gr-fi" data-t="grjump" data-a="${a}"><b>Year ${a}</b><span>${esc(f)}</span></button>`).join('');
-    grow = { id, age: 0, speed: 4, playing: true, last: performance.now(), shown: -1, st: st3 };
-    sl.addEventListener('input', () => { grow.age = +sl.value; grow.playing = false; root.querySelector('.gr-play').textContent = 'Play'; });
+    const story = T3.storyOf(id), beats = beatsFor(st3, story), sl = root.querySelector('.gr-slider');
+    sl.max = String(st3.L.life + 12);
+    root.querySelector('.gr-beats').innerHTML = beats.map((bt, i) => `<button class="gr-beat" data-t="grbeat" data-i="${i}">${esc(bt.name)}</button>`).join('');
+    grow = { id, beats, bi: 0, p: 0, playing: true, last: performance.now(), free: false, st: st3, age: 0 };
+    sl.addEventListener('input', () => { grow.free = true; grow.age = +sl.value; grow.playing = false; root.querySelector('.gr-play').textContent = 'Play'; });
     const tick = (now) => {
       if (!grow || grow.st !== st3 || !st3) return;
       const dt = Math.min(0.1, (now - grow.last) / 1000); grow.last = now;
-      if (grow.playing) { grow.age += dt * grow.speed; if (grow.age >= L.life + 12) { grow.age = L.life + 12; grow.playing = false; root.querySelector('.gr-play').textContent = 'Again'; } }
-      st3.setAge(grow.age);
-      const i = st3.info();
-      root.querySelector('.gr-year').textContent = `Year ${Math.floor(grow.age)}`;
-      root.querySelector('.gr-sub').textContent = `${STAGE(L, grow.age, i.height)} · ${SEASON_WORD[i.season]}${i.height ? ` · ${i.height.toFixed(i.height < 3 ? 1 : 0)} m tall` : ''}`;
-      if (document.activeElement !== sl) sl.value = String(grow.age);
-      const f = L.facts.findIndex(([a]) => grow.age >= a && grow.age < a + Math.max(4, grow.speed * 2.2));
-      const box = root.querySelector('.gr-fact');
-      if (f !== grow.shown) { grow.shown = f; box.hidden = f < 0; if (f >= 0) box.textContent = L.facts[f][1]; for (const [k, b] of [...root.querySelectorAll('.gr-fi')].entries()) b.classList.toggle('on', k === f); }
+      const L = st3.L; let st, line;
+      if (grow.free) {
+        st3.setView(null); st3.seed(-1); st3.sprout(null); st3.setAge(grow.age); line = '';
+      } else {
+        const bt = beats[grow.bi];
+        if (grow.playing) { grow.p += dt / bt.dur; if (grow.p >= 1) { if (grow.bi < beats.length - 1) { grow.bi++; grow.p = 0; } else { grow.p = 1; grow.playing = false; root.querySelector('.gr-play').textContent = 'Watch again'; } } }
+        st = beats[grow.bi].at(Math.min(1, grow.p));
+        st3.setAge(st.age, st.sf ?? null); st3.seed(st.seed ?? -1); st3.sprout(st.sprout || null); st3.setView(st.view === undefined ? null : st.view);
+        grow.age = st.age; line = beats[grow.bi].line;
+        if (document.activeElement !== sl) sl.value = String(st.age);
+      }
+      const i = st3.info(), bt = beats[grow.bi];
+      root.querySelector('.gr-year').textContent = grow.free ? `Year ${Math.floor(grow.age)}` : bt.id === 'seed' ? 'A seed' : bt.id === 'sprout' ? 'Year 0' : `Year ${Math.floor(grow.age)}`;
+      root.querySelector('.gr-sub').textContent = bt.id === 'seed' && !grow.free ? SEASON_WORD[i.season] : `${STAGE(L, grow.age, i.height)} · ${SEASON_WORD[i.season]}${i.height && bt.id !== 'sprout' ? ` · ${i.height.toFixed(i.height < 3 ? 1 : 0)} m tall` : ''}`;
+      const fb = root.querySelector('.gr-fact'); if (fb.dataset.l !== line) { fb.dataset.l = line; fb.textContent = line; fb.hidden = !line; fb.style.animation = 'none'; void fb.offsetWidth; fb.style.animation = ''; }
+      for (const [k, b] of [...root.querySelectorAll('.gr-beat')].entries()) b.classList.toggle('on', !grow.free && k === grow.bi);
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
@@ -695,9 +721,10 @@ export function initTrees(ctx) {
     quick: quickStart, qans: quickAnswer,
     t3season: (b) => show3d(b.dataset.id, b.dataset.s),
     grow: (b) => growScreen(b.dataset.id),
-    grplay: (b) => { if (!grow) return; if (b.textContent === 'Again') grow.age = 0; grow.playing = !grow.playing || b.textContent === 'Again'; grow.last = performance.now(); b.textContent = grow.playing ? 'Pause' : 'Play'; },
-    grspeed: (b) => { if (!grow) return; grow.speed = +b.dataset.v; for (const x of root.querySelectorAll('.gr-speed')) x.classList.toggle('on', x === b); },
-    grjump: (b) => { if (!grow) return; grow.age = +b.dataset.a + 0.5; grow.shown = -1; grow.playing = false; const p = root.querySelector('.gr-play'); if (p) p.textContent = 'Play'; }, name3d: nameStart, n3ans: nameAnswer, n3next: () => { if (n3) { n3.i++; nameAsk(); } },
+    grplay: (b) => { if (!grow) return; if (b.textContent === 'Watch again') { grow.bi = 0; grow.p = 0; } if (grow.free) { grow.free = false; grow.p = 0; } grow.playing = !grow.playing || b.textContent === 'Watch again'; grow.last = performance.now(); b.textContent = grow.playing ? 'Pause' : 'Play'; },
+    grbeat: (b) => { if (!grow) return; grow.free = false; grow.bi = +b.dataset.i; grow.p = 0; grow.playing = true; grow.last = performance.now(); const pl = root.querySelector('.gr-play'); if (pl) pl.textContent = 'Pause'; },
+    grprev: () => { if (!grow) return; grow.free = false; grow.bi = Math.max(0, grow.p > 0.15 ? grow.bi : grow.bi - 1); grow.p = 0; },
+    grnext: () => { if (!grow) return; grow.free = false; grow.bi = Math.min(grow.beats.length - 1, grow.bi + 1); grow.p = 0; grow.playing = true; const pl = root.querySelector('.gr-play'); if (pl) pl.textContent = 'Pause'; }, name3d: nameStart, n3ans: nameAnswer, n3next: () => { if (n3) { n3.i++; nameAsk(); } },
     walk: walkIntro, walkgps: () => walkBegin('gps'), walkspot: () => walkBegin('spot', spot().pt), walkmap: walkFromMap,
     snap: (b) => snap(b.dataset.id, () => card(by.get(b.dataset.id))),
     unsnap: async (b) => { await removePhoto(+b.dataset.k); card(by.get(b.dataset.id)); },
