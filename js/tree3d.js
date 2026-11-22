@@ -127,6 +127,29 @@ export const LIFE = {
   'red-maple': { Hmax: 20, k: 0.045, p: 1.5, life: 110, decline: 85, dur: { 1: 25, 2: 9, 3: 3.5 },
     facts: [[1, 'A seedling can grow 30 cm in its first year, then up to 60 cm a year.'], [8, 'First red flowers at about 8 years (some at 4).'], [90, 'Most red maples live less than 100 years; at most about 150.']] },
 };
+// The story of each life, in beats (js/trees.js plays them): seed, sprout, sapling, growing up, a year in its prime, old age, death. Lines are from
+// the species' Wikipedia article (November 2026); `seed` is how its seed looks and travels, drawn small in 3D for the first beat.
+const STORY = {
+  'red-maple': { seed: 'samara', seedSeason: 0.4,
+    lines: { seed: 'Seeds come in winged pairs (samaras), 15–25 mm long. They ripen from April to early June and spin away on the wind; one tree can shed tens of thousands in a season.',
+      sprout: 'The seeds sprout in early summer, soon after they fall. A seedling can grow 30 cm in its first year…', sapling: '…and up to 60 cm a year after that: red maples grow fast and fill in open ground.',
+      growing: 'First red flowers at about 8 years (some at 4).', prime: 'A year in its prime: red flowers before the leaves in spring, green all summer, red in fall, bare in winter.',
+      old: 'Most red maples live less than 100 years; at most about 150.' } },
+  'pin-oak': { seed: 'acorn', seedSeason: 0.78,
+    lines: { seed: 'An acorn in a shallow, thin cap: it takes two growing seasons to ripen, from green to pale brown.', sprout: 'The acorn sprouts: a root goes down, a shoot comes up.',
+      sapling: 'Pin oaks grow fast for an oak…', growing: '…about 8 m tall at 10 years in full sun. By about 40: rougher bark and a looser, spreading crown.',
+      prime: 'A year in its prime: flowers and leaves come out together in late spring, after the last frost; the leaves turn russet in fall.',
+      old: 'Dead lower branches stay on the tree for many years. A short-lived oak: about 120 years.' } },
+  sweetgum: { seed: 'gumball', seedSeason: 0.95,
+    lines: { seed: 'The spiky gumball hangs on through winter. Each of its 40–60 little capsules lets out one or two winged seeds on the wind.', sprout: 'A winged seed lands and sprouts.',
+      sapling: 'A cone-shaped young tree with one straight trunk.', growing: 'In a yard it reaches about 15–21 m; in the wild up to 45 m.',
+      prime: 'A year in its prime: star-shaped leaves turn yellow, orange, red and purple in fall, and the gumballs stay on through winter.', old: 'Sweetgums can live to 400 years.' } },
+  'white-pine': { seed: 'pineseed', seedSeason: 0.4,
+    lines: { seed: 'Cones 8–20 cm long take two years to ripen. The seeds have a slender wing and travel on the wind; big cone crops come every 3 to 5 years.',
+      sprout: 'A slow start…', sapling: '…about 2 m tall after 6 to 8 years.', growing: 'From about 15 to 45 years it grows about 1 m taller a year.',
+      prime: 'A year in its prime: evergreen, with soft needles in bundles of five all year round.', old: 'Mature white pines are often 200 to 250 years old.' } },
+};
+export const storyOf = (id) => STORY[id];
 const H = (L, a) => L.Hmax * Math.pow(1 - Math.exp(-L.k * Math.max(0, a)), L.p);
 const Hinv = (L, y) => -Math.log(1 - Math.pow(Math.min(0.995, y / L.Hmax), 1 / L.p)) / L.k;
 
@@ -194,10 +217,34 @@ export function lifeStage(el, id) {
   }
   const crownR = (box.max.x - box.min.x) * scale / 2;
 
-  let age = 0, yaw = 0.5, drag = null, raf = 0;
+  let age = 0, sf = null, yaw = 0.5, drag = null, raf = 0, view = null, camS = null, seedT = -1, sproutAt = null;
+  // the seed of the first beat, and a sprout (used for the first year, and beside the fallen log at the end)
+  const seed = new THREE.Group(); scene.add(seed); seed.visible = false;
+  const brown = new THREE.MeshLambertMaterial({ color: 0x7a5232 }), red = new THREE.MeshLambertMaterial({ color: 0xb8432d, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
+  const kind = (STORY[id] || {}).seed;
+  if (kind === 'samara' || kind === 'pineseed') {
+    const wing = new THREE.Shape(); wing.moveTo(0, 0); wing.bezierCurveTo(0.012, 0.01, 0.02, 0.03, 0.006, 0.045); wing.bezierCurveTo(-0.004, 0.03, -0.004, 0.01, 0, 0);
+    const wm = kind === 'samara' ? red : new THREE.MeshLambertMaterial({ color: 0xc9a77a, side: THREE.DoubleSide });
+    for (const sd of kind === 'samara' ? [-1, 1] : [1]) { const w = new THREE.Mesh(new THREE.ShapeGeometry(wing), wm); w.rotation.z = sd * 1.0; w.scale.setScalar(kind === 'samara' ? 1 : 0.8); seed.add(w); const n = new THREE.Mesh(new THREE.SphereGeometry(0.005, 10, 8), brown); n.position.set(sd * 0.002, 0, 0); seed.add(n); }
+  } else if (kind === 'acorn') {
+    const nut = new THREE.Mesh(new THREE.SphereGeometry(0.008, 14, 10), new THREE.MeshLambertMaterial({ color: 0x9a7448 })); nut.scale.set(1, 0.95, 1);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.0085, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2.6), new THREE.MeshLambertMaterial({ color: 0x5e4630 })); cap.position.y = 0.002; seed.add(nut, cap);
+  } else if (kind === 'gumball') {
+    const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(0.014, 1), brown); seed.add(ball);
+    const spike = new THREE.ConeGeometry(0.0015, 0.006, 5);
+    for (const v of new THREE.IcosahedronGeometry(1, 1).attributes.position.array.length ? [...Array(40)].map((_, i) => { const t = i * 2.39996, z = 1 - (2 * i + 1) / 40, r0 = Math.sqrt(1 - z * z); return new THREE.Vector3(Math.cos(t) * r0, z, Math.sin(t) * r0); }) : []) {
+      const sp = new THREE.Mesh(spike, brown); sp.position.copy(v.clone().multiplyScalar(0.016)); sp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), v); seed.add(sp);
+    }
+  }
+  const sprout = new THREE.Group(); scene.add(sprout); sprout.visible = false;
+  { const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.0025, 0.003, 0.08, 6), new THREE.MeshLambertMaterial({ color: 0x6d7f3a })); stem.position.y = 0.04; sprout.add(stem);
+    const lm = new THREE.MeshLambertMaterial({ map: S.leaf ? leafTexture(id, 'summer') : null, color: S.leaf ? 0xffffff : 0x3f7a3a, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide });
+    for (const [k, sd] of [[0, -1], [0, 1], [1, -1], [1, 1]]) {      // two pairs of first leaves, crossed, so they read from any side
+      const lf = new THREE.Mesh(new THREE.PlaneGeometry(0.035, 0.042), lm), g = new THREE.Group(); g.rotation.y = k * Math.PI / 2;
+      lf.position.set(sd * 0.018, 0.08 - k * 0.012, 0); lf.rotation.set(0, 0, -sd * 0.9); g.add(lf); sprout.add(g); } }
   function seasonOf(y) { return y < 0.25 ? 'winter' : y < 0.42 ? 'spring' : y < 0.70 ? 'summer' : y < 0.88 ? 'fall' : 'winter'; }
   function apply() {
-    const y = age - Math.floor(age), sm = (a, b, x) => Math.min(1, Math.max(0, (x - a) / (b - a)));
+    const y = sf != null ? sf : age - Math.floor(age), sm = (a, b, x) => Math.min(1, Math.max(0, (x - a) / (b - a)));
     U.uAge.value = age;
     if (L.evergreen) { U.uLeaf.value = 1; U.uMix.value = 0; U.uDrop.value = 0; }
     else {
@@ -212,11 +259,27 @@ export function lifeStage(el, id) {
     tree.scale.set(scale * sx, scale * sy, scale * sx);
     const fall = Math.min(1, Math.max(0, (age - L.life - 4) / 1.2));
     holder.rotation.z = -fall * Math.PI / 2; holder.position.y = fall * 0.45;
-    holder.visible = age < L.life + 40;
+    holder.visible = age >= 0.3 && age < L.life + 40;
   }
   function size() { const w = el.clientWidth || 300, hh = el.clientHeight || 300; r.setSize(w, hh, false); r.domElement.style.width = '100%'; r.domElement.style.height = '100%'; cam.aspect = w / hh; cam.updateProjectionMatrix(); }
   function frame() {
     if (!drag) yaw += 0.002;
+    // the falling seed (first beat): from 1.6 m down to the ground, spinning if it has wings
+    if (seedT >= 0) {
+      seed.visible = true; const tt = Math.min(1, seedT), winged = kind === 'samara' || kind === 'pineseed';
+      seed.position.set(0.12 * Math.sin(tt * 9) * (1 - tt), 1.6 * (1 - tt) + 0.01, 0.12 * Math.cos(tt * 9) * (1 - tt));
+      seed.rotation.y = winged ? tt * 60 : tt * 4; seed.rotation.x = winged ? 1.2 : tt * 3;
+      seed.scale.setScalar(3);
+    } else seed.visible = false;
+    sprout.visible = !!sproutAt; if (sproutAt) { sprout.position.set(sproutAt.x, 0, sproutAt.z); sprout.scale.setScalar(sproutAt.s * 3); }
+    if (view) {      // a beat's camera: look at height `look` from distance `dist`, eased
+      camS = camS || { ...view }; for (const k of ['look', 'dist', 'up', 'lx']) camS[k] += ((view[k] || 0) - (camS[k] || 0)) * 0.06;
+      man.visible = view.man !== false;
+      const h0 = Math.max(0.4, H(L, Math.min(age, L.life))), cr0 = Math.max(0.5, crownR * Math.min(1, h0 / L.Hmax)), side0 = Math.max(1.2, cr0 + 1.2);
+      man.position.set(Math.cos(yaw) * side0, 0, -Math.sin(yaw) * side0); ground.scale.setScalar(Math.max(4, cr0 * 2.4, h0 * 0.9, camS.dist * 1.5));
+      cam.position.set(camS.lx + Math.sin(yaw) * camS.dist, camS.up, Math.cos(yaw) * camS.dist); cam.lookAt(camS.lx, camS.look, 0);
+      r.render(scene, cam); raf = requestAnimationFrame(frame); return;
+    }
     const fallen = age > L.life + 5.2;
     const h = Math.max(0.4, H(L, Math.min(age, L.life))), cr = Math.max(0.5, crownR * Math.min(1, h / L.Hmax));
     const side = Math.max(1.2, cr + 1.2); man.position.set(Math.cos(yaw) * side, 0, -Math.sin(yaw) * side);   // always beside the tree, never in front
@@ -237,8 +300,13 @@ export function lifeStage(el, id) {
   new ResizeObserver(size).observe(el); size(); apply(); frame();
   return {
     el: r.domElement, L,
-    setAge(a) { age = Math.max(0, a); apply(); },
-    info() { return { age, season: seasonOf(age - Math.floor(age)), height: age > L.life + 4 ? 0 : H(L, Math.min(age, L.life)) }; },
+    setAge(a, seasonFrac = null) { age = Math.max(0, a); sf = seasonFrac; apply(); },
+    /** A beat's camera ({look, dist, up, lx, man}), or null for the automatic framing. */
+    setView(v) { view = v; if (!v) camS = null; },
+    seed(t) { seedT = t; },
+    sprout(v) { sproutAt = v; },
+    height: (a) => H(L, Math.min(a, L.life)), crown: () => crownR,
+    info() { return { age, season: seasonOf(sf != null ? sf : age - Math.floor(age)), height: age > L.life + 4 ? 0 : H(L, Math.min(age, L.life)) }; },
     dispose() { cancelAnimationFrame(raf); r.dispose(); r.forceContextLoss?.(); r.domElement.remove(); },
   };
 }

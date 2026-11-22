@@ -700,7 +700,18 @@ A generated 3D tree for four species so far (eastern white pine, pin oak, sweetg
 - They are models of each tree's habit, not portraits. Each was compared with photos of whole trees before it was added; `tree3d.html?season=winter` shows them side by side for that. Check: `tools/checks/ui-trees-3d.cjs`.
 
 
-### Trees: watch it grow (`lifeStage` in `js/tree3d.js`)
+### Trees: watch it grow, beat by beat (`lifeStage` in `js/tree3d.js`, `beatsFor` in `js/trees.js`)
+
+Feedback on the first version, a straight time-lapse from year 0 to death: most of it was a full-grown tree blinking through seasons too fast to see, then a slow decline; only the first few percent was worth watching. It is now a story in seven beats, each with its own pace, camera and line, and tabs to jump to any of them:
+1. **Seed**: close to the ground, the seed falls and lands in its season: a red maple's winged pair spinning down in spring, a pin oak's acorn and a white pine's winged seed, a sweetgum gumball in winter (each drawn small in 3D).
+2. **Sprout**: the first leaves, close up.
+3. **Sapling**: one whole year, slowly, so each season is visible.
+4. **Growing up**: years to decades in a few seconds, the season held at summer so nothing blinks, the camera pulling back as the tree grows.
+5. **A year in its prime**: one full year slowly: leaf-out, summer, fall colour leaf by leaf, bare winter.
+6. **Old age**: the decline held at winter, so the dying back of the crown shows.
+7. **Death and after**: a snag, the fall, the log, and a new seedling beside it (this beat is modelled, and says so).
+The lines are each species' figures from its Wikipedia article (seeds: red maple samaras 15–25 mm, ripening April to early June and sprouting in early summer; pin oak acorns taking two growing seasons; sweetgum gumballs of 40–60 capsules hanging on through winter; white pine cones 8–20 cm, two years to ripen, winged seeds). *Any year* still opens a slider to any age.
+
 
 One tree from seed to old age and death, as a fast time-lapse with the seasons turning every year: for red maple, pin oak, sweetgum and eastern white pine, from each tree's page (*Watch it grow*) and from the trees home screen.
 - **How it works.** The full-grown 3D tree is built once, and the tree generator (`lib/ez-tree/tree.js`, `recordGrowth`, `appearAt`) now records for every piece of wood and every leaf the year it first exists. The graphics card then shows the tree at any age by itself (`growMaterial`: each branch grows out from its parent and thickens with age; leaves come out, turn one by one in fall and drop), so nothing is rebuilt per frame and scrubbing is instant. The tree is drawn at its height for the age (slimmer than tall when young); main branches fill in from the bottom up over the first decades. Old age: branches die back in a random order, a share of the main limbs stays on as dead wood, leaves thin; then the tree stands dead for a few years, falls, and lies as a log.
