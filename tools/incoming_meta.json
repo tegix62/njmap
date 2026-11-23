@@ -548,5 +548,155 @@
   "licurl": "https://creativecommons.org/licenses/by-sa/4.0",
   "credit": "Own work",
   "page": "https://commons.wikimedia.org/wiki/File:Rubrum_buds.jpg"
+ },
+ "Acer_rubrum_drawing.png": {
+  "slug": "red-maple",
+  "artist": "Britton, N.L., and A. Brown. 1913. Illustrated flora of the northern states and Canada. Vol. 2: 495.",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Acer_rubrum_drawing.png"
+ },
+ "NAS-041_Acer_rubrum.png": {
+  "slug": "red-maple",
+  "artist": "François André Michaux (book author), Augustus Lucas Hillhouse (translator),  Pancrace Bessa (illustrator), Gabriel (engraver)",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:NAS-041_Acer_rubrum.png"
+ },
+ "Acer_saccharum_drawing.png": {
+  "slug": "sugar-maple",
+  "artist": "Britton, N.L., and A. Brown. 1913. Illustrated flora of the northern states and Canada. Vol. 2: 496.",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Acer_saccharum_drawing.png"
+ },
+ "NAS-001_Quercus_alba.png": {
+  "slug": "white-oak",
+  "artist": "François André Michaux (book author), Augustus Lucas Hillhouse (translator), Pierre Joseph  Redouté (illustrator), Bessin (engraver)",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:NAS-001_Quercus_alba.png"
+ },
+ "NAS-026_Quercus_rubra.png": {
+  "slug": "red-oak",
+  "artist": "François André Michaux (book author), Augustus Lucas Hillhouse (translator), Pancrace Bessa (illustrator), Gabriel (engraver)",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:NAS-026_Quercus_rubra.png"
+ },
+ "NAS-027_Quercus_palustris_clean.png": {
+  "slug": "pin-oak",
+  "artist": "François André Michaux (book author), Augustus Lucas Hillhouse (translator), Pierre-Joseph Redouté (illustrator), Gabriel (engraver)",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:NAS-027_Quercus_palustris_clean.png"
+ },
+ "NAS-061_Liriodendron_tulipifera.png": {
+  "slug": "tulip-tree",
+  "artist": "François André Michaux (book author), Augustus Lucas Hillhouse (translator),  Pancrace Bessa (illustrator), Gabriel (engraver)",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:NAS-061_Liriodendron_tulipifera.png"
+ },
+ "NAS-062_Liquidambar_styraciflua.png": {
+  "slug": "sweetgum",
+  "artist": "François André Michaux (book author), Augustus Lucas Hillhouse (translator), P.J. Redouté (illustrator), Gabriel (engraver)",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:NAS-062_Liquidambar_styraciflua.png"
+ },
+ "NAS-063_Platanus_occidentalis.png": {
+  "slug": "sycamore",
+  "artist": "François André Michaux (book author), Augustus Lucas Hillhouse (translator), iii (illustrator), eee (engraver)",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:NAS-063_Platanus_occidentalis.png"
+ },
+ "NAS-106_Fagus_grandifolia.png": {
+  "slug": "beech",
+  "artist": "François André Michaux (book author), Augustus Lucas Hillhouse (translator), Bessa (illustrator), Gabriel (engraver)",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:NAS-106_Fagus_grandifolia.png"
+ },
+ "NAS-081_Sassafras_albidum.png": {
+  "slug": "sassafras",
+  "artist": "François André Michaux (book author), Augustus Lucas Hillhouse (translator), Pancrace Bessa (illustrator), Gabriel (engraver)",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:NAS-081_Sassafras_albidum.png"
+ },
+ "Pinus_strobus_drawing.png": {
+  "slug": "white-pine",
+  "artist": "USDA-NRCS PLANTS Database / Britton, N.L., and A. Brown. 1913. Illustrated flora of the northern states and Canada. Vol. 1: 60.",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Pinus_strobus_drawing.png"
+ },
+ "NAS-145_Pinus_strobus.png": {
+  "slug": "white-pine",
+  "artist": "François André Michaux (book author), Augustus Lucas Hillhouse (translator), Pancrace Bessa (illustrator), Gabriel (engraver)",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:NAS-145_Pinus_strobus.png"
+ },
+ "Pinus_rigida_drawing.png": {
+  "slug": "pitch-pine",
+  "artist": "USDA-NRCS PLANTS Database / Britton, N.L., and A. Brown. 1913. Illustrated flora of the northern states and Canada. Vol. 1: 57.",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Pinus_rigida_drawing.png"
+ },
+ "NAS-143_Pinus_rigida.png": {
+  "slug": "pitch-pine",
+  "artist": "François André Michaux (book author), Augustus Lucas Hillhouse (translator), Pancrace Bessa (illustrator), Caly (engraver)",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:NAS-143_Pinus_rigida.png"
+ },
+ "Juniperus_virginiana_drawing.png": {
+  "slug": "red-cedar",
+  "artist": "USDA-NRCS PLANTS Database / Britton, N.L., and A. Brown. 1913. Illustrated flora of the northern states and Canada. Vol. 1: 66.",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Juniperus_virginiana_drawing.png"
+ },
+ "NAS-155_Juniperus_virginiana.png": {
+  "slug": "red-cedar",
+  "artist": "François André Michaux (book author), Augustus Lucas Hillhouse (translator),  Bessa (illustrator), Gabriel(engraver)",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:NAS-155_Juniperus_virginiana.png"
+ },
+ "Cornus_florida_BrittonBrown.png": {
+  "slug": "dogwood",
+  "artist": "USDA-NRCS PLANTS Database / Britton, N.L., and A. Brown. 1913. Illustrated flora of the northern states and Canada. Vol. 2: 664.",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Cornus_florida_BrittonBrown.png"
+ },
+ "NAS-076_Robinia_pseudoacacia.png": {
+  "slug": "black-locust",
+  "artist": "François André Michaux (book author), Augustus Lucas Hillhouse (translator), iii (illustrator), eee (engraver)",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:NAS-076_Robinia_pseudoacacia.png"
+ },
+ "Ailanthus_altissima_drawing.png": {
+  "slug": "tree-of-heaven",
+  "artist": "Britton, N.L., and A. Brown. 1913. Illustrated flora of the northern states and Canada. Vol. 2: 446.",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Ailanthus_altissima_drawing.png"
+ },
+ "NAS-084_Ilex_opaca.png": {
+  "slug": "holly",
+  "artist": "François André Michaux (book author), Augustus Lucas Hillhouse (translator), iii (illustrator), eee (engraver)",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:NAS-084_Ilex_opaca.png"
+ },
+ "Chamaecyparis_thyoides_drawing.png": {
+  "slug": "white-cedar",
+  "artist": "USDA-NRCS PLANTS Database / Britton, N.L., and A. Brown. 1913. Illustrated flora of the northern states and Canada. Vol. 1: 65.",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Chamaecyparis_thyoides_drawing.png"
+ },
+ "NAS-152_Chamaecyparis_thyoides.png": {
+  "slug": "white-cedar",
+  "artist": "François André Michaux (book author), Augustus Lucas Hillhouse (translator),  Bessa (illustrator), Gabriel (engraver)",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:NAS-152_Chamaecyparis_thyoides.png"
+ },
+ "NAS-149_Tsuga_canadensis.png": {
+  "slug": "hemlock",
+  "artist": "François André Michaux (book author), Augustus Lucas Hillhouse (translator), iii (illustrator), eee (engraver)",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:NAS-149_Tsuga_canadensis.png"
+ },
+ "NAS-030_Juglans_nigra.png": {
+  "slug": "black-walnut",
+  "artist": "François André Michaux (book author), Augustus Lucas Hillhouse (translator), Pierre-Joseph Redouté (illustrator), Bessin (engraver)",
+  "lic": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:NAS-030_Juglans_nigra.png"
  }
 }

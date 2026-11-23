@@ -42,7 +42,10 @@ def main():
             if not m.get('lic'):
                 print('  no licence, skipped:', slug, f); continue
             im = Image.open(os.path.join(ROOT, 'incoming', slug, f))
-            im = ImageOps.exif_transpose(im).convert('RGB')
+            im = ImageOps.exif_transpose(im)
+            if im.mode in ('RGBA', 'LA', 'P'):      # transparent drawings: on white paper, not black
+                im = im.convert('RGBA'); bg = Image.new('RGBA', im.size, (255, 255, 255, 255)); bg.alpha_composite(im); im = bg
+            im = im.convert('RGB')
             entry = {'credit': credit(m), 'lic': m['lic'], 'src': m.get('page', ''), 'cap': cap}
             if ctx == 'drawing':
                 im.thumbnail((1000, 1000), Image.LANCZOS)
