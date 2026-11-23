@@ -77,6 +77,48 @@ export function buildTree(id, season = 'summer', seed = 12345) {
   return tree;
 }
 
+/** Falling leaves: up to `n` leaf pictures that flutter down from the crown, spinning, and settle flat on the ground. One instanced mesh.
+ * update(dt, rate, {crown, top, low, size, stay}) spawns `rate` leaves a second (0 stops spawning), keeps landed ones `stay` seconds
+ * (Infinity: until clear()). */
+function leafFall(scene, tex, n = 90) {
+  const mat = new THREE.MeshLambertMaterial({ map: tex, transparent: true, alphaTest: 0.4, side: THREE.DoubleSide });
+  const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1.2), mat, n); mesh.frustumCulled = false; scene.add(mesh);
+  const P = [...Array(n)].map(() => ({ live: false })), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3();
+  let acc = 0, t = 0;
+  const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+  for (let i = 0; i < n; i++) mesh.setMatrixAt(i, zero);
+  return {
+    mesh,
+    clear() { for (const p of P) p.live = false; },
+    update(dt, rate, o) {
+      t += dt; acc += rate * dt;
+      while (acc >= 1) {
+        acc -= 1; const p = P.find((x) => !x.live) || P.reduce((a, b) => (a.landed && b.landed ? (a.at < b.at ? a : b) : a.landed ? a : b));
+        const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * o.crown * 0.85;
+        Object.assign(p, { live: true, landed: false, x: Math.cos(a) * rr, z: Math.sin(a) * rr, y: o.low + Math.random() * (o.top - o.low),
+          vy: o.fallSpeed * (0.75 + Math.random() * 0.5), ph: Math.random() * 6.3, w: 1.6 + Math.random() * 1.4, amp: o.size * (1.5 + Math.random() * 2),
+          spin: (Math.random() - 0.5) * 7, rz: Math.random() * 6.3, s: o.size * (0.8 + Math.random() * 0.4), at: 0 });
+      }
+      P.forEach((p, i) => {
+        if (!p.live) return;
+        if (!p.landed) {
+          p.y -= p.vy * dt; p.rz += p.spin * dt;
+          const sway = Math.sin(t * p.w + p.ph);
+          p.x += Math.cos(t * p.w + p.ph) * p.amp * dt; p.z += sway * p.amp * 0.6 * dt;
+          if (p.y <= 0.02 * o.size) { p.y = 0.01 + Math.random() * 0.01 * o.size; p.landed = true; p.at = t; p.rz = Math.random() * 6.3; }
+          e.set(0.9 * sway + 0.4, p.rz, 0.6 * Math.cos(t * p.w * 1.3 + p.ph));
+        } else {
+          if (t - p.at > o.stay) { p.live = false; mesh.setMatrixAt(i, zero); return; }
+          e.set(-Math.PI / 2, 0, p.rz);
+        }
+        q.setFromEuler(e); v.set(p.x, p.y, p.z); sc.setScalar(p.s); mesh.setMatrixAt(i, m4.compose(v, q, sc));
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+    },
+    dispose() { scene.remove(mesh); mesh.geometry.dispose(); mat.dispose(); },
+  };
+}
+
 /** A small turning stage in `el`: the tree, light, ground; drag to turn. Returns { set(id, season), dispose() }. */
 export function stage(el, { auto = true } = {}) {
   const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
@@ -88,12 +130,16 @@ export function stage(el, { auto = true } = {}) {
   const ground = new THREE.Mesh(new THREE.CircleGeometry(30, 48), new THREE.MeshLambertMaterial({ color: 0xc9d6b8 }));
   ground.rotation.x = -Math.PI / 2; scene.add(ground);
   const cam = new THREE.PerspectiveCamera(38, 1, 0.5, 2000);
-  let tree = null, yaw = 0.6, drag = null, raf = 0, h = 60;
+  let tree = null, yaw = 0.6, drag = null, raf = 0, h = 60, cw = 20, leafSz = 1.3, falls = null, last = performance.now();
+  const clock0 = performance.now();
   function size() { const w = el.clientWidth || 300, hh = el.clientHeight || 300; r.setSize(w, hh, false); r.domElement.style.width = '100%'; r.domElement.style.height = '100%'; cam.aspect = w / hh; cam.updateProjectionMatrix(); }
   function frame() {
     if (auto && !drag) yaw += 0.004;
     const d = h * 1.55;
     cam.position.set(Math.sin(yaw) * d, h * 0.48, Math.cos(yaw) * d); cam.lookAt(0, h * 0.45, 0);
+    const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (tree && !still3d()) tree.update((now - clock0) / 1000);      // ez-tree's own leaf sway
+    if (falls) falls.update(still3d() ? 0 : dt, still3d() ? 0 : 3.5, { crown: cw, top: h * 0.9, low: h * 0.4, size: leafSz, fallSpeed: h * 0.07, stay: 14 });
     r.render(scene, cam); raf = requestAnimationFrame(frame);
   }
   const down = (e) => { drag = { x: e.clientX, y0: yaw }; el.setPointerCapture?.(e.pointerId); };
@@ -106,12 +152,16 @@ export function stage(el, { auto = true } = {}) {
     set(id, season) {
       if (tree) { scene.remove(tree); tree.traverse((m) => { m.geometry?.dispose?.(); }); }
       tree = buildTree(id, season); scene.add(tree);
-      const box = new THREE.Box3().setFromObject(tree); h = Math.max(20, box.max.y - box.min.y);
+      const box = new THREE.Box3().setFromObject(tree); h = Math.max(20, box.max.y - box.min.y); cw = (box.max.x - box.min.x) / 2;
+      if (falls) { falls.dispose(); falls = null; }
+      leafSz = SPECIES[id].leaves.size * 0.7;
+      if (season === 'fall' && SPECIES[id].type === 'deciduous' && SPECIES[id].leaf) falls = leafFall(scene, leafTexture(id, 'fall'));
       ground.scale.setScalar(Math.max(1, (box.max.x - box.min.x) / 40));
     },
-    dispose() { cancelAnimationFrame(raf); r.dispose(); r.forceContextLoss?.(); r.domElement.remove(); },
+    dispose() { cancelAnimationFrame(raf); falls?.dispose(); r.dispose(); r.forceContextLoss?.(); r.domElement.remove(); },
   };
 }
+const still3d = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ---- a life in years: the same tree, grown from a seed to old age and death, seasons turning each year ------------------------------------
 // Growth curves: height H(age) = Hmax (1 - e^(-k age))^p (the Chapman-Richards form foresters use), fitted to the figures quoted in each
@@ -158,7 +208,7 @@ function growMaterial(mat, kind, U) {
     Object.assign(sh.uniforms, U);
     const head = kind === 'wood'
       ? 'uniform float uAge; uniform float uDie; uniform float uLife; uniform float uThick;\nattribute vec3 aBase; attribute vec3 aCenter; attribute float aAppear; attribute float aBirth; attribute float aRand; attribute float aLevel;\n'
-      : 'uniform float uAge; uniform float uLeaf; uniform float uMix; uniform float uDrop; uniform float uDen; uniform float uFallSide;\nattribute vec3 aAnchor; attribute float aAppear; attribute float aRand;\n';
+      : 'uniform float uAge; uniform float uLeaf; uniform float uMix; uniform float uDrop; uniform float uDen; uniform float uFallSide; uniform float uTime;\nattribute vec3 aAnchor; attribute float aAppear; attribute float aRand;\n';
     const body = kind === 'wood'
       ? `vec3 transformed = position;
          float alive = step(aBirth, uAge);
@@ -171,7 +221,9 @@ function growMaterial(mat, kind, U) {
       : `vec3 transformed = position;
          float side = uFallSide > 0.5 ? (1.0 - step(uMix, aRand)) : step(uMix, aRand);
          float s = step(aAppear, uAge) * uLeaf * step(aRand, uDen) * side * step(uDrop, fract(aRand * 7.13));
-         transformed = aAnchor + (position - aAnchor) * s;`;
+         vec3 off = position - aAnchor;
+         float w = sin(uTime * 1.9 + aRand * 40.0 + aAnchor.x * 0.3) * 0.12 + sin(uTime * 3.7 + aRand * 17.0) * 0.06;
+         transformed = aAnchor + (off + vec3(w, w * 0.4, w * 0.7) * length(off)) * s;`;
     sh.vertexShader = head + sh.vertexShader.replace('#include <begin_vertex>', body);
   };
   mat.needsUpdate = true;
@@ -205,7 +257,7 @@ export function lifeStage(el, id) {
   tree.generate();
   const box = new THREE.Box3().setFromObject(tree), scale = L.Hmax / Math.max(1, box.max.y - box.min.y);
   const holder = new THREE.Group(); holder.add(tree); tree.scale.setScalar(scale); scene.add(holder);
-  const U = { uAge: { value: 0 }, uDie: { value: L.decline }, uLife: { value: L.life }, uThick: { value: L.life * 0.35 }, uLeaf: { value: 1 }, uMix: { value: 0 }, uDrop: { value: 0 }, uDen: { value: 1 }, uFallSide: { value: 0 } };
+  const U = { uAge: { value: 0 }, uDie: { value: L.decline }, uLife: { value: L.life }, uThick: { value: L.life * 0.35 }, uLeaf: { value: 1 }, uMix: { value: 0 }, uDrop: { value: 0 }, uDen: { value: 1 }, uFallSide: { value: 0 }, uTime: { value: 0 } };
   growMaterial(tree.branchesMesh.material, 'wood', U);
   growMaterial(tree.leavesMesh.material, 'leaf', U);
   let fallMesh = null;
@@ -216,6 +268,8 @@ export function lifeStage(el, id) {
     fallMesh = new THREE.Mesh(tree.leavesMesh.geometry, fm); tree.add(fallMesh);
   }
   const crownR = (box.max.x - box.min.x) * scale / 2;
+  const falls = !L.evergreen && S.leaf ? leafFall(scene, leafTexture(id, S.fall ? 'fall' : 'summer'), 110) : null;
+  let last = performance.now(); const clock0 = last;
 
   let age = 0, sf = null, yaw = 0.5, drag = null, raf = 0, view = null, camS = null, seedT = -1, sproutAt = null;
   // the seed of the first beat, and a sprout (used for the first year, and beside the fallen log at the end)
@@ -262,7 +316,18 @@ export function lifeStage(el, id) {
     holder.visible = age >= 0.3 && age < L.life + 40;
   }
   function size() { const w = el.clientWidth || 300, hh = el.clientHeight || 300; r.setSize(w, hh, false); r.domElement.style.width = '100%'; r.domElement.style.height = '100%'; cam.aspect = w / hh; cam.updateProjectionMatrix(); }
+  function leavesTick() {
+    const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now;
+    U.uTime.value = still3d() ? 0 : (now - clock0) / 1000;
+    if (!falls) return;
+    const y = sf != null ? sf : age - Math.floor(age), h0 = H(L, Math.min(age, L.life));
+    if (y > 0.3 && y < 0.7) falls.clear();      // last fall's leaves have rotted into the ground by summer
+    const dropping = y > 0.74 && y < 0.9 && age > 2 && age < L.life && !still3d();
+    const cr0 = Math.max(0.5, crownR * Math.min(1, h0 / L.Hmax)) * Math.pow(Math.max(0.02, h0 / L.Hmax), 0.15);
+    falls.update(still3d() ? 0 : dt, dropping ? 14 * U.uDen.value : 0, { crown: cr0, top: h0 * 0.92, low: h0 * 0.35, size: S.leaves.size * scale * Math.pow(Math.max(0.02, h0 / L.Hmax), 1.15) * 0.7, fallSpeed: Math.max(0.6, h0 * 0.08), stay: Infinity });
+  }
   function frame() {
+    leavesTick();
     if (!drag) yaw += 0.002;
     // the falling seed (first beat): from 1.6 m down to the ground, spinning if it has wings
     if (seedT >= 0) {
@@ -307,6 +372,6 @@ export function lifeStage(el, id) {
     sprout(v) { sproutAt = v; },
     height: (a) => H(L, Math.min(a, L.life)), crown: () => crownR,
     info() { return { age, season: seasonOf(sf != null ? sf : age - Math.floor(age)), height: age > L.life + 4 ? 0 : H(L, Math.min(age, L.life)) }; },
-    dispose() { cancelAnimationFrame(raf); r.dispose(); r.forceContextLoss?.(); r.domElement.remove(); },
+    dispose() { cancelAnimationFrame(raf); falls?.dispose(); r.dispose(); r.forceContextLoss?.(); r.domElement.remove(); },
   };
 }
