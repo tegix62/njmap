@@ -99,27 +99,50 @@ def thumb_url(title, w):
     return f'https://upload.wikimedia.org/wikipedia/commons/thumb/{h[0]}/{h[:2]}/{q}/{w}px-{q}{ext}'
 
 
+def api_thumbs(titles, width=330):
+    """Thumbnail URLs as Commons itself gives them (iiurlwidth): batched, 40 titles a request. Self-made thumbnail URLs at unusual sizes
+    are throttled, so ask the API."""
+    out = {}
+    for i in range(0, len(titles), 40):
+        q = {'action': 'query', 'prop': 'imageinfo', 'iiprop': 'url', 'iiurlwidth': width, 'titles': '|'.join(titles[i:i + 40]), 'format': 'json'}
+        for k in range(6):
+            try:
+                d = json.load(urllib.request.urlopen(urllib.request.Request('https://commons.wikimedia.org/w/api.php', data=urllib.parse.urlencode(q).encode(), headers=UA), timeout=60)); break
+            except Exception as e:
+                print('  thumbs retry', e, flush=True); time.sleep(20 * (k + 1))
+        else:
+            continue
+        norm = {n['to']: n['from'] for n in d['query'].get('normalized', [])}
+        for pg in d['query']['pages'].values():
+            if 'imageinfo' in pg:
+                out[norm.get(pg['title'], pg['title'])] = pg['imageinfo'][0].get('thumburl')
+        time.sleep(3)
+    return out
+
+
 def sheet(slug, kinds):
     from PIL import Image, ImageDraw
     rec = json.load(open(f'{TMP}/{slug}.json'))
     sel = [(i, r) for i, r in enumerate(rec) if not kinds or r['kind'] in kinds][:30]
-    S = Image.new('RGB', (6 * 200, 5 * 215), 'white'); d = ImageDraw.Draw(S)
     os.makedirs(f'{TMP}/thumbs', exist_ok=True)
+    need = [r['title'] for i, r in sel if not os.path.exists(f'{TMP}/thumbs/{slug}-{i}.jpg')]
+    urls = api_thumbs(need) if need else {}
+    S = Image.new('RGB', (6 * 200, 5 * 215), 'white'); d = ImageDraw.Draw(S)
     for j, (i, r) in enumerate(sel):
         p = f'{TMP}/thumbs/{slug}-{i}.jpg'
-        if not os.path.exists(p):
-            raw = get(thumb_url(r['title'], 250))
+        if not os.path.exists(p) and urls.get(r['title']):
+            raw = get(urls[r['title']], tries=2)
             if raw:
                 try: Image.open(io.BytesIO(raw)).convert('RGB').save(p)
                 except Exception: pass
-            time.sleep(2)
+            time.sleep(1.5)
         x, y = (j % 6) * 200, (j // 6) * 215
         if os.path.exists(p):
             im = Image.open(p); im.thumbnail((196, 190)); S.paste(im, (x + 2, y + 2))
         d.rectangle((x, y, x + 34, y + 15), fill='black'); d.text((x + 3, y + 2), str(i), fill='yellow')
         d.text((x + 2, y + 196), f"{r['kind']}: {r['title'][5:32]}", fill='black')
     S.save(f'{TMP}/sheet-{slug}.jpg', quality=82)
-    print('sheet', slug, len(sel))
+    print('sheet', slug, len(sel), 'previews', sum(os.path.exists(f'{TMP}/thumbs/{slug}-{i}.jpg') for i, _ in sel), flush=True)
 
 
 def fetch():
