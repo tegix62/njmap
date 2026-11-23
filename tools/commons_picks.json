@@ -1,142 +1,23 @@
 {
- "red-maple": [
+ "black-walnut": [
   [
-   473,
-   "drawing"
-  ],
-  [
-   484,
-   "drawing"
+   294,
+   "leaf",
+   "one whole leaf: 15 to 23 leaflets"
   ]
  ],
- "sugar-maple": [
+ "shagbark-hickory": [
   [
-   430,
-   "drawing"
-  ]
- ],
- "white-oak": [
-  [
-   290,
-   "drawing"
-  ]
- ],
- "red-oak": [
-  [
-   896,
-   "drawing"
-  ]
- ],
- "pin-oak": [
-  [
-   257,
-   "drawing"
-  ]
- ],
- "tulip-tree": [
-  [
-   914,
-   "drawing"
-  ]
- ],
- "sweetgum": [
-  [
-   543,
-   "drawing"
-  ]
- ],
- "sycamore": [
-  [
-   168,
-   "drawing"
-  ]
- ],
- "beech": [
-  [
-   356,
-   "drawing"
+   182,
+   "leaf",
+   "five leaflets, the end three biggest"
   ]
  ],
  "sassafras": [
   [
-   101,
-   "drawing"
-  ]
- ],
- "white-pine": [
-  [
-   812,
-   "drawing"
-  ],
-  [
-   807,
-   "drawing"
-  ]
- ],
- "pitch-pine": [
-  [
-   310,
-   "drawing"
-  ],
-  [
-   306,
-   "drawing"
-  ]
- ],
- "red-cedar": [
-  [
-   189,
-   "drawing"
-  ],
-  [
-   191,
-   "drawing"
-  ]
- ],
- "dogwood": [
-  [
-   349,
-   "drawing"
-  ]
- ],
- "black-locust": [
-  [
-   173,
-   "drawing"
-  ]
- ],
- "tree-of-heaven": [
-  [
-   222,
-   "drawing"
-  ]
- ],
- "holly": [
-  [
-   70,
-   "drawing"
-  ]
- ],
- "white-cedar": [
-  [
-   203,
-   "drawing"
-  ],
-  [
-   209,
-   "drawing"
-  ]
- ],
- "hemlock": [
-  [
-   379,
-   "drawing"
-  ]
- ],
- "black-walnut": [
-  [
-   200,
-   "drawing"
+   21,
+   "leaf",
+   "the mitten-shaped leaf"
   ]
  ]
 }
