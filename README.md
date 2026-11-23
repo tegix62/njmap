@@ -749,3 +749,4 @@ One tree from seed to old age and death, as a fast time-lapse with the seasons t
 - On fall and winter observations people often photograph the trunk first. Those trunks were gone through by eye on contact sheets, and the clear bark shots, about 190 across all 24 trees, are listed under `bark` in `data/treepool.json`. Leaves held in front of a trunk are left out, because they give the answer away.
 - The app adds them to each tree's bark photos at load, so Whose bark is this?, Bark only, the bark drill and the tree pages all use them. Bark questions now have "Bad photo? Hide it" too.
 - `tools/commons_harvest.py fetch` falls back to each file's ordinary Commons page (licence, author, a 960 px copy) when the API is throttled.
+- Norway maple has a traced leaf now, from a pool photo (botanicalsusan, CC BY-NC, iNaturalist), so it appears in leaf questions and Leaf rain. `trace_leaves.py trace <slug>` retraces just that tree.

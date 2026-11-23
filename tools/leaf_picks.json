@@ -1,18 +1,114 @@
 {
- "sugar-maple": [8, 180, {"trim": 35}],
- "white-oak": [25, 0],
- "red-oak": [212, 0],
- "pin-oak": [167, 0],
- "tulip-tree": [41, 0],
- "sweetgum": [283, 0],
- "sycamore": [335, 0],
- "black-cherry": [710, 0],
- "gray-birch": [44, 0, {"smooth": 3}],
- "red-maple": ["incoming/red-maple/Acer_rubrum.jpg", 0, {"crop": [0, 0, 0.56, 0.53]}],
- "dogwood": ["incoming/dogwood/Cornus_florida_leaf.jpg", 42, {"crop": [0, 0, 0.48, 0.6]}],
- "beech": ["incoming/beech/American_Beech.jpg", 0],
- "black-locust": ["incoming/black-locust/Robinia_pseudoacacia_-_black_locust_-_Robinie_-_robinier_faux-acacia_04.jpg", -59],
- "black-walnut": ["incoming/black-walnut/Black_walnut_leaf.jpg", -45, {"crop": [0.08, 0.06, 1, 1], "white": true, "trim": 200}],
- "shagbark-hickory": ["incoming/shagbark-hickory/Carya_ovata_leaf_2.jpg", 0, {"white": true, "trim": 200}],
- "sassafras": ["incoming/sassafras/Sassafras_Leaf.jpg", 85]
+ "sugar-maple": [
+  8,
+  180,
+  {
+   "trim": 35
+  }
+ ],
+ "white-oak": [
+  25,
+  0
+ ],
+ "red-oak": [
+  212,
+  0
+ ],
+ "pin-oak": [
+  167,
+  0
+ ],
+ "tulip-tree": [
+  41,
+  0
+ ],
+ "sweetgum": [
+  283,
+  0
+ ],
+ "sycamore": [
+  335,
+  0
+ ],
+ "black-cherry": [
+  710,
+  0
+ ],
+ "gray-birch": [
+  44,
+  0,
+  {
+   "smooth": 3
+  }
+ ],
+ "red-maple": [
+  "incoming/red-maple/Acer_rubrum.jpg",
+  0,
+  {
+   "crop": [
+    0,
+    0,
+    0.56,
+    0.53
+   ]
+  }
+ ],
+ "dogwood": [
+  "incoming/dogwood/Cornus_florida_leaf.jpg",
+  42,
+  {
+   "crop": [
+    0,
+    0,
+    0.48,
+    0.6
+   ]
+  }
+ ],
+ "beech": [
+  "incoming/beech/American_Beech.jpg",
+  0
+ ],
+ "black-locust": [
+  "incoming/black-locust/Robinia_pseudoacacia_-_black_locust_-_Robinie_-_robinier_faux-acacia_04.jpg",
+  -59
+ ],
+ "black-walnut": [
+  "incoming/black-walnut/Black_walnut_leaf.jpg",
+  -45,
+  {
+   "crop": [
+    0.08,
+    0.06,
+    1,
+    1
+   ],
+   "white": true,
+   "trim": 200
+  }
+ ],
+ "shagbark-hickory": [
+  "incoming/shagbark-hickory/Carya_ovata_leaf_2.jpg",
+  0,
+  {
+   "white": true,
+   "trim": 200
+  }
+ ],
+ "sassafras": [
+  "incoming/sassafras/Sassafras_Leaf.jpg",
+  85
+ ],
+ "norway-maple": [
+  "incoming/norway-maple/inat-228677889.jpg",
+  0,
+  {
+   "seed": [
+    0.45,
+    0.4
+   ],
+   "tol": 16,
+   "trim": 40
+  }
+ ]
 }

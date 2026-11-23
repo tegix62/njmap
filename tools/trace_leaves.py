@@ -7,7 +7,7 @@ Stage 1 (score):  python3 tools/trace_leaves.py score   every photo of every bro
                                                         a background that is not green
 Stage 2 (sheet):  python3 tools/trace_leaves.py sheet   a numbered contact sheet per tree of the best 24, each with its cut-out outline drawn in red,
                                                         to choose from by eye (/tmp/leaves/sheet-<slug>.jpg)
-Stage 3 (trace):  python3 tools/trace_leaves.py trace   the picks in tools/leaf_picks.json (slug -> [candidate, turn in degrees, {seed, tol, trim, smooth}]), downloaded at
+Stage 3 (trace):  python3 tools/trace_leaves.py trace [slug ...]  the picks in tools/leaf_picks.json (slug -> [candidate, turn in degrees, {seed, tol, trim, smooth}]), downloaded at
                                                         medium size, cut out again, smoothed, turned stalk-down and written as SVG paths to
                                                         data/leafoutlines.json and js/treeoutlines.js (viewBox 0 0 100 120, stalk at the bottom), with the photo's credit
 """
@@ -245,8 +245,11 @@ def tone(slug, a, m, M):
 
 def trace():
     picks = json.load(open(os.path.join(ROOT, 'tools/leaf_picks.json')))
-    out = {}
+    only = sys.argv[2:]      # trace only these trees, keeping the others as they are
+    out = json.load(open(os.path.join(ROOT, 'data/leafoutlines.json'))) if only else {}
     for slug, pk in picks.items():
+        if only and slug not in only:
+            continue
         k, turn = pk[:2]; opt = pk[2] if len(pk) > 2 else {}
         if isinstance(k, str):      # a local picture (incoming/...), credited from tools/incoming_meta.json
             meta = json.load(open(os.path.join(ROOT, 'tools/incoming_meta.json'))).get(os.path.basename(k), {})
