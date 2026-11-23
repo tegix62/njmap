@@ -1,10 +1,433 @@
 {
- "beech": [["2014-10-30_13_24_34_American_Beech_foliage_during_autumn_in_the_woodlands_along_the_West_Branch_Shabakunk_Creek_in_Ewing,_New_Jersey.JPG", "fall"], ["American_Beech.jpg", "leaf"], ["American_Beech_During_a_Winter_Rain_1.jpg", "winter", "young beech keeping its dry leaves in winter"], ["American_Beech_During_a_Winter_Rain_2.jpg", "winter", "young beech keeping its dry leaves in winter"], ["American_Beech_Fagus_grandifolia_Feet.JPG", "bark", "roots and smooth grey bark"], ["Fagus_grandifolia_(30130540393).jpg", "bark"], ["Fagus_grandifolia_(31075598065).jpg", "bark"], ["Fagus_grandifolia_(American_Beech)_(27826373064).jpg", "fruit", "the spiny nut husk"], ["Fagus_grandifolia_Ehrh._American_beech.tiff.jpg", "drawing"], ["Fagus_grandifolia_foliage.jpg", "leaf"], ["Fagus_grandifolia_in_winter.jpg", "winter", "dry leaves hanging on in winter"]],
- "black-cherry": [["2014-11-02_11_47_15_Black_Cherry_foliage_during_autumn_along_Upper_Ferry_Road_in_Ewing,_New_Jersey.JPG", "fall"], ["Amerikaanse_vogelkers_bessen_Prunus_serotina.jpg", "fruit"], ["Black_Cherry_(Prunus_serotina)_bark_detail.jpg", "bark", "old bark: burnt potato chips"], ["Prunus-serotina-flowers.jpg", "flower"], ["PrunusSerotinaBark.jpg", "bark", "old bark"], ["Prunus_serotina_(30361665653).jpg", "bark", "young bark: smooth, with marks like a birch"], ["Prunus_serotina_(30626010100).jpg", "bark", "young bark"], ["Prunus_serotina_(30877332002).jpg", "bark", "old bark"], ["Prunus_serotina_(Padus_virginiana)_Black_cherry.png", "drawing"]],
- "black-locust": [["Black_Locust_(Robinia_pseudoacacia)_-_Guelph,_Ontario_02.jpg", "leaf", "leaflets close up"], ["Robinia_pseudoacacia_(33617443054).jpg", "bark"], ["Robinia_pseudoacacia_(33617443354).jpg", "flower"], ["Robinia_pseudoacacia_-_black_locust_-_Robinie_-_robinier_faux-acacia_04.jpg", "leaf", "one whole leaf of many leaflets"], ["Robinia_pseudoacacia_L._Black_locust.tiff.jpg", "drawing"]],
- "black-walnut": [["Black_Walnut_(Juglans_nigra)_-_Guelph,_Ontario_2020-07-29.jpg", "leaf"], ["Black_walnut_in_Prospect_Park_(92401p).jpg", "form"], ["Juglans_nigra_(Black_Walnut)_(36657514695).jpg", "fruit", "the green husk"], ["Juglans_nigra_(black_walnut)_1_(49083259276).jpg", "bark"], ["Juglans_nigra_-_Noyer_à_fruits_noirs._(Black_walnut)_(NYPL_b14485031-1109296).tiff.jpg", "drawing"], ["Marble_Hill_Park,_Eastern_black_walnut_(Juglans_nigra).jpg", "form"]],
- "dogwood": [["2014-10-30_10_36_30_Flowering_Dogwood_foliage_during_autumn_on_Glen_Mawr_Drive_in_Ewing,_New_Jersey.jfif", "fall"], ["Benthamidia_florida8.jpg", "fruit"], ["Cornus_florida_Arkansas.jpg", "form", "in flower"], ["Cornus_florida_in_Eastwoodhill_Arboretum_(3).jpg", "leaf", "the curving veins"], ["Cornus_florida_leaf.jpg", "leaf"], ["Cornus_florida_seeds.jpg", "fruit", "seeds"], ["Dogwood_flower_closeup_20080427_141400_1_crop_sharp.png", "flower", "the true flowers, in the middle"], ["Flowering_Dogwood_-_Cornus_florida_(41123271645).jpg", "flower"], ["Flowering_Dogwood_Cornus_florida_'First_Lady'_Bark_Detail_3008px.jpg", "bark", "bark in small blocks"], ["Flowering_Dogwood_Cornus_florida_Bark_2000px.jpg", "bark"], ["Flowering_Dogwood_Cornus_florida_Flower_High_DoF_Cropped.jfif", "flower", "four white bracts around the flowers"], ["NAS-048_Cornus_florida.png", "drawing"], ["dogwood01.jpg", "flower"]],
- "gray-birch": [["BetulaPopulifolia1.jpg", "bark", "dark chevrons under the branches"], ["Betula_populifolia_534726341.jpg", "leaf"], ["Betula_populifolia_534726365.jpg", "leaf", "triangular, long-pointed"], ["Betula_populifolia_575328960.jpg", "form", "several trunks from one base"], ["Betula_populifolia_in_fog_596285623.jpg", "form"], ["Gray-Birch-bark_(20701238634).gif", "bark"], ["Gray_Birches_(1)_(8673202113).jpg", "form"], ["Mature_gray_birch_bark.jpg", "bark", "chalky bark that barely peels"], ["NAS-071_Betula_populifolia.png", "drawing"]],
- "hemlock": [["Eastern_Hemlock,_Tsuga_canadensis.jpg", "leaf"], ["Eastern_Hemlock_(Tsuga_canadensis)_-_Flickr_-_wackybadger.jpg", "bark"], ["Eastern_Hemlock_(Tsuga_canadensis)_-_Flickr_-_wackybadger_(2).jpg", "bark"], ["Eastern_Hemlock_5155.jpg", "form", "young hemlocks in shade"], ["Tsuga_canadensis_(Eastern_Hemlock)_(36286065532).jpg", "form"], ["Tsuga_canadensis_15-p.bot-tsuga.cana-45.jpg", "leaf", "underneath: two white lines on each needle"], ["Tsuga_canadensis_drawing.png", "drawing"], ["Tsuga_canadensis_morton.jpg", "form"]],
- "red-maple": [["2014-10-30_13_47_46_Red_Maple_during_autumn_along_Terrace_Boulevard_in_Ewing,_New_Jersey.JPG", "fall"], ["Acer_rubrum.jpg", "leaf"], ["Acer_rubrum_042.jpg", "flower", "red flowers before the leaves"], ["Rubrum_buds.jpg", "twig", "red buds and flowers"]]
+ "beech": [
+  [
+   "2014-10-30_13_24_34_American_Beech_foliage_during_autumn_in_the_woodlands_along_the_West_Branch_Shabakunk_Creek_in_Ewing,_New_Jersey.JPG",
+   "fall"
+  ],
+  [
+   "American_Beech.jpg",
+   "leaf"
+  ],
+  [
+   "American_Beech_During_a_Winter_Rain_1.jpg",
+   "winter",
+   "young beech keeping its dry leaves in winter"
+  ],
+  [
+   "American_Beech_During_a_Winter_Rain_2.jpg",
+   "winter",
+   "young beech keeping its dry leaves in winter"
+  ],
+  [
+   "American_Beech_Fagus_grandifolia_Feet.JPG",
+   "bark",
+   "roots and smooth grey bark"
+  ],
+  [
+   "Fagus_grandifolia_(30130540393).jpg",
+   "bark"
+  ],
+  [
+   "Fagus_grandifolia_(31075598065).jpg",
+   "bark"
+  ],
+  [
+   "Fagus_grandifolia_(American_Beech)_(27826373064).jpg",
+   "fruit",
+   "the spiny nut husk"
+  ],
+  [
+   "Fagus_grandifolia_Ehrh._American_beech.tiff.jpg",
+   "drawing"
+  ],
+  [
+   "Fagus_grandifolia_foliage.jpg",
+   "leaf"
+  ],
+  [
+   "Fagus_grandifolia_in_winter.jpg",
+   "winter",
+   "dry leaves hanging on in winter"
+  ],
+  [
+   "NAS-106_Fagus_grandifolia.png",
+   "drawing"
+  ]
+ ],
+ "black-cherry": [
+  [
+   "2014-11-02_11_47_15_Black_Cherry_foliage_during_autumn_along_Upper_Ferry_Road_in_Ewing,_New_Jersey.JPG",
+   "fall"
+  ],
+  [
+   "Amerikaanse_vogelkers_bessen_Prunus_serotina.jpg",
+   "fruit"
+  ],
+  [
+   "Black_Cherry_(Prunus_serotina)_bark_detail.jpg",
+   "bark",
+   "old bark: burnt potato chips"
+  ],
+  [
+   "Prunus-serotina-flowers.jpg",
+   "flower"
+  ],
+  [
+   "PrunusSerotinaBark.jpg",
+   "bark",
+   "old bark"
+  ],
+  [
+   "Prunus_serotina_(30361665653).jpg",
+   "bark",
+   "young bark: smooth, with marks like a birch"
+  ],
+  [
+   "Prunus_serotina_(30626010100).jpg",
+   "bark",
+   "young bark"
+  ],
+  [
+   "Prunus_serotina_(30877332002).jpg",
+   "bark",
+   "old bark"
+  ],
+  [
+   "Prunus_serotina_(Padus_virginiana)_Black_cherry.png",
+   "drawing"
+  ]
+ ],
+ "black-locust": [
+  [
+   "Black_Locust_(Robinia_pseudoacacia)_-_Guelph,_Ontario_02.jpg",
+   "leaf",
+   "leaflets close up"
+  ],
+  [
+   "Robinia_pseudoacacia_(33617443054).jpg",
+   "bark"
+  ],
+  [
+   "Robinia_pseudoacacia_(33617443354).jpg",
+   "flower"
+  ],
+  [
+   "Robinia_pseudoacacia_-_black_locust_-_Robinie_-_robinier_faux-acacia_04.jpg",
+   "leaf",
+   "one whole leaf of many leaflets"
+  ],
+  [
+   "Robinia_pseudoacacia_L._Black_locust.tiff.jpg",
+   "drawing"
+  ],
+  [
+   "NAS-076_Robinia_pseudoacacia.png",
+   "drawing"
+  ]
+ ],
+ "black-walnut": [
+  [
+   "Black_Walnut_(Juglans_nigra)_-_Guelph,_Ontario_2020-07-29.jpg",
+   "leaf"
+  ],
+  [
+   "Black_walnut_in_Prospect_Park_(92401p).jpg",
+   "form"
+  ],
+  [
+   "Juglans_nigra_(Black_Walnut)_(36657514695).jpg",
+   "fruit",
+   "the green husk"
+  ],
+  [
+   "Juglans_nigra_(black_walnut)_1_(49083259276).jpg",
+   "bark"
+  ],
+  [
+   "Juglans_nigra_-_Noyer_à_fruits_noirs._(Black_walnut)_(NYPL_b14485031-1109296).tiff.jpg",
+   "drawing"
+  ],
+  [
+   "Marble_Hill_Park,_Eastern_black_walnut_(Juglans_nigra).jpg",
+   "form"
+  ],
+  [
+   "NAS-030_Juglans_nigra.png",
+   "drawing"
+  ]
+ ],
+ "dogwood": [
+  [
+   "2014-10-30_10_36_30_Flowering_Dogwood_foliage_during_autumn_on_Glen_Mawr_Drive_in_Ewing,_New_Jersey.jfif",
+   "fall"
+  ],
+  [
+   "Benthamidia_florida8.jpg",
+   "fruit"
+  ],
+  [
+   "Cornus_florida_Arkansas.jpg",
+   "form",
+   "in flower"
+  ],
+  [
+   "Cornus_florida_in_Eastwoodhill_Arboretum_(3).jpg",
+   "leaf",
+   "the curving veins"
+  ],
+  [
+   "Cornus_florida_leaf.jpg",
+   "leaf"
+  ],
+  [
+   "Cornus_florida_seeds.jpg",
+   "fruit",
+   "seeds"
+  ],
+  [
+   "Dogwood_flower_closeup_20080427_141400_1_crop_sharp.png",
+   "flower",
+   "the true flowers, in the middle"
+  ],
+  [
+   "Flowering_Dogwood_-_Cornus_florida_(41123271645).jpg",
+   "flower"
+  ],
+  [
+   "Flowering_Dogwood_Cornus_florida_'First_Lady'_Bark_Detail_3008px.jpg",
+   "bark",
+   "bark in small blocks"
+  ],
+  [
+   "Flowering_Dogwood_Cornus_florida_Bark_2000px.jpg",
+   "bark"
+  ],
+  [
+   "Flowering_Dogwood_Cornus_florida_Flower_High_DoF_Cropped.jfif",
+   "flower",
+   "four white bracts around the flowers"
+  ],
+  [
+   "NAS-048_Cornus_florida.png",
+   "drawing"
+  ],
+  [
+   "dogwood01.jpg",
+   "flower"
+  ],
+  [
+   "Cornus_florida_BrittonBrown.png",
+   "drawing"
+  ]
+ ],
+ "gray-birch": [
+  [
+   "BetulaPopulifolia1.jpg",
+   "bark",
+   "dark chevrons under the branches"
+  ],
+  [
+   "Betula_populifolia_534726341.jpg",
+   "leaf"
+  ],
+  [
+   "Betula_populifolia_534726365.jpg",
+   "leaf",
+   "triangular, long-pointed"
+  ],
+  [
+   "Betula_populifolia_575328960.jpg",
+   "form",
+   "several trunks from one base"
+  ],
+  [
+   "Betula_populifolia_in_fog_596285623.jpg",
+   "form"
+  ],
+  [
+   "Gray-Birch-bark_(20701238634).gif",
+   "bark"
+  ],
+  [
+   "Gray_Birches_(1)_(8673202113).jpg",
+   "form"
+  ],
+  [
+   "Mature_gray_birch_bark.jpg",
+   "bark",
+   "chalky bark that barely peels"
+  ],
+  [
+   "NAS-071_Betula_populifolia.png",
+   "drawing"
+  ]
+ ],
+ "hemlock": [
+  [
+   "Eastern_Hemlock,_Tsuga_canadensis.jpg",
+   "leaf"
+  ],
+  [
+   "Eastern_Hemlock_(Tsuga_canadensis)_-_Flickr_-_wackybadger.jpg",
+   "bark"
+  ],
+  [
+   "Eastern_Hemlock_(Tsuga_canadensis)_-_Flickr_-_wackybadger_(2).jpg",
+   "bark"
+  ],
+  [
+   "Eastern_Hemlock_5155.jpg",
+   "form",
+   "young hemlocks in shade"
+  ],
+  [
+   "Tsuga_canadensis_(Eastern_Hemlock)_(36286065532).jpg",
+   "form"
+  ],
+  [
+   "Tsuga_canadensis_15-p.bot-tsuga.cana-45.jpg",
+   "leaf",
+   "underneath: two white lines on each needle"
+  ],
+  [
+   "Tsuga_canadensis_drawing.png",
+   "drawing"
+  ],
+  [
+   "Tsuga_canadensis_morton.jpg",
+   "form"
+  ],
+  [
+   "NAS-149_Tsuga_canadensis.png",
+   "drawing"
+  ]
+ ],
+ "red-maple": [
+  [
+   "2014-10-30_13_47_46_Red_Maple_during_autumn_along_Terrace_Boulevard_in_Ewing,_New_Jersey.JPG",
+   "fall"
+  ],
+  [
+   "Acer_rubrum.jpg",
+   "leaf"
+  ],
+  [
+   "Acer_rubrum_042.jpg",
+   "flower",
+   "red flowers before the leaves"
+  ],
+  [
+   "Rubrum_buds.jpg",
+   "twig",
+   "red buds and flowers"
+  ],
+  [
+   "Acer_rubrum_drawing.png",
+   "drawing"
+  ],
+  [
+   "NAS-041_Acer_rubrum.png",
+   "drawing"
+  ]
+ ],
+ "sugar-maple": [
+  [
+   "Acer_saccharum_drawing.png",
+   "drawing"
+  ]
+ ],
+ "white-oak": [
+  [
+   "NAS-001_Quercus_alba.png",
+   "drawing"
+  ]
+ ],
+ "red-oak": [
+  [
+   "NAS-026_Quercus_rubra.png",
+   "drawing"
+  ]
+ ],
+ "pin-oak": [
+  [
+   "NAS-027_Quercus_palustris_clean.png",
+   "drawing"
+  ]
+ ],
+ "tulip-tree": [
+  [
+   "NAS-061_Liriodendron_tulipifera.png",
+   "drawing"
+  ]
+ ],
+ "sweetgum": [
+  [
+   "NAS-062_Liquidambar_styraciflua.png",
+   "drawing"
+  ]
+ ],
+ "sycamore": [
+  [
+   "NAS-063_Platanus_occidentalis.png",
+   "drawing"
+  ]
+ ],
+ "sassafras": [
+  [
+   "NAS-081_Sassafras_albidum.png",
+   "drawing"
+  ]
+ ],
+ "white-pine": [
+  [
+   "Pinus_strobus_drawing.png",
+   "drawing"
+  ],
+  [
+   "NAS-145_Pinus_strobus.png",
+   "drawing"
+  ]
+ ],
+ "pitch-pine": [
+  [
+   "Pinus_rigida_drawing.png",
+   "drawing"
+  ],
+  [
+   "NAS-143_Pinus_rigida.png",
+   "drawing"
+  ]
+ ],
+ "red-cedar": [
+  [
+   "Juniperus_virginiana_drawing.png",
+   "drawing"
+  ],
+  [
+   "NAS-155_Juniperus_virginiana.png",
+   "drawing"
+  ]
+ ],
+ "tree-of-heaven": [
+  [
+   "Ailanthus_altissima_drawing.png",
+   "drawing"
+  ]
+ ],
+ "holly": [
+  [
+   "NAS-084_Ilex_opaca.png",
+   "drawing"
+  ]
+ ],
+ "white-cedar": [
+  [
+   "Chamaecyparis_thyoides_drawing.png",
+   "drawing"
+  ],
+  [
+   "NAS-152_Chamaecyparis_thyoides.png",
+   "drawing"
+  ]
+ ]
 }
