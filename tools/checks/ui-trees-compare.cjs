@@ -28,7 +28,7 @@ const { chromium } = require('playwright'); const fs = require('fs');
       const ask = await page.locator('.tr-ask').innerText(); kinds[ask.slice(0, 30)] = 1;
       await page.click('.tr-cmp summary'); await page.waitForTimeout(700);
       await page.screenshot({ path: `${out}/2-practise-${shots}.png`, fullPage: true }); shots++;
-      console.log('practise:', ask.slice(0, 40), '||', (await page.locator('.tr-cmp-body p').innerText()).slice(0, 100));
+      console.log('practise:', ask.slice(0, 40), '||', (await page.locator('.tr-pair').innerText()).replace(/\n/g, ' | ').slice(0, 160));
     }
     await page.click('[data-t=next]'); await page.waitForTimeout(200);
   }

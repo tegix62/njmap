@@ -7,6 +7,7 @@ import { leafSvg, twigSvg, HAS_LEAF, HAS_OUTLINE, outlineSource } from './treele
 import { SKILLS, DRILL_N, PASS } from './treeskills.js';
 import { PROFILE, barkKindOf } from './treeprofile.js';
 import { juice } from './juice.js';
+import { ASPECT_WORD, idLine, aspectOf } from './treeid.js';
 import { distanceMi, bearing, compass8 } from './geo.js';
 const DAYS = [0, 1, 3, 7, 16, 35];
 const DAY = 864e5;
@@ -285,7 +286,7 @@ export function initTrees(ctx) {
     for (const x of root.querySelectorAll('[data-t=n3ans]')) { x.disabled = true; if (x.dataset.id === q.id) x.classList.add('right'); }
     if (!ok) b.classList.add('wrong');
     feel(ok, b, q.id);
-    root.querySelector('.tr-fb').innerHTML = `<div class="tr-res ${ok ? 'ok' : 'no'}"><b>${ok ? '✓' : '✗'} ${esc(by.get(q.id).name)}</b><p>${esc(SHAPE_TELL[q.id])}</p></div>${ok ? '' : compareHtml(b.dataset.id, 'form')}<button class="tr-go" data-t="n3next">Next</button>`;
+    root.querySelector('.tr-fb').innerHTML = `${idPair(q.id, b.dataset.id, 'form', ok)}${ok ? '' : compareHtml(b.dataset.id, 'form')}<button class="tr-go" data-t="n3next">Next</button>`;
   }
 
   // ---- your own photos: kept in this browser only (IndexedDB), never uploaded
@@ -435,6 +436,16 @@ export function initTrees(ctx) {
   const photoOf = (t, ctxs) => { const ps = t.photos.filter((p) => !ctxs || ctxs.includes(p.ctx)); return rand(ps.length ? ps : t.photos); };
   const img = (p, cls = '') => `<figure class="tr-ph ${cls}"><img src="${esc(p.f)}" alt="" loading="lazy"><figcaption><b>${esc(p.cap || CTX[p.ctx] || p.ctx)}</b><span>${esc(p.credit.replace(/^\(c\)/, '©').replace(/,? some rights reserved/, ''))}${p.lic && p.via ? ` · ${esc(p.lic)}` : ''} · ${esc(p.via || 'iNaturalist')}</span></figcaption></figure>`;
   const drawingHtml = (dr, cls = '') => `<figure class="tn-plate ${cls}"><img src="${esc(dr.f)}" alt="" loading="lazy"><figcaption>${/Britton/.test(dr.credit) ? 'Britton &amp; Brown, <i>Illustrated Flora</i> (1913)' : /Michaux/.test(dr.credit) ? 'Michaux, <i>The North American Sylva</i>' : esc(dr.credit)} · public domain</figcaption></figure>`;
+  /** What tells the trees apart for the thing the question showed (its leaf, bark, fruit, winter look ...): after a right answer one line
+   * for the tree; after a wrong one the right tree and the one you picked, each marked, one short line each. */
+  function idPair(rightId, pickedId, how, ok, head = '') {
+    const a = aspectOf(how), r = by.get(rightId), w = by.get(pickedId), word = ASPECT_WORD[a];
+    // fall colour alone rarely settles it; with it, the leaf's shape (which a fall photo shows too)
+    const idLineX = (id) => a === 'fall' ? `${idLine(id, 'fall')} ${idLine(id, 'leaf')}` : idLine(id, a);
+    if (ok || !w || pickedId === rightId) return `<div class="tr-res ok"><b>✓ ${esc(r.name)}</b>${head}<p class="tr-idl"><i>${word}</i>${esc(idLineX(r.id))}</p></div>`;
+    return `<div class="tr-res no"><b>✗ Not quite</b>${head}<span class="tr-aspect">${word}</span>
+      <div class="tr-pair"><div class="ok"><span>✓ ${esc(r.name)}</span><p>${esc(idLineX(r.id))}</p></div><div class="no"><span>✗ ${esc(w.name)} <small>your pick</small></span><p>${esc(idLineX(w.id))}</p></div></div></div>`;
+  }
   /** After a wrong answer: the tree you picked, to compare with the right one (which stays the big picture). A small picture of the same
    * kind as the question's (its bark, its traced leaf, its drawing, a photo from the same season), opened for a bigger one and its tell. */
   function compareHtml(wid, how) {
@@ -450,7 +461,6 @@ export function initTrees(ctx) {
     } else if (how && how.ctx) pic = ph(photoOf(w, [how.ctx]));
     else if (how === 'form') pic = ph(photoOf(w, ['form']));
     if (!pic) pic = ph(photoOf(w, how === 'bark' ? ['bark'] : ['leaf', 'form']));
-    const tell = (how === 'bark' && PROFILE[w.id] && PROFILE[w.id].bark) || (how === 'form' && SHAPE_TELL[w.id]) || groupOf(w.id).tell[w.id] || w.tell;
     const th = pic.sil ? `<span class="tr-cmp-th sil">${pic.sil}</span>` : pic.src ? `<span class="tr-cmp-th"><img src="${esc(pic.src)}" alt="" loading="lazy"></span>` : '';
     // opened: the right one (the question's own picture) beside the one you picked, the same size, the right one first and marked
     const big = root.querySelector('.tr-body .big img, .tr-body .tk-bigsil svg, .tr-body .t3-stage canvas');
@@ -461,7 +471,7 @@ export function initTrees(ctx) {
     const body = rightPic && rname
       ? `<div class="tr-cmp-two"><figure class="ok${pic.sil ? ' sil' : ''}">${rightPic}<figcaption>✓ ${esc(rname)}</figcaption></figure><figure class="no${pic.sil ? ' sil' : ''}">${wrongPic}<figcaption>Your pick: ${esc(w.name)}</figcaption></figure></div>${credit ? `<small class="tr-cmp-cr">Your pick’s photo: ${esc(credit)}</small>` : ''}`
       : pic.html;
-    return `<details class="tr-cmp"><summary>${th}<span>Compare with the <b>${esc(w.name)}</b> you picked</span><i>›</i></summary><div class="tr-cmp-body">${body}<p><b>${esc(w.name)}</b>${how === 'bark' ? ' bark' : ''}: ${esc(tell)}</p></div></details>`;
+    return `<details class="tr-cmp"><summary>${th}<span>Compare with the <b>${esc(w.name)}</b> you picked</span><i>›</i></summary><div class="tr-cmp-body">${body}</div></details>`;
   }
   const frame = (top, body) => { drop3d(); root.classList.remove('jc-in'); void root.offsetWidth; root.classList.add('jc-in'); root.innerHTML = `<div class="tr-top">${top}</div><div class="tr-body">${body}</div>`; root.scrollTop = 0; root.classList.remove('peek'); ctx.hud(''); };
   const back = (label = 'Trees') => `<button class="tr-back" data-t="hub"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>${esc(label)}</button>`;
@@ -584,14 +594,13 @@ export function initTrees(ctx) {
     if (!ok) b.classList.add('wrong');
     feel(ok, b, q.id);
     if (ok) { setTimeout(() => { if (quick) { quick.i++; quickAsk(); } }, 550); return; }
-    const t = by.get(q.id), tell = (quick.bark && PROFILE[t.id] && PROFILE[t.id].bark) || groupOf(t.id).tell[t.id];
-    root.querySelector('.tr-body').insertAdjacentHTML('beforeend', `<div class="tr-fb"><div class="tr-res no"><b>✗ It was ${esc(t.name)}</b><p>${esc(tell)}</p></div>${compareHtml(b.dataset.id, quick.bark ? 'bark' : q.how)}<button class="tr-go" data-t="qnext">Next</button></div>`);
+    root.querySelector('.tr-body').insertAdjacentHTML('beforeend', `<div class="tr-fb">${idPair(q.id, b.dataset.id, quick.bark ? 'bark' : q.how, false)}${compareHtml(b.dataset.id, quick.bark ? 'bark' : q.how)}<button class="tr-go" data-t="qnext">Next</button></div>`);
     root.querySelector('.tr-go').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
   function quickEnd() {
     const mix = Object.entries(quick.mix).sort((a, b) => b[1] - a[1]).slice(0, 2);
     const r = quick.right, n = quick.n, wasBark = quick.bark, quickIds = quick.ids; quick = null;
-    const tellOf = (x) => (wasBark && PROFILE[x.id] && PROFILE[x.id].bark) || groupOf(x.id).tell[x.id];
+    const tellOf = (x) => idLine(x.id, wasBark ? 'bark' : 'leaf');
     setTimeout(() => { juice.done(r >= n * 0.7); juice.countUp(root.querySelector('.jc-count'), r); if (r >= n * 0.8) juice.fall(quickIds.map(leafSrc).filter(Boolean)); }, 120);
     frame(back(), `<div class="tr-done"><h2><span class="jc-count">${r}</span> of ${n}</h2><p>${r >= n * 0.9 ? 'Sharp eyes.' : r >= n * 0.7 ? 'Getting there.' : 'These take many looks: that is how everyone learns them.'}</p>
       ${mix.map(([k]) => { const [a, c] = k.split('|').map((x) => by.get(x)); return `<div class="tr-res no"><b>You mixed up ${esc(a.name)} and ${esc(c.name)}</b><p>${esc(a.name)}: ${esc(tellOf(a))}</p><p>${esc(c.name)}: ${esc(tellOf(c))}</p></div>`; }).join('')}
@@ -696,7 +705,7 @@ export function initTrees(ctx) {
         const asUrl = (pp) => { const [pid, ext] = pp[0].split('.'); return [`${POOL.base}${pid}/${POOL.size}.${ext}`, pp[2]]; };
         const opts = shuffle([[t.id, asUrl(rand(win(t.id)))], ...others.slice(0, 2).map((id) => [id, asUrl(rand(win(id)))])]);
         frame(head, `<p class="tr-ask">Here is a <b>${esc(t.name.toLowerCase())}</b>: ${esc({ leaf: 'its leaves', fall: 'its fall colour', flower: 'its flowers', fruit: 'its fruit' }[sum.ctx] || 'in season')}. Which photo is the same kind of tree in winter?</p>${img(sum)}<div class="tk-silpick sk-tiles tn-wintiles">${opts.map(([id, [u]]) => `<button data-t="ans" data-id="${id}"><img src="${esc(u)}" alt=""></button>`).join('')}</div><div class="tr-fb"></div>`);
-        q = { kind: 'season2', t, right: t.id, names: true };
+        q = { kind: 'season2', t, right: t.id, names: true, how: { ctx: 'winter' } };
         return;
       }
       kind = 'flash';
@@ -732,7 +741,7 @@ export function initTrees(ctx) {
     if (kind === 'shapepick') {
       const ch = choicesFor(t, pool.filter(HAS_LEAF)).filter((c) => HAS_LEAF(c.id));
       frame(head, `<p class="tr-ask">Tap the leaf of the <b>${esc(t.name)}</b></p><div class="tk-silpick">${ch.map((c) => `<button data-t="ans" data-id="${c.id}">${leafSvg(c.id)}</button>`).join('')}</div><div class="tr-fb"></div>`);
-      q = { kind, t, right: t.id };
+      q = { kind, t, right: t.id, how: 'leaf' };
       return;
     }
     if (kind === 'groupq') {
@@ -753,7 +762,7 @@ export function initTrees(ctx) {
       const ch = choicesFor(t, pool);
       const cx = rand(['leaf', 'bark', 'leaf', 'form']);
       frame(head, `<p class="tr-ask">Tap the <b>${esc(t.name)}</b></p><div class="tr-pick">${ch.map((c) => { const p = photoOf(c, [cx]); return `<button data-t="ans" data-id="${c.id}"><img src="${esc(p.f)}" alt=""><small>${esc(CTX[p.ctx])}</small></button>`; }).join('')}</div><div class="tr-fb"></div>`);
-      q = { kind, t, right: t.id };
+      q = { kind, t, right: t.id, how: { ctx: cx } };
     } else if (kind === 'same') {
       const other = Math.random() < 0.5 ? t : by.get(rand(t.like.filter((x) => pool.includes(x)).length ? t.like.filter((x) => pool.includes(x)) : pool.filter((x) => x !== t.id)) || t.id);
       const a = photoOf(t, ['leaf', 'fall']), b = photoOf(other, ['bark', 'form', 'fruit', 'flower', 'twig']);
@@ -798,7 +807,10 @@ export function initTrees(ctx) {
     if (q.kind === 'bark' && PROFILE[t.id] && PROFILE[t.id].bark) line = `${esc(t.name)} bark: ${esc(PROFILE[t.id].bark)}`;
     const cmp = !ok && by.has(btn.dataset.id) && !['pick', 'shapepick', 'season2', 'same'].includes(q.kind) ? compareHtml(btn.dataset.id, q.how) : '';
     if (cmp && (q.kind === 'photo' || q.kind === 'shape')) line = '';      // the comparison says what the one you picked is
-    root.querySelector('.tr-fb').innerHTML = `<div class="tr-res ${ok ? 'ok' : 'no'}"><b>${ok ? '✓' : '✗ It was'} ${esc(t.name)}</b>${comboChip()}${line ? `<p>${line}</p>` : ''}<p>${esc(groupOf(t.id).tell[t.id])}</p></div>${cmp}<button class="tr-go" data-t="next">Next</button>`;
+    const treeQ = by.has(q.right) && by.has(btn.dataset.id) && q.kind !== 'same';
+    const res = treeQ ? idPair(q.right, btn.dataset.id, q.how, ok, comboChip())
+      : `<div class="tr-res ${ok ? 'ok' : 'no'}"><b>${ok ? '✓' : '✗ It was'} ${esc(t.name)}</b>${comboChip()}${line ? `<p>${line}</p>` : ''}<p>${esc(groupOf(t.id).tell[t.id])}</p></div>`;
+    root.querySelector('.tr-fb').innerHTML = `${res}${cmp}<button class="tr-go" data-t="next">Next</button>`;
     root.querySelector('.tr-go').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 

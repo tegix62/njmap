@@ -4069,3 +4069,13 @@ span.jc-leaf { width: 9px; height: 9px; border-radius: 50%; background: #3f9b62;
 .tr-cmp-two figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 5px 8px; font-size: 12.5px; font-weight: 600; color: #fff; }
 .tr-cmp-two .ok figcaption { background: #2f8f5b; } .tr-cmp-two .no figcaption { background: #d24a3a; }
 .tr-cmp-cr { display: block; margin-top: 4px; font-size: 10.5px; opacity: .6; }
+/* after an answer: what tells the trees apart, for the thing the question showed */
+.tr-aspect { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 99px; background: rgba(0,0,0,.07); font-size: 12px; font-weight: 600; letter-spacing: .02em; vertical-align: 2px; }
+.tr-pair { display: grid; gap: 6px; margin-top: 10px; }
+.tr-pair > div { background: rgba(255,255,255,.75); border-radius: 12px; padding: 8px 10px; border-left: 4px solid; }
+.tr-pair > .ok { border-color: #2f8f5b; } .tr-pair > .no { border-color: #d24a3a; }
+.tr-pair span { display: block; font-weight: 700; font-size: 14.5px; }
+.tr-pair .ok span { color: #1f6e43; } .tr-pair .no span { color: #a83426; }
+.tr-pair small { font-weight: 500; font-size: 12px; opacity: .75; margin-left: 4px; }
+.tr-pair p { margin: 2px 0 0 !important; font-size: 14.5px; line-height: 1.38; }
+.tr-idl i { font-style: normal; font-weight: 600; font-size: 12px; padding: 2px 8px; border-radius: 99px; background: rgba(0,0,0,.07); margin-right: 8px; }
