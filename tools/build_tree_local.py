@@ -4,6 +4,8 @@
 Stage 1 (grid):  python3 tools/build_tree_local.py grid    every research-grade iNaturalist observation of each tree in New Jersey (place 51),
                                                            counted on a 0.05-degree grid (about 4 x 5.5 km), into data/treegrid.json. The app
                                                            ranks "trees near you" from it on the device: your spot never leaves it.
+Stage 4 (winter): python3 tools/build_tree_local.py winter  up to 40 more winter photos per tree into data/treepool.json (no live leaves, or December
+                                                           to March): bark, buds, shape and what hangs on through winter.
 Stage 3 (points): python3 tools/build_tree_local.py points  each sighting's own place (open, not obscured, located to within 100 m), for tree
                                                            walks, into data/treepoints.json: per tree, coordinates in 1e-4 degree steps (about 10 m),
                                                            sorted and delta-coded. Loaded only when a walk starts.
@@ -113,5 +115,36 @@ def points():
     json.dump(out, open(os.path.join(ROOT, 'data/treepoints.json'), 'w'), separators=(',', ':'))
 
 
+def winter():
+    """Up to 40 more winter photos per tree, added to data/treepool.json: observations annotated 'no live leaves', or (evergreens, and to
+    top up) observed December to March; New Jersey first, then anywhere."""
+    path = os.path.join(ROOT, 'data/treepool.json'); P = json.load(open(path))
+    for sci, slug in BT.TREES:
+        have = {p[0].split('.')[0] for p in P['trees'][slug]}
+        t = BT.get('taxa', q=sci, rank='species', per_page=1)['results'][0]
+        add = []
+        for q in ({'term_id': 36, 'term_value_id': 40, 'place_id': BT.NJ}, {'term_id': 36, 'term_value_id': 40}, {'month': '12,1,2,3', 'place_id': BT.NJ}, {'month': '12,1,2,3'}):
+            if len(add) >= 40:
+                break
+            r = BT.get('observations', taxon_id=t['id'], quality_grade='research', photos='true', photo_license=BT.OK_LICENSES, order_by='votes', per_page=100, **q)
+            for o in r['results']:
+                for p in o['photos']:
+                    u = p['url']
+                    if 'inaturalist-open-data' not in u or not p.get('license_code'):
+                        continue
+                    pid, ext = u.split('/photos/')[1].split('/')[0], u.rsplit('.', 1)[1]
+                    if pid in have:
+                        continue
+                    have.add(pid)
+                    credit = p['attribution'].replace('(c) ', '© ').replace(', some rights reserved', '').replace(' (CC', ' · CC').split(', uploaded')[0]
+                    add.append([f'{pid}.{ext}', 'winter', credit])
+                    break          # one photo per observation: more different trees
+                if len(add) >= 40:
+                    break
+        P['trees'][slug] += add
+        print(f'{slug:18s} +{len(add)} winter photos ({sum(1 for p in P["trees"][slug] if p[1] == "winter")} in all)', flush=True)
+    json.dump(P, open(path, 'w'), ensure_ascii=False, separators=(',', ':'))
+
+
 if __name__ == '__main__':
-    {'grid': grid, 'pool': pool, 'points': points}[sys.argv[1]]()
+    {'grid': grid, 'pool': pool, 'points': points, 'winter': winter}[sys.argv[1]]()
