@@ -698,5 +698,23 @@
   "artist": "François André Michaux (book author), Augustus Lucas Hillhouse (translator), Pierre-Joseph Redouté (illustrator), Bessin (engraver)",
   "lic": "Public domain",
   "page": "https://commons.wikimedia.org/wiki/File:NAS-030_Juglans_nigra.png"
+ },
+ "Black_walnut_leaf.jpg": {
+  "slug": "black-walnut",
+  "artist": "Gmihail at Serbian Wikipedia",
+  "lic": "CC BY-SA 3.0 rs",
+  "page": "https://commons.wikimedia.org/wiki/File:Black_walnut_leaf.jpg"
+ },
+ "Carya_ovata_leaf_2.jpg": {
+  "slug": "shagbark-hickory",
+  "artist": "Kristel Schoonderwoerd",
+  "lic": "CC BY-SA 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Carya_ovata_leaf_2.jpg"
+ },
+ "Sassafras_Leaf.jpg": {
+  "slug": "sassafras",
+  "artist": "John Stockla",
+  "lic": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Sassafras_Leaf.jpg"
  }
 }

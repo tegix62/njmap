@@ -154,6 +154,11 @@
   [
    "NAS-030_Juglans_nigra.png",
    "drawing"
+  ],
+  [
+   "Black_walnut_leaf.jpg",
+   "leaf",
+   "one whole leaf: 15 to 23 leaflets"
   ]
  ],
  "dogwood": [
@@ -376,6 +381,11 @@
   [
    "NAS-081_Sassafras_albidum.png",
    "drawing"
+  ],
+  [
+   "Sassafras_Leaf.jpg",
+   "leaf",
+   "the mitten-shaped leaf"
   ]
  ],
  "white-pine": [
@@ -428,6 +438,13 @@
   [
    "NAS-152_Chamaecyparis_thyoides.png",
    "drawing"
+  ]
+ ],
+ "shagbark-hickory": [
+  [
+   "Carya_ovata_leaf_2.jpg",
+   "leaf",
+   "five leaflets, the end three biggest"
   ]
  ]
 }

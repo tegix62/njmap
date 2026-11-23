@@ -109,6 +109,24 @@ def leaf_mask_gc(im, trim=50, iters=6):
     return comp | cv2.bitwise_not(ff)
 
 
+def leaf_mask_white(im, trim=120):
+    """For a leaf laid on white paper: everything that is not paper (coloured, or darker than paper), the largest piece, holes filled.
+    Catches pale leaflets that a colour cut-out misses."""
+    a = np.asarray(im); hsv = cv2.cvtColor(a, cv2.COLOR_RGB2HSV).astype(int)
+    m = ((hsv[..., 1] > 28) | (hsv[..., 2] < 175)).astype(np.uint8) * 255
+    m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+    t = max(3, im.width // trim) | 1
+    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (t, t)))
+    n, lab, st, _ = cv2.connectedComponentsWithStats(m, 8)
+    if n < 2:
+        return None
+    comp = (lab == 1 + int(np.argmax(st[1:, cv2.CC_STAT_AREA]))).astype(np.uint8) * 255
+    # fill holes, with a border of paper all round first, so paper the leaf closes off against the photo's edge is not taken for a hole
+    pad = cv2.copyMakeBorder(comp, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0)
+    ff = pad.copy(); cv2.floodFill(ff, np.zeros((pad.shape[0] + 2, pad.shape[1] + 2), np.uint8), (0, 0), 255)
+    return (pad | cv2.bitwise_not(ff))[1:-1, 1:-1]
+
+
 def smooth_contour(c, sigma):
     """Smooth a closed outline along its length (keeps lobes and teeth bigger than sigma, drops pixel steps)."""
     n = len(c); k = int(3 * sigma) or 1
@@ -231,7 +249,8 @@ def trace():
         else:
             p = pool(slug)[k]
             im = fetch_img(p['url'].replace('square', 'medium'))
-        m = leaf_mask_seeded(im, tuple(opt['seed']), opt.get('tol', 14), opt.get('trim', 50)) if 'seed' in opt else leaf_mask_gc(im, opt.get('trim', 50))
+        m = (leaf_mask_white(im, opt.get('trim', 120)) if opt.get('white') else
+             leaf_mask_seeded(im, tuple(opt['seed']), opt.get('tol', 14), opt.get('trim', 50)) if 'seed' in opt else leaf_mask_gc(im, opt.get('trim', 50)))
         cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         c = max(cs, key=cv2.contourArea).reshape(-1, 2).astype(float)
         c = smooth_contour(c, opt.get('smooth', max(1.5, len(c) / 400)))
