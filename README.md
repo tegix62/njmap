@@ -735,3 +735,10 @@ One tree from seed to old age and death, as a fast time-lapse with the seasons t
 - **Same tree, other season**: a tree's leaves, fall colour, flowers or fruit, and three winter photos (the tree's own, and two of the trees you know): which is it in winter?
 - **True colours**: the traced leaves keep their four tones but each tone takes the leaf's own average colour from its photo (nudged a fifth toward the house greens), so a dark red oak stays dark and a pale sycamore stays pale.
 - **Watch it grow** now says how the tree's life compares with a long human life of about 80 years (a red maple about the same; a white pine nearly three).
+
+### Trees: game feel (`js/juice.js`) and Leaf rain
+- Every answer has a feel: a right answer plays a soft chime that climbs a pentatonic step for each one in a row (a little run every 5), bursts small copies of the tree's own traced leaf out of the button and pops it; a wrong one thuds and shakes. "N in a row" shows from 3.
+- Round ends count the score up; a good round rains leaves down the screen. Each new screen slides in.
+- All sound is synthesised with Web Audio (no audio files). The 🔊 button in the Trees header mutes it (remembered); a phone buzz goes with it. Motion stays still when the system asks for reduced motion.
+- **Leaf rain** (hub card): 45 seconds of falling traced leaves. Tap only the named tree's leaves; the named tree changes every 15 seconds, among trees you've met. Look-alikes fall more often than chance. A wrong tap, or a target leaf that lands, costs one of three lives. The end screen shows each pair you confused, side by side. Best score is kept.
+- Check: `tools/checks/ui-trees-juice.cjs`.

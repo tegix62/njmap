@@ -6,6 +6,7 @@ import { GROUPS, GROUP_OF, KEY, ICON, pathTo, treesUnder } from './treekey.js';
 import { leafSvg, twigSvg, HAS_LEAF, HAS_OUTLINE, outlineSource } from './treeleaf.js';
 import { SKILLS, DRILL_N, PASS } from './treeskills.js';
 import { PROFILE, barkKindOf } from './treeprofile.js';
+import { juice } from './juice.js';
 import { distanceMi, bearing, compass8 } from './geo.js';
 const DAYS = [0, 1, 3, 7, 16, 35];
 const DAY = 864e5;
@@ -18,7 +19,15 @@ const today = () => new Date().toLocaleDateString('en-CA');
 
 export function initTrees(ctx) {
   const { map, store } = ctx;
-  let walk = null, PTS = null, mine = {};
+  let walk = null, PTS = null, mine = {}, combo = 0;
+  const leafSrc = (id) => (outlineSource(id) || {}).img || null;
+  /** The feel of an answer: a climbing chime, a burst of the tree's own leaves from the right button and a pop; or a thud and a shake. */
+  function feel(ok, picked, id) {
+    const right = root.querySelector('.right');
+    if (ok) { combo++; juice.right(combo); juice.burst(right || picked, leafSrc(id)); juice.pop(right || picked); }
+    else { combo = 0; juice.wrong(); juice.shake(picked); if (right) juice.pop(right); }
+  }
+  const comboChip = () => (combo >= 3 ? `<span class="jc-combo">${combo} in a row</span>` : '');
   let D = null, by = null, root = null, q = null, run = null, layer = false, H = null, G = null, POOL = null, quick = null, picking = false;
 
   async function load() {
@@ -177,6 +186,81 @@ export function initTrees(ctx) {
     requestAnimationFrame(tick);
   }
 
+  // ---- Leaf rain: traced leaves falling; tap only the target tree's; three lives; the target changes every 15 seconds and the rain speeds up
+  let rain = null;
+  function rainStart() {
+    const traced = D.trees.filter((t) => HAS_OUTLINE(t.id)).map((t) => t.id), m = met().filter((id) => traced.includes(id));
+    if (traced.length < 3) return hub();
+    const targets = shuffle(m.length >= 3 ? m : traced).slice(0, 4);
+    frame(`${back()}<span class="tr-kick">Leaf rain</span>`,
+      `<div class="lr-head"><div class="lr-target"><img alt=""><span><small>Catch only</small><b></b></span></div><div class="lr-stats"><span class="lr-score">0</span><small class="lr-lives">♥♥♥</small></div></div>
+      <div class="lr-field"><div class="lr-ground"></div></div><div class="lr-bar"><i></i></div>
+      <p class="tn-hint">Tap every leaf of the tree named above before it lands; leave the others. A wrong tap, or a target leaf that lands, costs a life.</p>`);
+    rain = { traced, targets, ti: 0, t: 0, score: 0, lives: 3, leaves: [], next: 0.4, last: performance.now(), dur: 45, mix: {}, alive: true, round: { right: 0, wrong: 0 } };
+    setTarget(0);
+    const field = root.querySelector('.lr-field');
+    field.addEventListener('pointerdown', (e) => { const el = e.target.closest('.lr-leaf'); if (el) hitLeaf(el); });
+    requestAnimationFrame(rainTick);
+  }
+  function setTarget(i) {
+    const id = rain.targets[i % rain.targets.length]; rain.target = id;
+    const box = root.querySelector('.lr-target'); if (!box) return;
+    box.querySelector('img').src = leafSrc(id); box.querySelector('b').textContent = by.get(id).name;
+    box.classList.remove('flip'); void box.offsetWidth; box.classList.add('flip');
+    if (i) juice.right(1);
+  }
+  function rainTick(now) {
+    if (!rain || !rain.alive) return;
+    const field = root.querySelector('.lr-field'); if (!field) { rain = null; return; }
+    const dt = Math.min(0.05, (now - rain.last) / 1000); rain.last = now; rain.t += dt;
+    const W = field.clientWidth, Hh = field.clientHeight, k = rain.t / rain.dur;
+    if (Math.floor(rain.t / 15) !== rain.ti && rain.t < rain.dur) { rain.ti = Math.floor(rain.t / 15); setTarget(rain.ti); }
+    rain.next -= dt;
+    if (rain.next <= 0 && rain.t < rain.dur - 1) {      // a new leaf: the target about two times in five, else its look-alikes first
+      const near = rain.traced.filter((x) => x !== rain.target && (by.get(rain.target).like.includes(x) || GROUP_OF[x] === GROUP_OF[rain.target]));
+      const id = Math.random() < 0.42 ? rain.target : rand(near.length && Math.random() < 0.6 ? near : rain.traced.filter((x) => x !== rain.target));
+      const el = document.createElement('img'); el.className = 'lr-leaf'; el.src = leafSrc(id); el.alt = ''; el.dataset.id = id; el.draggable = false;
+      field.appendChild(el);
+      rain.leaves.push({ el, id, x: 20 + Math.random() * (W - 80), y: -70, vy: 55 + 70 * k + Math.random() * 30, sway: 20 + Math.random() * 30, ph: Math.random() * 6, rot: (Math.random() - 0.5) * 80 });
+      rain.next = Math.max(0.42, 1.05 - 0.6 * k) * (0.7 + Math.random() * 0.6);
+    }
+    for (const L of rain.leaves) {
+      L.y += L.vy * dt; L.ph += dt * 1.6;
+      L.el.style.transform = `translate(${L.x + Math.sin(L.ph) * L.sway}px, ${L.y}px) rotate(${L.rot + Math.sin(L.ph * 0.8) * 25}deg)`;
+      if (L.y > Hh - 60 && !L.done) {
+        L.done = true; L.el.remove();
+        if (L.id === rain.target) { loseLife(L, 'missed'); }
+      }
+    }
+    rain.leaves = rain.leaves.filter((L) => !L.done);
+    root.querySelector('.lr-bar i').style.width = `${Math.max(0, 100 - k * 100)}%`;
+    if (rain.t >= rain.dur || rain.lives <= 0) return rainEnd();
+    requestAnimationFrame(rainTick);
+  }
+  function hitLeaf(el) {
+    const L = rain.leaves.find((x) => x.el === el); if (!L || L.done) return;
+    L.done = true;
+    if (L.id === rain.target) {
+      rain.score++; combo++; rain.round.right++; juice.right(combo); juice.burst(el, leafSrc(L.id), 7);
+      root.querySelector('.lr-score').textContent = String(rain.score); el.remove();
+    } else { const k = [L.id, rain.target].sort().join('|'); rain.mix[k] = (rain.mix[k] || 0) + 1; rain.round.wrong++; loseLife(L, by.get(L.id).name); el.remove(); }
+  }
+  function loseLife(L, label) {
+    rain.lives--; combo = 0; juice.wrong(); juice.shake(root.querySelector('.lr-field'));
+    root.querySelector('.lr-lives').textContent = '♥'.repeat(Math.max(0, rain.lives)) + '♡'.repeat(Math.max(0, 3 - rain.lives));
+    const f = root.querySelector('.lr-field'), m = document.createElement('span'); m.className = 'lr-miss'; m.textContent = label;
+    m.style.left = `${Math.min(f.clientWidth - 120, Math.max(4, L.x))}px`; m.style.top = `${Math.min(f.clientHeight - 30, Math.max(4, L.y))}px`; f.appendChild(m); setTimeout(() => m.remove(), 900);
+  }
+  function rainEnd() {
+    const r = rain; r.alive = false; rain = null;
+    const best = Math.max(store.get('trees.rainbest', 0), r.score); store.set('trees.rainbest', best);
+    const mix = Object.entries(r.mix).sort((a, b) => b[1] - a[1]).slice(0, 2);
+    setTimeout(() => { juice.done(r.score >= 15); juice.countUp(root.querySelector('.jc-count'), r.score); if (r.score >= 15) juice.fall(r.targets.map(leafSrc)); }, 120);
+    frame(back(), `<div class="tr-done"><h2><span class="jc-count">${r.score}</span> leaves caught</h2><p>${r.lives <= 0 ? 'Out of lives.' : 'Time!'} Best: ${best}</p>
+      ${mix.map(([k]) => { const [a, c] = k.split('|').map((x) => by.get(x)); return `<div class="tr-res no"><b>You took ${esc(a.name)} for ${esc(c.name)}</b><div class="lr-pair"><span>${leafSvg(a.id)}<small>${esc(a.name)}</small></span><span>${leafSvg(c.id)}<small>${esc(c.name)}</small></span></div></div>`; }).join('')}
+      <button class="tr-go" data-t="rain">Again</button><button class="tr-card wide" data-t="hub"><b>Back to the trees</b></button></div>`);
+  }
+
   // Name that tree: a 3D tree turning on the stage, in a season; four names
   let n3 = null;
   function nameStart() { n3 = { i: 0, n: 8, right: 0 }; nameAsk(); }
@@ -195,6 +279,7 @@ export function initTrees(ctx) {
     const ok = b.dataset.id === q.id; if (ok) n3.right++;
     for (const x of root.querySelectorAll('[data-t=n3ans]')) { x.disabled = true; if (x.dataset.id === q.id) x.classList.add('right'); }
     if (!ok) b.classList.add('wrong');
+    feel(ok, b, q.id);
     root.querySelector('.tr-fb').innerHTML = `<div class="tr-res ${ok ? 'ok' : 'no'}"><b>${ok ? '✓' : '✗'} ${esc(by.get(q.id).name)}</b><p>${esc(SHAPE_TELL[q.id])}</p></div><button class="tr-go" data-t="n3next">Next</button>`;
   }
 
@@ -343,7 +428,7 @@ export function initTrees(ctx) {
   const photoOf = (t, ctxs) => { const ps = t.photos.filter((p) => !ctxs || ctxs.includes(p.ctx)); return rand(ps.length ? ps : t.photos); };
   const img = (p, cls = '') => `<figure class="tr-ph ${cls}"><img src="${esc(p.f)}" alt="" loading="lazy"><figcaption><b>${esc(p.cap || CTX[p.ctx] || p.ctx)}</b><span>${esc(p.credit.replace(/^\(c\)/, '©').replace(/,? some rights reserved/, ''))}${p.lic && p.via ? ` · ${esc(p.lic)}` : ''} · ${esc(p.via || 'iNaturalist')}</span></figcaption></figure>`;
   const drawingHtml = (dr, cls = '') => `<figure class="tn-plate ${cls}"><img src="${esc(dr.f)}" alt="" loading="lazy"><figcaption>${/Britton/.test(dr.credit) ? 'Britton &amp; Brown, <i>Illustrated Flora</i> (1913)' : /Michaux/.test(dr.credit) ? 'Michaux, <i>The North American Sylva</i>' : esc(dr.credit)} · public domain</figcaption></figure>`;
-  const frame = (top, body) => { drop3d(); root.innerHTML = `<div class="tr-top">${top}</div><div class="tr-body">${body}</div>`; root.scrollTop = 0; root.classList.remove('peek'); ctx.hud(''); };
+  const frame = (top, body) => { drop3d(); root.classList.remove('jc-in'); void root.offsetWidth; root.classList.add('jc-in'); root.innerHTML = `<div class="tr-top">${top}</div><div class="tr-body">${body}</div>`; root.scrollTop = 0; root.classList.remove('peek'); ctx.hud(''); };
   const back = (label = 'Trees') => `<button class="tr-back" data-t="hub"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>${esc(label)}</button>`;
 
   const groupOf = (id) => GROUPS.find((g) => g.id === GROUP_OF[id]);
@@ -379,7 +464,7 @@ export function initTrees(ctx) {
   }
 
   function hub() {
-    q = null; run = null; quick = null; n3 = null; drop3d(); if (walk) walkEnd();
+    q = null; run = null; quick = null; n3 = null; if (rain) rain.alive = false; rain = null; drop3d(); if (walk) walkEnd();
     const m = met(), t = store.get('trees.today', {}), doneToday = t.d === today() && t.done;
     const due = m.filter((id) => isDue(id)).length;
     const C = 2 * Math.PI * 21, frac = doneToday ? 1 : t.d === today() && t.n ? t.i / t.n : 0;
@@ -387,7 +472,7 @@ export function initTrees(ctx) {
     const fresh = list.filter((x) => !m.includes(x.id)).slice(0, 2);
     const plan = doneToday ? `Done today ✓${streak() ? ` · ${streak()}-day streak` : ''}` : `${fresh.length ? `Meet: ${fresh.map((x) => esc(x.name)).join(' and ')}` : 'Review what you know'}${due ? ` · ${due} to review` : ''}`;
     const learnt = Object.keys(SKILLS).filter(skillDone);
-    frame(`<button class="tr-back" data-t="home"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Home</button><h1>Trees of New Jersey</h1>`,
+    frame(`<button class="tr-back" data-t="home"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Home</button><h1>Trees of New Jersey</h1><button class="jc-mute" data-t="mute" aria-label="${juice.muted ? 'Sound off' : 'Sound on'}">${juice.muted ? '🔇' : '🔊'}</button>`,
       `<button class="tr-today${doneToday ? ' done' : ''}" data-t="today"><span><b>${doneToday ? 'Today is done' : t.d === today() && t.i ? 'Carry on today' : 'Start today'}</b><small>${plan}</small></span>
         <svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="21" class="bg"/><circle cx="26" cy="26" r="21" class="fg" stroke-dasharray="${(C * frac).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 26 26)"/></svg></button>
       <p class="tn-season">${esc(SEASON_LINE[season()])}</p>
@@ -398,6 +483,7 @@ export function initTrees(ctx) {
       <div class="tr-row"><button class="tr-card" data-t="quick"${m.length < 2 ? ' disabled' : ''}><b>Quick look</b><small>${m.length < 2 ? 'after you meet two trees' : '20 photos, fast: which tree?'}</small></button>
         <button class="tr-card" data-t="barkonly"${m.length < 2 ? ' disabled' : ''}><b>Bark only</b><small>${m.length < 2 ? 'after you meet two trees' : '15 bark photos: whose is it?'}</small></button></div>
       <button class="tr-card wide" data-t="identify"><b>Name a tree</b><small>in front of you: a few questions, with pictures</small></button>
+      <button class="tr-card wide lr-card" data-t="rain"><b>Leaf rain</b><small>leaves falling: tap only the right tree’s${store.get('trees.rainbest', 0) ? ` · best ${store.get('trees.rainbest', 0)}` : ''}</small></button>
       <button class="tr-card wide t3-card" data-t="name3d"><b>Name that tree</b><small>a tree in 3D, turning, in any season: which is it? (4 trees so far)</small></button>
       <div class="tr-row">${['red-maple', 'pin-oak', 'sweetgum', 'white-pine'].map((x) => `<button class="tr-card gr-mini" data-t="grow" data-id="${x}"><b>Watch it grow</b><small>${esc(by.get(x).name)}</small></button>`).join('')}</div>
       <button class="tr-card wide tw-card" data-t="walk"><b>Tree walk</b><small>the trees recorded around you, on the map: go and find them${store.get('trees.found', []).length ? ` · ${store.get('trees.found', []).length} found so far` : ''}</small></button>
@@ -461,13 +547,15 @@ export function initTrees(ctx) {
     if (ok) quick.right++; else { const k = [q.id, q.other].sort().join('|'); quick.mix[k] = (quick.mix[k] || 0) + 1; }
     for (const x of root.querySelectorAll('[data-t=qans]')) { x.disabled = true; if (x.dataset.id === q.id) x.classList.add('right'); }
     if (!ok) b.classList.add('wrong');
+    feel(ok, b, q.id);
     setTimeout(() => { if (quick) { quick.i++; quickAsk(); } }, ok ? 550 : 1300);
   }
   function quickEnd() {
     const mix = Object.entries(quick.mix).sort((a, b) => b[1] - a[1]).slice(0, 2);
-    const r = quick.right, n = quick.n, wasBark = quick.bark; quick = null;
+    const r = quick.right, n = quick.n, wasBark = quick.bark, quickIds = quick.ids; quick = null;
     const tellOf = (x) => (wasBark && PROFILE[x.id] && PROFILE[x.id].bark) || groupOf(x.id).tell[x.id];
-    frame(back(), `<div class="tr-done"><h2>${r} of ${n}</h2><p>${r >= n * 0.9 ? 'Sharp eyes.' : r >= n * 0.7 ? 'Getting there.' : 'These take many looks: that is how everyone learns them.'}</p>
+    setTimeout(() => { juice.done(r >= n * 0.7); juice.countUp(root.querySelector('.jc-count'), r); if (r >= n * 0.8) juice.fall(quickIds.map(leafSrc).filter(Boolean)); }, 120);
+    frame(back(), `<div class="tr-done"><h2><span class="jc-count">${r}</span> of ${n}</h2><p>${r >= n * 0.9 ? 'Sharp eyes.' : r >= n * 0.7 ? 'Getting there.' : 'These take many looks: that is how everyone learns them.'}</p>
       ${mix.map(([k]) => { const [a, c] = k.split('|').map((x) => by.get(x)); return `<div class="tr-res no"><b>You mixed up ${esc(a.name)} and ${esc(c.name)}</b><p>${esc(a.name)}: ${esc(tellOf(a))}</p><p>${esc(c.name)}: ${esc(tellOf(c))}</p></div>`; }).join('')}
       <button class="tr-go" data-t="${wasBark ? 'barkonly' : 'quick'}">Another round</button><button class="tr-card wide" data-t="hub"><b>Back to the trees</b></button></div>`);
   }
@@ -648,7 +736,8 @@ export function initTrees(ctx) {
       if (run) { run.right += ok ? 1 : 0; const st = run.steps[run.i]; if (!st.review) { run.skr = run.skr || {}; const [r = 0, n = 0] = run.skr[q.skill] || []; run.skr[q.skill] = [r + (ok ? 1 : 0), n + 1]; } }
       for (const b of root.querySelectorAll('[data-t=ans]')) { b.disabled = true; if (b.dataset.id === q.right) b.classList.add('right'); }
       if (!ok) btn.classList.add('wrong');
-      root.querySelector('.tr-fb').innerHTML = `<div class="tr-res ${ok ? 'ok' : 'no'}"><b>${ok ? '✓ Yes' : '✗ Not quite'}</b><p>${esc(q.why)}</p>${q.about ? `<p class="sk-about">That was ${/^[aeiou]/i.test(q.about.name) ? 'an' : 'a'} ${esc(q.about.name.toLowerCase())}.</p>` : ''}</div><button class="tr-go" data-t="next">Next</button>`;
+      feel(ok, btn, q.about ? q.about.id : null);
+      root.querySelector('.tr-fb').innerHTML = `<div class="tr-res ${ok ? 'ok' : 'no'}"><b>${ok ? '✓ Yes' : '✗ Not quite'}</b>${comboChip()}<p>${esc(q.why)}</p>${q.about ? `<p class="sk-about">That was ${/^[aeiou]/i.test(q.about.name) ? 'an' : 'a'} ${esc(q.about.name.toLowerCase())}.</p>` : ''}</div><button class="tr-go" data-t="next">Next</button>`;
       root.querySelector('.tr-go').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       return;
     }
@@ -657,6 +746,7 @@ export function initTrees(ctx) {
     if (run) { run.right += ok ? 1 : 0; }
     for (const b of root.querySelectorAll('[data-t=ans]')) { b.disabled = true; if (b.dataset.id === q.right) b.classList.add('right'); }
     if (!ok) btn.classList.add('wrong');
+    feel(ok, btn, t.id);
     let line = '';
     if (q.kind === 'key') line = `${esc(KEY[q.node].a[+q.right][0])}. The questions that lead to it: ${pathTo(t.id).map(([n, i]) => esc(KEY[n].a[i][0])).join(' › ')}.`;
     else if (q.kind === 'groupq') line = `One of the <b>${esc(groupOf(t.id).name.toLowerCase())}</b>: ${esc(groupOf(t.id).why)}`;
@@ -668,7 +758,7 @@ export function initTrees(ctx) {
     if (q.kind === 'pick') for (const b of root.querySelectorAll('.tr-pick button')) b.insertAdjacentHTML('beforeend', `<em>${esc(by.get(b.dataset.id).name)}</em>`);
     if (q.kind === 'season2') for (const b of root.querySelectorAll('.tn-wintiles button')) b.insertAdjacentHTML('beforeend', `<em>${esc(by.get(b.dataset.id).name)}</em>`);
     if (q.kind === 'bark' && PROFILE[t.id] && PROFILE[t.id].bark) line = `${esc(t.name)} bark: ${esc(PROFILE[t.id].bark)}`;
-    root.querySelector('.tr-fb').innerHTML = `<div class="tr-res ${ok ? 'ok' : 'no'}"><b>${ok ? '✓' : '✗'} ${esc(t.name)}</b>${line ? `<p>${line}</p>` : ''}<p>${esc(groupOf(t.id).tell[t.id])}</p></div><button class="tr-go" data-t="next">Next</button>`;
+    root.querySelector('.tr-fb').innerHTML = `<div class="tr-res ${ok ? 'ok' : 'no'}"><b>${ok ? '✓' : '✗'} ${esc(t.name)}</b>${comboChip()}${line ? `<p>${line}</p>` : ''}<p>${esc(groupOf(t.id).tell[t.id])}</p></div><button class="tr-go" data-t="next">Next</button>`;
     root.querySelector('.tr-go').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
@@ -728,7 +818,8 @@ export function initTrees(ctx) {
     if (wasToday) { saveRun(true); const days = store.get('trees.days', []); if (!days.includes(today())) { days.push(today()); store.set('trees.days', days.slice(-400)); } }
     run = null;
     const nx = ranked().list.find((x) => !met().includes(x.id));
-    frame(back(), `<div class="tr-done"><h2>${wasToday ? 'Done for today' : 'Practice done'}</h2><p><b>${r}</b> of ${n} right · ${met().length} of ${D.trees.length} trees met${streak() ? ` · ${streak()}-day streak` : ''}</p>${skl}
+    setTimeout(() => { juice.done(r >= n * 0.7); juice.countUp(root.querySelector('.jc-count'), r); if (r >= n * 0.7) juice.fall(met().map(leafSrc).filter(Boolean)); }, 120);
+    frame(back(), `<div class="tr-done"><h2>${wasToday ? 'Done for today' : 'Practice done'}</h2><p><b class="jc-count">${r}</b> of ${n} right · ${met().length} of ${D.trees.length} trees met${streak() ? ` · ${streak()}-day streak` : ''}</p>${skl}
       ${nx ? `<p class="tr-sci">Next on your list: <b>${esc(nx.name)}</b>.</p>` : ''}
       ${wasToday ? '<p class="tr-sci">The trees you have met come back tomorrow, in three days, in a week: each time from a different side.</p>' : ''}
       <button class="tr-go" data-t="hub">Back to the trees</button>${nx && wasToday ? `<button class="tr-card wide" data-t="more"><b>Keep going</b><small>meet the ${esc(nx.name.toLowerCase())}</small></button>` : '<button class="tr-card wide" data-t="practise">Keep practising</button>'}</div>`);
@@ -751,6 +842,8 @@ export function initTrees(ctx) {
     lesson: (b) => { run = null; lesson(b.dataset.sk); },
     spot: spotPicker, spotmap: spotFromMap, spotclear: () => { store.set('trees.spot', null); hub(); },
     spotset: (b) => { const a = store.get('anchors', [])[+b.dataset.i]; if (a) store.set('trees.spot', { name: a.name, pt: a.pt }); hub(); },
+    mute: (b) => { juice.setMuted(!juice.muted); b.textContent = juice.muted ? '🔇' : '🔊'; if (!juice.muted) juice.tap(); },
+    rain: rainStart,
     quick: () => quickStart(), barkonly: () => quickStart('bark'), qans: quickAnswer,
     t3season: (b) => show3d(b.dataset.id, b.dataset.s),
     grow: (b) => growScreen(b.dataset.id),
