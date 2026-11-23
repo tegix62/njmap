@@ -4007,3 +4007,12 @@ body.trees-on #tabs, body.trees-on #fabs, body.trees-on #lookFab, body.trees-on 
 .gr-ctl .tr-go.gr-play { flex: 1; width: auto; }
 .gr-any { margin: 10px 2px 4px; font-size: 14px; }
 .gr-any summary { cursor: pointer; color: #2f8f5b; font-weight: 700; }
+/* trees: bark and the year */
+.tn-bark { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 6px; }
+.tn-barkph { margin: 0; position: relative; }
+.tn-barkph img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 12px; display: block; }
+.tn-barkph figcaption { font-size: 11px; line-height: 1.25; margin-top: 3px; opacity: 0.75; }
+.tn-line { margin: 4px 2px 12px; font-size: 14.5px; line-height: 1.45; }
+.tn-year { margin: 0 0 12px; padding-left: 18px; font-size: 14.5px; line-height: 1.45; }
+.tn-year li { margin-bottom: 4px; }
+.tn-wintiles button { height: 150px; }

@@ -226,8 +226,18 @@ def tone(slug, a, m, M):
     q = np.quantile(vals, [0.22, 0.55, 0.85])
     lvl = np.digitize(g, q)
     rgba = np.zeros((H, W, 4), np.uint8)
-    for i, col in enumerate(PALETTE):
-        sel = mk & (lvl == i); rgba[sel, :3] = col; rgba[sel, 3] = 255
+    # true colour: each of the four tones takes the leaf's own average colour for those pixels (from the photo), nudged a little toward
+    # the house greens so photos shot in odd light stay readable; so a dark Norway maple stays dark and a pale sugar maple stays pale
+    col = cv2.warpAffine(a, M, (W, H), flags=cv2.INTER_AREA, borderValue=0)
+    for i, base in enumerate(PALETTE):
+        sel = mk & (lvl == i)
+        if not sel.any():
+            continue
+        own = col[sel].reshape(-1, 3).mean(0)
+        hsv = cv2.cvtColor(np.uint8([[own]]), cv2.COLOR_RGB2HSV)[0, 0].astype(int)
+        hsv[1] = min(255, int(hsv[1] * 1.15 + 10))                                   # a touch more colour than a flat photo
+        own = cv2.cvtColor(np.uint8([[hsv]]), cv2.COLOR_HSV2RGB)[0, 0].astype(float)
+        rgba[sel, :3] = (0.8 * own + 0.2 * np.array(base)).astype(np.uint8); rgba[sel, 3] = 255
     edge = mk & ~cv2.erode(mk.astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool)
     rgba[edge, :3] = (16, 56, 34)
     Image.fromarray(rgba, 'RGBA').save(os.path.join(ROOT, f'img/trees/leaf/{slug}.png'), optimize=True)
