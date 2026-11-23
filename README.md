@@ -750,3 +750,9 @@ One tree from seed to old age and death, as a fast time-lapse with the seasons t
 - The app adds them to each tree's bark photos at load, so Whose bark is this?, Bark only, the bark drill and the tree pages all use them. Bark questions now have "Bad photo? Hide it" too.
 - `tools/commons_harvest.py fetch` falls back to each file's ordinary Commons page (licence, author, a 960 px copy) when the API is throttled.
 - Norway maple (botanicalsusan, CC BY-NC) and holly (yousefb, CC BY-NC) have traced leaves now, from iNaturalist pool photos, so it appears in leaf questions and Leaf rain. `trace_leaves.py trace <slug>` retraces just that tree.
+
+### Trees: compare with the one you picked (`compareHtml` in `js/trees.js`)
+- After a wrong answer the right tree stays the big picture, with "✗ It was …" and its tell. Under that, "Compare with the X you picked" shows a small thumbnail of the same kind of picture for your pick: its bark on a bark question, its traced leaf on a leaf question, its botanist's drawing on a drawing question, a pool photo from the same season on photo questions, and its whole tree on Name that tree.
+- Opening it puts the two side by side at the same size: the right one first, outlined green and ticked, and your pick outlined red, with your pick's tell and photo credit.
+- Covers Practise, Quick look, Bark only and Name that tree. In Quick look and Bark only a wrong answer now waits for Next instead of moving on after 1.3 seconds. Questions where the wrong picture is already on screen (tap the leaf, tap the photo, same tree in winter) keep their names-on-tiles reveal.
+- Check: `tools/checks/ui-trees-compare.cjs`.

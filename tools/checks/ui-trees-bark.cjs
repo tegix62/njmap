@@ -17,7 +17,7 @@ const { chromium } = require('playwright'); const fs = require('fs');
   for (let i = 0; i < 6; i++) { if (i < 2) await page.screenshot({ path: `${out}/2-drill-${i}.png` }); await page.locator('[data-t=ans]').first().click(); await page.waitForTimeout(150); await page.click('[data-t=next]'); await page.waitForTimeout(150); }
   console.log('drill:', (await page.locator('.tr-done .tr-res b').innerText().catch(() => '?')));
   await page.click('.tr-done [data-t=hub]'); await page.click('[data-t=barkonly]'); await page.waitForTimeout(500); await page.screenshot({ path: `${out}/3-barkonly.png` });
-  for (let i = 0; i < 15; i++) { await page.locator('[data-t=qans]').first().click(); await page.waitForTimeout(1400); if (await page.locator('.tr-done').count()) break; }
+  for (let i = 0; i < 15; i++) { await page.locator('[data-t=qans]').first().click(); await page.waitForTimeout(700); if (await page.locator('[data-t=qnext]').count()) await page.click('[data-t=qnext]'); await page.waitForTimeout(200); if (await page.locator('.tr-done').count()) break; }
   console.log('bark only:', (await page.locator('.tr-done').innerText()).replace(/\n/g, ' | ').slice(0, 220)); await page.screenshot({ path: `${out}/4-barkonly-end.png` });
   await page.click('.tr-done [data-t=hub]'); let seen = { bark: 0, season2: 0 };
   await page.click('[data-t=practise]'); await page.waitForTimeout(300);
