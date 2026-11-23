@@ -5,6 +5,7 @@
 import { GROUPS, GROUP_OF, KEY, ICON, pathTo, treesUnder } from './treekey.js';
 import { leafSvg, twigSvg, HAS_LEAF, HAS_OUTLINE, outlineSource } from './treeleaf.js';
 import { SKILLS, DRILL_N, PASS } from './treeskills.js';
+import { PROFILE, barkKindOf } from './treeprofile.js';
 import { distanceMi, bearing, compass8 } from './geo.js';
 const DAYS = [0, 1, 3, 7, 16, 35];
 const DAY = 864e5;
@@ -128,7 +129,7 @@ export function initTrees(ctx) {
       { id: 'sapling', name: 'Sapling', dur: 10, line: Ln.sapling, at: (p) => ({ age: sap + 0.15 + p * 0.85, view: { ...fit(sap + 1), man: true } }) },
       { id: 'growing', name: 'Growing up', dur: 7, line: Ln.growing, at: (p) => { const a = sap + 1 + p * (prime - sap - 1); return { age: a, sf: 0.55, view: fit(a) }; } },
       { id: 'prime', name: 'A year in its prime', dur: 14, line: Ln.prime, at: (p) => ({ age: prime + 0.12 + p * 0.86, view: fit(prime) }) },
-      { id: 'old', name: 'Old age', dur: 8, line: Ln.old, at: (p) => { const a = L.decline + p * (L.life - L.decline); return { age: a, sf: 0.1, view: fit(a) }; } },
+      { id: 'old', name: 'Old age', dur: 8, line: `${Ln.old} Next to a long human life of about 80 years, this tree's life here is ${L.life / 80 < 1.15 ? 'about the same length' : `about ${(L.life / 80).toFixed(1).replace('.0', '')} human lifetimes`}.`, at: (p) => { const a = L.decline + p * (L.life - L.decline); return { age: a, sf: 0.1, view: fit(a) }; } },
       { id: 'death', name: 'Death and after', dur: 11, line: 'Dead, it stands for a few years as a snag, then falls. The log slowly goes back into the soil, and new seedlings start beside it. (This part is modelled, not timed from a source.)',
         at: (p) => p < 0.3 ? { age: L.life + 0.5 + (p / 0.3) * 3, sf: 0.1, view: fit(L.life) } : p < 0.62 ? { age: L.life + 4 + ((p - 0.3) / 0.32) * 1.3, sf: 0.1, view: fit(L.life) }
           : { age: L.life + 8, sf: 0.5, view: null, sprout: { x: Hm * 0.25, z: 1.2, s: 0.8 + 14 * (p - 0.62) } } },
@@ -395,13 +396,14 @@ export function initTrees(ctx) {
       ${sp ? '' : '<p class="tn-hint">Set the place you are outdoors most (home, work, a park) and these become the trees most often seen around it.</p>'}
       <div class="tn-list">${local.map((x, i) => `<button class="tn-row${m.includes(x.id) ? ' met' : ''}" data-t="card" data-id="${x.id}"><span class="tn-n">${m.includes(x.id) ? '✓' : i + 1}</span><span class="tn-leaf">${leafArt(x.id)}</span><span class="tk-gt"><b>${esc(x.name)}</b><small>${nc ? `seen ${nc[x.id].n.toLocaleString()} times within about 10 km` : `${x.count.toLocaleString()} sightings in New Jersey`}${!m.includes(x.id) && fresh.some((f) => f.id === x.id) ? ' · next to meet' : ''}</small></span></button>`).join('')}</div>
       <div class="tr-row"><button class="tr-card" data-t="quick"${m.length < 2 ? ' disabled' : ''}><b>Quick look</b><small>${m.length < 2 ? 'after you meet two trees' : '20 photos, fast: which tree?'}</small></button>
-        <button class="tr-card" data-t="identify"><b>Name a tree</b><small>in front of you: a few questions</small></button></div>
+        <button class="tr-card" data-t="barkonly"${m.length < 2 ? ' disabled' : ''}><b>Bark only</b><small>${m.length < 2 ? 'after you meet two trees' : '15 bark photos: whose is it?'}</small></button></div>
+      <button class="tr-card wide" data-t="identify"><b>Name a tree</b><small>in front of you: a few questions, with pictures</small></button>
       <button class="tr-card wide t3-card" data-t="name3d"><b>Name that tree</b><small>a tree in 3D, turning, in any season: which is it? (4 trees so far)</small></button>
       <div class="tr-row">${['red-maple', 'pin-oak', 'sweetgum', 'white-pine'].map((x) => `<button class="tr-card gr-mini" data-t="grow" data-id="${x}"><b>Watch it grow</b><small>${esc(by.get(x).name)}</small></button>`).join('')}</div>
       <button class="tr-card wide tw-card" data-t="walk"><b>Tree walk</b><small>the trees recorded around you, on the map: go and find them${store.get('trees.found', []).length ? ` · ${store.get('trees.found', []).length} found so far` : ''}</small></button>
       <button class="tr-card wide" data-t="practise"${m.length < 2 && !learnt.length ? ' disabled' : ''}><b>Practise</b><small>${m.length < 2 && !learnt.length ? 'after you meet two trees' : 'endless, every kind of question'}</small></button>
       <h4>Learn to look</h4><p class="tn-hint">Optional short lessons: what field guides ask about any tree. Each tree's page links to the one it needs.</p>
-      <div class="tn-skills">${Object.entries(SKILLS).map(([k, S]) => `<button class="tn-skill${skillDone(k) ? ' done' : ''}" data-t="lesson" data-sk="${k}">${ICON[KEY[Object.keys(KEY).find((n) => KEY[n].skill === k)].a[0][1]]}<b>${esc(S.name)}</b>${skillDone(k) ? '<small>✓ learned</small>' : ''}</button>`).join('')}</div>
+      <div class="tn-skills">${Object.entries(SKILLS).map(([k, S]) => `<button class="tn-skill${skillDone(k) ? ' done' : ''}" data-t="lesson" data-sk="${k}">${k === 'bark' ? ICON.bark : ICON[KEY[Object.keys(KEY).find((n) => KEY[n].skill === k)].a[0][1]]}<b>${esc(S.name)}</b>${skillDone(k) ? '<small>✓ learned</small>' : ''}</button>`).join('')}</div>
       <button class="tr-card wide" data-t="guide"><b>Field guide</b><small>every tree, by group, with side-by-side comparisons</small></button>
       <p class="tr-note">Photos and sightings: iNaturalist, each under its own licence; your spot stays on this device. The identifying tips were checked against each tree’s Wikipedia article (November 2026); if your field guide disagrees, trust the book.</p>`);
   }
@@ -435,19 +437,20 @@ export function initTrees(ctx) {
   }
 
   // ---- quick look: 20 photos from the big pools, two names each, fast
-  function quickStart() {
+  function quickStart(mode) {
     const m = met(); if (m.length < 2) return hub();
-    quick = { i: 0, n: 20, right: 0, mix: {}, ids: m };
+    const bark = mode === 'bark', ids = bark ? D.trees.filter((t) => t.photos.some((p) => p.ctx === 'bark')).map((t) => t.id) : m;
+    quick = { i: 0, n: bark ? 15 : 20, right: 0, mix: {}, ids, bark };
     quickAsk();
   }
   function quickAsk() {
     if (quick.i >= quick.n) return quickEnd();
     const id = rand(quick.ids), t = by.get(id);
-    const near = [...t.like, ...Object.keys(groupOf(id).tell)].filter((x) => x !== id && quick.ids.includes(x));
+    const near = quick.bark ? quick.ids.filter((x) => x !== id && barkKindOf(x) === barkKindOf(id)) : [...t.like, ...Object.keys(groupOf(id).tell)].filter((x) => x !== id && quick.ids.includes(x));
     const other = rand(near.length && Math.random() < 0.7 ? near : quick.ids.filter((x) => x !== id));
-    const [u, credit, file] = poolPhoto(id);
+    const [u, credit, file] = quick.bark ? (() => { const p = rand(t.photos.filter((pp) => pp.ctx === 'bark')); return [p.f, p.credit, null]; })() : poolPhoto(id);
     frame(`${back()}<span class="tr-prog">${Array.from({ length: quick.n }, (_, i) => `<i class="${i < quick.i ? 'd' : i === quick.i ? 'c' : ''}"></i>`).join('')}</span>`,
-      `<span class="tr-kick">Quick look</span><figure class="tr-ph big tn-quick"><img src="${esc(u)}" alt=""><figcaption><span>${esc(credit)} · iNaturalist</span></figcaption></figure>
+      `<span class="tr-kick">${quick.bark ? 'Bark only' : 'Quick look'}</span><figure class="tr-ph big tn-quick"><img src="${esc(u)}" alt=""><figcaption><span>${esc(credit)} · iNaturalist</span></figcaption></figure>
       <div class="tr-choices two">${shuffle([id, other]).map((x) => `<button data-t="qans" data-id="${x}">${esc(by.get(x).name)}</button>`).join('')}</div>
       ${file ? `<button class="sk-link tn-hide" data-t="hidephoto" data-f="${esc(file)}">Bad photo? Hide it</button>` : ''}`);
     q = { kind: 'quick', id, other };
@@ -462,10 +465,11 @@ export function initTrees(ctx) {
   }
   function quickEnd() {
     const mix = Object.entries(quick.mix).sort((a, b) => b[1] - a[1]).slice(0, 2);
-    const r = quick.right, n = quick.n; quick = null;
-    frame(back(), `<div class="tr-done"><h2>${r} of ${n}</h2><p>${r >= 18 ? 'Sharp eyes.' : r >= 14 ? 'Getting there.' : 'These take many looks: that is how everyone learns them.'}</p>
-      ${mix.map(([k]) => { const [a, c] = k.split('|').map((x) => by.get(x)); return `<div class="tr-res no"><b>You mixed up ${esc(a.name)} and ${esc(c.name)}</b><p>${esc(a.name)}: ${esc(groupOf(a.id).tell[a.id])}</p><p>${esc(c.name)}: ${esc(groupOf(c.id).tell[c.id])}</p></div>`; }).join('')}
-      <button class="tr-go" data-t="quick">Another 20</button><button class="tr-card wide" data-t="hub"><b>Back to the trees</b></button></div>`);
+    const r = quick.right, n = quick.n, wasBark = quick.bark; quick = null;
+    const tellOf = (x) => (wasBark && PROFILE[x.id] && PROFILE[x.id].bark) || groupOf(x.id).tell[x.id];
+    frame(back(), `<div class="tr-done"><h2>${r} of ${n}</h2><p>${r >= n * 0.9 ? 'Sharp eyes.' : r >= n * 0.7 ? 'Getting there.' : 'These take many looks: that is how everyone learns them.'}</p>
+      ${mix.map(([k]) => { const [a, c] = k.split('|').map((x) => by.get(x)); return `<div class="tr-res no"><b>You mixed up ${esc(a.name)} and ${esc(c.name)}</b><p>${esc(a.name)}: ${esc(tellOf(a))}</p><p>${esc(c.name)}: ${esc(tellOf(c))}</p></div>`; }).join('')}
+      <button class="tr-go" data-t="${wasBark ? 'barkonly' : 'quick'}">Another round</button><button class="tr-card wide" data-t="hub"><b>Back to the trees</b></button></div>`);
   }
 
   /** A tree's page: all its photos, its tell, and where it has been seen. */
@@ -476,6 +480,7 @@ export function initTrees(ctx) {
       <div class="tr-strip">${(mine[t.id] || []).map((p) => myImg(p)).join('')}${t.photos.map((p) => img(p)).join('')}</div>
       <div class="tw-mine"><button class="sk-link" data-t="snap" data-id="${t.id}">${(mine[t.id] || []).length ? 'Add another photo of yours' : 'Add your own photo of this tree'}</button>${(mine[t.id] || []).length ? ` · <button class="sk-link" data-t="unsnap" data-k="${mine[t.id][mine[t.id].length - 1].k}" data-id="${t.id}">remove your latest</button>` : ''}<small>Your photos stay on this device and come back in your reviews.</small></div>
       <div class="tk-tellrow"><div class="tk-sil">${leafArt(t.id)}</div><p class="tr-tell">${esc(t.tell)}</p></div>
+      ${(() => { const P = PROFILE[t.id] || {}; const yr = [P.fall, ...(P.more || [])].filter(Boolean); return (P.bark || P.young ? `<h4>Bark</h4><div class="tn-bark">${t.photos.filter((p) => p.ctx === 'bark').slice(0, 3).map((p) => `<figure class="tn-barkph"><img src="${esc(p.f)}" alt="" loading="lazy">${p.cap ? `<figcaption>${esc(p.cap)}</figcaption>` : ''}</figure>`).join('')}</div><p class="tn-line">${P.young ? `<b>Young:</b> ${esc(P.young)} ` : ''}${P.bark ? `${P.young ? '<b>Older:</b> ' : ''}${esc(P.bark)}` : ''}</p>` : '') + (yr.length ? `<h4>Through the year</h4><ul class="tn-year">${yr.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''); })()}
       ${has3d(t.id) ? `<h4>In 3D</h4><div class="t3-wrap"><div class="t3-stage"></div><div class="t3-seasons">${['spring', 'summer', 'fall', 'winter'].map((x) => `<button data-t="t3season" data-id="${t.id}" data-s="${x}">${SEASON_WORD[x]}</button>`).join('')}</div><p class="sk-cap">Drag to turn. A model of how this tree grows, from its branching and outline, with its own traced leaf.</p><button class="tr-card wide gr-card" data-t="grow" data-id="${t.id}"><b>Watch it grow</b><small>from a seed to old age, the seasons turning every year</small></button></div>` : ''}
       ${(t.drawings || []).length ? `<h4>${t.drawings.length > 1 ? 'Botanists’ drawings' : 'A botanist’s drawing'}</h4>${t.drawings.map((d) => drawingHtml(d)).join('')}` : ''}
       <button class="tk-ingroup" data-t="groupcard" data-g="${groupOf(t.id).id}"><small>One of the <b>${esc(groupOf(t.id).name.toLowerCase())}</b>: ${esc(groupOf(t.id).tell[t.id])}</small></button>
@@ -543,6 +548,32 @@ export function initTrees(ctx) {
       frame(head, `<p class="tr-ask">${esc(n.q)}</p><p class="tr-sub">${esc(t.name)}</p>${pic}<details class="sk-hint"><summary>How do I check?</summary>${esc(n.how)}</details><div class="tk-opts sm">${n.a.map(([label, ic], i) => `<button data-t="ans" data-id="${i}">${ICON[ic]}<b>${esc(label)}</b></button>`).join('')}</div><div class="tr-fb"></div>`);
       q = { kind, t, right: String(ans), node };
       return;
+    }
+    if (kind === 'bark') {
+      const bp = t.photos.filter((p) => p.ctx === 'bark');
+      if (bp.length) {
+        const k = barkKindOf(t.id), others = D.trees.filter((x) => x.id !== t.id && x.photos.some((p) => p.ctx === 'bark'));
+        const pref = shuffle(others.filter((x) => pool.includes(x.id) && barkKindOf(x.id) === k)).concat(shuffle(others.filter((x) => pool.includes(x.id))), shuffle(others.filter((x) => barkKindOf(x.id) === k)), shuffle(others));
+        const ch = shuffle([t, ...pref.filter((x, i, a) => a.indexOf(x) === i).slice(0, 3)]);
+        frame(head, `<p class="tr-ask">Whose bark is this?</p>${img(rand(bp), 'big')}<div class="tr-choices">${ch.map((c) => `<button data-t="ans" data-id="${c.id}">${esc(c.name)}</button>`).join('')}</div><div class="tr-fb"></div>`);
+        q = { kind: 'bark', t, right: t.id };
+        return;
+      }
+      kind = 'flash';
+    }
+    if (kind === 'season2') {
+      // the same tree in another season: this tree in leaf (or flower or fall), and three winter photos to choose from
+      const win = (id) => (POOL.trees[id] || []).filter((p) => p[1] === 'winter' && !hidden().includes(p[0]));
+      const others = shuffle(pool.filter((x) => x !== t.id && win(x).length));
+      if (win(t.id).length && others.length >= 2) {
+        const sum = photoOf(t, ['leaf', 'fall', 'flower', 'fruit']);
+        const asUrl = (pp) => { const [pid, ext] = pp[0].split('.'); return [`${POOL.base}${pid}/${POOL.size}.${ext}`, pp[2]]; };
+        const opts = shuffle([[t.id, asUrl(rand(win(t.id)))], ...others.slice(0, 2).map((id) => [id, asUrl(rand(win(id)))])]);
+        frame(head, `<p class="tr-ask">Here is a <b>${esc(t.name.toLowerCase())}</b>: ${esc({ leaf: 'its leaves', fall: 'its fall colour', flower: 'its flowers', fruit: 'its fruit' }[sum.ctx] || 'in season')}. Which photo is the same kind of tree in winter?</p>${img(sum)}<div class="tk-silpick sk-tiles tn-wintiles">${opts.map(([id, [u]]) => `<button data-t="ans" data-id="${id}"><img src="${esc(u)}" alt=""></button>`).join('')}</div><div class="tr-fb"></div>`);
+        q = { kind: 'season2', t, right: t.id, names: true };
+        return;
+      }
+      kind = 'flash';
     }
     if (kind === 'plate' && (t.drawings || []).length) {
       const ch = choicesFor(t, pool);
@@ -635,6 +666,8 @@ export function initTrees(ctx) {
     if (q.kind === 'shapepick') for (const b of root.querySelectorAll('.tk-silpick button')) b.insertAdjacentHTML('beforeend', `<em>${esc(by.get(b.dataset.id).name)}</em>`);
     if ((q.kind === 'shape' || q.kind === 'shapepick') && !ok) { const w = by.get(btn.dataset.id); line = `${q.kind === 'shape' ? 'That' : 'You tapped the'} ${esc(w.name)}: ${esc(groupOf(w.id).tell[w.id])}`; }
     if (q.kind === 'pick') for (const b of root.querySelectorAll('.tr-pick button')) b.insertAdjacentHTML('beforeend', `<em>${esc(by.get(b.dataset.id).name)}</em>`);
+    if (q.kind === 'season2') for (const b of root.querySelectorAll('.tn-wintiles button')) b.insertAdjacentHTML('beforeend', `<em>${esc(by.get(b.dataset.id).name)}</em>`);
+    if (q.kind === 'bark' && PROFILE[t.id] && PROFILE[t.id].bark) line = `${esc(t.name)} bark: ${esc(PROFILE[t.id].bark)}`;
     root.querySelector('.tr-fb').innerHTML = `<div class="tr-res ${ok ? 'ok' : 'no'}"><b>${ok ? '✓' : '✗'} ${esc(t.name)}</b>${line ? `<p>${line}</p>` : ''}<p>${esc(groupOf(t.id).tell[t.id])}</p></div><button class="tr-go" data-t="next">Next</button>`;
     root.querySelector('.tr-go').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
@@ -645,7 +678,7 @@ export function initTrees(ctx) {
     const learnt = Object.keys(SKILLS).filter(skillDone);
     const revSkill = learnt.length && Math.random() < 0.5 ? [{ drill: rand(learnt), review: true }] : [];
     const mix = (qs) => { const x = shuffle(qs); for (let i = 1; i < x.length; i++) if (x[i].id && x[i].id === x[i - 1].id) { const j = x.findIndex((y, k) => k > i && y.id !== x[i].id); if (j > 0) [x[i], x[j]] = [x[j], x[i]]; } return x; };
-    const kinds = ['flash', 'flash', 'photo', 'pick', 'same', 'key', 'groupq', 'shape', 'shapepick', 'plate'];
+    const kinds = ['flash', 'flash', 'photo', 'pick', 'same', 'key', 'groupq', 'shape', 'shapepick', 'plate', 'bark', 'bark', 'season2'];
     // the next trees on your local list (two a day; three on the very first day)
     const fresh = ranked().list.filter((t) => !m.includes(t.id)).slice(0, m.length ? 2 : 3).map((t) => t.id);
     const due = shuffle(m.filter((id) => isDue(id, s))).slice(0, Math.max(4, SET - fresh.length * 2));
@@ -707,7 +740,7 @@ export function initTrees(ctx) {
     const s = srs(), due = m.filter((id) => isDue(id, s));
     if (learnt.length && (m.length < 2 || Math.random() < 0.25)) return drillAsk(rand(learnt));
     const id = rand(due.length ? due : m);
-    ask(by.get(id), rand(['flash', 'flash', 'photo', 'pick', 'same', 'key', 'groupq', 'shape', 'shapepick', 'plate']), m);
+    ask(by.get(id), rand(['flash', 'flash', 'photo', 'pick', 'same', 'key', 'groupq', 'shape', 'shapepick', 'plate', 'bark', 'bark', 'season2']), m);
   }
 
   const actions = {
@@ -718,7 +751,7 @@ export function initTrees(ctx) {
     lesson: (b) => { run = null; lesson(b.dataset.sk); },
     spot: spotPicker, spotmap: spotFromMap, spotclear: () => { store.set('trees.spot', null); hub(); },
     spotset: (b) => { const a = store.get('anchors', [])[+b.dataset.i]; if (a) store.set('trees.spot', { name: a.name, pt: a.pt }); hub(); },
-    quick: quickStart, qans: quickAnswer,
+    quick: () => quickStart(), barkonly: () => quickStart('bark'), qans: quickAnswer,
     t3season: (b) => show3d(b.dataset.id, b.dataset.s),
     grow: (b) => growScreen(b.dataset.id),
     grplay: (b) => { if (!grow) return; if (b.textContent === 'Watch again') { grow.bi = 0; grow.p = 0; } if (grow.free) { grow.free = false; grow.p = 0; } grow.playing = !grow.playing || b.textContent === 'Watch again'; grow.last = performance.now(); b.textContent = grow.playing ? 'Pause' : 'Play'; },

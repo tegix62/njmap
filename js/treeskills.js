@@ -4,6 +4,7 @@
 // Facts used: arrangement, leaf type and evergreen-ness of the 24 trees in data/trees.json (checked against Wikipedia, November 2026).
 // "MAD Horse" (maples, ashes, dogwoods, horse-chestnut: most trees with leaves in pairs) is the usual field-guide memory aid.
 import { ICON } from './treekey.js';
+import { PROFILE, BARK_KINDS, barkKindOf } from './treeprofile.js';
 import { leafSvg, twigSvg, HAS_OUTLINE } from './treeleaf.js';
 
 const rand = (a) => a[Math.floor(Math.random() * a.length)];
@@ -147,6 +148,36 @@ export const SKILLS = {
         opts: [['round', 'Rounded'], ['bristle', 'Pointed, bristle tips']], right: id === 'white-oak' ? 'round' : 'bristle', about: H.by.get(id),
         why: id === 'white-oak' ? 'Rounded lobes: the white oak side.' : 'Pointed lobes with a bristle at each tip: the red oak side.' };
     },
+  },
+};
+
+// Bark: added for the trees' winter half. Its lines are the bark sentences of each species' Wikipedia article (js/treeprofile.js).
+SKILLS.bark = {
+  name: 'Reading bark', short: 'The year-round clue',
+  panels: (H) => {
+    const ph = (id) => H.img(H.photoOf(H.by.get(id), ['bark']));
+    return [
+      { h: 'Bark is there all year', p: 'Leaves come and go; bark stays. In winter it is often the best clue you have. Start by sorting it into one of five kinds.' },
+      { h: 'Smooth', p: 'No cracks to speak of: beech (silver-grey, smooth all its life), young red maples, holly (grey with small warty lumps).', art: ph('beech') },
+      { h: 'Plates and scales', p: 'Broken into flat pieces: pitch pine’s thick irregular plates, old black cherry’s dark “burnt potato chips”, white oak’s pale scales.', art: ph('pitch-pine') },
+      { h: 'Ridges and furrows', p: 'Long ridges with grooves between, often crossing into diamonds: black walnut, black locust, tulip tree. Northern red oak’s ridges have shiny stripes down their middles.', art: ph('black-walnut') },
+      { h: 'Peeling, shaggy or stringy', p: 'Coming away: shagbark hickory in long shaggy strips, sycamore in patches like camouflage, eastern red cedar in narrow stringy strips.', art: ph('shagbark-hickory') },
+      { h: 'Chalky white', p: 'Gray birch: chalky white, with a dark triangle under each branch.', art: ph('gray-birch') },
+      { h: 'Bark changes with age', p: 'Young bark is usually smoother. Red maple: smooth pale grey, then long plates. Black cherry: banded like a birch for ten years, then dark chips. Shagbark hickory turns shaggy only when mature; pin oak is smooth until about 40.' },
+    ];
+  },
+  drill(H) {
+    const withBark = H.trees.filter((t) => barkKindOf(t.id) && t.photos.some((p) => p.ctx === 'bark'));
+    const t = rand(withBark), kind = barkKindOf(t.id);
+    if (Math.random() < 0.55) {
+      return { ask: 'What kind of bark is this?', body: H.img(H.photoOf(t, ['bark']), 'big'), layout: 'choices',
+        opts: shuffle(Object.entries(BARK_KINDS)).slice(0, 5).map(([k, l]) => [k, l]), right: kind, about: t, why: (PROFILE[t.id] || {}).bark || BARK_KINDS[kind] };
+    }
+    const same = withBark.filter((x) => x.id !== t.id && barkKindOf(x.id) === kind), other = withBark.filter((x) => x.id !== t.id);
+    const ch = shuffle([t, ...shuffle(same).slice(0, 2), ...shuffle(other)].filter((x, i, a) => a.findIndex((y) => y.id === x.id) === i).slice(0, 4));
+    if (!ch.includes(t)) ch[0] = t;
+    return { ask: 'Whose bark is this?', body: H.img(H.photoOf(t, ['bark']), 'big'), layout: 'choices', opts: shuffle(ch).map((x) => [x.id, x.name]), right: t.id, about: t,
+      why: (PROFILE[t.id] || {}).bark || '' };
   },
 };
 export const SKILL_IDS = Object.keys(SKILLS);
