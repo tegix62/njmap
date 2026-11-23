@@ -145,6 +145,28 @@ def sheet(slug, kinds):
     print('sheet', slug, len(sel), 'previews', sum(os.path.exists(f'{TMP}/thumbs/{slug}-{i}.jpg') for i, _ in sel), flush=True)
 
 
+def page_meta(title):
+    """Author, licence and a 960 px (or the original, if smaller) image URL read from the file's ordinary web page, for when the API is
+    throttled. None if the page has no licence template."""
+    raw = get('https://commons.wikimedia.org/wiki/' + urllib.parse.quote(title.replace(' ', '_')), tries=3)
+    if not raw:
+        return None
+    h = html.unescape(raw.decode('utf-8', 'replace'))
+    lic = re.search(r'<span class="licensetpl_short"[^>]*>([^<]+)</span>', h)
+    if not lic:
+        return None
+    aut = re.search(r'id="fileinfotpl_aut"[^>]*>.*?</td>\s*<td[^>]*>(.*?)</td>', h, re.S)
+    artist = re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', '', aut.group(1))).strip() if aut else ''
+    artist = re.sub(r'\s*\(talk\)|\s*\[edit\]', '', artist)[:120]
+    url = None
+    for w in (960, 1280, 800, 640):
+        m = re.search(r'(https://(?:upload|thumb)\.wikimedia\.org/wikipedia/commons/thumb/[^"?\s]+/%dpx-[^"?\s]+)' % w, h)
+        if m: url = m.group(1); break
+    if not url:
+        m = re.search(r'class="fullMedia".*?href="([^"?]+)', h, re.S); url = m.group(1) if m else None
+    return {'artist': artist or 'unknown', 'lic': lic.group(1).strip(), 'page': 'https://commons.wikimedia.org/wiki/' + urllib.parse.quote(title.replace(' ', '_')), 'thumb': url}
+
+
 def fetch():
     picks = json.load(open(os.path.join(ROOT, 'tools/commons_picks.json')))
     ipicks = json.load(open(os.path.join(ROOT, 'tools/incoming_picks.json')))
@@ -158,13 +180,17 @@ def fetch():
     for i in range(0, len(titles), 40):
         q = {'action': 'query', 'prop': 'imageinfo', 'iiprop': 'extmetadata|url', 'iiurlwidth': 900, 'titles': '|'.join(titles[i:i + 40]), 'format': 'json'}
         d = None
-        for k in range(8):
+        for k in range(int(os.environ.get('API_TRIES', 8))):
             try:
                 d = json.load(urllib.request.urlopen(urllib.request.Request('https://commons.wikimedia.org/w/api.php', data=urllib.parse.urlencode(q).encode(), headers=UA), timeout=60)); break
             except Exception as e:
                 print('  metadata retry', e, flush=True); time.sleep(20 * (k + 1))
-        if not d:
-            raise SystemExit('could not read metadata')
+        if not d:      # the API is throttled: read each file's web page instead
+            for t in titles[i:i + 40]:
+                m = page_meta(t)
+                if m: info[t] = m
+                print('  page', 'ok' if m else 'no licence', t[5:60], flush=True); time.sleep(2)
+            continue
         norm = {n['to']: n['from'] for n in d['query'].get('normalized', [])}
         for p in d['query']['pages'].values():
             if 'imageinfo' not in p:

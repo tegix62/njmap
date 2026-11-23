@@ -37,6 +37,11 @@ export function initTrees(ctx) {
     by = new Map(D.trees.map((t) => [t.id, t]));
     // pictures added by hand from Wikimedia Commons (tools/build_incoming.py): more photos, and botanists' drawings
     for (const [id, x] of Object.entries(X)) { const t = by.get(id); if (!t) continue; t.photos.push(...x.photos.map((p) => ({ ...p, via: 'Wikimedia Commons' }))); t.drawings = x.drawings; }
+    // bark photos picked by eye from each tree's photo pool (iNaturalist, New Jersey first): many trunks per tree for bark practice
+    for (const [id, fs] of Object.entries(POOL.bark || {})) {
+      const t = by.get(id), cr = new Map((POOL.trees[id] || []).map((pp) => [pp[0], pp[2]])); if (!t) continue;
+      t.photos.push(...fs.map((f) => { const [pid, ext] = f.split('.'); return { f: `${POOL.base}${pid}/${POOL.size}.${ext}`, ctx: 'bark', credit: cr.get(f) || '', pool: f }; }));
+    }
     H = { trees: D.trees, by, photoOf, img, esc };
     mine = await myPhotos();
   }
@@ -534,7 +539,7 @@ export function initTrees(ctx) {
     const id = rand(quick.ids), t = by.get(id);
     const near = quick.bark ? quick.ids.filter((x) => x !== id && barkKindOf(x) === barkKindOf(id)) : [...t.like, ...Object.keys(groupOf(id).tell)].filter((x) => x !== id && quick.ids.includes(x));
     const other = rand(near.length && Math.random() < 0.7 ? near : quick.ids.filter((x) => x !== id));
-    const [u, credit, file] = quick.bark ? (() => { const p = rand(t.photos.filter((pp) => pp.ctx === 'bark')); return [p.f, p.credit, null]; })() : poolPhoto(id);
+    const [u, credit, file] = quick.bark ? (() => { const p = rand(t.photos.filter((pp) => pp.ctx === 'bark' && !hidden().includes(pp.pool))); return [p.f, p.credit, p.pool || null]; })() : poolPhoto(id);
     frame(`${back()}<span class="tr-prog">${Array.from({ length: quick.n }, (_, i) => `<i class="${i < quick.i ? 'd' : i === quick.i ? 'c' : ''}"></i>`).join('')}</span>`,
       `<span class="tr-kick">${quick.bark ? 'Bark only' : 'Quick look'}</span><figure class="tr-ph big tn-quick"><img src="${esc(u)}" alt=""><figcaption><span>${esc(credit)} · iNaturalist</span></figcaption></figure>
       <div class="tr-choices two">${shuffle([id, other]).map((x) => `<button data-t="qans" data-id="${x}">${esc(by.get(x).name)}</button>`).join('')}</div>
@@ -638,12 +643,12 @@ export function initTrees(ctx) {
       return;
     }
     if (kind === 'bark') {
-      const bp = t.photos.filter((p) => p.ctx === 'bark');
+      const bp = t.photos.filter((p) => p.ctx === 'bark' && !hidden().includes(p.pool));
       if (bp.length) {
         const k = barkKindOf(t.id), others = D.trees.filter((x) => x.id !== t.id && x.photos.some((p) => p.ctx === 'bark'));
         const pref = shuffle(others.filter((x) => pool.includes(x.id) && barkKindOf(x.id) === k)).concat(shuffle(others.filter((x) => pool.includes(x.id))), shuffle(others.filter((x) => barkKindOf(x.id) === k)), shuffle(others));
-        const ch = shuffle([t, ...pref.filter((x, i, a) => a.indexOf(x) === i).slice(0, 3)]);
-        frame(head, `<p class="tr-ask">Whose bark is this?</p>${img(rand(bp), 'big')}<div class="tr-choices">${ch.map((c) => `<button data-t="ans" data-id="${c.id}">${esc(c.name)}</button>`).join('')}</div><div class="tr-fb"></div>`);
+        const ch = shuffle([t, ...pref.filter((x, i, a) => a.indexOf(x) === i).slice(0, 3)]), bph = rand(bp);
+        frame(head, `<p class="tr-ask">Whose bark is this?</p>${img(bph, 'big')}<div class="tr-choices">${ch.map((c) => `<button data-t="ans" data-id="${c.id}">${esc(c.name)}</button>`).join('')}</div>${bph.pool ? `<button class="sk-link tn-hide" data-t="hidephoto" data-f="${esc(bph.pool)}">Bad photo? Hide it</button>` : ''}<div class="tr-fb"></div>`);
         q = { kind: 'bark', t, right: t.id };
         return;
       }

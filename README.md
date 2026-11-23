@@ -743,3 +743,9 @@ One tree from seed to old age and death, as a fast time-lapse with the seasons t
 - **Leaf rain** (hub card): 45 seconds of falling traced leaves. Tap only the named tree's leaves; the named tree changes every 15 seconds, among trees you've met. Look-alikes fall more often than chance. A wrong tap, or a target leaf that lands, costs one of three lives. The end screen shows each pair you confused, side by side. Best score is kept.
 - Check: `tools/checks/ui-trees-juice.cjs`.
 - **3D**: the trees move. Leaves sway in the wind (ez-tree's own sway on the turning trees; a flutter added to the growth shader in Watch it grow). In fall, leaves of the tree's fall colour come off the crown, spin down and settle on the ground. In Watch it grow they lie there through winter and are gone by summer. Motion stays still under reduced motion. Check: `tools/checks/ui-trees-3dfeel.cjs`.
+
+### Trees: more photos — fall, summer, and bark picked by eye (`build_tree_local.py fall|summer`, `treepool.json` `bark`)
+- Each tree's photo pool is topped up from iNaturalist by volunteer annotation: up to 40 fall photos ("coloured leaves") and 30 summer ones ("green leaves", June to August), New Jersey first. About 690 photos added; evergreens stay thinner on fall.
+- On fall and winter observations people often photograph the trunk first. Those trunks were gone through by eye on contact sheets, and the clear bark shots, about 190 across all 24 trees, are listed under `bark` in `data/treepool.json`. Leaves held in front of a trunk are left out, because they give the answer away.
+- The app adds them to each tree's bark photos at load, so Whose bark is this?, Bark only, the bark drill and the tree pages all use them. Bark questions now have "Bad photo? Hide it" too.
+- `tools/commons_harvest.py fetch` falls back to each file's ordinary Commons page (licence, author, a 960 px copy) when the API is throttled.

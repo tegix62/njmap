@@ -6,6 +6,8 @@ Stage 1 (grid):  python3 tools/build_tree_local.py grid    every research-grade 
                                                            ranks "trees near you" from it on the device: your spot never leaves it.
 Stage 4 (winter): python3 tools/build_tree_local.py winter  up to 40 more winter photos per tree into data/treepool.json (no live leaves, or December
                                                            to March): bark, buds, shape and what hangs on through winter.
+Stage 5 (fall / summer): python3 tools/build_tree_local.py fall|summer   top each tree up to 40 fall photos (annotated 'coloured
+                                                           leaves') or 30 summer ones ('green leaves', June to August), New Jersey first.
 Stage 3 (points): python3 tools/build_tree_local.py points  each sighting's own place (open, not obscured, located to within 100 m), for tree
                                                            walks, into data/treepoints.json: per tree, coordinates in 1e-4 degree steps (about 10 m),
                                                            sorted and delta-coded. Loaded only when a walk starts.
@@ -72,7 +74,7 @@ def pool():
                 if 'inaturalist-open-data' not in u:
                     continue
                 pid, ext = u.split('/photos/')[1].split('/')[0], u.rsplit('.', 1)[1]
-                credit = p['attr'].replace('(c) ', '© ').replace(', some rights reserved', '').replace(' (CC', ' · CC').split(', uploaded')[0]
+                credit = p['attr'].replace('(c) ', '© ').replace(', some rights reserved', '').replace(' (CC', ' · CC').split(', uploaded')[0].rstrip(')')
                 ps.append([f'{pid}.{ext}', season, credit])
                 if len(ps) >= 80:
                     break
@@ -115,6 +117,47 @@ def points():
     json.dump(out, open(os.path.join(ROOT, 'data/treepoints.json'), 'w'), separators=(',', ':'))
 
 
+TOPUP = {      # season: (photos per tree to reach, the searches in order: annotation 36 'Leaves' = 39 coloured, 38 green, 40 none)
+    'fall': (40, [{'term_id': 36, 'term_value_id': 39, 'place_id': BT.NJ}, {'term_id': 36, 'term_value_id': 39, 'place_id': 46}, {'term_id': 36, 'term_value_id': 39}]),
+    'summer': (30, [{'term_id': 36, 'term_value_id': 38, 'month': '6,7,8', 'place_id': BT.NJ}, {'term_id': 36, 'term_value_id': 38, 'month': '6,7,8'}, {'month': '6,7,8', 'place_id': BT.NJ}]),
+}
+
+
+def topup(season):
+    """More photos of one season per tree, until each tree has TOPUP[season][0] of them, added to data/treepool.json. Searches by
+    annotation (most-faved first), New Jersey first, then the Northeast (place 46 is the US; evergreens show no 'coloured leaves')."""
+    want, qs = TOPUP[season]
+    path = os.path.join(ROOT, 'data/treepool.json'); P = json.load(open(path))
+    for sci, slug in BT.TREES:
+        have = {p[0].split('.')[0] for p in P['trees'][slug]}
+        n = sum(1 for p in P['trees'][slug] if p[1] == season)
+        if n >= want:
+            continue
+        t = BT.get('taxa', q=sci, rank='species', per_page=1)['results'][0]
+        add = []
+        for q in qs:
+            if n + len(add) >= want:
+                break
+            r = BT.get('observations', taxon_id=t['id'], quality_grade='research', photos='true', photo_license=BT.OK_LICENSES, order_by='votes', per_page=100, **q)
+            for o in r['results']:
+                for ph in o['photos']:
+                    u = ph['url']
+                    if 'inaturalist-open-data' not in u or not ph.get('license_code'):
+                        continue
+                    pid, ext = u.split('/photos/')[1].split('/')[0], u.rsplit('.', 1)[1]
+                    if pid in have:
+                        break
+                    have.add(pid)
+                    credit = ph['attribution'].replace('(c) ', '© ').replace(', some rights reserved', '').replace(' (CC', ' · CC').split(', uploaded')[0].rstrip(')')
+                    add.append([f'{pid}.{ext}', season, credit])
+                    break
+                if n + len(add) >= want:
+                    break
+        P['trees'][slug] += add
+        print(f'{slug:18s} +{len(add)} {season} photos ({n + len(add)} in all)', flush=True)
+    json.dump(P, open(path, 'w'), ensure_ascii=False, separators=(',', ':'))
+
+
 def winter():
     """Up to 40 more winter photos per tree, added to data/treepool.json: observations annotated 'no live leaves', or (evergreens, and to
     top up) observed December to March; New Jersey first, then anywhere."""
@@ -136,7 +179,7 @@ def winter():
                     if pid in have:
                         continue
                     have.add(pid)
-                    credit = p['attribution'].replace('(c) ', '© ').replace(', some rights reserved', '').replace(' (CC', ' · CC').split(', uploaded')[0]
+                    credit = p['attribution'].replace('(c) ', '© ').replace(', some rights reserved', '').replace(' (CC', ' · CC').split(', uploaded')[0].rstrip(')')
                     add.append([f'{pid}.{ext}', 'winter', credit])
                     break          # one photo per observation: more different trees
                 if len(add) >= 40:
@@ -147,4 +190,6 @@ def winter():
 
 
 if __name__ == '__main__':
-    {'grid': grid, 'pool': pool, 'points': points, 'winter': winter}[sys.argv[1]]()
+    a = sys.argv[1]
+    if a in TOPUP: topup(a)
+    else: {'grid': grid, 'pool': pool, 'points': points, 'winter': winter}[a]()
