@@ -4079,3 +4079,9 @@ span.jc-leaf { width: 9px; height: 9px; border-radius: 50%; background: #3f9b62;
 .tr-pair small { font-weight: 500; font-size: 12px; opacity: .75; margin-left: 4px; }
 .tr-pair p { margin: 2px 0 0 !important; font-size: 14.5px; line-height: 1.38; }
 .tr-idl i { font-style: normal; font-weight: 600; font-size: 12px; padding: 2px 8px; border-radius: 99px; background: rgba(0,0,0,.07); margin-right: 8px; }
+/* a tree's leaf through the year: summer and fall traces side by side */
+.tn-leafyr { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+.tn-leafyr figure { margin: 0; flex: 0 0 31%; background: #fff; border-radius: 14px; padding: 8px 8px 4px; box-shadow: 0 1px 3px rgba(23,37,28,.1); text-align: center; }
+.tn-leafyr svg { width: 100%; height: auto; display: block; }
+.tn-leafyr figcaption { font-size: 12.5px; font-weight: 600; opacity: .7; padding-top: 2px; }
+.tr-lfseason { display: block; text-align: center; font-size: 12.5px; opacity: .65; margin-top: 4px; }

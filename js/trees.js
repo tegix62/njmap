@@ -3,7 +3,7 @@
 // out of four photos, matched across two photos, and one fact about its leaves. Where it has been seen in New Jersey is shown on the map.
 // Data: data/trees.json (tools/build_trees.py: iNaturalist photos and sightings; the tells were checked against Wikipedia in November 2026, see the README).
 import { GROUPS, GROUP_OF, KEY, ICON, pathTo, treesUnder } from './treekey.js';
-import { leafSvg, twigSvg, HAS_LEAF, HAS_OUTLINE, outlineSource } from './treeleaf.js';
+import { leafSvg, twigSvg, HAS_LEAF, HAS_OUTLINE, outlineSource, leafVariants } from './treeleaf.js';
 import { SKILLS, DRILL_N, PASS } from './treeskills.js';
 import { PROFILE, barkKindOf } from './treeprofile.js';
 import { juice } from './juice.js';
@@ -22,6 +22,10 @@ export function initTrees(ctx) {
   const { map, store } = ctx;
   let walk = null, PTS = null, mine = {}, combo = 0;
   const leafSrc = (id) => (outlineSource(id) || {}).img || null;
+  /** One of a tree's traced leaves for a question: any of them, a fall one more often in fall. */
+  const leafAny = (id) => { const vs = leafVariants(id); if (vs.length < 2) return vs[0] || null; const fl = vs.filter((v) => v.season === 'fall'); return season() === 'fall' && fl.length && Math.random() < 0.6 ? rand(fl) : rand(vs); };
+  const leafAnySrc = (id) => (leafAny(id) || {}).img || leafSrc(id);
+  const fallTag = (v) => (v && v.season === 'fall' ? '<small class="tr-lfseason">a fall leaf</small>' : '');
   /** The feel of an answer: a climbing chime, a burst of the tree's own leaves from the right button and a pop; or a thud and a shake. */
   function feel(ok, picked, id) {
     const right = root.querySelector('.right');
@@ -225,7 +229,7 @@ export function initTrees(ctx) {
     if (rain.next <= 0 && rain.t < rain.dur - 1) {      // a new leaf: the target about two times in five, else its look-alikes first
       const near = rain.traced.filter((x) => x !== rain.target && (by.get(rain.target).like.includes(x) || GROUP_OF[x] === GROUP_OF[rain.target]));
       const id = Math.random() < 0.42 ? rain.target : rand(near.length && Math.random() < 0.6 ? near : rain.traced.filter((x) => x !== rain.target));
-      const el = document.createElement('img'); el.className = 'lr-leaf'; el.src = leafSrc(id); el.alt = ''; el.dataset.id = id; el.draggable = false;
+      const el = document.createElement('img'); el.className = 'lr-leaf'; el.src = leafAnySrc(id); el.alt = ''; el.dataset.id = id; el.draggable = false;
       field.appendChild(el);
       rain.leaves.push({ el, id, x: 20 + Math.random() * (W - 80), y: -70, vy: 55 + 70 * k + Math.random() * 30, sway: 20 + Math.random() * 30, ph: Math.random() * 6, rot: (Math.random() - 0.5) * 80 });
       rain.next = Math.max(0.42, 1.05 - 0.6 * k) * (0.7 + Math.random() * 0.6);
@@ -452,7 +456,7 @@ export function initTrees(ctx) {
     const w = by.get(wid); if (!w) return '';
     let pic = null;
     const ph = (pp) => pp && { src: pp.f, html: img(pp) };
-    if (how === 'leaf' && HAS_LEAF(w.id)) pic = { src: leafSrc(w.id), html: `<div class="tk-bigsil tr-cmp-sil">${leafSvg(w.id)}</div>`, sil: leafSvg(w.id) };
+    if (how === 'leaf' && HAS_LEAF(w.id)) { const lv = leafAny(w.id); pic = { src: (lv || {}).img || null, html: `<div class="tk-bigsil tr-cmp-sil">${leafSvg(w.id, '', lv)}</div>`, sil: leafSvg(w.id, '', lv) }; }
     else if (how === 'drawing' && (w.drawings || []).length) { const d = rand(w.drawings); pic = { src: d.f, html: drawingHtml(d) }; }
     else if (how === 'bark') { const bp = w.photos.filter((pp) => pp.ctx === 'bark' && !hidden().includes(pp.pool)); if (bp.length) pic = ph(rand(bp)); }
     else if (how && how.season) {
@@ -615,13 +619,14 @@ export function initTrees(ctx) {
       <div class="tr-strip">${(mine[t.id] || []).map((p) => myImg(p)).join('')}${t.photos.map((p) => img(p)).join('')}</div>
       <div class="tw-mine"><button class="sk-link" data-t="snap" data-id="${t.id}">${(mine[t.id] || []).length ? 'Add another photo of yours' : 'Add your own photo of this tree'}</button>${(mine[t.id] || []).length ? ` · <button class="sk-link" data-t="unsnap" data-k="${mine[t.id][mine[t.id].length - 1].k}" data-id="${t.id}">remove your latest</button>` : ''}<small>Your photos stay on this device and come back in your reviews.</small></div>
       <div class="tk-tellrow"><div class="tk-sil">${leafArt(t.id)}</div><p class="tr-tell">${esc(t.tell)}</p></div>
+      ${leafVariants(t.id).length > 1 ? `<h4>Its leaf through the year</h4><div class="tn-leafyr">${leafVariants(t.id).map((v) => `<figure>${leafSvg(t.id, '', v)}<figcaption>${v.season === 'fall' ? 'Fall' : 'Summer'}</figcaption></figure>`).join('')}</div>` : ''}
       ${(() => { const P = PROFILE[t.id] || {}; const yr = [P.fall, ...(P.more || [])].filter(Boolean); return (P.bark || P.young ? `<h4>Bark</h4><div class="tn-bark">${t.photos.filter((p) => p.ctx === 'bark').slice(0, 3).map((p) => `<figure class="tn-barkph"><img src="${esc(p.f)}" alt="" loading="lazy">${p.cap ? `<figcaption>${esc(p.cap)}</figcaption>` : ''}</figure>`).join('')}</div><p class="tn-line">${P.young ? `<b>Young:</b> ${esc(P.young)} ` : ''}${P.bark ? `${P.young ? '<b>Older:</b> ' : ''}${esc(P.bark)}` : ''}</p>` : '') + (yr.length ? `<h4>Through the year</h4><ul class="tn-year">${yr.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''); })()}
       ${has3d(t.id) ? `<h4>In 3D</h4><div class="t3-wrap"><div class="t3-stage"></div><div class="t3-seasons">${['spring', 'summer', 'fall', 'winter'].map((x) => `<button data-t="t3season" data-id="${t.id}" data-s="${x}">${SEASON_WORD[x]}</button>`).join('')}</div><p class="sk-cap">Drag to turn. A model of how this tree grows, from its branching and outline, with its own traced leaf.</p><button class="tr-card wide gr-card" data-t="grow" data-id="${t.id}"><b>Watch it grow</b><small>from a seed to old age, the seasons turning every year</small></button></div>` : ''}
       ${(t.drawings || []).length ? `<h4>${t.drawings.length > 1 ? 'Botanists’ drawings' : 'A botanist’s drawing'}</h4>${t.drawings.map((d) => drawingHtml(d)).join('')}` : ''}
       <button class="tk-ingroup" data-t="groupcard" data-g="${groupOf(t.id).id}"><small>One of the <b>${esc(groupOf(t.id).name.toLowerCase())}</b>: ${esc(groupOf(t.id).tell[t.id])}</small></button>
       ${pathHtml(t.id)}
       <div class="tr-facts">${t.arr === 'opposite' || t.arr === 'alternate' ? `${HAS_OUTLINE(t.id) ? `<span class="sk-twigchip">${twigSvg(t.id, { arr: t.arr, n: t.arr === 'opposite' ? 2 : 3 })}</span>` : ''}<button class="tn-fact" data-t="lesson" data-sk="pairs">Leaves <b>${t.arr === 'opposite' ? 'in pairs' : 'one at a time'}</b> on the twig <i>what's that?</i></button><button class="tn-fact" data-t="lesson" data-sk="leaflets"><b>${t.leaf === 'compound' ? 'A leaf made of leaflets' : 'One leaf'}</b> on each stalk <i>what's that?</i></button>` : `<button class="tn-fact" data-t="lesson" data-sk="look">Green all year, with <b>${t.arr}</b> <i>what's that?</i></button>`}</div>
-      ${HAS_OUTLINE(t.id) ? `<p class="tr-src">Leaf picture traced from a photo: ${esc(outlineSource(t.id).credit.replace(/^\(c\)/, '©').replace(/,? some rights reserved/, ''))} · iNaturalist</p>` : ''}
+      ${HAS_OUTLINE(t.id) ? `<p class="tr-src">${leafVariants(t.id).length > 1 ? 'Leaf pictures' : 'Leaf picture'} traced from photos: ${leafVariants(t.id).map((v) => esc(v.credit.replace(/^\(c\)/, '©').replace(/,? some rights reserved/, ''))).filter((c, i, a) => a.indexOf(c) === i).join('; ')} · iNaturalist</p>` : ''}
       ${t.checked ? `<p class="tr-src">Checked against <a href="${esc(t.checked.src)}" target="_blank" rel="noopener">Wikipedia</a>${t.checked.note ? `. ${esc(t.checked.note)}` : ''}</p>` : ''}
       <button class="tr-where" data-t="where" data-id="${t.id}"><b>Where it has been seen</b><small>${top3.length ? `Most in ${esc(top3.join(', '))}` : ''} · show on the map</small></button>
       ${opts.meet ? '<button class="tr-go" data-t="next">Got it</button>' : ''}`);
@@ -734,13 +739,13 @@ export function initTrees(ctx) {
     if (kind === 'shapepick' && pool.filter(HAS_LEAF).length < 3) kind = 'shape';
     if (kind === 'shape') {
       const ch = choicesFor(t, pool);
-      frame(head, `<p class="tr-ask">Which tree has this leaf?</p><div class="tk-bigsil">${leafSvg(t.id)}</div><div class="tr-choices">${ch.map((c) => `<button data-t="ans" data-id="${c.id}">${esc(c.name)}</button>`).join('')}</div><div class="tr-fb"></div>`);
+      frame(head, `<p class="tr-ask">Which tree has this leaf?</p><div class="tk-bigsil">${(() => { const lv = leafAny(t.id); return leafSvg(t.id, '', lv) + fallTag(lv); })()}</div><div class="tr-choices">${ch.map((c) => `<button data-t="ans" data-id="${c.id}">${esc(c.name)}</button>`).join('')}</div><div class="tr-fb"></div>`);
       q = { kind, t, right: t.id, how: 'leaf' };
       return;
     }
     if (kind === 'shapepick') {
       const ch = choicesFor(t, pool.filter(HAS_LEAF)).filter((c) => HAS_LEAF(c.id));
-      frame(head, `<p class="tr-ask">Tap the leaf of the <b>${esc(t.name)}</b></p><div class="tk-silpick">${ch.map((c) => `<button data-t="ans" data-id="${c.id}">${leafSvg(c.id)}</button>`).join('')}</div><div class="tr-fb"></div>`);
+      frame(head, `<p class="tr-ask">Tap the leaf of the <b>${esc(t.name)}</b></p><div class="tk-silpick">${ch.map((c) => `<button data-t="ans" data-id="${c.id}">${leafSvg(c.id, '', leafAny(c.id))}</button>`).join('')}</div><div class="tr-fb"></div>`);
       q = { kind, t, right: t.id, how: 'leaf' };
       return;
     }

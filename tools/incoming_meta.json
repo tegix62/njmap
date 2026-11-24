@@ -1760,5 +1760,59 @@
   "artist": "Gmihail at Serbian Wikipedia",
   "lic": "CC BY-SA 3.0 rs",
   "page": "https://commons.wikimedia.org/wiki/File%3AJuglans_nigra_bark.jpg"
+ },
+ "inat-445722907.jpeg": {
+  "slug": "red-maple",
+  "artist": "michaelthestone",
+  "lic": "CC BY-NC",
+  "page": "https://www.inaturalist.org/photos/445722907"
+ },
+ "inat-100513543.jpg": {
+  "slug": "sugar-maple",
+  "artist": "osofskycl",
+  "lic": "CC BY-NC",
+  "page": "https://www.inaturalist.org/photos/100513543"
+ },
+ "inat-585372002.jpg": {
+  "slug": "sugar-maple",
+  "artist": "brianmai",
+  "lic": "CC BY-NC",
+  "page": "https://www.inaturalist.org/photos/585372002"
+ },
+ "inat-448684892.jpeg": {
+  "slug": "white-oak",
+  "artist": "bobbar",
+  "lic": "CC BY-NC",
+  "page": "https://www.inaturalist.org/photos/448684892"
+ },
+ "inat-12788892.jpg": {
+  "slug": "red-oak",
+  "artist": "Kitty Maurey",
+  "lic": "CC BY-NC",
+  "page": "https://www.inaturalist.org/photos/12788892"
+ },
+ "inat-476339991.jpg": {
+  "slug": "red-oak",
+  "artist": "François Plourde - Renard frak",
+  "lic": "CC BY-NC",
+  "page": "https://www.inaturalist.org/photos/476339991"
+ },
+ "inat-729409158.jpg": {
+  "slug": "pin-oak",
+  "artist": "Jose Ortigoza",
+  "lic": "CC BY-NC",
+  "page": "https://www.inaturalist.org/photos/729409158"
+ },
+ "inat-167023705.jpeg": {
+  "slug": "sassafras",
+  "artist": "Sara Rall",
+  "lic": "CC BY-NC",
+  "page": "https://www.inaturalist.org/photos/167023705"
+ },
+ "inat-466173467.jpg": {
+  "slug": "gray-birch",
+  "artist": "François Plourde - Renard frak",
+  "lic": "CC BY-NC",
+  "page": "https://www.inaturalist.org/photos/466173467"
  }
 }

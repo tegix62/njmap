@@ -40,8 +40,8 @@ function needleSvg(id) {
 
 let uid = 0;
 /** The leaf picture of a tree as an inline SVG, or '' when there is no accurate one. */
-export function leafSvg(id, cls = '') {
-  const L = OUTLINES[id];
+export function leafSvg(id, cls = '', v = null) {
+  const L = v || OUTLINES[id];
   if (L) return `<svg viewBox="0 0 100 120" class="leafsvg ${cls}" aria-hidden="true">${L.img ? `<image href="${L.img}" x="0" y="0" width="100" height="120"/>` : `<path d="${L.d}" class="lf-fill"/>`}</svg>`;
   if (NEEDLE_IDS.includes(id)) return `<svg viewBox="0 0 100 120" class="leafsvg ${cls}" aria-hidden="true">${needleSvg(id)}</svg>`;
   return '';
@@ -51,6 +51,8 @@ export const HAS_LEAF = (id) => !!OUTLINES[id] || NEEDLE_IDS.includes(id);
 export const HAS_OUTLINE = (id) => !!OUTLINES[id];
 /** The photo a traced outline came from, for its credit. */
 export const outlineSource = (id) => OUTLINES[id] || null;
+/** All of a tree's traced leaves: the first (summer) one, then any others, each with its season (a fall leaf in its own colours). */
+export const leafVariants = (id) => (OUTLINES[id] ? [OUTLINES[id], ...(OUTLINES[id].more || [])] : []);
 
 export function twigSvg(id, { arr = 'alternate', n, cls = '' } = {}) {
   const L = OUTLINES[id];

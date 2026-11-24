@@ -123,5 +123,106 @@
    ],
    "trim": 80
   }
+ ],
+ "red-maple@fall": [
+  "incoming/red-maple/inat-445722907.jpeg",
+  0,
+  {
+   "seed": [
+    0.5,
+    0.42
+   ],
+   "tol": 12
+  }
+ ],
+ "sugar-maple@fall": [
+  "incoming/sugar-maple/inat-100513543.jpg",
+  0,
+  {
+   "seed": [
+    0.5,
+    0.4
+   ],
+   "tol": 12
+  }
+ ],
+ "sugar-maple@fall2": [
+  "incoming/sugar-maple/inat-585372002.jpg",
+  -90,
+  {
+   "crop": [
+    0.05,
+    0.0,
+    0.98,
+    0.5
+   ],
+   "seed": [
+    0.55,
+    0.5
+   ],
+   "tol": 12
+  }
+ ],
+ "white-oak@fall2": [
+  "incoming/white-oak/inat-448684892.jpeg",
+  45,
+  {
+   "white": true
+  }
+ ],
+ "red-oak@fall": [
+  "incoming/red-oak/inat-12788892.jpg",
+  -90,
+  {
+   "seed": [
+    0.5,
+    0.45
+   ],
+   "tol": 14
+  }
+ ],
+ "red-oak@fall2": [
+  "incoming/red-oak/inat-476339991.jpg",
+  0,
+  {
+   "seed": [
+    0.55,
+    0.5
+   ],
+   "tol": 16
+  }
+ ],
+ "pin-oak@fall2": [
+  "incoming/pin-oak/inat-729409158.jpg",
+  0,
+  {
+   "seed": [
+    0.5,
+    0.45
+   ],
+   "tol": 12
+  }
+ ],
+ "sassafras@fall2": [
+  "incoming/sassafras/inat-167023705.jpeg",
+  90,
+  {
+   "seed": [
+    0.55,
+    0.5
+   ],
+   "tol": 12
+  }
+ ],
+ "gray-birch@fall": [
+  "incoming/gray-birch/inat-466173467.jpg",
+  180,
+  {
+   "seed": [
+    0.5,
+    0.45
+   ],
+   "tol": 14
+  }
  ]
 }

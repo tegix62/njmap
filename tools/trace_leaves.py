@@ -209,7 +209,7 @@ def sheet():
 PALETTE = [(24, 78, 48), (40, 128, 80), (92, 172, 122), (190, 226, 200)]
 
 
-def tone(slug, a, m, M):
+def tone(slug, a, m, M, mix=0.2):
     """The leaf in four greens: the photo's light and dark within the leaf (local contrast evened out, so veins and teeth show), cut into four
     steps by its own quartiles, with a dark edge; transparent around it. Written to img/trees/leaf/<slug>.png (400 x 480, the 100 x 120 frame)."""
     os.makedirs(os.path.join(ROOT, 'img/trees/leaf'), exist_ok=True)
@@ -237,18 +237,25 @@ def tone(slug, a, m, M):
         hsv = cv2.cvtColor(np.uint8([[own]]), cv2.COLOR_RGB2HSV)[0, 0].astype(int)
         hsv[1] = min(255, int(hsv[1] * 1.15 + 10))                                   # a touch more colour than a flat photo
         own = cv2.cvtColor(np.uint8([[hsv]]), cv2.COLOR_HSV2RGB)[0, 0].astype(float)
-        rgba[sel, :3] = (0.8 * own + 0.2 * np.array(base)).astype(np.uint8); rgba[sel, 3] = 255
+        rgba[sel, :3] = ((1 - mix) * own + mix * np.array(base)).astype(np.uint8); rgba[sel, 3] = 255
+        if i == 0: dark = own
     edge = mk & ~cv2.erode(mk.astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool)
-    rgba[edge, :3] = (16, 56, 34)
+    rgba[edge, :3] = (16, 56, 34) if mix else (np.array(dark) * 0.45).astype(np.uint8)      # a fall leaf: its own darkest colour, darker
     Image.fromarray(rgba, 'RGBA').save(os.path.join(ROOT, f'img/trees/leaf/{slug}.png'), optimize=True)
 
 
 def trace():
     picks = json.load(open(os.path.join(ROOT, 'tools/leaf_picks.json')))
-    only = sys.argv[2:]      # trace only these trees, keeping the others as they are
+    only = sys.argv[2:]      # trace only these trees (or picks, like red-maple@fall), keeping the others as they are
     out = json.load(open(os.path.join(ROOT, 'data/leafoutlines.json'))) if only else {}
-    for slug, pk in picks.items():
-        if only and slug not in only:
+    if only:
+        for v in out.values():
+            v['more'] = [x for x in v.get('more', []) if not any(o in (x['key'], x['key'].split('@')[0]) for o in only)]
+    # a key like "red-maple@fall" is another leaf of that tree, in that season, traced in its own colours
+    picks = dict(sorted(picks.items(), key=lambda kv: '@' in kv[0]))
+    for key, pk in picks.items():
+        slug, season = (key.split('@') + [''])[:2]; season = season.rstrip('0123456789')
+        if only and key not in only and slug not in only:
             continue
         k, turn = pk[:2]; opt = pk[2] if len(pk) > 2 else {}
         if isinstance(k, str):      # a local picture (incoming/...), credited from tools/incoming_meta.json
@@ -262,9 +269,16 @@ def trace():
         else:
             p = pool(slug)[k]
             im = fetch_img(p['url'].replace('square', 'medium'))
-        m = (leaf_mask_white(im, opt.get('trim', 120)) if opt.get('white') else
-             leaf_mask_seeded(im, tuple(opt['seed']), opt.get('tol', 14), opt.get('trim', 50)) if 'seed' in opt else leaf_mask_gc(im, opt.get('trim', 50)))
+        try:
+            m = (leaf_mask_white(im, opt.get('trim', 120)) if opt.get('white') else
+                 leaf_mask_seeded(im, tuple(opt['seed']), opt.get('tol', 14), opt.get('trim', 50)) if 'seed' in opt else leaf_mask_gc(im, opt.get('trim', 50)))
+        except cv2.error:
+            m = None
+        if m is None:
+            print(f'{key:22s} no leaf found, skipped', flush=True); continue
         cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        if not cs:
+            print(f'{key:22s} no leaf found, skipped', flush=True); continue
         c = max(cs, key=cv2.contourArea).reshape(-1, 2).astype(float)
         c = smooth_contour(c, opt.get('smooth', max(1.5, len(c) / 400)))
         th = math.radians(turn)
@@ -276,14 +290,19 @@ def trace():
         R = np.array([[math.cos(th), math.sin(th)], [-math.sin(th), math.cos(th)]])
         A = 4 * sc * R.T; b = 4 * (np.array([50, 118]) - sc * np.array([cx, y1]))
         M = np.hstack([A, b.reshape(2, 1)])
-        tone(slug, np.asarray(im), m, M)
+        name = key.replace('@', '-')
+        tone(name, np.asarray(im), m, M, mix=0.0 if season else 0.2)
         c = (c - [cx, y1]) * sc + [50, 118]
         eps = 0.35
         c = cv2.approxPolyDP(c.astype(np.float32).reshape(-1, 1, 2), eps, True).reshape(-1, 2)
         d = 'M' + 'L'.join(f'{x:.1f} {y:.1f}' for x, y in c) + 'Z'
         os.makedirs(f'{TMP}/traced', exist_ok=True); im.save(f'{TMP}/traced/{slug}.jpg')
-        out[slug] = {'img': f'img/trees/leaf/{slug}.png', 'd': d, 'photo': p['url'].replace('square', 'medium'), 'credit': p['attr'], 'lic': p['lic'], 'obs_photo': k}
-        print(f'{slug:18s} {len(c)} points', flush=True)
+        rec = {'img': f'img/trees/leaf/{name}.png', 'd': d, 'photo': p['url'].replace('square', 'medium'), 'credit': p['attr'], 'lic': p['lic'], 'obs_photo': k}
+        if season:
+            if slug in out: out[slug].setdefault('more', []).append({**rec, 'season': season, 'key': key})
+        else:
+            rec['more'] = (out.get(slug) or {}).get('more', []); out[slug] = rec
+        print(f'{key:22s} {len(c)} points', flush=True)
     json.dump(out, open(os.path.join(ROOT, 'data/leafoutlines.json'), 'w'), ensure_ascii=False, separators=(',', ':'))
     with open(os.path.join(ROOT, 'js/treeoutlines.js'), 'w') as f:
         f.write('// Generated by tools/trace_leaves.py trace: each tree\'s leaf outline traced from a real photo (credit and licence with it).\n')
