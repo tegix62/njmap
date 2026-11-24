@@ -276,5 +276,16 @@
    ],
    "tol": 14
   }
+ ],
+ "sweetbay": [
+  "incoming/sweetbay/inat-258450312.jpeg",
+  0,
+  {
+   "seed": [
+    0.5,
+    0.45
+   ],
+   "tol": 12
+  }
  ]
 }

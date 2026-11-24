@@ -29,7 +29,12 @@ const WAVE2_TELL = {
   lobed: { 'white-mulberry': 'Glossy, toothed mittens and hearts on one tree, the lobes uneven; berries like small blackberries.' },
   plain: { 'callery-pear': 'Glossy, rounded, wavy-edged leaves; white with smelly flowers in early spring.', hackberry: 'Corky, warty bark; lopsided leaves with a long tip.', redbud: 'Heart-shaped leaves with smooth edges; pink flowers on bare twigs in spring.', cottonwood: 'Big triangular leaves with curved teeth, fluttering on flat stalks; by rivers.' },
 };
-for (const g of GROUPS) Object.assign(g.tell, WAVE2_TELL[g.id] || {});
+// Wave 3 (into the woods)
+const WAVE3_TELL = {
+  oaks: { 'black-oak': 'Like red oak but glossier, often more deeply and unevenly cut; very dark, blocky bark, orange inside.', 'chestnut-oak': 'No real lobes: big rounded teeth like a chestnut leaf; very thick, deeply ridged bark; rocky ridges.' },
+  plain: { 'black-gum': 'Glossy, smooth-edged ovals crowded at the twig tips; brilliant scarlet early in fall; alligator bark.', 'black-birch': 'Scratched twig smells of wintergreen; dark, shiny cherry-like bark with long lenticels.', hornbeam: 'Smooth, blue-grey, muscly fluted trunk; double-toothed leaves; shady stream banks.', persimmon: 'Very dark bark in small square blocks; plain smooth-edged ovals; orange fruit.', sweetbay: 'Leathery leaves, silvery white underneath; lemon-scented creamy flowers; swamps.', basswood: 'Big, toothed, lopsided hearts; seed clusters hang from a pale strap-like wing.' },
+};
+for (const g of GROUPS) Object.assign(g.tell, WAVE2_TELL[g.id] || {}, WAVE3_TELL[g.id] || {});
 export const GROUP_OF = Object.fromEntries(GROUPS.flatMap((g) => Object.keys(g.tell).map((id) => [id, g.id])));
 
 /** The way through: each skill of looking is learned just before the first group that needs it. */
@@ -72,6 +77,7 @@ export function pathTo(id) {
   if (id === 'hemlock') return [['start', 0], ['bundle', 2]];
   if (id === 'holly') return [['start', 2], ['winter', 0]];
   if (id === 'red-cedar' || id === 'white-cedar') return [['start', 1]];
+  if (id === 'chestnut-oak') return [...[['start', 2], ['winter', 1], ['arr', 1]], ['cmpd', 0], ['lobe', 1]];      // an oak without lobes: the key finds it with the plain leaves
   if (id === 'box-elder') return [['start', 2], ['winter', 1], ['arr', 0]];      // in pairs, but leaflets: the key's lobe question does not fit it
   return PATHS[GROUP_OF[id]];
 }

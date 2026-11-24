@@ -32,9 +32,13 @@ TREES = [
     # wave 2: roadsides and town edges (the most-reported wild trees in New Jersey after the first wave, on iNaturalist, November 2026)
     ('Acer negundo', 'box-elder'), ('Pyrus calleryana', 'callery-pear'), ('Acer saccharinum', 'silver-maple'), ('Gleditsia triacanthos', 'honey-locust'),
     ('Morus alba', 'white-mulberry'), ('Celtis occidentalis', 'hackberry'), ('Cercis canadensis', 'redbud'), ('Populus deltoides', 'cottonwood'),
+    # wave 3: into the woods (the next most-reported, November 2026)
+    ('Nyssa sylvatica', 'black-gum'), ('Quercus montana', 'chestnut-oak'), ('Betula lenta', 'black-birch'), ('Carpinus caroliniana', 'hornbeam'),
+    ('Diospyros virginiana', 'persimmon'), ('Magnolia virginiana', 'sweetbay'), ('Tilia americana', 'basswood'), ('Quercus velutina', 'black-oak'),
 ]
 # Trees come in waves: the first is open from the start; each later one opens in the app once the one before it is known (js/trees.js).
-WAVE = {slug: 2 for slug in ['box-elder', 'callery-pear', 'silver-maple', 'honey-locust', 'white-mulberry', 'hackberry', 'redbud', 'cottonwood']}
+WAVE = {**{slug: 2 for slug in ['box-elder', 'callery-pear', 'silver-maple', 'honey-locust', 'white-mulberry', 'hackberry', 'redbud', 'cottonwood']},
+        **{slug: 3 for slug in ['black-gum', 'chestnut-oak', 'black-birch', 'hornbeam', 'persimmon', 'sweetbay', 'basswood', 'black-oak']}}
 
 
 def get(path, **q):
@@ -146,6 +150,15 @@ FACTS = {
     'hackberry': ('alternate', 'simple', 'Grey bark with corky, warty ridges; lopsided, toothed leaves with a long pointed tip and an uneven base; small purple-brown berries.', ['white-mulberry', 'black-cherry', 'beech']),
     'redbud': ('alternate', 'simple', 'Heart-shaped leaves with smooth edges; rosy-pink pea flowers straight from bare twigs and even the trunk in early spring; flat brown pods.', ['callery-pear', 'white-mulberry', 'dogwood']),
     'cottonwood': ('alternate', 'simple', 'Big triangular leaves with coarse, curved teeth on flattened stalks, so they flutter; deeply furrowed grey bark; cottony seeds drifting in late spring; by rivers.', ['gray-birch', 'sycamore', 'silver-maple']),
+    # wave 3
+    'black-gum': ('alternate', 'simple', 'Glossy, smooth-edged oval leaves crowded at the twig tips; among the first trees to turn, a brilliant scarlet; old bark in blocks like alligator skin; branches stick out level.', ['dogwood', 'persimmon', 'sassafras']),
+    'chestnut-oak': ('alternate', 'simple', 'Leaves with wavy, rounded teeth instead of lobes, like a chestnut’s; very thick bark in deep, dark ridges; dry, rocky ridgetops.', ['white-oak', 'black-birch', 'beech']),
+    'black-birch': ('alternate', 'simple', 'A scratched twig smells of wintergreen; young bark dark and shiny like a cherry’s, with long horizontal lenticels; old bark in dark, scaly plates; neat, double-toothed oval leaves.', ['black-cherry', 'gray-birch', 'hornbeam']),
+    'hornbeam': ('alternate', 'simple', 'A small tree of shady stream banks with smooth, blue-grey, fluted trunks like flexed muscle (musclewood); double-toothed oval leaves; papery three-lobed wings on the seeds.', ['beech', 'black-birch', 'black-cherry']),
+    'persimmon': ('alternate', 'simple', 'Bark in small, thick, square blocks, very dark; plain, smooth-edged oval leaves; orange plum-like fruit that is sweet only when soft and ripe.', ['black-gum', 'dogwood', 'sassafras']),
+    'sweetbay': ('alternate', 'simple', 'Leathery, smooth-edged leaves, bright silvery white underneath, flashing in the wind; creamy, lemon-scented flowers in early summer; swamps and wet woods in the south.', ['holly', 'black-gum', 'persimmon']),
+    'basswood': ('alternate', 'simple', 'Big, heart-shaped, toothed leaves with a lopsided base; flower and nut clusters hang from a long, pale, strap-like leafy wing; red twigs and buds.', ['white-mulberry', 'redbud', 'cottonwood']),
+    'black-oak': ('alternate', 'simple', 'Like red oak, with bristle-tipped lobes, but leaves glossier and often with deeper, uneven cuts; very dark, blocky bark with a bright yellow-orange inner bark.', ['red-oak', 'pin-oak', 'white-oak']),
 }
 # Claims kept although the Wikipedia article does not state them (field-guide staples); shown on the tree's page.
 CHECKED = {
@@ -196,7 +209,7 @@ def build():
             pts.append([round(o['loc'][0], 3), round(o['loc'][1], 3)])
         arr, leaf, tell, like = FACTS[slug]
         name = rec['common'] or sci
-        name = {'Eastern Cottonwood': 'eastern cottonwood'}.get(name, name)
+        name = {'Eastern Cottonwood': 'eastern cottonwood', 'Black Tupelo': 'black gum', 'sweet birch': 'black birch'}.get(name, name)
         out.append({'id': slug, 'wave': WAVE.get(slug, 1), 'name': name[0].upper() + name[1:], 'sci': sci, 'count': rec['count'], 'arr': arr, 'leaf': leaf, 'tell': tell, 'like': [x for x in like if x in picks],
                     'photos': photos, 'checked': {'src': 'https://en.wikipedia.org/wiki/' + sci.replace(' ', '_'), 'on': '2026-11', **({'note': CHECKED[slug]} if slug in CHECKED else {})}, 'pts': pts, 'counties': dict(sorted(counties.items(), key=lambda kv: -kv[1]))})
         print(f"{slug:18s} {len(photos)} photos, {len(pts)} points, top counties {list(out[-1]['counties'])[:3]}")

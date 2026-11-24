@@ -40,5 +40,14 @@ export const PROFILE = {
   hackberry: { barkKind: 'ridges', bark: 'Grey, with corky, warty ridges.', fall: 'Yellow, not showy.' },
   redbud: { barkKind: 'plates', young: 'Dark grey and smooth.', bark: 'Later in small scaly plates, sometimes showing orange.', fall: 'Yellow.' },
   cottonwood: { barkKind: 'ridges', young: 'Smooth and yellowish grey.', bark: 'Old trunks thick, with deep, dark grey furrows.', fall: 'Yellow.' },
+  // wave 3
+  'black-gum': { barkKind: 'plates', young: 'Grey and fairly smooth.', bark: 'Old trunks in thick, squarish blocks, like alligator skin.', fall: 'Among the first to turn: brilliant scarlet, orange and purple, often by early September.' },
+  'chestnut-oak': { barkKind: 'ridges', bark: 'Very thick and dark, in deep, wide, V-shaped ridges.', fall: 'Orange-brown to dull red.' },
+  'black-birch': { barkKind: 'smooth', young: 'Dark, shiny red-brown to near black, with long horizontal lenticels, like a cherry; does not peel.', bark: 'Old trunks break into large, dark grey, scaly plates.', fall: 'Bright golden yellow.' },
+  hornbeam: { barkKind: 'smooth', bark: 'Smooth, thin, blue-grey, the trunk fluted with long ridges like flexed muscle, all its life.', fall: 'Yellow, orange and red.' },
+  persimmon: { barkKind: 'plates', bark: 'Very dark, in small, thick, square blocks, orange in the cracks.', fall: 'Yellow to reddish-purple; the fruit stays after the leaves drop.' },
+  sweetbay: { barkKind: 'smooth', bark: 'Smooth and light grey, often lichen-covered.', fall: 'In New Jersey most leaves drop in winter; some stay green.' },
+  basswood: { barkKind: 'ridges', young: 'Smooth and grey.', bark: 'Older trunks with long, flat-topped, narrow ridges.', fall: 'Pale yellow to brown.' },
+  'black-oak': { barkKind: 'plates', bark: 'Very dark, almost black, deeply furrowed into rough blocks; the inner bark bright yellow-orange.', fall: 'Dull red to brown.' },
 };
 export const barkKindOf = (id) => (PROFILE[id] || {}).barkKind;
