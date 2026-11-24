@@ -215,7 +215,7 @@ export function initTrees(ctx) {
   function setTarget(i) {
     const id = rain.targets[i % rain.targets.length]; rain.target = id;
     const box = root.querySelector('.lr-target'); if (!box) return;
-    box.querySelector('img').src = leafSrc(id); box.querySelector('b').textContent = by.get(id).name;
+    box.querySelector('img').src = leafSrc(id); box.dataset.id = id; box.querySelector('b').textContent = by.get(id).name;
     box.classList.remove('flip'); void box.offsetWidth; box.classList.add('flip');
     if (i) juice.right(1);
   }

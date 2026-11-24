@@ -20,13 +20,13 @@ const { chromium } = require('playwright'); const fs = require('fs');
   await page.click('[data-t=hub]'); await page.click('[data-t=rain]'); await page.waitForTimeout(2500); await page.screenshot({ path: `${out}/1-rain.png` });
   const t0 = Date.now(); let tapped = 0;
   while (Date.now() - t0 < 12000) {
-    tapped += await page.evaluate(() => { const src = document.querySelector('.lr-target img').src; let n = 0; for (const el of document.querySelectorAll('.lr-leaf')) if (el.src === src) { el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); n++; } return n; });
+    tapped += await page.evaluate(() => { const t = document.querySelector('.lr-target'); if (!t) return 0; const id = t.dataset.id; let n = 0; for (const el of document.querySelectorAll('.lr-leaf')) if (el.dataset.id === id) { el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); n++; } return n; });
     await page.waitForTimeout(400);
   }
   await page.screenshot({ path: `${out}/2-rain-later.png` });
   console.log('rain: tapped', tapped, '| score', await page.locator('.lr-score').innerText(), '| target', await page.locator('.lr-target b').innerText());
   for (let i = 0; i < 40 && !(await page.locator('.tr-done').count()); i++) {
-    await page.evaluate(() => { const src = document.querySelector('.lr-target img')?.src; const el = [...document.querySelectorAll('.lr-leaf')].find((x) => x.src !== src); if (el) el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); });
+    await page.evaluate(() => { const id = document.querySelector('.lr-target')?.dataset.id; const el = [...document.querySelectorAll('.lr-leaf')].find((x) => x.dataset.id !== id); if (el) el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); });
     await page.waitForTimeout(500);
   }
   await page.waitForTimeout(800); await page.screenshot({ path: `${out}/3-rain-end.png` });
