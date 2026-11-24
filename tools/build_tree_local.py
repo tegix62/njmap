@@ -4,7 +4,7 @@
 Stage 1 (grid):  python3 tools/build_tree_local.py grid    every research-grade iNaturalist observation of each tree in New Jersey (place 51),
                                                            counted on a 0.05-degree grid (about 4 x 5.5 km), into data/treegrid.json. The app
                                                            ranks "trees near you" from it on the device: your spot never leaves it.
-Stage 4 (winter): python3 tools/build_tree_local.py winter  up to 40 more winter photos per tree into data/treepool.json (no live leaves, or December
+Stage 4 (winter): python3 tools/build_tree_local.py winter [slug ...] up to 40 more winter photos per tree into data/treepool.json (no live leaves, or December
                                                            to March): bark, buds, shape and what hangs on through winter.
 Stage 5 (fall / summer): python3 tools/build_tree_local.py fall|summer   top each tree up to 40 fall photos (annotated 'coloured
                                                            leaves') or 30 summer ones ('green leaves', June to August), New Jersey first.
@@ -57,8 +57,13 @@ SEASON_OF_MONTH = {12: 'winter', 1: 'winter', 2: 'winter', 3: 'spring', 4: 'spri
 
 
 def pool():
-    out = {}
+    # only trees not yet in the file (a new wave); everything already there, with its later top-ups and bark picks, is kept
+    path = os.path.join(ROOT, 'data/treepool.json')
+    old = json.load(open(path)) if os.path.exists(path) else {'trees': {}}
+    out = old['trees']
     for sci, slug in BT.TREES:
+        if slug in out:
+            continue
         rec = json.load(open(f'/tmp/trees/{slug}.json'))
         ps = []
         for o in rec['obs']:
@@ -82,8 +87,7 @@ def pool():
                 break
         out[slug] = ps
         print(f'{slug:18s} {len(ps)} photos', {s: sum(1 for p in ps if p[1] == s) for s in ('spring', 'summer', 'fall', 'winter')}, flush=True)
-    json.dump({'base': 'https://inaturalist-open-data.s3.amazonaws.com/photos/', 'size': 'medium', 'trees': out},
-              open(os.path.join(ROOT, 'data/treepool.json'), 'w'), ensure_ascii=False, separators=(',', ':'))
+    json.dump({**old, 'base': 'https://inaturalist-open-data.s3.amazonaws.com/photos/', 'size': 'medium', 'trees': out}, open(path, 'w'), ensure_ascii=False, separators=(',', ':'))
 
 
 def points():
@@ -162,7 +166,10 @@ def winter():
     """Up to 40 more winter photos per tree, added to data/treepool.json: observations annotated 'no live leaves', or (evergreens, and to
     top up) observed December to March; New Jersey first, then anywhere."""
     path = os.path.join(ROOT, 'data/treepool.json'); P = json.load(open(path))
+    only = sys.argv[2:]      # only these trees (a new wave): running it again for the others would add 40 more each time
     for sci, slug in BT.TREES:
+        if only and slug not in only:
+            continue
         have = {p[0].split('.')[0] for p in P['trees'][slug]}
         t = BT.get('taxa', q=sci, rank='species', per_page=1)['results'][0]
         add = []

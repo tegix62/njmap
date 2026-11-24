@@ -31,5 +31,14 @@ export const PROFILE = {
   'black-walnut': { barkKind: 'ridges', bark: 'Grey-black, deeply furrowed into thin ridges in a diamond pattern.' },
   'white-pine': { barkKind: 'ridges' },
   dogwood: { barkKind: 'plates' },
+  // wave 2
+  'box-elder': { barkKind: 'ridges', young: 'Smooth and light grey-brown.', bark: 'Older trunks with shallow, narrow ridges.', fall: 'Yellow, often dull.' },
+  'callery-pear': { barkKind: 'ridges', young: 'Smooth, with pale dots.', bark: 'Grey-brown, in shallow, scaly ridges.', fall: 'Late: glossy red, purple and orange, often into November.' },
+  'silver-maple': { barkKind: 'peeling', young: 'Smooth and silvery grey.', bark: 'Old trunks break into long, loose, shaggy strips.', fall: 'Pale yellow, and early.' },
+  'honey-locust': { barkKind: 'plates', bark: 'Grey-brown, in long, scaly plates; clusters of branched thorns on wild trees.', fall: 'Bright yellow; the tiny leaflets drop early.' },
+  'white-mulberry': { barkKind: 'ridges', bark: 'Light orange-brown, with shallow, twisting ridges.', fall: 'Yellow.' },
+  hackberry: { barkKind: 'ridges', bark: 'Grey, with corky, warty ridges.', fall: 'Yellow, not showy.' },
+  redbud: { barkKind: 'plates', young: 'Dark grey and smooth.', bark: 'Later in small scaly plates, sometimes showing orange.', fall: 'Yellow.' },
+  cottonwood: { barkKind: 'ridges', young: 'Smooth and yellowish grey.', bark: 'Old trunks thick, with deep, dark grey furrows.', fall: 'Yellow.' },
 };
 export const barkKindOf = (id) => (PROFILE[id] || {}).barkKind;

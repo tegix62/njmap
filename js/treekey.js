@@ -22,6 +22,14 @@ export const GROUPS = [
   { id: 'plain', name: 'Plain leaves', why: 'One leaf at a time, no lobes: just an outline with small teeth or none. The leaves look alike, so the bark is often the quickest clue.',
     tell: { 'beech': 'Smooth grey bark; long cigar-shaped buds; young trees keep dry leaves in winter.', 'black-cherry': 'Dark bark in flakes like burnt potato chips; narrow, finely toothed leaves.', 'gray-birch': 'Chalky white bark with dark chevrons; triangular leaves.' } },
 ];
+// Wave 2 (roadsides and town edges): each joins the group a field guide would put it in, with the one thing that tells it from the others there.
+const WAVE2_TELL = {
+  maples: { 'silver-maple': 'Five lobes cut almost to the middle, silvery white underneath; shaggy bark on old trees.', 'box-elder': 'The maple made of leaflets: three to five, in pairs, with maple seeds; green twigs.' },
+  compound: { 'honey-locust': 'Fine, feathery leaflets, often divided twice; big branched thorns on wild trees; long twisted pods.' },
+  lobed: { 'white-mulberry': 'Glossy, toothed mittens and hearts on one tree, the lobes uneven; berries like small blackberries.' },
+  plain: { 'callery-pear': 'Glossy, rounded, wavy-edged leaves; white with smelly flowers in early spring.', hackberry: 'Corky, warty bark; lopsided leaves with a long tip.', redbud: 'Heart-shaped leaves with smooth edges; pink flowers on bare twigs in spring.', cottonwood: 'Big triangular leaves with curved teeth, fluttering on flat stalks; by rivers.' },
+};
+for (const g of GROUPS) Object.assign(g.tell, WAVE2_TELL[g.id] || {});
 export const GROUP_OF = Object.fromEntries(GROUPS.flatMap((g) => Object.keys(g.tell).map((id) => [id, g.id])));
 
 /** The way through: each skill of looking is learned just before the first group that needs it. */
@@ -64,6 +72,7 @@ export function pathTo(id) {
   if (id === 'hemlock') return [['start', 0], ['bundle', 2]];
   if (id === 'holly') return [['start', 2], ['winter', 0]];
   if (id === 'red-cedar' || id === 'white-cedar') return [['start', 1]];
+  if (id === 'box-elder') return [['start', 2], ['winter', 1], ['arr', 0]];      // in pairs, but leaflets: the key's lobe question does not fit it
   return PATHS[GROUP_OF[id]];
 }
 /** The trees an answer in the key can still lead to. */

@@ -29,7 +29,12 @@ TREES = [
     ('Cornus florida', 'dogwood'), ('Betula populifolia', 'gray-birch'), ('Robinia pseudoacacia', 'black-locust'),
     ('Ailanthus altissima', 'tree-of-heaven'), ('Ilex opaca', 'holly'), ('Chamaecyparis thyoides', 'white-cedar'),
     ('Tsuga canadensis', 'hemlock'), ('Carya ovata', 'shagbark-hickory'), ('Juglans nigra', 'black-walnut'),
+    # wave 2: roadsides and town edges (the most-reported wild trees in New Jersey after the first wave, on iNaturalist, November 2026)
+    ('Acer negundo', 'box-elder'), ('Pyrus calleryana', 'callery-pear'), ('Acer saccharinum', 'silver-maple'), ('Gleditsia triacanthos', 'honey-locust'),
+    ('Morus alba', 'white-mulberry'), ('Celtis occidentalis', 'hackberry'), ('Cercis canadensis', 'redbud'), ('Populus deltoides', 'cottonwood'),
 ]
+# Trees come in waves: the first is open from the start; each later one opens in the app once the one before it is known (js/trees.js).
+WAVE = {slug: 2 for slug in ['box-elder', 'callery-pear', 'silver-maple', 'honey-locust', 'white-mulberry', 'hackberry', 'redbud', 'cottonwood']}
 
 
 def get(path, **q):
@@ -132,6 +137,15 @@ FACTS = {
     'hemlock': ('needles', 'needles', 'Short, flat needles with two white lines underneath; tiny cones; shady ravines in the north.', ['white-pine', 'red-cedar', 'white-cedar']),
     'shagbark-hickory': ('alternate', 'compound', 'Bark peeling in long shaggy strips, on grown trees (young ones are smooth); a compound leaf of five leaflets, the end three much the largest.', ['black-walnut', 'black-locust', 'tree-of-heaven']),
     'black-walnut': ('alternate', 'compound', 'Long compound leaves of 15 to 23 narrow, toothed leaflets, the biggest in the middle; round green husks with a spicy smell; dark bark in diamond furrows.', ['tree-of-heaven', 'shagbark-hickory', 'black-locust']),
+    # wave 2
+    'box-elder': ('opposite', 'compound', 'A maple with leaflets: three to five coarsely toothed leaflets, in pairs on the twig; green twigs, often with a pale bloom; winged maple seeds in hanging clusters.', ['silver-maple', 'red-maple', 'tree-of-heaven']),
+    'callery-pear': ('alternate', 'simple', 'Glossy, rounded leaves with wavy, finely toothed edges; the whole tree white with bad-smelling flowers in early spring; thorny thickets along roads and fields. Invasive.', ['black-cherry', 'redbud', 'gray-birch']),
+    'silver-maple': ('opposite', 'simple', 'Five deep lobes cut almost to the middle, silvery white underneath; old bark in long, loose, shaggy plates; along rivers and streets.', ['red-maple', 'sugar-maple', 'norway-maple']),
+    'honey-locust': ('alternate', 'compound', 'Fine, feathery leaves of many small leaflets, often divided twice; big branched thorns on the trunks of wild trees; long, flat, twisted brown pods.', ['black-locust', 'tree-of-heaven', 'black-walnut']),
+    'white-mulberry': ('alternate', 'simple', 'Glossy, toothed leaves in many shapes on one tree, from plain hearts to mittens with uneven lobes; berries like small blackberries, white to purple, in early summer.', ['sassafras', 'hackberry', 'redbud']),
+    'hackberry': ('alternate', 'simple', 'Grey bark with corky, warty ridges; lopsided, toothed leaves with a long pointed tip and an uneven base; small purple-brown berries.', ['white-mulberry', 'black-cherry', 'beech']),
+    'redbud': ('alternate', 'simple', 'Heart-shaped leaves with smooth edges; rosy-pink pea flowers straight from bare twigs and even the trunk in early spring; flat brown pods.', ['callery-pear', 'white-mulberry', 'dogwood']),
+    'cottonwood': ('alternate', 'simple', 'Big triangular leaves with coarse, curved teeth on flattened stalks, so they flutter; deeply furrowed grey bark; cottony seeds drifting in late spring; by rivers.', ['gray-birch', 'sycamore', 'silver-maple']),
 }
 # Claims kept although the Wikipedia article does not state them (field-guide staples); shown on the tree's page.
 CHECKED = {
@@ -182,7 +196,8 @@ def build():
             pts.append([round(o['loc'][0], 3), round(o['loc'][1], 3)])
         arr, leaf, tell, like = FACTS[slug]
         name = rec['common'] or sci
-        out.append({'id': slug, 'name': name[0].upper() + name[1:], 'sci': sci, 'count': rec['count'], 'arr': arr, 'leaf': leaf, 'tell': tell, 'like': [x for x in like if x in picks],
+        name = {'Eastern Cottonwood': 'eastern cottonwood'}.get(name, name)
+        out.append({'id': slug, 'wave': WAVE.get(slug, 1), 'name': name[0].upper() + name[1:], 'sci': sci, 'count': rec['count'], 'arr': arr, 'leaf': leaf, 'tell': tell, 'like': [x for x in like if x in picks],
                     'photos': photos, 'checked': {'src': 'https://en.wikipedia.org/wiki/' + sci.replace(' ', '_'), 'on': '2026-11', **({'note': CHECKED[slug]} if slug in CHECKED else {})}, 'pts': pts, 'counties': dict(sorted(counties.items(), key=lambda kv: -kv[1]))})
         print(f"{slug:18s} {len(photos)} photos, {len(pts)} points, top counties {list(out[-1]['counties'])[:3]}")
     json.dump({'v': 1, 'source': 'iNaturalist research-grade observations in New Jersey (photos under their own CC licences, credited); tells and leaf facts checked against each species’ English Wikipedia article in November 2026 (see checked.src)', 'trees': out},

@@ -224,5 +224,57 @@
    ],
    "tol": 14
   }
+ ],
+ "box-elder": [
+  "incoming/box-elder/inat-190694939.jpg",
+  0,
+  {
+   "crop": [
+    0.0,
+    0.0,
+    0.95,
+    0.78
+   ],
+   "seed": [
+    0.5,
+    0.4
+   ],
+   "tol": 8,
+   "trim": 70
+  }
+ ],
+ "silver-maple": [
+  "incoming/silver-maple/inat-162925320.jpg",
+  0,
+  {
+   "seed": [
+    0.5,
+    0.42
+   ],
+   "tol": 14,
+   "trim": 60
+  }
+ ],
+ "redbud": [
+  "incoming/redbud/inat-590169392.jpg",
+  180,
+  {
+   "seed": [
+    0.55,
+    0.62
+   ],
+   "tol": 14
+  }
+ ],
+ "cottonwood": [
+  "incoming/cottonwood/inat-42963112.jpg",
+  0,
+  {
+   "seed": [
+    0.5,
+    0.5
+   ],
+   "tol": 14
+  }
  ]
 }

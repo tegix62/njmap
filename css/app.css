@@ -4085,3 +4085,9 @@ span.jc-leaf { width: 9px; height: 9px; border-radius: 50%; background: #3f9b62;
 .tn-leafyr svg { width: 100%; height: auto; display: block; }
 .tn-leafyr figcaption { font-size: 12.5px; font-weight: 600; opacity: .7; padding-top: 2px; }
 .tr-lfseason { display: block; text-align: center; font-size: 12.5px; opacity: .65; margin-top: 4px; }
+/* waves: how far through the current wave, and what opens next */
+.tn-wave { margin: 10px 0 4px; padding: 12px 14px; border-radius: 16px; background: #fff; box-shadow: 0 1px 3px rgba(23,37,28,.1); display: grid; gap: 6px; }
+.tn-wave b { font-size: 15px; } .tn-wave small { display: block; font-size: 12.5px; opacity: .72; line-height: 1.35; }
+.tn-wavebar { height: 8px; border-radius: 99px; background: #e4eae0; overflow: hidden; }
+.tn-wavebar i { display: block; height: 100%; background: linear-gradient(90deg, #2f8f5b, #7cc28f); border-radius: 99px; transition: width .6s; }
+.tn-wavelist { display: grid; gap: 6px; margin: 12px 0; text-align: left; }

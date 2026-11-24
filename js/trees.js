@@ -33,13 +33,48 @@ export function initTrees(ctx) {
     else { combo = 0; juice.wrong(); juice.shake(picked); if (right) juice.pop(right); }
   }
   const comboChip = () => (combo >= 3 ? `<span class="jc-combo">${combo} in a row</span>` : '');
+  // ---- waves: trees come a few at a time. The first wave is open from the start; the next opens once every tree of the one before is
+  // met and answered right at least twice. Until then its trees are left out everywhere (questions, choices, guide, games).
+  const WAVE_NAME = { 1: 'The first trees', 2: 'Roadsides and town edges', 3: 'Into the woods', 4: 'Wet ground and the south' };
+  let ALL = null;
+  const waveOf = (t) => t.wave || 1;
+  const openWaves = () => { const w = store.get('trees.waves', [1]); return w.includes(1) ? w : [1, ...w]; };
+  function applyWaves() {
+    const w = openWaves(); D.trees = ALL.filter((t) => w.includes(waveOf(t))); by = new Map(D.trees.map((t) => [t.id, t]));
+    if (H) { H.trees = D.trees; H.by = by; }
+  }
+  function waveState() {
+    const w = Math.max(...openWaves()), inW = ALL.filter((t) => waveOf(t) === w), m = store.get('trees.met', []), st = store.get('trees.stats', {});
+    const sure = inW.filter((t) => m.includes(t.id) && (st[t.id] || [0, 0])[1] >= 2).length;
+    const next = ALL.filter((t) => waveOf(t) === w + 1);
+    return { w, n: inW.length, metN: inW.filter((t) => m.includes(t.id)).length, sure, next: next.length ? w + 1 : 0, nextTrees: next };
+  }
+  /** Opens the next wave if the current one is known; returns its number (or 0). */
+  function waveCheck() {
+    const s = waveState(); if (!s.next || s.sure < s.n) return 0;
+    store.set('trees.waves', [...openWaves(), s.next]); applyWaves(); return s.next;
+  }
+  function waveOpened(w) {
+    const ts = ALL.filter((t) => waveOf(t) === w);
+    setTimeout(() => { juice.done(true); const src = (x) => leafSrc(x.id), mine = ts.map(src).filter(Boolean); juice.fall(mine.length ? mine : D.trees.map(src).filter(Boolean)); }, 150);
+    frame(back(), `<div class="tr-done tn-wavenew"><span class="tr-kick">Wave ${w} is open</span><h2>${esc(WAVE_NAME[w] || `Wave ${w}`)}</h2><p>You know every tree of the last wave. ${ts.length} new trees join today’s lessons, a couple a day, mixed in with the ones you know.</p>
+      <div class="tn-wavelist">${ts.map((t) => `<button class="tr-li" data-t="card" data-id="${t.id}"><span class="tk-li-sil">${leafArt(t.id)}</span><span><b>${esc(t.name)}</b><small>${esc(t.sci)}</small></span></button>`).join('')}</div>
+      <button class="tr-go" data-t="today">Start today</button><button class="tr-card wide" data-t="hub"><b>Back to the trees</b></button></div>`);
+  }
+  function waveCardHtml() {
+    const s = waveState();
+    if (!s.next) return s.w > 1 ? `<div class="tn-wave"><b>All ${s.w} waves open</b><small>${ALL.length} trees</small></div>` : '';
+    const pct = Math.round((100 * s.sure) / Math.max(1, s.n));
+    return `<div class="tn-wave"><div><b>Wave ${s.w} · ${esc(WAVE_NAME[s.w] || '')}</b><small>${s.metN} of ${s.n} met · ${s.sure} answered right twice</small></div>
+      <div class="tn-wavebar"><i style="width:${pct}%"></i></div><small>Wave ${s.next}, <b>${esc(WAVE_NAME[s.next] || '')}</b> (${s.nextTrees.length} trees), opens when all ${s.n} are met and answered right twice.</small></div>`;
+  }
   let D = null, by = null, root = null, q = null, run = null, layer = false, H = null, G = null, POOL = null, quick = null, picking = false;
 
   async function load() {
     if (D) return;
     let X;
     [D, G, POOL, X] = await Promise.all(['data/trees.json', 'data/treegrid.json', 'data/treepool.json', 'data/treeextra.json'].map((f) => fetch(f).then((r) => r.json())));
-    by = new Map(D.trees.map((t) => [t.id, t]));
+    ALL = D.trees; by = new Map(ALL.map((t) => [t.id, t]));      // every tree, for the merges below; narrowed to the open waves after
     // pictures added by hand from Wikimedia Commons (tools/build_incoming.py): more photos, and botanists' drawings
     for (const [id, x] of Object.entries(X)) { const t = by.get(id); if (!t) continue; t.photos.push(...x.photos.map((p) => ({ ...p, via: 'Wikimedia Commons' }))); t.drawings = x.drawings; }
     // bark photos picked by eye from each tree's photo pool (iNaturalist, New Jersey first): many trunks per tree for bark practice
@@ -48,6 +83,7 @@ export function initTrees(ctx) {
       t.photos.push(...fs.map((f) => { const [pid, ext] = f.split('.'); return { f: `${POOL.base}${pid}/${POOL.size}.${ext}`, ctx: 'bark', credit: cr.get(f) || '', pool: f }; }));
     }
     H = { trees: D.trees, by, photoOf, img, esc };
+    applyWaves();
     mine = await myPhotos();
   }
   // ---- the skills of looking: learned once (a lesson, then a short practice that must go well), and asked again now and then
@@ -498,10 +534,10 @@ export function initTrees(ctx) {
   /** Identify: the key, one question at a time, with the trees it still leaves; at a group, its side-by-side card. */
   function identify(node = 'start', trail = []) {
     const n = KEY[node];
-    const left = trail.length ? treesUnder(...trail[trail.length - 1]) : Object.keys(GROUP_OF);
+    const left = (trail.length ? treesUnder(...trail[trail.length - 1]) : Object.keys(GROUP_OF)).filter((id) => by.has(id));
     frame(back(), `<span class="tr-kick">Name a tree in front of you</span><p class="tr-ask">${esc(n.q)}</p>
       <p class="sk-how"><b>How to check:</b> ${esc(n.how)}${n.skill ? ` <button class="sk-link" data-t="lesson" data-sk="${n.skill}">Show me</button>` : ''}</p>
-      <div class="tk-opts">${n.a.map(([label, ic], i) => `<button data-t="keypick" data-node="${node}" data-i="${i}" data-trail='${esc(JSON.stringify(trail))}'>${ICON[ic]}<b>${esc(label)}</b><small>${treesUnder(node, i).length} tree${treesUnder(node, i).length === 1 ? '' : 's'}</small></button>`).join('')}</div>
+      <div class="tk-opts">${n.a.map(([label, ic], i) => `<button data-t="keypick" data-node="${node}" data-i="${i}" data-trail='${esc(JSON.stringify(trail))}'>${ICON[ic]}<b>${esc(label)}</b><small>${treesUnder(node, i).filter((id) => by.has(id)).length} tree${treesUnder(node, i).filter((id) => by.has(id)).length === 1 ? '' : 's'}</small></button>`).join('')}</div>
       ${trail.length ? `<div class="tk-trail">${trail.map(([tn, ti]) => `<span>${esc(KEY[tn].a[ti][0])}</span>`).join(' › ')}</div>` : ''}
       <h4>Trees it could still be: ${left.length}</h4><div class="tk-left">${left.map((id) => `<span title="${esc(by.get(id).name)}">${leafArt(id)}</span>`).join('')}</div>`);
   }
@@ -514,6 +550,7 @@ export function initTrees(ctx) {
 
   function hub() {
     q = null; run = null; quick = null; n3 = null; if (rain) rain.alive = false; rain = null; drop3d(); if (walk) walkEnd();
+    const nw = waveCheck(); if (nw) return waveOpened(nw);
     const m = met(), t = store.get('trees.today', {}), doneToday = t.d === today() && t.done;
     const due = m.filter((id) => isDue(id)).length;
     const C = 2 * Math.PI * 21, frac = doneToday ? 1 : t.d === today() && t.n ? t.i / t.n : 0;
@@ -526,6 +563,7 @@ export function initTrees(ctx) {
         <svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="21" class="bg"/><circle cx="26" cy="26" r="21" class="fg" stroke-dasharray="${(C * frac).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 26 26)"/></svg></button>
       <p class="tn-season">${esc(SEASON_LINE[season()])}</p>
       <div class="tr-stats"><span><b>${m.length}</b> of ${D.trees.length} met</span><span><b>${learned()}</b> learned</span><span><b>${streak()}</b> day streak</span></div>
+      ${waveCardHtml()}
       <div class="tn-head"><h4>${sp ? `Trees near ${esc(sp.name)}` : 'The most-seen trees in New Jersey'}</h4><button class="sk-link" data-t="spot">${sp ? 'Change' : 'Set your spot'}</button></div>
       ${sp ? '' : '<p class="tn-hint">Set the place you are outdoors most (home, work, a park) and these become the trees most often seen around it.</p>'}
       <div class="tn-list">${local.map((x, i) => `<button class="tn-row${m.includes(x.id) ? ' met' : ''}" data-t="card" data-id="${x.id}"><span class="tn-n">${m.includes(x.id) ? '✓' : i + 1}</span><span class="tn-leaf">${leafArt(x.id)}</span><span class="tk-gt"><b>${esc(x.name)}</b><small>${nc ? `seen ${nc[x.id].n.toLocaleString()} times within about 10 km` : `${x.count.toLocaleString()} sightings in New Jersey`}${!m.includes(x.id) && fresh.some((f) => f.id === x.id) ? ' · next to meet' : ''}</small></span></button>`).join('')}</div>
@@ -634,7 +672,7 @@ export function initTrees(ctx) {
     drop3d(); if (has3d(t.id)) show3d(t.id, season());
   }
   function guide() {
-    frame(back(), `<h2>Field guide</h2>${GROUPS.map((g) => `<button class="tk-gh" data-t="groupcard" data-g="${g.id}" data-from="guide">${esc(g.name)} <span>compare ›</span></button><div class="tr-list">${Object.keys(g.tell).map((id) => by.get(id)).map((t) => `<button class="tr-li" data-t="card" data-id="${t.id}" data-from="guide"><span class="tk-li-sil">${leafArt(t.id)}</span><span><b>${esc(t.name)}</b><small>${esc(g.tell[t.id])}</small></span></button>`).join('')}</div>`).join('')}`);
+    frame(back(), `<h2>Field guide</h2>${GROUPS.map((g) => `<button class="tk-gh" data-t="groupcard" data-g="${g.id}" data-from="guide">${esc(g.name)} <span>compare ›</span></button><div class="tr-list">${Object.keys(g.tell).map((id) => by.get(id)).filter(Boolean).map((t) => `<button class="tr-li" data-t="card" data-id="${t.id}" data-from="guide"><span class="tk-li-sil">${leafArt(t.id)}</span><span><b>${esc(t.name)}</b><small>${esc(g.tell[t.id])}</small></span></button>`).join('')}</div>`).join('')}`);
   }
   /** The map, with every sighting of one tree; the screen steps aside. */
   function where(t) {
