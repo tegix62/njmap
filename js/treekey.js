@@ -24,7 +24,7 @@ export const GROUPS = [
 ];
 // Wave 2 (roadsides and town edges): each joins the group a field guide would put it in, with the one thing that tells it from the others there.
 const WAVE2_TELL = {
-  maples: { 'silver-maple': 'Five lobes cut almost to the middle, silvery white underneath; shaggy bark on old trees.', 'box-elder': 'The maple made of leaflets: three to five, in pairs, with maple seeds; green twigs.' },
+  maples: { 'silver-maple': 'Five lobes cut almost to the middle, silvery white underneath; shaggy bark on old trees.', 'box-elder': 'The maple made of leaflets: three to seven, in pairs, with maple seeds; green twigs.' },
   compound: { 'honey-locust': 'Fine, feathery leaflets, often divided twice; big branched thorns on wild trees; long twisted pods.' },
   lobed: { 'white-mulberry': 'Glossy, toothed mittens and hearts on one tree, the lobes uneven; berries like small blackberries.' },
   plain: { 'callery-pear': 'Glossy, rounded, wavy-edged leaves; white with smelly flowers in early spring.', hackberry: 'Corky, warty bark; lopsided leaves with a long tip.', redbud: 'Heart-shaped leaves with smooth edges; pink flowers on bare twigs in spring.', cottonwood: 'Big triangular leaves with curved teeth, fluttering on flat stalks; by rivers.' },
