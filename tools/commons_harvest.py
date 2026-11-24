@@ -167,6 +167,10 @@ def page_meta(title):
     return {'artist': artist or 'unknown', 'lic': lic.group(1).strip(), 'page': 'https://commons.wikimedia.org/wiki/' + urllib.parse.quote(title.replace(' ', '_')), 'thumb': url}
 
 
+PC = f'{TMP}/pagemeta.json'
+PCACHE = json.load(open(PC)) if os.path.exists(PC) else {}
+
+
 def fetch():
     picks = json.load(open(os.path.join(ROOT, 'tools/commons_picks.json')))
     ipicks = json.load(open(os.path.join(ROOT, 'tools/incoming_picks.json')))
@@ -187,7 +191,9 @@ def fetch():
                 print('  metadata retry', e, flush=True); time.sleep(20 * (k + 1))
         if not d:      # the API is throttled: read each file's web page instead
             for t in titles[i:i + 40]:
+                if t in PCACHE: info[t] = PCACHE[t]; continue
                 m = page_meta(t)
+                if m: PCACHE[t] = m; json.dump(PCACHE, open(PC, 'w'))
                 if m: info[t] = m
                 print('  page', 'ok' if m else 'no licence', t[5:60], flush=True); time.sleep(2)
             continue
@@ -212,7 +218,7 @@ def fetch():
                 fn += '.png'
             path = os.path.join(ROOT, 'incoming', slug, fn)
             if not os.path.exists(path):
-                raw = get(m['thumb'])
+                raw = get(m['thumb'], tries=2)
                 if not raw:
                     print('  download failed:', fn); continue
                 im = Image.open(io.BytesIO(raw)); im.save(path) if fn.lower().endswith('.png') else im.convert('RGB').save(path, quality=88)
@@ -221,6 +227,8 @@ def fetch():
             if fn not in have:
                 ipicks.setdefault(slug, []).append([fn] + list(it[1:]))
             print('  ok', slug, fn[:60], m['lic'], flush=True)
+            json.dump(ipicks, open(os.path.join(ROOT, 'tools/incoming_picks.json'), 'w'), ensure_ascii=False, indent=1)      # saved as it goes
+            json.dump(meta, open(os.path.join(ROOT, 'tools/incoming_meta.json'), 'w'), ensure_ascii=False, indent=1)
     json.dump(ipicks, open(os.path.join(ROOT, 'tools/incoming_picks.json'), 'w'), ensure_ascii=False, indent=1)
     json.dump(meta, open(os.path.join(ROOT, 'tools/incoming_meta.json'), 'w'), ensure_ascii=False, indent=1)
 
