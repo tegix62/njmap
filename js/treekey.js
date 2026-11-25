@@ -31,8 +31,8 @@ const WAVE2_TELL = {
 };
 // Wave 3 (into the woods)
 const WAVE3_TELL = {
-  oaks: { 'black-oak': 'Like red oak but glossier, often more deeply and unevenly cut; very dark, blocky bark, yellow inside.', 'chestnut-oak': 'No deep lobes: big rounded teeth like a chestnut leaf; very thick, deeply ridged bark; rocky ridges.' },
-  plain: { 'black-gum': 'Glossy, smooth-edged ovals crowded at the twig tips; brilliant scarlet early in fall; alligator bark.', 'black-birch': 'Scratched twig smells of wintergreen; dark, shiny cherry-like bark with long lenticels.', hornbeam: 'Smooth, blue-grey, muscly fluted trunk; double-toothed leaves; shady stream banks.', persimmon: 'Very dark bark in small square blocks; plain smooth-edged ovals; orange fruit.', sweetbay: 'Leathery leaves, silvery white underneath; vanilla-scented creamy flowers; swamps.', basswood: 'Big, toothed, lopsided hearts; seed clusters hang from a pale strap-like wing.' },
+  oaks: { 'black-oak': 'Like red oak but glossier, often more deeply and unevenly cut; very dark, blocky bark, yellow-orange inside.', 'chestnut-oak': 'No deep lobes: big rounded teeth like a chestnut leaf; very thick, deeply ridged bark; rocky ridges.' },
+  plain: { 'black-gum': 'Glossy, smooth-edged ovals crowded at the twig tips; brilliant scarlet early in fall; alligator bark.', 'black-birch': 'Scratched twig smells of wintergreen; dark, shiny cherry-like bark with long lenticels.', hornbeam: 'Smooth, blue-grey, muscly fluted trunk; double-toothed leaves; shady stream banks.', persimmon: 'Very dark bark in small square blocks; plain smooth-edged ovals; orange fruit.', sweetbay: 'Leathery leaves, silvery white underneath; sweet-scented creamy flowers; swamps.', basswood: 'Big, toothed, lopsided hearts; seed clusters hang from a pale strap-like wing.' },
 };
 for (const g of GROUPS) Object.assign(g.tell, WAVE2_TELL[g.id] || {}, WAVE3_TELL[g.id] || {});
 export const GROUP_OF = Object.fromEntries(GROUPS.flatMap((g) => Object.keys(g.tell).map((id) => [id, g.id])));
