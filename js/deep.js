@@ -18,7 +18,7 @@ const KIND_COLOR = { rock: '#9a5b3c', ice: '#3d7fbf', lenape: '#a2652a', iron: '
 const ERA_FILL = { grenville: '#c98f6a', paleozoic: '#a9b27a', newark: '#c4614b', basalt: '#4a3b3b', diabase: '#6b5b73', coastal: '#e3d29a' };
 const REGION_COLOR = Object.fromEntries(LAND.map((r) => [r.id, r.color]));
 const DEM = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
-const LAYERS = ['deep-hs', 'deep-prov', 'deep-prov-line', 'deep-rocks', 'deep-sand', 'deep-flows', 'deep-lake', 'deep-ice-sheet', 'deep-icelines', 'deep-ice-older', 'deep-ice-limit', 'deep-canal'];
+const LAYERS = ['deep-relief', 'deep-hs', 'deep-iceanim', 'deep-rivers', 'deep-prov', 'deep-prov-line', 'deep-rocks', 'deep-sand', 'deep-flows', 'deep-lake', 'deep-ice-sheet', 'deep-icelines', 'deep-ice-older', 'deep-ice-limit', 'deep-canal'];
 // "How it works" explainers for each chapter, region, close-up stop and card that leans on an idea
 const HOW = {
   's-mountains': ['fold', 'ridges'], 's-rift': ['rift', 'ridges'], 's-coast': ['coastal', 'aquifer'], 's-ice': ['icesheet', 'moraine'], 's-lake': ['glaciallake', 'erratic'], 's-iron': ['bogiron'],
@@ -46,7 +46,7 @@ export function initDeep(ctx) {
 
   async function load() {
     if (data) return;
-    const names = ['rocks', 'flows', 'ice', 'lakes', 'canal', 'sand', 'provinces', 'icelines'];
+    const names = ['rocks', 'flows', 'ice', 'lakes', 'canal', 'sand', 'provinces', 'icelines', 'iceanim'];
     const got = await Promise.all(names.map((f) => fetch(`data/deep/${f}.json`).then((r) => r.json())));
     data = Object.fromEntries(names.map((n, i) => [n, got[i]]));
   }
@@ -62,17 +62,28 @@ export function initDeep(ctx) {
     map.addSource('deep-ice', { type: 'geojson', data: data.ice });
     map.addSource('deep-icelines', { type: 'geojson', data: data.icelines });
     map.addSource('deep-lakes', { type: 'geojson', data: data.lakes });
+    map.addSource('deep-iceanim', { type: 'geojson', data: data.iceanim });
     map.addSource('deep-sand', { type: 'geojson', data: data.sand });
     map.addSource('deep-canal', { type: 'geojson', data: data.canal, attribution: 'Canal: © OpenStreetMap contributors' });
     const T = { duration: ctx.dur(900), delay: 0 };
-    map.addLayer({ id: 'deep-hs', type: 'hillshade', source: 'deep-dem-hs', paint: { 'hillshade-exaggeration': 0.6, 'hillshade-shadow-color': '#3f4a44', 'hillshade-highlight-color': '#ffffff' } });
+    // the land coloured by height (green lowlands, tan hills, brown mountains), shading from several directions on top of the region
+    // colours, and rivers drawn stronger: valleys, ridges and rivers read at a glance
+    map.addLayer({ id: 'deep-relief', type: 'color-relief', source: 'deep-dem-hs', paint: { 'color-relief-opacity': 0.6,
+      'color-relief-color': ['interpolate', ['linear'], ['elevation'], -5, 'rgba(0,0,0,0)', 0, '#cfdcbc', 40, '#d9e0bd', 120, '#e6ddb3', 250, '#dcc597', 450, '#c8a67c', 750, '#a98567', 1100, '#8f7461', 1600, '#a59a91'] } });
     map.addLayer({ id: 'deep-prov', type: 'fill', source: 'deep-prov', paint: { 'fill-color': ['match', ['get', 'region'], ...Object.entries(REGION_COLOR).flat(), '#999'], 'fill-opacity': 0, 'fill-opacity-transition': T } });
     map.addLayer({ id: 'deep-prov-line', type: 'line', source: 'deep-prov', paint: { 'line-color': ['match', ['get', 'region'], ...Object.entries(REGION_COLOR).flat(), '#999'], 'line-width': 1.4, 'line-opacity': 0, 'line-opacity-transition': T } });
+    map.addLayer({ id: 'deep-hs', type: 'hillshade', source: 'deep-dem-hs', paint: { 'hillshade-method': 'multidirectional',
+      'hillshade-illumination-direction': [270, 315, 0, 45], 'hillshade-illumination-altitude': [30, 30, 30, 30],
+      'hillshade-highlight-color': ['rgba(255,255,255,0.35)', 'rgba(255,255,255,0.35)', 'rgba(255,255,255,0.35)', 'rgba(255,255,255,0.35)'],
+      'hillshade-shadow-color': ['rgba(40,36,30,0.55)', 'rgba(40,36,30,0.45)', 'rgba(40,36,30,0.35)', 'rgba(40,36,30,0.3)'], 'hillshade-exaggeration': 0.9 } });
+    map.addLayer({ id: 'deep-rivers', type: 'line', source: 'omt', 'source-layer': 'waterway', filter: ['==', ['get', 'class'], 'river'],
+      paint: { 'line-color': '#3b7fc0', 'line-opacity': 0.9, 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.8, 8, 1.8, 11, 3.2] } });
     map.addLayer({ id: 'deep-rocks', type: 'fill', source: 'deep-rocks', paint: { 'fill-color': ['match', ['get', 'era'], ...Object.entries(ERA_FILL).flat(), '#999'], 'fill-opacity': 0, 'fill-opacity-transition': T } });
     map.addLayer({ id: 'deep-sand', type: 'fill', source: 'deep-sand', paint: { 'fill-color': ['match', ['get', 'unit'], 'cohansey', '#e6c86e', '#c9b48c'], 'fill-opacity': 0, 'fill-opacity-transition': T } });
     map.addLayer({ id: 'deep-flows', type: 'fill', source: 'deep-flows', paint: { 'fill-color': ['match', ['get', 'flow'], 1, '#b0412e', 2, '#c96a2b', '#d99a2b'], 'fill-opacity': 0, 'fill-opacity-transition': T } });
     map.addLayer({ id: 'deep-lake', type: 'fill', source: 'deep-lakes', paint: { 'fill-color': '#3f86c9', 'fill-opacity': 0, 'fill-opacity-transition': T }, filter: ['==', ['get', 'stage'], 'moggy'] });
     map.addLayer({ id: 'deep-ice-sheet', type: 'fill', source: 'deep-ice', filter: ['==', ['get', 'kind'], 'sheet'], paint: { 'fill-color': '#eef6fb', 'fill-opacity': 0, 'fill-opacity-transition': { duration: ctx.dur(1600), delay: 0 } } });
+    map.addLayer({ id: 'deep-iceanim', type: 'fill', source: 'deep-iceanim', filter: ['==', ['get', 'f'], -1], paint: { 'fill-color': '#f4f9fd', 'fill-opacity': 0.92, 'fill-outline-color': '#8fb9d9' } });
     map.addLayer({ id: 'deep-icelines', type: 'line', source: 'deep-icelines', paint: { 'line-color': '#4f86b5', 'line-width': 1.3, 'line-opacity': 0, 'line-opacity-transition': T } });
     map.addLayer({ id: 'deep-ice-older', type: 'line', source: 'deep-ice', filter: ['==', ['get', 'kind'], 'older'], paint: { 'line-color': '#7aa6c8', 'line-width': 1.2, 'line-dasharray': [2, 2], 'line-opacity': 0, 'line-opacity-transition': T } });
     map.addLayer({ id: 'deep-ice-limit', type: 'line', source: 'deep-ice', filter: ['==', ['get', 'kind'], 'limit'], paint: { 'line-color': '#2b6aa3', 'line-width': 3, 'line-opacity': 0, 'line-opacity-transition': T } });
@@ -84,7 +95,8 @@ export function initDeep(ctx) {
   /** What the map shows. sc: { prov: {region: opacity}, provFaint, rocks, flows ('anim' or opacity), sand, iceSheet, iceLimit, iceLines,
    * iceOlder, lake ('moggy'|'notch'), canal, pins: [card ids], labels: [region ids] } */
   function applyScene(sc) {
-    for (const t of timers) clearTimeout(t); timers = [];
+    for (const t of timers) clearTimeout(t); timers = []; caption('');
+    if (map.getLayer('deep-iceanim')) map.setFilter('deep-iceanim', ['==', ['get', 'f'], -1]);
     const prov = sc.prov || {}, faint = sc.provFaint ?? 0;
     const pm = ['match', ['get', 'region'], ...Object.entries(prov).flat(), faint];
     op('deep-prov', 'fill-opacity', Object.keys(prov).length || faint ? pm : 0);
@@ -103,6 +115,35 @@ export function initDeep(ctx) {
     op('deep-canal', 'line-opacity', sc.canal ?? 0);
     drawPins(sc.pins || [], sc.labels || Object.keys(prov).filter((k) => prov[k] >= 0.3));
   }
+  // ---- the ice age, played on the map -----------------------------------------------------------------------------------------
+  let capEl = null;
+  function caption(text) {
+    if (!capEl) { capEl = document.createElement('div'); capEl.id = 'deepcap'; document.body.appendChild(capEl); }
+    capEl.textContent = text; capEl.hidden = !text || ctx.mode !== 'deep';
+    if (text) { const t = bar && !bar.hidden ? bar.getBoundingClientRect().bottom + 8 : 12; capEl.style.top = `${t}px`; }
+  }
+  /** The ice spreads south to the moraine, stands there, then melts back; Glacial Lake Passaic fills behind it, drops, and drains.
+   * The ice edge is drawn as a line sweeping south, a simplification of its real, lobed edge. */
+  function playIce() {
+    applyScene({ flows: 0.4 });
+    terrain(false); after(() => fly([-74.62, 40.92], 7.7, 0, 1200));
+    const N = 14, frame = (k) => map.setFilter('deep-iceanim', ['==', ['get', 'f'], k]);
+    const steps = [];
+    steps.push([300, () => caption('About 25,000 years ago: the ice sheet creeps south over New Jersey (its edge drawn straight here; the real one was lobed)')]);
+    for (let k = 1; k <= N; k++) steps.push([420, () => frame(k)]);
+    steps.push([600, () => { op('deep-ice-limit', 'line-opacity', 1); caption('About 20,000 years ago: it stops here, and dumps the moraine along its edge (dark blue)'); }]);
+    steps.push([2600, () => caption('It starts to melt back. Meltwater is trapped behind the Watchung ridges and the moraine...')]);
+    for (let k = N - 1; k >= 6; k--) steps.push([450, () => frame(k)]);
+    steps.push([300, () => { map.setFilter('deep-lake', ['==', ['get', 'stage'], 'moggy']); op('deep-lake', 'fill-opacity', 0.75); caption('Glacial Lake Passaic, up to about 300 ft deep, held in by the ice to the north'); }]);
+    steps.push([3000, () => { frame(4); caption('The ice uncovers a lower gap at Great Notch: the lake drops about 34 ft'); }]);
+    steps.push([400, () => map.setFilter('deep-lake', ['==', ['get', 'stage'], 'notch'])]);
+    steps.push([2600, () => { frame(2); }]);
+    steps.push([500, () => { frame(-1); caption('The ice is gone. The lake drains away through Paterson, and its floor becomes the Great Swamp and the meadows'); }]);
+    steps.push([1800, () => op('deep-lake', 'fill-opacity', 0)]);
+    steps.push([4200, () => caption('')]);
+    let t = 0; for (const [dt, f] of steps) { t += ctx.dur(dt) || dt * 0.05; timers.push(setTimeout(() => { if (ctx.mode === 'deep') f(); }, t)); }
+  }
+
   /** A close-up stop's scene. */
   function stopScene(id) {
     const rocks = { highlands: ['match', ['get', 'era'], 'grenville', 0.75, 0.12], paleo: ['match', ['get', 'era'], 'paleozoic', 0.75, 'grenville', 0.3, 0.1],
@@ -221,6 +262,7 @@ export function initDeep(ctx) {
       <p class="dp-kick">Chapter ${i + 1} of ${STORY.length}</p><h2>${esc(S.title)}</h2>
       ${paras(S.text)}
       ${L ? `<button class="dp-region" data-d="landone" data-id="${L.id}"><i style="background:${L.color}"></i><span><b>${esc(L.name)} today</b><small>${esc(L.nj)}</small></span></button>` : ''}
+      ${S.id === 's-ice' || S.id === 's-lake' ? '<button class="dp-play" data-d="playice"><b>▶ Play the ice age on the map</b><small>the ice spreads, stops, melts back; the lake fills and drains</small></button>' : ''}
       ${howRow(S.id)}
       ${S.close.length ? `<h4>See it up close</h4>${chips(S.close)}` : ''}
       ${i < STORY.length - 1 ? `<button class="dp-start" data-d="next"><b>Next: ${esc(STORY[i + 1].title)}</b><small>${esc(STORY[i + 1].when)}</small></button>` : `<button class="dp-start" data-d="intro"><b>The end, for now</b><small>back to Deep Jersey: the land today and the close-ups</small></button>`}
@@ -263,6 +305,7 @@ export function initDeep(ctx) {
     frame(`${top(cor.name, 'intro', 'Deep Jersey')}
       <p class="dp-kick">${esc(E.when)} · stop ${era + 1} of ${ERAS.length}</p><h2>${esc(E.title)}</h2><p class="dp-line">${esc(E.line)}</p>
       <div class="dp-cards">${cards.map((c) => `<button class="dp-card${s.includes(c.id) ? ' seen' : ''}" data-d="card" data-id="${c.id}"><i style="background:${KIND_COLOR[c.kind]}"></i><span><b>${esc(c.title)}</b><small>${esc(c.when)}</small></span></button>`).join('')}</div>
+      ${['ice', 'moggy', 'notch'].includes(E.id) ? '<button class="dp-play" data-d="playice"><b>▶ Play the ice age on the map</b><small>the ice spreads, stops, melts back; the lake fills and drains</small></button>' : ''}
       ${howRow(E.id)}
       <p class="tn-hint">Step through time with the arrows at the top: newer on the left, older on the right.</p>
       <h4>Follow a thread</h4>
@@ -386,6 +429,7 @@ export function initDeep(ctx) {
     back: () => (ret ? ret() : intro()),
     card: (b) => openCard(b.dataset.id),
     how: (b) => how(b.dataset.id),
+    playice: () => playIce(),
     howstep: (b) => how(b.dataset.id, +b.dataset.s),
     howback: () => (howBack ? howBack() : intro()),
     orderpick: orderPick, whypick: whyPick,
@@ -405,7 +449,7 @@ export function initDeep(ctx) {
       go();
     },
     leave() {
-      for (const t of timers) clearTimeout(t); timers = [];
+      for (const t of timers) clearTimeout(t); timers = []; caption('');
       document.body.classList.remove('deep-on');
       if (root) root.hidden = true; if (bar) bar.hidden = true;
       map.stop(); map.setTerrain(null); terrainOn = false; hideLayers();

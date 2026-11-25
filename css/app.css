@@ -4208,3 +4208,8 @@ body.deep-on #tabs, body.deep-on #fabs, body.deep-on #lookFab, body.deep-on #she
 .dp-arrow { width: 46px; height: 46px; border-radius: 14px; }
 .dp-dots { margin-top: 2px; }
 body.deep-on #edges { display: none !important; }   /* the shading outside New Jersey's frame: Deep Jersey goes well past it */
+/* Deep Jersey: the ice age on the map */
+.dp-play { display: grid; gap: 2px; width: 100%; margin: 6px 0; border: 0; border-radius: 14px; padding: 12px 14px; text-align: left; background: #2f6fa8; color: #fff; font: inherit; cursor: pointer; }
+.dp-play b { font-size: 15.5px; } .dp-play small { opacity: 0.85; font-size: 12.5px; }
+#deepcap { position: fixed; z-index: 31; left: 12px; right: 12px; max-width: 520px; margin: 0 auto; padding: 9px 12px; border-radius: 12px; background: rgba(23, 50, 80, 0.86); color: #fff; font: 600 14px/1.35 system-ui, sans-serif; text-align: center; pointer-events: none; }
+#deepcap[hidden] { display: none; }

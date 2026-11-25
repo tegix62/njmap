@@ -787,6 +787,11 @@ handle on top makes the panel tall, and it remembers), and the map has no fence 
   Lenape, iron, canals and glass, and what is left. Each chapter links to its region today and to close-up stories.
 - **The land today**: New Jersey's four natural regions and the two next door (the Poconos and Catskills plateau, the Piedmont
   Upland), each shown whole when tapped, with where it is in New Jersey, what it is made of and how far it runs.
+- **Relief that reads**: the land coloured by height (green lowlands, tan hills, brown mountains) with shading from several directions
+  over the region colours, and rivers drawn stronger, so valleys, ridges and rivers stand out.
+- **Play the ice age on the map** (the ice and lake chapters, and the ice stops in the close-up): the ice sheet creeps south over New
+  Jersey to the moraine, stands there, melts back; Glacial Lake Passaic fills behind the ridges, drops at Great Notch and drains, with a
+  caption for each step. The ice edge is drawn sweeping south as a straight line (the real edge was lobed); the caption says so.
 - **How it works**: short illustrated explainers for the ideas the story leans on, each a side-on slice through the ground in two to
   four steps (what is new slides in), with a sentence or two each and its sources: what an ice sheet is (and how it differs from an ice
   shelf), how the ice leaves a moraine, how the ice made a lake, how a boulder ends up on a hilltop, how a rift valley opens (lava flow

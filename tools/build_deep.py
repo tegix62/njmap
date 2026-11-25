@@ -144,6 +144,21 @@ def provinces():
     dump('provinces.json', feats)
 
 
+def ice_anim():
+    """Frames for the ice age played on the map: the New Jersey ice sheet (ice.json) cut off north of a line that sweeps south, from
+    the state's top edge to the moraine. A simplification (the real ice edge was lobed, not straight); the app says so."""
+    d = json.load(open(os.path.join(OUT, 'ice.json')))
+    sheet = shape([f for f in d['features'] if f['properties']['kind'] == 'sheet'][0]['geometry'])
+    top, low, n = 41.40, 40.45, 14
+    feats = []
+    for k in range(n + 1):
+        lat = top - (top - low) * k / n
+        g = sheet.intersection(box(-76, lat, -73, 42))
+        if g.is_empty: continue
+        feats.append({'type': 'Feature', 'properties': {'f': k, 'lat': round(lat, 3)}, 'geometry': mapping(rnd(g.simplify(0.002), 3))})
+    dump('iceanim.json', feats)
+
+
 def ice_region():
     """Every 'outer limit of glacial advance' line on the USGS NK-18 sheet (40-44 N, 72-78 W): the ice edges across New York,
     Pennsylvania and Long Island too, this and older advances."""
@@ -286,7 +301,7 @@ def canal():
 
 if __name__ == '__main__':
     import urllib.parse
-    what = sys.argv[1:] or ['rocks', 'ice', 'lakes', 'canal', 'sand', 'provinces', 'icelines']
+    what = sys.argv[1:] or ['rocks', 'ice', 'lakes', 'canal', 'sand', 'provinces', 'icelines', 'iceanim']
     fw = il = None
     if 'rocks' in what or 'lakes' in what: fw = rocks()
     if 'ice' in what or 'lakes' in what: il = ice()
@@ -295,3 +310,4 @@ if __name__ == '__main__':
     if 'sand' in what: sand()
     if 'provinces' in what: provinces()
     if 'icelines' in what: ice_region()
+    if 'iceanim' in what: ice_anim()
