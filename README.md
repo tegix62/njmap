@@ -773,3 +773,31 @@ One tree from seed to old age and death, as a fast time-lapse with the seasons t
 - The wave-2 tells and lines were written from field-guide features. Their check against Wikipedia (as was done for wave 1) is still running, because Wikipedia was rate-limiting.
 - Check: `tools/checks/ui-trees-waves.cjs`.
 - **Wave 3, "Into the woods"** (opens once wave 2 is known): black gum, chestnut oak, black birch, American hornbeam, American persimmon, sweetbay magnolia, basswood and black oak. Each has 6 or 7 photos checked by eye, 80+ pool photos with 40 winter, fall and summer photos (fewer for sweetbay and black birch), bark picks (black birch 15, chestnut oak 13, hornbeam 13, persimmon 11, black gum 10, black oak 9, basswood 6, sweetbay 1), group tells, bark and fall lines, and identifying lines. Chestnut oak goes with the oaks, but the key finds it under "no lobes", where its leaf puts it. Only sweetbay has a traced leaf; the other cut-outs leaked into the background. Check: `tools/checks/ui-trees-wave3.cjs`.
+
+## Deep Jersey (first slice, 2026-11-25)
+
+How New Jersey got here, told on the map. From the home page, **Deep Jersey**. This first slice is the Boonton and Rockaway valley.
+
+- **The time slider** at the top runs from today back past a billion years, in ten stops: what is left today, the canal years, the
+  forges, Lenapehoking, the lake dropping, glacial Lake Passaic, the ice sheet, Pangaea tearing apart, old seas and mountains, and the
+  Highlands rock. Each stop changes the map: rock eras, the three Watchung lava flows flooding in one after another, the ice sheet and its
+  edge, the lake at its two highest stages, the canal stretches that survive. The camera pulls out as time goes back (town, region,
+  state), over real 3D terrain.
+- **Story cards** for each stop (18 so far), pinned on the map, each with its sources listed.
+- **The iron chain**: rock → resource → industry → town → decline → what is left, one card per step.
+- **Put it in order** (five events, oldest first) and **Why is it here?** (pick the reason a place grew).
+
+Data (`tools/build_deep.py` writes `data/deep/`; source files are downloaded to `$DEEP_SRC`):
+
+| Layer | Source |
+| --- | --- |
+| Rock eras, lava flows | USGS State Geologic Map Compilation, New Jersey (from the NJ Geological Survey's 1:250,000 bedrock map), units grouped into six eras |
+| Ice limit, older limits | USGS I-1420 (NK-18), Quaternary Geologic Map of the Hudson River quadrangle: "outer limit of glacial advance" lines |
+| Glacial Lake Passaic | Ground height (AWS Terrain Tiles, z12) below the spillway altitudes in USGS I-2540-C (Moggy Hollow stage 103 m, Great Notch stage 93 m), inside First Watchung Mountain and south of the ice. Approximate. |
+| Morris Canal | OpenStreetMap ways named Morris Canal (© OpenStreetMap contributors, ODbL) |
+
+The cards (`js/deepcards.js`) come from those USGS reports and the Wikipedia articles they list, opened in November 2026. Where the sources
+disagree the card says so: Wikipedia says the lake fell about 80 ft at the Great Notch stage, while the USGS spillway heights give 34 ft,
+and the card uses the USGS figure. Uncertain Lenape meanings (Rockaway, Hopatcong) are given as uncertain.
+
+To add a corridor: add its eras or reuse these, write its cards with sources, and extend `tools/build_deep.py` for any new layer.

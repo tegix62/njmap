@@ -23,8 +23,9 @@ import { initProgress } from './progress.js';
 import { initCouncil } from './goblin/ui/council.js';
 import { askHome } from './goblin/ui/home.js';
 import { initTrees } from './trees.js';
+import { initDeep } from './deep.js';
 // entries from the home page that are their own mode on the New Jersey map (not one of the tabs)
-const SIDE_MODES = ['goblin', 'trees'];
+const SIDE_MODES = ['goblin', 'trees', 'deep'];
 
 /** Map filter for one road, by the label people use ("I-287", "Columbia Turnpike"). */
 const roadFilter = (label) => (label ? ['==', LABEL_EXPR, label] : ['==', ['get', 'ref'], '__none__']);
@@ -612,6 +613,7 @@ async function main() {
     progress: initProgress(ctx),
     goblin: initCouncil(ctx),
     trees: initTrees(ctx),
+    deep: initDeep(ctx),
   };
   ctx.modes = modes;
 

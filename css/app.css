@@ -4091,3 +4091,52 @@ span.jc-leaf { width: 9px; height: 9px; border-radius: 50%; background: #3f9b62;
 .tn-wavebar { height: 8px; border-radius: 99px; background: #e4eae0; overflow: hidden; }
 .tn-wavebar i { display: block; height: 100%; background: linear-gradient(90deg, #2f8f5b, #7cc28f); border-radius: 99px; transition: width .6s; }
 .tn-wavelist { display: grid; gap: 6px; margin: 12px 0; text-align: left; }
+/* Deep Jersey: a time bar over the map, the story sheet below it */
+body.deep-on #tabs, body.deep-on #fabs, body.deep-on #lookFab, body.deep-on #sheet, body.deep-on #hud { display: none !important; }
+#deepbar { position: fixed; z-index: 31; top: calc(env(safe-area-inset-top, 0px) + 10px); left: 12px; right: 12px; max-width: 560px; margin: 0 auto; padding: 10px 14px 8px;
+  border-radius: 18px; background: rgba(250, 247, 240, 0.94); color: #22201b; box-shadow: 0 6px 20px rgba(30, 25, 15, 0.18); font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; backdrop-filter: blur(6px); }
+#deepbar[hidden] { display: none; }
+#deepbar .dp-head { display: flex; flex-direction: column; gap: 1px; }
+#deepbar .dp-when { font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #8a5a2b; }
+#deepbar .dp-title { font-size: 17px; letter-spacing: -0.01em; }
+#deepbar input[type=range] { width: 100%; margin: 8px 0 2px; accent-color: #8a5a2b; height: 28px; }
+#deepbar .dp-ends { display: flex; justify-content: space-between; font-size: 11px; opacity: 0.6; }
+#deep { position: fixed; z-index: 30; left: 0; right: 0; bottom: 0; max-height: 46vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  background: #faf7f0; color: #22201b; border-radius: 22px 22px 0 0; box-shadow: 0 -6px 24px rgba(30, 25, 15, 0.2);
+  padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 20px); font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+#deep[hidden] { display: none; }
+#deep > * { max-width: 560px; margin-left: auto; margin-right: auto; }
+#deep .dp-top { display: flex; align-items: center; gap: 10px; min-height: 36px; margin-bottom: 4px; }
+#deep .dp-top h1 { margin: 0; font-size: 18px; letter-spacing: -0.01em; }
+#deep .tr-back { background: #ece5d6; }
+#deep h2 { margin: 2px 0 4px; font-size: 24px; letter-spacing: -0.02em; }
+#deep h4 { margin: 18px 2px 8px; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.55; }
+.dp-kick { margin: 6px 0 0; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #8a5a2b; }
+.dp-line { margin: 0 0 10px; font-size: 15.5px; line-height: 1.45; }
+.dp-p { margin: 0 0 10px; font-size: 15.5px; line-height: 1.5; }
+.dp-cards { display: grid; gap: 6px; }
+.dp-card { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; border-radius: 14px; padding: 10px 12px; text-align: left; background: #fff; color: inherit; font: inherit; cursor: pointer; box-shadow: 0 1px 3px rgba(30, 25, 15, 0.12); }
+.dp-card i { flex: none; width: 12px; height: 12px; border-radius: 50%; box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgba(0, 0, 0, 0.08); }
+.dp-card span { display: grid; } .dp-card small { opacity: 0.6; font-size: 12.5px; }
+.dp-card.seen b::after { content: ' ✓'; color: #2f8f5b; font-weight: 600; }
+.dp-nav { display: flex; gap: 8px; margin: 10px 0 0; }
+.dp-nav button { flex: 1; border: 0; border-radius: 12px; padding: 10px; background: #ece5d6; color: inherit; font: 600 14px system-ui, sans-serif; cursor: pointer; }
+.dp-nav button:disabled { opacity: 0.4; cursor: default; }
+.dp-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.dp-tags span { font-size: 12.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: #efe6d3; color: #6b4520; }
+.dp-src { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.5; } .dp-src a { color: #6b4520; }
+.dp-chain { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.dp-chain li { position: relative; padding-left: 0; }
+.dp-chain li + li::before { content: ''; display: block; width: 2px; height: 10px; margin-left: 27px; background: #c9b38f; }
+.dp-chain button { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; border-radius: 14px; padding: 10px 12px; text-align: left; background: #fff; color: inherit; font: inherit; cursor: pointer; box-shadow: 0 1px 3px rgba(30, 25, 15, 0.12); }
+.dp-chain button > span:last-child { display: grid; } .dp-chain small { opacity: 0.65; font-size: 13px; }
+.dp-step { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #8a5a2b; color: #fff; font-weight: 700; }
+.dp-got { margin: 0 0 10px; padding-left: 22px; display: grid; gap: 4px; } .dp-got small { display: block; opacity: 0.6; font-size: 12.5px; }
+.dp-pick { display: grid; gap: 6px; margin-bottom: 10px; }
+.dp-pick button { border: 0; border-radius: 14px; padding: 12px 14px; text-align: left; background: #fff; color: inherit; font: 600 15px system-ui, sans-serif; cursor: pointer; box-shadow: 0 1px 3px rgba(30, 25, 15, 0.12); }
+.dp-pick button:active, .dp-card:active, .dp-chain button:active { transform: scale(0.98); }
+#deeppins { position: fixed; inset: 0; z-index: 29; pointer-events: none; }
+#deeppins[hidden] { display: none; }
+#deeppins button { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; margin: -9px 0 0 -60px; width: 120px; border: 0; background: none; padding: 0; pointer-events: auto; cursor: pointer; font: 600 12.5px system-ui, sans-serif; color: #22201b; }
+#deeppins i { width: 18px; height: 18px; border-radius: 50%; background: var(--k); border: 3px solid #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); }
+#deeppins span { padding: 1px 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.88); text-align: center; line-height: 1.25; }
