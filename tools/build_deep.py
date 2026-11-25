@@ -12,6 +12,8 @@ Sources (all public):
          Great Notch stage 93 m. The lake is kept west of First Watchung Mountain (its basalt, from the rock map) and south of the ice
          (approximate). So the outline is approximate: today's valley floor sits on the lake's own sediment.
   sand   The Cohansey and Kirkwood formations (the Pine Barrens' sand and the aquifer's two layers), from the same USGS compilation.
+  provinces  The regions round New Jersey in full past the state line: USGS Physiographic Divisions (Fenneman and Johnson, 1946).
+  icelines   All the ice-limit lines on the NK-18 sheet, across New York, Pennsylvania and Long Island.
   canal  OpenStreetMap ways named "Morris Canal" (waterway canal / derelict / defunct): the stretches that survive. (c) OpenStreetMap
          contributors, ODbL.
 
@@ -112,6 +114,46 @@ def sand():
     dump('sand.json', feats)
 
 
+REGION_BOX = box(-81.0, 36.5, -69.5, 43.6)       # wide enough to see each belt run past New Jersey
+PROVINCES = [   # key, Fenneman (province, section) pairs, extra clip, name
+    ('highlands', [('NEW ENGLAND', 'NEW ENGLAND UPLAND')], box(-76.5, 40.0, -73.2, 41.95), 'The Highlands (Reading Prong)'),
+    ('valleyridge', [('VALLEY AND RIDGE', 'MIDDLE'), ('VALLEY AND RIDGE', 'HUDSON VALLEY')], None, 'Valley and Ridge'),
+    ('piedmont', [('PIEDMONT', 'PIEDMONT LOWLANDS')], None, 'Piedmont Lowlands: the rift basins'),
+    ('upland', [('PIEDMONT', 'PIEDMONT UPLAND')], None, 'Piedmont Upland'),
+    ('coastal', [('COASTAL PLAIN', 'EMBAYED')], None, 'Coastal Plain'),
+    ('plateau', [('APPALACHIAN PLATEAUS', 'SOUTHERN NEW YORK'), ('APPALACHIAN PLATEAUS', 'CATSKILL'), ('APPALACHIAN PLATEAUS', 'ALLEGHENY MOUNTAIN')], None, 'Appalachian Plateaus (Poconos, Catskills)'),
+]
+
+
+def provinces():
+    """The physiographic regions round New Jersey, each drawn in full past the state line: USGS Physiographic Divisions of the
+    Conterminous U.S. (Fenneman and Johnson, 1946; water.usgs.gov/GIS/dsdl/physio_shp.zip)."""
+    import geopandas as gpd
+    g = gpd.read_file(os.path.join(SRC, 'geo/physio/physio.shp')).to_crs(4326)
+    feats = []
+    for key, pairs, clip, name in PROVINCES:
+        sel = g[[(p, s) in pairs for p, s in zip(g.PROVINCE, g.SECTION)]]
+        geom = unary_union(list(sel.geometry)).intersection(REGION_BOX)
+        if clip is not None: geom = geom.intersection(clip)
+        geom = geom.simplify(0.008, preserve_topology=True)
+        geom = MultiPolygon([p for p in getattr(geom, 'geoms', [geom]) if p.geom_type == 'Polygon' and p.area > 2e-4])
+        # where to put its name: inside the part nearest New Jersey; and the box to fit when it is shown whole
+        near = geom.intersection(box(-75.9, 39.2, -73.4, 41.6))
+        lp = (near if not near.is_empty and near.area > 0.01 else geom).representative_point()
+        feats.append({'type': 'Feature', 'properties': {'region': key, 'name': name, 'lp': [round(lp.x, 3), round(lp.y, 3)], 'bbox': [round(v, 2) for v in geom.bounds]}, 'geometry': mapping(rnd(geom, 3))})
+    dump('provinces.json', feats)
+
+
+def ice_region():
+    """Every 'outer limit of glacial advance' line on the USGS NK-18 sheet (40-44 N, 72-78 W): the ice edges across New York,
+    Pennsylvania and Long Island too, this and older advances."""
+    import geopandas as gpd
+    g = gpd.read_file(os.path.join(SRC, 'geo/nk18/gla_lin.e00')).to_crs(4326)
+    lim = g[g.TYPE == 'OUTER LIMIT OF GLACIAL ADVANCE']
+    lines = [rnd(x.simplify(0.004), 3) for x in lim.geometry]
+    dump('icelines.json', [{'type': 'Feature', 'properties': {'last': i in WISCONSIN}, 'geometry': mapping(l)} for i, l in zip(lim.index, lines)])
+
+
 # ---- ice --------------------------------------------------------------------------------------------------------------------
 WISCONSIN = [101, 77, 100, 99, 76, 93, 92]     # gla_lin ids of the late Wisconsinan limit, east to west (checked on a plot; 67 is an inner line west of Morristown)
 
@@ -137,6 +179,10 @@ def ice():
     c = list(line.coords)
     ring = [(E, c[0][1])] + c + [(W, c[-1][1]), (W, N), (E, N)]
     sheet = Polygon(ring).buffer(0)
+    # only over New Jersey (outline from the state geology map): outside it these lines alone do not say where the ice stood
+    r = shapefile.Reader(os.path.join(SRC, 'geo/NJ/NJ_geol_poly.shp'))
+    nj = unary_union([shape(x.__geo_interface__).buffer(0.002) for x in r.shapes()]).buffer(-0.002).simplify(0.003)
+    sheet = sheet.intersection(nj)
     feats = [
         {'type': 'Feature', 'properties': {'kind': 'limit', 'name': 'Edge of the last ice sheet (terminal moraine)', 'age': 'about 25,000 to 20,000 years ago'}, 'geometry': mapping(rnd(line))},
         {'type': 'Feature', 'properties': {'kind': 'sheet'}, 'geometry': mapping(rnd(sheet, 3))},
@@ -240,10 +286,12 @@ def canal():
 
 if __name__ == '__main__':
     import urllib.parse
-    what = sys.argv[1:] or ['rocks', 'ice', 'lakes', 'canal', 'sand']
+    what = sys.argv[1:] or ['rocks', 'ice', 'lakes', 'canal', 'sand', 'provinces', 'icelines']
     fw = il = None
     if 'rocks' in what or 'lakes' in what: fw = rocks()
     if 'ice' in what or 'lakes' in what: il = ice()
     if 'lakes' in what: lakes(fw, il)
     if 'canal' in what: canal()
     if 'sand' in what: sand()
+    if 'provinces' in what: provinces()
+    if 'icelines' in what: ice_region()

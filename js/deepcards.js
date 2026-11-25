@@ -217,3 +217,78 @@ export const CORRIDORS = [
   { id: 'pine', name: 'The Pine Barrens', eras: PINE_ERAS, cards: PINE_CARDS, chain: PINE_CHAIN, chainName: 'The bog iron chain', end: '13 million years ago' },
 ];
 for (const c of PINE_CARDS) CARD[c.id] = c;
+
+// ================================================================================================================================
+// The big picture: the story from the oldest rock forward, at the scale of the whole region, and the land as it is today. Regions from
+// the USGS physiographic map (Fenneman and Johnson, 1946), drawn past the state line. Sources opened November 2026.
+Object.assign(SRC, {
+  physio: ['USGS Physiographic Divisions of the Conterminous U.S. (Fenneman and Johnson, 1946)', 'https://water.usgs.gov/GIS/metadata/usgswrd/XML/physio.xml'],
+  reading: ['Wikipedia: Reading Prong', W('Reading_Prong')],
+  grenville: ['Wikipedia: Grenville orogeny', W('Grenville_orogeny')],
+  taconic: ['Wikipedia: Taconic orogeny', W('Taconic_orogeny')],
+  allegh: ['Wikipedia: Alleghanian orogeny', W('Alleghanian_orogeny')],
+  ridge: ['Wikipedia: Ridge-and-Valley Appalachians', W('Ridge-and-Valley_Appalachians')],
+  kitt: ['Wikipedia: Kittatinny Mountain', W('Kittatinny_Mountain')],
+  gunks: ['Wikipedia: Shawangunk Ridge', W('Shawangunk_Ridge')],
+  bluemtn: ['Wikipedia: Blue Mountain (Pennsylvania)', W('Blue_Mountain_(Pennsylvania)')],
+  newark: ['Wikipedia: Newark Basin', W('Newark_Basin')],
+  palisades: ['Wikipedia: Palisades Sill', W('Palisades_Sill')],
+  atl: ['Wikipedia: Atlantic Plain', W('Atlantic_Plain')],
+  poconos: ['Wikipedia: Pocono Mountains', W('Pocono_Mountains')],
+  laurentide: ['Wikipedia: Laurentide ice sheet', W('Laurentide_ice_sheet')],
+  harbor: ['Wikipedia: Harbor Hill Moraine', W('Harbor_Hill_Moraine')],
+  lenapehoking: ['Wikipedia: Lenapehoking', W('Lenapehoking')],
+});
+
+/** The land today: the regions New Jersey shares with its neighbours, each shown whole. close: cards that show it up close. */
+export const LAND = [
+  { id: 'valleyridge', color: '#8f9a55', name: 'Valley and Ridge', nj: 'The far north-west: Kittatinny Mountain and the valleys either side',
+    text: ['Long, parallel ridges and valleys of folded rock, part of the Appalachian Mountains. The province runs from south-eastern New York through north-western New Jersey and Pennsylvania, south into Maryland, Virginia and Tennessee, as far as Georgia and Alabama.', 'Its first big ridge is one ridge with three names: the Shawangunk Ridge in New York, Kittatinny Mountain in New Jersey, and Blue Mountain in Pennsylvania, which runs on 150 miles from the Delaware Water Gap to Big Gap. High Point, on Kittatinny Mountain, is New Jersey’s highest place at 1,803 ft.', 'For walkers and horses heading west, these ridges were a barrier that was almost impossible to cross.'],
+    src: ['physio', 'ridge', 'kitt', 'gunks', 'bluemtn'], close: ['green-pond'] },
+  { id: 'highlands', color: '#c27a52', name: 'The Highlands (Reading Prong)', nj: 'A belt across the north, from the Delaware to the New York line',
+    text: ['Mountains of crystalline metamorphic rock, more than a billion years old: part of the Precambrian basement that shows through here and there in the Appalachians.', 'It runs from near Reading, Pennsylvania, where it is called South Mountain, across New Jersey and New York as the New York–New Jersey Highlands (the Hudson Highlands by the river), into Connecticut as the Housatonic Highlands.', 'Its rock holds iron ore, which built the iron towns, and also uranium, whose decay gives off radon, a known indoor hazard on the prong.'],
+    src: ['physio', 'reading', 'sgmc'], close: ['highlands', 'old-boonton', 'hibernia'] },
+  { id: 'piedmont', color: '#b9503c', name: 'Piedmont Lowlands: the rift basins', nj: 'The middle: Newark, Paterson, New Brunswick, Trenton',
+    text: ['Valleys that opened about 200 million years ago as Pangaea broke apart, filled with red sandstone and shale. New Jersey’s, the Newark Basin, reaches into south-eastern Pennsylvania and southern New York; it is one of a chain of rift basins down the East Coast.', 'Lava flooded the basin three times: the three Watchung ridges. Molten rock that cooled underground became the Palisades Sill, which runs through New Jersey and New York along the Hudson.'],
+    src: ['physio', 'newark', 'palisades', 'watchung'], close: ['watchungs', 'lake-passaic'] },
+  { id: 'coastal', color: '#d8c27a', name: 'Coastal Plain', nj: 'Everything south-east of a line from about Trenton to Perth Amboy',
+    text: ['Sand, clay and gravel laid down over the last hundred million years and more, tilting gently out under the sea. It is part of the flattest region in the country, the Atlantic Plain, which runs over 2,200 miles from Cape Cod to the Mexican border.', 'In New Jersey it holds the Pine Barrens, on the Cohansey sand, and the aquifer of very pure water beneath them.'],
+    src: ['physio', 'atl', 'sgmc'], close: ['cohansey', 'aquifer', 'batsto'] },
+  { id: 'upland', color: '#c9a37c', name: 'Piedmont Upland', nj: 'Barely in New Jersey: just touches the Delaware by Trenton',
+    text: ['Older, harder rock of rolling uplands. On the USGS map it starts at the Delaware by Trenton and runs south-west through Pennsylvania, Maryland and Virginia all the way to Alabama.'],
+    src: ['physio'], close: [] },
+  { id: 'plateau', color: '#8faa96', name: 'Appalachian Plateaus (Poconos, Catskills)', nj: 'Not in New Jersey: just across the Delaware',
+    text: ['High, flat-lying rock cut into hills by rivers. The Poconos, across the Delaware Water Gap, are not really a mountain range but a plateau of about 2,400 square miles, part of the Allegheny Plateau, edged by an escarpment.', 'Their name comes from the Munsee word Pokawachne, “creek between two hills”.'],
+    src: ['physio', 'poconos'], close: [] },
+];
+
+/** The story, from the oldest rock forward. scene: what the map shows. cam: [lon, lat, zoom]. */
+export const STORY = [
+  { id: 's-oldest', when: 'More than a billion years ago', title: 'The oldest rock',
+    text: ['The story starts deep underground, with the rock of the Highlands: gneiss and granite more than a billion years old, from the same era as the Grenville mountain-building, which built a belt of mountains from Labrador to Mexico while an earlier supercontinent came together.', 'Today that rock runs as a belt of hills from Reading, Pennsylvania, across northern New Jersey into New York and Connecticut. It holds New Jersey’s iron ore.'],
+    scene: { prov: { highlands: 0.8 }, provFaint: 0.06 }, cam: [-74.9, 40.95, 6.6], src: ['grenville', 'reading', 'sgmc', 'physio'], close: ['highlands'], land: 'highlands' },
+  { id: 's-mountains', when: 'About 450 to 260 million years ago', title: 'Mountains rise, twice',
+    text: ['Sand, mud and lime settle in shallow seas. Then continents collide. The Taconic mountain-building, which ended about 440 million years ago, raised a great chain from eastern Canada down the East Coast; as it wore away, its sediment spread across the Appalachians.', 'From about 325 to 260 million years ago Africa crashed into North America, forming the supercontinent Pangaea and folding the Appalachians into the long ridges and valleys you can see on the map, from Alabama to New Jersey and on into New York.'],
+    scene: { prov: { valleyridge: 0.8, plateau: 0.35 }, provFaint: 0.05 }, cam: [-77.2, 39.8, 5.4], src: ['taconic', 'allegh', 'ridge', 'physio'], close: ['green-pond'], land: 'valleyridge' },
+  { id: 's-rift', when: 'About 200 million years ago', title: 'Pangaea tears apart',
+    text: ['The supercontinent starts to split and the Atlantic begins to open. Long valleys crack open down the East Coast: rift basins, the red patches on the map. New Jersey’s, the Newark Basin, runs into Pennsylvania and New York.', 'Lava floods the Newark Basin three times, making the three Watchung ridges; molten rock squeezes between the layers and cools underground as the Palisades.'],
+    scene: { prov: { piedmont: 0.75 }, provFaint: 0.05, flows: 'anim' }, cam: [-75.6, 40.0, 6.1], src: ['newark', 'watchung', 'palisades', 'physio'], close: ['watchungs'], land: 'piedmont' },
+  { id: 's-coast', when: 'The last 100 million years', title: 'The coastal plain builds',
+    text: ['As the Atlantic widens, rivers and the sea lay down sand, clay and gravel along its edge, layer on layer. They make the Coastal Plain, part of the flattest land in the country, from Cape Cod to Mexico.', 'One of the youngest layers, the Cohansey sand of about 12 to 14 million years ago (yellow on the map), is the ground the Pine Barrens stand on.'],
+    scene: { prov: { coastal: 0.6 }, provFaint: 0.05, sand: 0.75 }, cam: [-75.4, 39.2, 5.8], src: ['atl', 'sgmc', 'physio'], close: ['cohansey'], land: 'coastal' },
+  { id: 's-ice', when: 'About 20,000 years ago', title: 'The ice sheet',
+    text: ['The Laurentide ice sheet, which covered most of Canada and much of the northern United States, reaches its last farthest point about 20,000 years ago. Its edge reaches New York City and Long Island, where the ridges of the moraines it dumped still run along the island.', 'In New Jersey it stops on a line from Perth Amboy past Morristown to Belvidere (the dark blue line). The thinner blue lines are the edges of this and older advances across New York and Pennsylvania.'],
+    scene: { iceSheet: 0.85, iceLimit: 1, iceLines: 0.8 }, cam: [-75.0, 41.1, 6.3], src: ['laurentide', 'harbor', 'i1420'], close: ['moraine', 'tripod'] },
+  { id: 's-lake', when: 'About 19,000 to 14,000 years ago', title: 'Glacial Lake Passaic',
+    text: ['As the ice melts back, its meltwater is trapped behind the Watchung ridges and the moraine: a lake up to about 300 ft deep, from Wayne to Liberty Corner.', 'When lower gaps open the lake drains away, and the Passaic River takes a new, roundabout route over the Great Falls. Its old floor is the Great Swamp and the meadows around it.'],
+    scene: { lake: 'moggy', flows: 0.45, iceLimit: 0.9 }, cam: [-74.45, 40.82, 9.1], src: ['passaic', 'i2540'], close: ['lake-passaic', 'great-notch', 'swamp'] },
+  { id: 's-people', when: 'From at least 10,000 years ago', title: 'The Lenape',
+    text: ['People follow the ice. The ancestors of the Lenape live here from at least 10,000 years ago, in a homeland called Lenapehoking, which stretched from western Connecticut to Delaware: the Delaware and lower Hudson valleys and all the land between them, New Jersey included.', 'Their names are still on the map: Parsippany, Hopatcong, Pompton, the Poconos. And their history goes on: from a reservation at Brotherton in 1758 to forced removals in 1801 and 1822, and Lenape communities today.'],
+    scene: { pins: ['lenape', 'names', 'brotherton'] }, cam: [-74.6, 40.3, 7.2], src: ['lenapehoking', 'pines', 'montville', 'indianmills', 'poconos'], close: ['lenape', 'names', 'brotherton', 'lenape-pines'] },
+  { id: 's-iron', when: '1700s and 1800s', title: 'Iron, canals and glass',
+    text: ['The rocks decide the industry. In the Highlands, iron ore from the billion-year-old rock, charcoal from the woods and water power make forges and iron towns; the Morris Canal carries coal across the hills to them.', 'In the Pine Barrens, iron comes from the bogs, where iron-rich groundwater seeps out, and the sand itself makes glass. Furnace villages grow deep in the woods.'],
+    scene: { canal: 0.95, pins: ['old-boonton', 'hibernia', 'canal', 'batsto', 'atsion', 'glass', 'allaire'] }, cam: [-74.55, 40.25, 7.3], src: ['boonton', 'canal', 'batsto', 'bog'], close: ['boonton', 'canal', 'bog-iron', 'batsto'] },
+  { id: 's-today', when: 'Today', title: 'What is left',
+    text: ['When iron from elsewhere became easier to get, the furnaces went cold. What is left: foundations in the woods, ghost towns, a village drowned under a reservoir, canal stretches, and a protected forest over an aquifer of very pure water.', 'Go closer: the close-ups follow the story step by step in two places, Boonton in the Highlands and the Pine Barrens.'],
+    scene: { canal: 0.8, pins: ['reservoir', 'swamp', 'harrisville', 'wharton-water'] }, cam: [-74.55, 40.25, 7.3], src: ['res', 'harris', 'pact', 'wsf'], close: ['reservoir', 'harrisville', 'protect', 'aquifer'] },
+];

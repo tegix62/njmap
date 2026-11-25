@@ -774,26 +774,27 @@ One tree from seed to old age and death, as a fast time-lapse with the seasons t
 - Check: `tools/checks/ui-trees-waves.cjs`.
 - **Wave 3, "Into the woods"** (opens once wave 2 is known): black gum, chestnut oak, black birch, American hornbeam, American persimmon, sweetbay magnolia, basswood and black oak. Each has 6 or 7 photos checked by eye, 80+ pool photos with 40 winter, fall and summer photos (fewer for sweetbay and black birch), bark picks (black birch 15, chestnut oak 13, hornbeam 13, persimmon 11, black gum 10, black oak 9, basswood 6, sweetbay 1), group tells, bark and fall lines, and identifying lines. Chestnut oak goes with the oaks, but the key finds it under "no lobes", where its leaf puts it. Only sweetbay has a traced leaf; the other cut-outs leaked into the background. Check: `tools/checks/ui-trees-wave3.cjs`.
 
-## Deep Jersey (first slice, 2026-11-25)
+## Deep Jersey (2026-11-25)
 
-How New Jersey got here, told on the map. From the home page, **Deep Jersey**. Two corridors so far, picked at the top of the sheet:
-**Boonton and the Rockaway** (ten stops, from today back past a billion years) and **the Pine Barrens** (five stops, from today back to
-the Miocene sand: bog iron and glass, Brotherton, Wharton's water, the blueberry, ghost towns, the 1978–79 protection, the Jersey Devil
-marked as legend).
+How the ground under New Jersey was made, and what people made of it. From the home page, **Deep Jersey**. It opens on a short
+explanation (no camera flying yet) and three ways in:
 
-- **The time bar** at the top (arrows to step newer or older, or tap a dot to jump) runs from today back past a billion years, in ten stops: what is left today, the canal years, the
-  forges, Lenapehoking, the lake dropping, glacial Lake Passaic, the ice sheet, Pangaea tearing apart, old seas and mountains, and the
-  Highlands rock. Each stop changes the map: rock eras, the three Watchung lava flows flooding in one after another, the ice sheet and its
-  edge, the lake at its two highest stages, the canal stretches that survive. The camera pulls out as time goes back (town, region,
-  state), over real 3D terrain.
-- **Story cards** for each stop (34 so far), pinned on the map, each with its sources listed.
-- **A chain per corridor** (the iron chain; the bog iron chain): rock → resource → industry → town → decline → what is left, one card per step.
-- **Put it in order** (five events, oldest first) and **Why is it here?** (pick the reason a place grew).
+- **The story** (start here): nine short chapters from the oldest rock forward, with Back and Next arrows at the top and a dot per
+  chapter. The rock chapters show each belt whole, past the state line: the Highlands from Reading, Pennsylvania, to Connecticut; the
+  Valley and Ridge sweeping down to Virginia and beyond; the rift basins from New York to Virginia; the Coastal Plain down the seaboard.
+  Then the ice sheet (its edge across New Jersey, and the ice-edge lines across New York and Pennsylvania), Glacial Lake Passaic, the
+  Lenape, iron, canals and glass, and what is left. Each chapter links to its region today and to close-up stories.
+- **The land today**: New Jersey's four natural regions and the two next door (the Poconos and Catskills plateau, the Piedmont
+  Upland), each shown whole when tapped, with where it is in New Jersey, what it is made of and how far it runs.
+- **Close-ups**: the same story step by step in one place, **Boonton and the Rockaway** (ten stops) and **the Pine Barrens** (five
+  stops): pinned story cards (34), a chain from rock to ruin for each, and two light games (put it in order; why is it here?).
 
 Data (`tools/build_deep.py` writes `data/deep/`; source files are downloaded to `$DEEP_SRC`):
 
 | Layer | Source |
 | --- | --- |
+| Regions, whole past the state line | USGS Physiographic Divisions of the Conterminous U.S. (Fenneman and Johnson, 1946) |
+| Ice-edge lines across the region | USGS I-1420 (NK-18), every "outer limit of glacial advance" line on the sheet |
 | Rock eras, lava flows | USGS State Geologic Map Compilation, New Jersey (from the NJ Geological Survey's 1:250,000 bedrock map), units grouped into six eras |
 | Ice limit, older limits | USGS I-1420 (NK-18), Quaternary Geologic Map of the Hudson River quadrangle: "outer limit of glacial advance" lines |
 | Glacial Lake Passaic | Ground height (AWS Terrain Tiles, z12) below the spillway altitudes in USGS I-2540-C (Moggy Hollow stage 103 m, Great Notch stage 93 m), inside First Watchung Mountain and south of the ice. Approximate. |

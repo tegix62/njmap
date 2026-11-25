@@ -4154,3 +4154,20 @@ body.deep-on #tabs, body.deep-on #fabs, body.deep-on #lookFab, body.deep-on #she
 .dp-dots button { width: 18px; height: 18px; border: 0; padding: 0; background: none; cursor: pointer; position: relative; }
 .dp-dots button::after { content: ''; position: absolute; inset: 6px; border-radius: 50%; background: #cfc3ab; }
 .dp-dots button.on::after { inset: 4px; background: #8a5a2b; }
+/* Deep Jersey: the way in, the story and the regions */
+.dp-lead { margin: 4px 0 8px; font-size: 19px; line-height: 1.35; font-weight: 650; letter-spacing: -0.01em; }
+.dp-start { display: grid; gap: 2px; width: 100%; margin: 12px 0 8px; border: 0; border-radius: 18px; padding: 16px 18px; text-align: left; color: #fff; font: inherit; cursor: pointer; background: linear-gradient(135deg, #a8703a, #6e4520); box-shadow: 0 8px 20px rgba(110, 69, 32, 0.28); }
+.dp-start b { font-size: 18px; } .dp-start small { opacity: 0.85; font-size: 13.5px; }
+.dp-start:active { transform: scale(0.98); }
+.dp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.dp-chips button { display: inline-flex; align-items: center; gap: 6px; border: 1.5px solid #e2d7c2; border-radius: 999px; padding: 7px 12px; background: #fff; color: inherit; font: 600 13.5px system-ui, sans-serif; cursor: pointer; }
+.dp-chips i { width: 10px; height: 10px; border-radius: 50%; }
+.dp-regions { display: grid; gap: 6px; }
+.dp-region { display: flex; align-items: center; gap: 12px; width: 100%; margin: 6px 0; border: 0; border-radius: 14px; padding: 11px 12px; text-align: left; background: #fff; color: inherit; font: inherit; cursor: pointer; box-shadow: 0 1px 3px rgba(30, 25, 15, 0.12); }
+.dp-regions .dp-region { margin: 0; }
+.dp-region i { flex: none; width: 26px; height: 26px; border-radius: 8px; }
+.dp-region span { display: grid; } .dp-region small { opacity: 0.65; font-size: 13px; }
+.dp-srcs { margin-top: 16px; font-size: 13px; } .dp-srcs summary { cursor: pointer; opacity: 0.65; font-weight: 600; }
+#deeppins .dp-rl { position: absolute; left: 0; top: 0; margin: -10px 0 0 -70px; width: 140px; text-align: center; pointer-events: auto; cursor: pointer;
+  font: 700 12px system-ui, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: #2a241b; text-shadow: 0 0 3px #fff, 0 0 6px #fff, 0 0 2px #fff; }
+#deeppins .dp-rl::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 2px; background: var(--k); vertical-align: 1px; }
