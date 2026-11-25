@@ -50,4 +50,10 @@ const { chromium } = require('playwright'); const fs = require('fs');
   await page.click('#deep [data-d=era]'); await page.click('#deep [data-d=chain]'); console.log('pine chain:', await page.locator('#deep .dp-top h1').innerText(), await page.locator('.dp-chain li').count());
   await page.click('#deep [data-d=era]'); await page.click('#deep [data-d=why]'); await page.locator('[data-d=whypick]').first().click(); await page.waitForTimeout(200);
   console.log('pine why:', await page.locator('#deep h2').innerText(), '->', await page.locator('#deep .tr-res b').innerText());
+  // Home from Deep Jersey: the home page must be on top and usable; picking New Jersey leaves Deep Jersey
+  await page.click('#deep [data-d=era]'); await page.click('#deep [data-d=home]'); await page.waitForTimeout(500);
+  const homeOk = await page.evaluate(() => { const w = document.getElementById('welcome'); return !w.hidden && document.getElementById('deep').hidden && document.getElementById('deepbar').hidden; });
+  console.log('home over deep:', homeOk); await page.screenshot({ path: `${out}/home.png` });
+  await page.click('#welcome [data-entry=deep]'); await page.waitForTimeout(800);
+  console.log('back in deep:', await page.evaluate(() => !document.getElementById('deep').hidden && !document.getElementById('deepbar').hidden));
   console.log('errors', errs.length); await b.close(); })();

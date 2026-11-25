@@ -210,7 +210,12 @@ export function initDeep(ctx) {
   }
 
   const actions = {
-    home: () => ctx.showHome(),
+    home: async () => {
+      // the home page opens under this sheet and the time bar: hide them while it is up, and come back if Deep Jersey is picked again
+      root.hidden = true; bar.hidden = true; if (pinEl) pinEl.hidden = true;
+      await ctx.showHome();
+      if (ctx.mode === 'deep') { root.hidden = false; bar.hidden = false; drawPins(); eraSheet(); }
+    },
     era: () => eraSheet(),
     newer: () => { showEra(Math.max(0, era - 1)); eraSheet(); },
     older: () => { showEra(Math.min(ERAS.length - 1, era + 1)); eraSheet(); },
