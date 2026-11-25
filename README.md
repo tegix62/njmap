@@ -776,15 +776,18 @@ One tree from seed to old age and death, as a fast time-lapse with the seasons t
 
 ## Deep Jersey (first slice, 2026-11-25)
 
-How New Jersey got here, told on the map. From the home page, **Deep Jersey**. This first slice is the Boonton and Rockaway valley.
+How New Jersey got here, told on the map. From the home page, **Deep Jersey**. Two corridors so far, picked at the top of the sheet:
+**Boonton and the Rockaway** (ten stops, from today back past a billion years) and **the Pine Barrens** (five stops, from today back to
+the Miocene sand: bog iron and glass, Brotherton, Wharton's water, the blueberry, ghost towns, the 1978–79 protection, the Jersey Devil
+marked as legend).
 
 - **The time slider** at the top runs from today back past a billion years, in ten stops: what is left today, the canal years, the
   forges, Lenapehoking, the lake dropping, glacial Lake Passaic, the ice sheet, Pangaea tearing apart, old seas and mountains, and the
   Highlands rock. Each stop changes the map: rock eras, the three Watchung lava flows flooding in one after another, the ice sheet and its
   edge, the lake at its two highest stages, the canal stretches that survive. The camera pulls out as time goes back (town, region,
   state), over real 3D terrain.
-- **Story cards** for each stop (18 so far), pinned on the map, each with its sources listed.
-- **The iron chain**: rock → resource → industry → town → decline → what is left, one card per step.
+- **Story cards** for each stop (34 so far), pinned on the map, each with its sources listed.
+- **A chain per corridor** (the iron chain; the bog iron chain): rock → resource → industry → town → decline → what is left, one card per step.
 - **Put it in order** (five events, oldest first) and **Why is it here?** (pick the reason a place grew).
 
 Data (`tools/build_deep.py` writes `data/deep/`; source files are downloaded to `$DEEP_SRC`):
@@ -795,6 +798,7 @@ Data (`tools/build_deep.py` writes `data/deep/`; source files are downloaded to 
 | Ice limit, older limits | USGS I-1420 (NK-18), Quaternary Geologic Map of the Hudson River quadrangle: "outer limit of glacial advance" lines |
 | Glacial Lake Passaic | Ground height (AWS Terrain Tiles, z12) below the spillway altitudes in USGS I-2540-C (Moggy Hollow stage 103 m, Great Notch stage 93 m), inside First Watchung Mountain and south of the ice. Approximate. |
 | Morris Canal | OpenStreetMap ways named Morris Canal (© OpenStreetMap contributors, ODbL) |
+| Pine Barrens sand | The Cohansey and Kirkwood formations from the same USGS compilation (the sand the forest stands on, and the aquifer's two layers) |
 
 The cards (`js/deepcards.js`) come from those USGS reports and the Wikipedia articles they list, opened in November 2026. Where the sources
 disagree the card says so: Wikipedia says the lake fell about 80 ft at the Great Notch stage, while the USGS spillway heights give 34 ft,

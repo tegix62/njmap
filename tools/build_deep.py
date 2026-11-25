@@ -11,6 +11,7 @@ Sources (all public):
          spillway altitude given in USGS I-2540-C (Surficial Geologic Map of Northern New Jersey, 2002): Moggy Hollow stage 103 m,
          Great Notch stage 93 m. The lake is kept west of First Watchung Mountain (its basalt, from the rock map) and south of the ice
          (approximate). So the outline is approximate: today's valley floor sits on the lake's own sediment.
+  sand   The Cohansey and Kirkwood formations (the Pine Barrens' sand and the aquifer's two layers), from the same USGS compilation.
   canal  OpenStreetMap ways named "Morris Canal" (waterway canal / derelict / defunct): the stretches that survive. (c) OpenStreetMap
          contributors, ODbL.
 
@@ -90,6 +91,25 @@ def rocks():
         ff.append({'type': 'Feature', 'properties': {'flow': n, 'name': nm}, 'geometry': mapping(rnd(g))})
     dump('flows.json', ff)
     return unary_union(flows[1])
+
+
+def sand():
+    """The Pine Barrens' sand: the Cohansey Formation (Middle Miocene) over the Kirkwood Formation, from the same USGS compilation."""
+    d = os.path.join(SRC, 'geo/NJ')
+    U = {r['unit_link']: r for r in csv.DictReader(open(os.path.join(d, 'NJ_units.csv'), encoding='latin-1'))}
+    r = shapefile.Reader(os.path.join(d, 'NJ_geol_poly.shp'))
+    parts = collections.defaultdict(list)
+    for sr in r.iterShapeRecords():
+        u = U.get(sr.record['UNIT_LINK'])
+        if not u: continue
+        k = 'cohansey' if u['unit_name'] == 'Cohansey Formation' else 'kirkwood' if 'Kirkwood' in u['unit_name'] else None
+        if k: parts[k].append(shape(sr.shape.__geo_interface__).buffer(0))
+    feats = []
+    for k, name, age in (('kirkwood', 'Kirkwood Formation: sand, silt and clay', 'early to middle Miocene'), ('cohansey', 'Cohansey Formation: the Pine Barrens sand', 'middle Miocene')):
+        g = unary_union(parts[k]).buffer(0.0008).buffer(-0.0008).simplify(0.0035, preserve_topology=True)
+        g = MultiPolygon([p for p in getattr(g, 'geoms', [g]) if p.area > 3e-5])          # drop the specks
+        feats.append({'type': 'Feature', 'properties': {'unit': k, 'name': name, 'age': age}, 'geometry': mapping(rnd(g))})
+    dump('sand.json', feats)
 
 
 # ---- ice --------------------------------------------------------------------------------------------------------------------
@@ -220,9 +240,10 @@ def canal():
 
 if __name__ == '__main__':
     import urllib.parse
-    what = sys.argv[1:] or ['rocks', 'ice', 'lakes', 'canal']
+    what = sys.argv[1:] or ['rocks', 'ice', 'lakes', 'canal', 'sand']
     fw = il = None
     if 'rocks' in what or 'lakes' in what: fw = rocks()
     if 'ice' in what or 'lakes' in what: il = ice()
     if 'lakes' in what: lakes(fw, il)
     if 'canal' in what: canal()
+    if 'sand' in what: sand()

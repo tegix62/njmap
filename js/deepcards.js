@@ -121,3 +121,99 @@ export const CHAIN = [
   { step: 'Decline', card: 'canal', line: 'The ironworks close in 1876; railroads take the canal’s trade' },
   { step: 'Remains', card: 'reservoir', line: 'Foundations in the Hollow; Old Boonton under the reservoir' },
 ];
+
+// ================================================================================================================================
+// Second corridor: the Pine Barrens. Sources opened November 2026.
+Object.assign(SRC, {
+  pines: ['Wikipedia: New Jersey Pine Barrens', W('New_Jersey_Pine_Barrens')],
+  batsto: ['Wikipedia: Batsto Village', W('Batsto_Village,_New_Jersey')],
+  atsion: ['Wikipedia: Atsion, New Jersey', W('Atsion,_New_Jersey')],
+  bog: ['Wikipedia: Bog iron', W('Bog_iron')],
+  harris: ['Wikipedia: Harrisville, New Jersey', W('Harrisville,_New_Jersey')],
+  indianmills: ['Wikipedia: Indian Mills, New Jersey', W('Indian_Mills,_New_Jersey')],
+  jwharton: ['Wikipedia: Joseph Wharton', W('Joseph_Wharton')],
+  wsf: ['Wikipedia: Wharton State Forest', W('Wharton_State_Forest')],
+  byrne: ['Wikipedia: Brendan T. Byrne State Forest', W('Brendan_T._Byrne_State_Forest')],
+  aquifer: ['Wikipedia: Kirkwood–Cohansey aquifer', W('Kirkwood%E2%80%93Cohansey_aquifer')],
+  glassboro: ['Wikipedia: Glassboro, New Jersey', W('Glassboro,_New_Jersey')],
+  allaire: ['Wikipedia: Allaire Village', W('Allaire_Village')],
+  devil: ['Wikipedia: Jersey Devil', W('Jersey_Devil')],
+  ongs: ['Wikipedia: Ong’s Hat, New Jersey', W('Ong%27s_Hat,_New_Jersey')],
+  pact: ['Wikipedia: Pinelands Protection Act', W('Pinelands_Protection_Act')],
+});
+Object.assign(WHY, { bog: 'Bog iron', glass: 'Glass sand', berries: 'Cranberries and blueberries', cedar: 'Wood and charcoal' });
+
+export const PINE_ERAS = [
+  { id: 'p-today', when: 'Today', title: 'The quiet forest', line: 'Over a million protected acres, ghost towns in the woods, and an aquifer of very pure water under the sand.', center: [-74.60, 39.75], zoom: 9.3, pitch: 50 },
+  { id: 'p-wharton', when: '1876–1954', title: 'Water and berries', line: 'A Philadelphia industrialist buys the forest for its water; cranberry and blueberry farms grow in the bogs.', center: [-74.62, 39.72], zoom: 9.2, pitch: 45 },
+  { id: 'p-iron', when: '1740s–1860s', title: 'Bog iron and glass', line: 'Iron dug from the streams, charcoal from the pines, sand for glass: furnace villages deep in the woods.', center: [-74.65, 39.70], zoom: 9.0, pitch: 45 },
+  { id: 'p-lenape', when: 'Before 1700 to 1822', title: 'The Lenape in the pines', line: 'Ten thousand years of Lenape life, then a reservation at Brotherton, then removal.', center: [-74.70, 39.75], zoom: 9.1, pitch: 40 },
+  { id: 'p-sand', when: 'About 12 to 14 million years ago', title: 'The sugar sand', line: 'Sand laid down by rivers and the sea in the Miocene: the Cohansey Formation, the ground the whole forest stands on.', center: [-74.65, 39.65], zoom: 7.9, pitch: 25 },
+];
+
+export const PINE_CARDS = [
+  { id: 'cohansey', era: 'p-sand', kind: 'rock', p: null, title: 'The Cohansey sand', when: 'middle Miocene, about 12 to 14 million years ago', year: -1.3e7,
+    text: ['The Pine Barrens stand on the Cohansey Formation: white to yellow quartz sand with some gravel and clay, laid down in a mix of river and sea settings. Locals call it sugar sand.', 'In places it is stained red or orange-brown by iron oxides, or cemented into blocks of ironstone. Below it lies the older Kirkwood Formation, with more silt and clay.', 'A clay bed in the Cohansey near Millville holds fossil leaves, mostly of Alangium, a tree that no longer grows in eastern North America.'],
+    src: ['sgmc', 'pines'] },
+  { id: 'bog-iron', era: 'p-iron', kind: 'iron', p: null, title: 'Iron from the bogs', when: '1765 to the mid-1800s', year: 1765, why: ['bog'],
+    text: ['Iron-bearing groundwater seeps out at springs and streams; meeting the air, the iron turns to rusty ferric compounds, helped along by iron bacteria. Over time it builds up as bog iron ore in the stream beds.', 'From 1765 bog ore was dug from the bogs, streams and waterways of the Pine Barrens and smelted with charcoal in about 35 furnaces. Their iron armed the Revolution, the War of 1812 and the Second Barbary War: Stephen Decatur sailed to Algiers with 24-pound cannons cast at Hanover Furnace in 1814.'],
+    src: ['bog', 'pines'] },
+  { id: 'batsto', era: 'p-iron', kind: 'iron', p: [-74.6478, 39.6417], title: 'Batsto', when: '1766 to 1867', year: 1766, why: ['bog', 'glass'],
+    text: ['Charles Read found bog ore in the streams, pine for charcoal and water power from the Batsto River, and by the end of 1766 had built the Batsto Iron Works. It made pots and kettles, and supplies for the Continental Army in the Revolution.', 'The Richards family ran it from 1784 for about 90 years. In the mid-1800s demand for its iron fell; Batsto turned to glass without lasting success, and went bankrupt.', 'Its name is said to come from the Swedish bastu, a bathing place; the first bathers were probably Lenape.'],
+    src: ['batsto', 'wsf'] },
+  { id: 'atsion', era: 'p-iron', kind: 'iron', p: [-74.7261, 39.7425], title: 'Atsion', when: '1765 to 1774', year: 1774, why: ['bog'],
+    text: ['Charles Read set up an iron forge at Atsion in 1765–66, fed with pig iron from his Batsto furnace downstream.', 'Short of money, he sold out in 1773 to three Philadelphia Quakers, who built Atsion its own furnace in 1774.'],
+    src: ['atsion'] },
+  { id: 'glass', era: 'p-iron', kind: 'iron', p: [-75.1114, 39.7001], title: 'Glass in the woods', when: '1779 onward', year: 1779, why: ['glass'],
+    text: ['The Pine Barrens’ sand suited glassmaking. Glassboro was founded in 1779 by Solomon Stanger as “Glass Works in the Woods”, and is named for the industry.', 'A glassworks opened at Port Elizabeth in 1799, and Weymouth and Alloway had small glass factories in the 1800s.'],
+    src: ['glassboro', 'pines'] },
+  { id: 'allaire', era: 'p-iron', kind: 'iron', p: [-74.1289, 40.1586], title: 'Allaire', when: '1822 to 1846', year: 1822, why: ['bog'],
+    text: ['A bog iron furnace on the north-east edge of the pines, renamed the Howell Works and bought in 1822 by James P. Allaire, who tried to make it a self-contained village.', 'The wood-burning furnace business collapsed in 1846 and the village closed. Its buildings survive as a historic village.'],
+    src: ['allaire'] },
+  { id: 'devil', era: 'p-iron', kind: 'legend', p: [-74.4292, 39.4919], title: 'The Jersey Devil (legend)', when: 'said to be 1735', year: 1735,
+    text: ['A legend, not history. The story says that in 1735 Mrs. Leeds of Leeds Point gave birth to her 13th child, cursed for the unlucky number, which turned into a monster and flew up the chimney into the Barrens.', 'It is usually described with hooves, leathery bat-like wings, a horse- or goat-like head and a forked tail, and a blood-curdling scream. The pines have other ghost stories too: the Black Dog, Captain Kidd’s ghost and the Blue Hole.'],
+    src: ['devil', 'pines'] },
+  { id: 'lenape-pines', era: 'p-lenape', kind: 'lenape', p: null, title: 'Ten thousand years', when: 'from about 10,000 years ago', year: -1.0e4, why: ['lenape'],
+    text: ['The ancestors of the Lenape lived in the Pine Barrens from about 10,000 years ago.', 'They burned the woods in spring and fall to clear underbrush and improve plants and hunting. The sandy soil never drew permanent farming, so the forest stayed.'],
+    src: ['pines'] },
+  { id: 'brotherton', era: 'p-lenape', kind: 'lenape', p: [-74.7444, 39.7939], title: 'Brotherton', when: '1758 to 1822', year: 1758, why: ['lenape'],
+    text: ['In 1758 a reservation for the Lenape was set up at Brotherton, now Indian Mills (also called Edgepillock). Colonists led by the Reverend John Brainerd moved about 200 people there by force. It was the only Indian reservation in New Jersey, and is often called the first in America.', 'In 1798 Munsee Lenape leaders, Bartholomew Calvin, Jason Skekit and 18 others, signed a refusal to leave “our fine place in Jersey”. In 1801 many families agreed to move to New Stockbridge, New York, to join the Oneidas; in 1822 the rest were forced out again, to Green Bay, Wisconsin.'],
+    src: ['indianmills', 'pines'] },
+  { id: 'wharton-water', era: 'p-wharton', kind: 'water', p: [-74.6478, 39.6417], title: 'Wharton’s water', when: '1876 to 1954', year: 1876, why: ['water'],
+    text: ['In 1876 the Philadelphia industrialist Joseph Wharton bought Batsto, and over the years about 150 square miles of the pines, for the pure water under them. He planned to send it to Philadelphia.', 'Opposition rose on both sides of the river, and in 1884 the New Jersey legislature passed a law banning the export of water from the state. Wharton farmed cranberries and cut timber instead.', 'In 1954 New Jersey bought the estate: Wharton State Forest, now the largest in the state park system.'],
+    src: ['jwharton', 'batsto', 'wsf'] },
+  { id: 'whitesbog', era: 'p-wharton', kind: 'water', p: null, title: 'The blueberry', when: 'Whitesbog, from the 1870s', year: 1875, why: ['berries'],
+    text: ['Whitesbog, a company town founded in the 1870s by Joseph J. White, became one of the largest cranberry and blueberry farms in the state.', 'The cultivated blueberry, a hybrid of the wild Vaccinium caesariense of the pines, was developed and sold from here by Elizabeth Coleman White and Frank Coville. The village is in Brendan T. Byrne State Forest.'],
+    src: ['byrne'] },
+  { id: 'harrisville', era: 'p-today', kind: 'iron', p: [-74.5219, 39.6614], title: 'Harrisville, a ghost town', when: '1760 to 1914', year: 1914, why: ['cedar'],
+    text: ['A sawmill by 1760 on the Oswego River; in 1795 a slitting mill, cutting iron from Martha Furnace upstream into strips for nails; about 1815 a paper mill. The Harris family bought it in 1855 and ran it as a company town, with a store, a post office and free houses for the mill workers.', 'In 1914 a fire destroyed the whole town. Only decayed ruins remain.'],
+    src: ['harris'] },
+  { id: 'ongs-hat', era: 'p-today', kind: 'legend', p: [-74.6208, 39.9108], title: 'Ong’s Hat', when: 'a ghost town and its name',
+    text: ['A ghost town with a famous name. The folk story: a dandy named Ong had his silk hat stomped at a dance, threw it in the air, and it caught high in a pine.', 'The likelier answer is plainer: it may first have been Ong’s Hut, a farmer’s overnight shelter. Ong was a common name among early settlers.'],
+    src: ['ongs'] },
+  { id: 'aquifer', era: 'p-today', kind: 'water', p: null, title: 'The water under the sand', when: 'today', year: 2024, why: ['water'],
+    text: ['Under the pines lies the Kirkwood–Cohansey aquifer, about 3,000 square miles, estimated at 17 trillion gallons, some of the purest water in the country.', 'The Cohansey sand on top soaks up rain; the siltier, clayey Kirkwood beneath holds it. Of about 44 inches of rain a year, some 17 to 20 inches sinks into the ground. It feeds the cedar swamps, the cranberry bogs and nearly 1,000 big wells.'],
+    src: ['aquifer', 'pines'] },
+  { id: 'fire', era: 'p-today', kind: 'rock', p: null, title: 'A forest made by fire', when: 'today',
+    text: ['The name “barrens” comes from the sandy, acidic, poor soil: settlers’ crops would not grow. Instead it holds orchids, carnivorous plants and the pygmy pitch pines of the Pine Plains.', 'Fire has shaped the forest since before people came, and some plants need frequent fires to reproduce.'],
+    src: ['pines'] },
+  { id: 'protect', era: 'p-today', kind: 'water', p: null, title: 'Saved from the jetport', when: '1978 and 1979', year: 1978,
+    text: ['In 1969 the Pine Barrens had about 15 people per square mile, against 1,000 in the lands around them, and there were plans for a jetport and a new city in the pines.', 'In 1978 Congress made the Pinelands the country’s first National Reserve, about 1.1 million acres. In 1979 Governor Brendan Byrne halted building there and the state passed the Pinelands Protection Act. UNESCO named it a biosphere reserve in 1983.'],
+    src: ['pines', 'pact'] },
+];
+
+export const PINE_CHAIN = [
+  { step: 'Rock', card: 'cohansey', line: 'The Cohansey sand, stained and cemented by iron in places' },
+  { step: 'Resource', card: 'bog-iron', line: 'Bog ore in the stream beds; pines for charcoal' },
+  { step: 'Industry', card: 'batsto', line: 'Batsto Iron Works, 1766; about 35 furnaces in the pines' },
+  { step: 'Town', card: 'batsto', line: 'Furnace villages: Batsto, Atsion, Allaire' },
+  { step: 'Decline', card: 'allaire', line: 'Demand falls in the mid-1800s; Allaire closes in 1846, Batsto goes bankrupt' },
+  { step: 'Remains', card: 'harrisville', line: 'Ghost towns and restored villages in a protected forest' },
+];
+
+/** The corridors: each with its own stops, cards and chain. */
+export const CORRIDORS = [
+  { id: 'boonton', name: 'Boonton and the Rockaway', eras: ERAS, cards: CARDS, chain: CHAIN, chainName: 'The iron chain', end: 'A billion years ago' },
+  { id: 'pine', name: 'The Pine Barrens', eras: PINE_ERAS, cards: PINE_CARDS, chain: PINE_CHAIN, chainName: 'The bog iron chain', end: '13 million years ago' },
+];
+for (const c of PINE_CARDS) CARD[c.id] = c;

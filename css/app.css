@@ -4140,3 +4140,6 @@ body.deep-on #tabs, body.deep-on #fabs, body.deep-on #lookFab, body.deep-on #she
 #deeppins button { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; margin: -9px 0 0 -60px; width: 120px; border: 0; background: none; padding: 0; pointer-events: auto; cursor: pointer; font: 600 12.5px system-ui, sans-serif; color: #22201b; }
 #deeppins i { width: 18px; height: 18px; border-radius: 50%; background: var(--k); border: 3px solid #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); }
 #deeppins span { padding: 1px 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.88); text-align: center; line-height: 1.25; }
+.dp-cors { display: flex; gap: 6px; margin: 2px 0 6px; overflow-x: auto; }
+.dp-cors button { flex: none; border: 1.5px solid #d9ccb2; border-radius: 999px; padding: 6px 12px; background: #fff; color: inherit; font: 600 13px system-ui, sans-serif; cursor: pointer; }
+.dp-cors button.on { background: #8a5a2b; border-color: #8a5a2b; color: #fff; }

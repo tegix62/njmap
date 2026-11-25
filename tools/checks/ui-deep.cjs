@@ -34,4 +34,20 @@ const { chromium } = require('playwright'); const fs = require('fs');
   console.log('order:', (await page.locator('#deep .tr-res').innerText().catch(() => 'no result')).split('\n')[0]); await page.screenshot({ path: `${out}/order.png` });
   await page.click('#deep [data-d=era]'); await page.click('#deep [data-d=why]'); await page.locator('[data-d=whypick]').first().click(); await page.waitForTimeout(300);
   console.log('why:', (await page.locator('#deep .tr-res b').innerText())); await page.screenshot({ path: `${out}/why.png` });
+  // the second corridor: the Pine Barrens
+  await page.click('#deep [data-d=era]'); await page.click('#deep [data-d=cor][data-id=pine]'); await page.waitForTimeout(2600);
+  const pn = await page.locator('#deepbar input').evaluate((e) => +e.max);
+  console.log('pine stops:', pn + 1, '| end label:', await page.locator('#deepbar .dp-ends span').last().innerText());
+  for (let i = 0; i <= pn; i++) {
+    await page.locator('#deepbar input').evaluate((e, v) => { e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); }, i); await page.waitForTimeout(2400);
+    const t = await page.locator('#deepbar .dp-title').innerText();
+    console.log(`pine ${i}: ${t} · ${await page.locator('#deep .dp-card').count()} cards · ${await page.locator('#deeppins button').count()} pins`);
+    await page.screenshot({ path: `${out}/pine-${i}-${t.replace(/\W+/g, '-').toLowerCase()}.png` });
+  }
+  await page.locator('#deepbar input').evaluate((e) => { e.value = 2; e.dispatchEvent(new Event('input', { bubbles: true })); }); await page.waitForTimeout(1200);
+  await page.locator('#deep .dp-card', { hasText: 'Batsto' }).click(); await page.waitForTimeout(1800);
+  console.log('pine card:', await page.locator('#deep h2').innerText()); await page.screenshot({ path: `${out}/pine-card.png` });
+  await page.click('#deep [data-d=era]'); await page.click('#deep [data-d=chain]'); console.log('pine chain:', await page.locator('#deep .dp-top h1').innerText(), await page.locator('.dp-chain li').count());
+  await page.click('#deep [data-d=era]'); await page.click('#deep [data-d=why]'); await page.locator('[data-d=whypick]').first().click(); await page.waitForTimeout(200);
+  console.log('pine why:', await page.locator('#deep h2').innerText(), '->', await page.locator('#deep .tr-res b').innerText());
   console.log('errors', errs.length); await b.close(); })();

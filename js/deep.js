@@ -3,28 +3,36 @@
 // glacial Lake Passaic, the Morris Canal) and pulls the camera out as time goes back (the deep-time zoom). Story cards for each stop,
 // the iron chain from rock to ruin, and two light games: put events in order, and why is this town here.
 // Data: data/deep/*.json (tools/build_deep.py, USGS and OpenStreetMap), the cards in js/deepcards.js (each with its sources).
-import { ERAS, ERA_INDEX, CARDS, CARD, CHAIN, SRC, WHY } from './deepcards.js';
+import { CORRIDORS, CARD, SRC, WHY } from './deepcards.js';
 import { juice } from './juice.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const shuffle = (a) => a.map((v) => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map((p) => p[1]);
 const rand = (a) => a[Math.floor(Math.random() * a.length)];
-const KIND_COLOR = { rock: '#9a5b3c', ice: '#3d7fbf', lenape: '#a2652a', iron: '#5b5f66', canal: '#2f7d6d', water: '#2f6fb0' };
+const KIND_COLOR = { rock: '#9a5b3c', ice: '#3d7fbf', lenape: '#a2652a', iron: '#5b5f66', canal: '#2f7d6d', water: '#2f6fb0', legend: '#7a4a8c' };
 const ERA_FILL = { grenville: '#c98f6a', paleozoic: '#a9b27a', newark: '#c4614b', basalt: '#4a3b3b', diabase: '#6b5b73', coastal: '#e3d29a' };
 const DEM = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
-const LAYERS = ['deep-hs', 'deep-rocks', 'deep-flows', 'deep-lake', 'deep-ice-sheet', 'deep-ice-older', 'deep-ice-limit', 'deep-canal'];
+const LAYERS = ['deep-hs', 'deep-rocks', 'deep-flows', 'deep-lake', 'deep-ice-sheet', 'deep-ice-older', 'deep-ice-limit', 'deep-canal', 'deep-sand'];
 
 export function initDeep(ctx) {
   const { map, store } = ctx;
   let root = null, bar = null, data = null, era = 0, timers = [], game = null;
+  // the corridor on show: its stops, cards and chain
+  let cor, ERAS, CARDS, CHAIN, ERA_INDEX;
+  function setCorridor(id) {
+    cor = CORRIDORS.find((c) => c.id === id) || CORRIDORS[0]; store.set('deep.corridor', cor.id);
+    ({ eras: ERAS, cards: CARDS, chain: CHAIN } = cor); ERA_INDEX = Object.fromEntries(ERAS.map((e, i) => [e.id, i]));
+    if (bar) { const inp = bar.querySelector('input'); inp.max = ERAS.length - 1; bar.querySelector('.dp-ends span:last-child').textContent = cor.end; }
+  }
+  setCorridor(store.get('deep.corridor', 'boonton'));
   const seen = () => store.get('deep.seen', []);
   const markSeen = (id) => { const s = seen(); if (!s.includes(id)) store.set('deep.seen', [...s, id]); };
 
   async function load() {
     if (data) return;
     const get = (f) => fetch(`data/deep/${f}.json`).then((r) => r.json());
-    const [rocks, flows, ice, lakes, canal] = await Promise.all(['rocks', 'flows', 'ice', 'lakes', 'canal'].map(get));
-    data = { rocks, flows, ice, lakes, canal };
+    const [rocks, flows, ice, lakes, canal, sand] = await Promise.all(['rocks', 'flows', 'ice', 'lakes', 'canal', 'sand'].map(get));
+    data = { rocks, flows, ice, lakes, canal, sand };
   }
 
   // ---- map layers -----------------------------------------------------------------------------------------------------------
@@ -36,6 +44,7 @@ export function initDeep(ctx) {
     map.addSource('deep-flows', { type: 'geojson', data: data.flows });
     map.addSource('deep-ice', { type: 'geojson', data: data.ice });
     map.addSource('deep-lakes', { type: 'geojson', data: data.lakes });
+    map.addSource('deep-sand', { type: 'geojson', data: data.sand });
     map.addSource('deep-canal', { type: 'geojson', data: data.canal, attribution: 'Canal: © OpenStreetMap contributors' });
     const T = { duration: ctx.dur(900), delay: 0 };
     map.addLayer({ id: 'deep-hs', type: 'hillshade', source: 'deep-dem-hs', paint: { 'hillshade-exaggeration': 0.6, 'hillshade-shadow-color': '#3f4a44', 'hillshade-highlight-color': '#ffffff' } });
@@ -45,6 +54,7 @@ export function initDeep(ctx) {
     map.addLayer({ id: 'deep-ice-sheet', type: 'fill', source: 'deep-ice', filter: ['==', ['get', 'kind'], 'sheet'], paint: { 'fill-color': '#eef6fb', 'fill-opacity': 0, 'fill-opacity-transition': { duration: ctx.dur(1600), delay: 0 } } });
     map.addLayer({ id: 'deep-ice-older', type: 'line', source: 'deep-ice', filter: ['==', ['get', 'kind'], 'older'], paint: { 'line-color': '#7aa6c8', 'line-width': 1.2, 'line-dasharray': [2, 2], 'line-opacity': 0, 'line-opacity-transition': T } });
     map.addLayer({ id: 'deep-ice-limit', type: 'line', source: 'deep-ice', filter: ['==', ['get', 'kind'], 'limit'], paint: { 'line-color': '#2b6aa3', 'line-width': 3, 'line-opacity': 0, 'line-opacity-transition': T } });
+    map.addLayer({ id: 'deep-sand', type: 'fill', source: 'deep-sand', paint: { 'fill-color': ['match', ['get', 'unit'], 'cohansey', '#e6c86e', '#c9b48c'], 'fill-opacity': 0, 'fill-opacity-transition': T } }, 'deep-flows');
     map.addLayer({ id: 'deep-canal', type: 'line', source: 'deep-canal', paint: { 'line-color': '#1f7a68', 'line-width': 3, 'line-opacity': 0, 'line-opacity-transition': T } });
   }
   // story pins: drawn as an overlay placed with map.project (map layers drop points over terrain that has not loaded yet)
@@ -91,6 +101,7 @@ export function initDeep(ctx) {
     if (id === 'moggy' || id === 'notch') { map.setFilter('deep-lake', ['==', ['get', 'stage'], id]); op('deep-lake', 'fill-opacity', 0.7); }
     else op('deep-lake', 'fill-opacity', 0);
     op('deep-canal', 'line-opacity', id === 'canal' ? 0.95 : id === 'today' ? 0.8 : 0);
+    op('deep-sand', 'fill-opacity', id === 'p-sand' ? ['match', ['get', 'unit'], 'cohansey', 0.75, 0.45] : id.startsWith('p-') ? ['match', ['get', 'unit'], 'cohansey', 0.22, 0] : 0);
     drawPins();
     if (fly) map.flyTo({ center: E.center, zoom: E.zoom, pitch: E.pitch, bearing: -12, padding: pad(), duration: ctx.dur(1800), essential: true });
     if (bar) { bar.querySelector('input').value = i; bar.querySelector('.dp-when').textContent = E.when; bar.querySelector('.dp-title').textContent = E.title; }
@@ -103,7 +114,7 @@ export function initDeep(ctx) {
     bar = document.createElement('div'); bar.id = 'deepbar';
     bar.innerHTML = `<div class="dp-head"><span class="dp-when"></span><b class="dp-title"></b></div>
       <input type="range" min="0" max="${ERAS.length - 1}" step="1" value="0" aria-label="Time: drag right to go back in time">
-      <div class="dp-ends"><span>Today</span><span>A billion years ago</span></div>`;
+      <div class="dp-ends"><span>Today</span><span>${esc(cor.end)}</span></div>`;
     document.body.appendChild(bar);
     const inp = bar.querySelector('input');
     inp.addEventListener('input', () => { const i = +inp.value; if (i !== era) { showEra(i); if (!game) eraSheet(); } });
@@ -117,14 +128,15 @@ export function initDeep(ctx) {
     game = null;
     const E = ERAS[era], cards = CARDS.filter((c) => c.era === E.id), s = seen();
     frame(`${top('Deep Jersey', 'home')}
+      <div class="dp-cors">${CORRIDORS.map((c) => `<button data-d="cor" data-id="${c.id}"${c.id === cor.id ? ' class="on" aria-pressed="true"' : ''}>${esc(c.name)}</button>`).join('')}</div>
       <p class="dp-kick">${esc(E.when)} · stop ${era + 1} of ${ERAS.length}</p><h2>${esc(E.title)}</h2><p class="dp-line">${esc(E.line)}</p>
       <div class="dp-cards">${cards.map((c) => `<button class="dp-card${s.includes(c.id) ? ' seen' : ''}" data-d="card" data-id="${c.id}"><i style="background:${KIND_COLOR[c.kind]}"></i><span><b>${esc(c.title)}</b><small>${esc(c.when)}</small></span></button>`).join('')}</div>
       <div class="dp-nav"><button data-d="newer"${era === 0 ? ' disabled' : ''}>← Newer</button><button data-d="older"${era === ERAS.length - 1 ? ' disabled' : ''}>Older →</button></div>
       <h4>Follow a thread</h4>
-      <button class="tr-card wide" data-d="chain"><b>The iron chain</b><small>rock → resource → industry → town → decline → what is left</small></button>
+      <button class="tr-card wide" data-d="chain"><b>${esc(cor.chainName)}</b><small>rock → resource → industry → town → decline → what is left</small></button>
       <div class="tr-row"><button class="tr-card" data-d="order"><b>Put it in order</b><small>oldest first${store.get('deep.orderbest', 0) ? ` · best ${store.get('deep.orderbest', 0)}` : ''}</small></button>
         <button class="tr-card" data-d="why"><b>Why is it here?</b><small>pick the reason a place grew</small></button></div>
-      <p class="tr-note">This first slice covers the Boonton and Rockaway valley. ${s.length} of ${CARDS.length} stories read. Every card lists its sources; lake outlines are approximate.</p>`);
+      <p class="tr-note">${CARDS.filter((c) => s.includes(c.id)).length} of ${CARDS.length} stories read here. Every card lists its sources; lake outlines are approximate.</p>`);
   }
 
   function openCard(id) {
@@ -137,16 +149,16 @@ export function initDeep(ctx) {
       <p class="dp-kick" style="color:${KIND_COLOR[c.kind]}">${esc(c.when)}</p><h2>${esc(c.title)}</h2>
       ${c.text.map((p) => `<p class="dp-p">${esc(p)}</p>`).join('')}
       ${c.why ? `<p class="dp-tags">${c.why.map((w) => `<span>${esc(WHY[w])}</span>`).join('')}</p>` : ''}
-      ${links.length ? `<button class="tr-card wide" data-d="chain"><b>Part of the iron chain</b><small>${esc(links.join(' and '))}</small></button>` : ''}
+      ${links.length ? `<button class="tr-card wide" data-d="chain"><b>Part of ${esc(cor.chainName.replace(/^The /, 'the '))}</b><small>${esc(links.join(' and '))}</small></button>` : ''}
       <h4>Sources</h4><ul class="dp-src">${c.src.map((k) => `<li><a href="${esc(SRC[k][1])}" target="_blank" rel="noopener">${esc(SRC[k][0])}</a></li>`).join('')}</ul>`);
   }
 
   function chain() {
     game = null;
-    frame(`${top('The iron chain')}
-      <p class="dp-line">How the oldest rock in the state became a town, and then a ruin. Tap a step for its story.</p>
+    frame(`${top(cor.chainName)}
+      <p class="dp-line">How the ground became an industry, a town, and then a ruin. Tap a step for its story.</p>
       <ol class="dp-chain">${CHAIN.map((x, i) => `<li><button data-d="card" data-id="${x.card}"><span class="dp-step">${i + 1}</span><span><b>${esc(x.step)}</b><small>${esc(x.line)}</small></span></button></li>`).join('')}</ol>
-      <p class="tr-note">Glass, bog iron, zinc and oysters follow the same six steps elsewhere in New Jersey; they come with later corridors.</p>`);
+      <p class="tr-note">Every corridor has a chain like this: the same six steps from the ground to what is left.</p>`);
   }
 
   // ---- games ----------------------------------------------------------------------------------------------------------------
@@ -181,7 +193,7 @@ export function initDeep(ctx) {
     }
   }
   function why() {
-    const c = rand(CARDS.filter((x) => x.why && x.kind !== 'ice')), right = rand(c.why);
+    const c = rand(CARDS.filter((x) => x.why && x.kind !== 'ice' && x.kind !== 'rock')), right = rand(c.why);
     const others = shuffle(Object.keys(WHY).filter((k) => !c.why.includes(k))).slice(0, 3);
     game = { kind: 'why', c, right };
     frame(`${top('Why is it here?')}
@@ -203,6 +215,7 @@ export function initDeep(ctx) {
     newer: () => { showEra(Math.max(0, era - 1)); eraSheet(); },
     older: () => { showEra(Math.min(ERAS.length - 1, era + 1)); eraSheet(); },
     card: (b) => openCard(b.dataset.id),
+    cor: (b) => { if (b.dataset.id === cor.id) return; setCorridor(b.dataset.id); showEra(0); eraSheet(); },
     chain, order, why,
     orderpick: orderPick, whypick: whyPick,
   };
