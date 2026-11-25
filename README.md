@@ -787,6 +787,10 @@ handle on top makes the panel tall, and it remembers), and the map has no fence 
   Lenape, iron, canals and glass, and what is left. Each chapter links to its region today and to close-up stories.
 - **The land today**: New Jersey's four natural regions and the two next door (the Poconos and Catskills plateau, the Piedmont
   Upland), each shown whole when tapped, with where it is in New Jersey, what it is made of and how far it runs.
+- **3D and animated**: every view is tilted 3D with heights exaggerated more the further out it is (×5 wide, ×3 at state scale, ×1.8
+  close; a tag on the map says how much), then the camera drifts slowly so the shape reads. Chapters play as they open: the land rising
+  as continents collide, each Watchung lava flood glowing then cooling to dark basalt, the coastal sand building, the ice age, the lake
+  filling, story pins popping in one by one.
 - **Relief that reads**: the land coloured by height (green lowlands, tan hills, brown mountains) with shading from several directions
   over the region colours, and rivers drawn stronger, so valleys, ridges and rivers stand out.
 - **Play the ice age on the map** (the ice and lake chapters, and the ice stops in the close-up): the ice sheet creeps south over New

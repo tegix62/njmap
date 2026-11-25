@@ -102,16 +102,14 @@ export function initDeep(ctx) {
     op('deep-prov', 'fill-opacity', Object.keys(prov).length || faint ? pm : 0);
     op('deep-prov-line', 'line-opacity', Object.keys(prov).length ? ['match', ['get', 'region'], ...Object.keys(prov).flatMap((k) => [k, 0.9]), 0] : 0);
     op('deep-rocks', 'fill-opacity', sc.rocks ?? 0);
-    if (sc.flows === 'anim') {
-      op('deep-flows', 'fill-opacity', 0);
-      [1, 2, 3].forEach((n, k) => timers.push(setTimeout(() => op('deep-flows', 'fill-opacity', ['case', ['<=', ['get', 'flow'], n], 0.9, 0]), ctx.dur(700 + k * 1100))));
-    } else op('deep-flows', 'fill-opacity', sc.flows ?? 0);
+    op('deep-flows', 'fill-color', ['match', ['get', 'flow'], 1, '#b0412e', 2, '#c96a2b', '#d99a2b']);
+    if (sc.flows === 'anim') lavaFloods(); else op('deep-flows', 'fill-opacity', sc.flows ?? 0);
     op('deep-sand', 'fill-opacity', typeof sc.sand === 'number' ? ['match', ['get', 'unit'], 'cohansey', sc.sand, sc.sand * 0.55] : sc.sand ?? 0);
     op('deep-ice-sheet', 'fill-opacity', sc.iceSheet ?? 0);
     op('deep-ice-limit', 'line-opacity', sc.iceLimit ?? 0);
     op('deep-icelines', 'line-opacity', sc.iceLines ?? 0);
     op('deep-ice-older', 'line-opacity', sc.iceOlder ?? 0);
-    if (sc.lake) { map.setFilter('deep-lake', ['==', ['get', 'stage'], sc.lake]); op('deep-lake', 'fill-opacity', 0.7); } else op('deep-lake', 'fill-opacity', 0);
+    if (sc.lake) { map.setFilter('deep-lake', ['==', ['get', 'stage'], sc.lake]); map.setPaintProperty('deep-lake', 'fill-opacity-transition', { duration: ctx.dur(2600), delay: ctx.dur(900) }); op('deep-lake', 'fill-opacity', 0.75); } else { map.setPaintProperty('deep-lake', 'fill-opacity-transition', { duration: ctx.dur(600), delay: 0 }); op('deep-lake', 'fill-opacity', 0); }
     op('deep-canal', 'line-opacity', sc.canal ?? 0);
     drawPins(sc.pins || [], sc.labels || Object.keys(prov).filter((k) => prov[k] >= 0.3));
   }
@@ -126,7 +124,7 @@ export function initDeep(ctx) {
    * The ice edge is drawn as a line sweeping south, a simplification of its real, lobed edge. */
   function playIce() {
     applyScene({ flows: 0.4 });
-    terrain(false); after(() => fly([-74.62, 40.92], 7.7, 0, 1200));
+    after(() => fly([-74.62, 40.85], 7.6, 50, 1200));
     const N = 14, frame = (k) => map.setFilter('deep-iceanim', ['==', ['get', 'f'], k]);
     const steps = [];
     steps.push([300, () => caption('About 25,000 years ago: the ice sheet creeps south over New Jersey (its edge drawn straight here; the real one was lobed)')]);
@@ -169,7 +167,7 @@ export function initDeep(ctx) {
     const LP = { valleyridge: [-75.55, 40.72], plateau: [-75.55, 41.3] };     // names kept apart where the two belts meet by New Jersey
     const lp = (k) => { const p = (data.provinces.features.find((f) => f.properties.region === k) || {}).properties; return p && LP[k] ? { ...p, lp: LP[k] } : p; };
     pinEl.innerHTML = labels.map((k) => { const p = lp(k), r = LAND.find((x) => x.id === k); return p && r ? `<b class="dp-rl" data-region="${k}" data-p="${p.lp}" style="--k:${r.color}">${esc(r.name.replace(/ \(.*\)|:.*$/, ''))}</b>` : ''; }).join('')
-      + pins.map((id) => { const c = CARD[id]; return c && c.p ? `<button data-id="${id}" data-p="${c.p}" style="--k:${KIND_COLOR[c.kind]}"><i></i><span>${esc(c.title)}</span></button>` : ''; }).join('');
+      + pins.map((id, n) => { const c = CARD[id]; return c && c.p ? `<button data-id="${id}" data-p="${c.p}" style="--k:${KIND_COLOR[c.kind]};--n:${n}"><i></i><span>${esc(c.title)}</span></button>` : ''; }).join('');
     pinEl.hidden = false; placePins();
   }
   function placePins() {
@@ -183,14 +181,57 @@ export function initDeep(ctx) {
   }
   /** The strip of map between the bar (when shown) and the sheet: the camera centres there. */
   const pad = () => { const t = bar && !bar.hidden ? bar.getBoundingClientRect().bottom + 8 : 12, b = root && !root.hidden ? Math.max(12, innerHeight - root.getBoundingClientRect().top + 8) : 12; return { top: t, bottom: b, left: 20, right: 20 }; };
-  /** Fit a box in the free strip. (fitBounds adds any padding already stored on the map, which every flyTo leaves behind: clear it first.) */
-  const fitBox = (bb, maxZoom) => { terrain(false); const p = pad(); map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 }); map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], { padding: p, pitch: 0, bearing: 0, duration: ctx.dur(1800), maxZoom }); };
-  // 3D terrain only close in: at the wide views it adds nothing, and MapLibre leaves part of the screen undrawn with it on
-  let terrainOn = false;
-  const terrain = (on) => { if (on === terrainOn) return; map.stop(); map.setTerrain(on ? { source: 'deep-dem', exaggeration: 1.8 } : null); terrainOn = on; };
+  // ---- the camera: always 3D, tilted, heights exaggerated more the further out it is (a tag on the map says how much), then a slow
+  // drift so the shape of the land reads
+  let exagNow = 0, exagEl = null, drift = 0;
+  const exagFor = (z) => (z < 6.8 ? 5 : z < 9 ? 3 : 1.8);
+  function setExag(e) {
+    exagNow = e; map.setTerrain(e ? { source: 'deep-dem', exaggeration: e } : null);
+    if (!exagEl) { exagEl = document.createElement('div'); exagEl.id = 'deepexag'; document.body.appendChild(exagEl); }
+    exagEl.textContent = e > 1.05 ? `heights ×${Math.round(e * 10) / 10}` : ''; exagEl.hidden = !(e > 1.05) || ctx.mode !== 'deep';
+    if (root && !root.hidden) exagEl.style.bottom = `${innerHeight - root.getBoundingClientRect().top + 8}px`;
+  }
+  const terrain = (on) => { if (!on) { map.stop(); setExag(0); } };
   /** Camera moves wait until the sheet has its new text, so the free strip they centre in is measured right. */
   const after = (f) => Promise.resolve().then(f);
-  const fly = (center, zoom, pitch = 0, dur = 1800) => terrain(zoom >= 8) || map.flyTo({ center, zoom, pitch, bearing: zoom > 8 ? -12 : 0, padding: pad(), duration: ctx.dur(dur), essential: true });
+  function fly(center, zoom, pitch = null, dur = 1800, then = null) {
+    const e = exagFor(zoom); if (Math.abs(e - exagNow) > 0.01) { map.stop(); setExag(e); }
+    const tok = ++drift, P = pitch ?? (zoom < 7 ? 45 : zoom < 9 ? 52 : 58), bearing = zoom < 7 ? -8 : -16;
+    map.flyTo({ center, zoom, pitch: P, bearing, padding: pad(), duration: ctx.dur(dur), essential: true });
+    // wait for this flight to land: a moveend can also come from the move it interrupted, straight away
+    const start = Date.now(), onEnd = () => {
+      if (tok !== drift || ctx.mode !== 'deep') return;
+      if (map.isMoving() || Date.now() - start < (ctx.dur(dur) || 0) * 0.6) { map.once('moveend', onEnd); return; }
+      if (then) { then(); if (tok !== drift) return; }   // a follow-on move started: no drift to cancel it
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) map.easeTo({ bearing: bearing + 22, duration: 40000, easing: (t) => t, padding: pad() });   // the slow drift
+    };
+    map.once('moveend', onEnd);
+  }
+  /** Fit a box in the free strip, then tilt: the zoom comes from fitting it flat, a little further out to allow for the tilt. */
+  function fitBox(bb, maxZoom, then = null) {
+    const p = pad(); map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
+    const cam = map.cameraForBounds([[bb[0], bb[1]], [bb[2], bb[3]]], { padding: p, maxZoom, bearing: 0, pitch: 0 }) || { center: [(bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2], zoom: 6 };
+    fly(cam.center, cam.zoom - 0.3, null, 1800, then);
+  }
+  /** The land rising: heights grow from flat to `to` over a few seconds (the mountain-building chapter). */
+  function rise(to, ms = 3200) {
+    const n = 16; for (let k = 1; k <= n; k++) timers.push(setTimeout(() => setExag((to * k) / n), ctx.dur((ms * k) / n) || 1));
+  }
+  /** The lava floods: each flow appears glowing orange, then cools to dark basalt, one after another. */
+  function lavaFloods() {
+    if (!map.getLayer('deep-flows')) return;
+    map.setPaintProperty('deep-flows', 'fill-color-transition', { duration: ctx.dur(1600), delay: 0 });
+    op('deep-flows', 'fill-opacity', 0); op('deep-prov', 'fill-opacity', ['match', ['get', 'region'], 'piedmont', 0.28, 0]);   // the basin pale, so the lava stands out
+    const names = ['', 'First Watchung', 'Second Watchung', 'Third Watchung'];
+    [1, 2, 3].forEach((n, k) => {
+      timers.push(setTimeout(() => {
+        op('deep-flows', 'fill-color', ['case', ['==', ['get', 'flow'], n], '#ffb21f', '#3a2f2c']);
+        op('deep-flows', 'fill-opacity', ['case', ['<=', ['get', 'flow'], n], 0.92, 0]);
+        caption(`Lava floods the rift valley: the ${names[n]} flow, glowing hot`);
+      }, ctx.dur(400 + k * 2600) || 1));
+      timers.push(setTimeout(() => { op('deep-flows', 'fill-color', '#3a2f2c'); caption(n < 3 ? 'It cools to dark basalt, and red mud buries it...' : 'Three sheets of basalt, buried, later tilted and worn: the three Watchung ridges'); }, ctx.dur(1800 + k * 2600) || 1));
+    });
+  }
 
   // ---- the bar: Newer / Older (close-ups) or Back / Next (the story), with a dot per step -------------------------------------
   function setBar(items, i, labels) {
@@ -237,7 +278,7 @@ export function initDeep(ctx) {
   function intro() {
     view = 'intro'; game = null; setBar(null);
     applyScene({ prov: Object.fromEntries(LAND.map((r) => [r.id, 0.5])), labels: ['valleyridge', 'coastal', 'plateau'] });
-    after(() => fly([-75.2, 40.2], 6.0, 0, 1600));
+    after(() => fly([-75.2, 40.2], 6.0, null, 1600));
     const started = store.get('deep.chapter', 0);
     frame(`${top('Deep Jersey', 'home', 'Home')}
       <p class="dp-lead">How the ground under New Jersey was made, and what people made of it.</p>
@@ -256,7 +297,12 @@ export function initDeep(ctx) {
     setBar(STORY, i, ['Back a chapter', 'Next chapter']);
     applyScene(S.scene);
     const bb = S.land && data.provinces.features.find((f) => f.properties.region === S.land).properties.bbox;
-    after(() => (bb ? fitBox(bb, 7) : fly([S.cam[0], S.cam[1]], S.cam[2], S.cam[2] > 8 ? 50 : S.cam[2] > 6.8 ? 30 : 0)));   // the whole belt, past the state line
+    // each chapter plays: the land rising, the lava flooding, the ice coming and going; otherwise the whole belt, past the state line
+    const play = { 's-mountains': () => { setExag(0.01); rise(6); caption('Continents collide: the land is pushed up into mountains (heights ×6)'); timers.push(setTimeout(() => caption(''), ctx.dur(6500) || 1)); },
+      's-rift': () => fly([-74.42, 40.72], 8.4, 55, 2400, () => lavaFloods()),
+      's-ice': () => playIce(),
+      's-coast': () => { op('deep-sand', 'fill-opacity', 0); timers.push(setTimeout(() => { map.setPaintProperty('deep-sand', 'fill-opacity-transition', { duration: ctx.dur(3000), delay: 0 }); op('deep-sand', 'fill-opacity', ['match', ['get', 'unit'], 'cohansey', 0.8, 0.45]); caption('Layer on layer of sand and clay along the coast; the yellow is the Cohansey sand'); }, ctx.dur(300) || 1)); timers.push(setTimeout(() => caption(''), ctx.dur(6000) || 1)); } }[S.id];
+    after(() => (bb ? fitBox(bb, 7, play) : fly([S.cam[0], S.cam[1]], S.cam[2], null, 1800, play)));
     const L = S.land && LAND.find((r) => r.id === S.land);
     frame(`${top('The story', 'intro', 'Deep Jersey')}
       <p class="dp-kick">Chapter ${i + 1} of ${STORY.length}</p><h2>${esc(S.title)}</h2>
@@ -273,7 +319,7 @@ export function initDeep(ctx) {
   function land() {
     view = 'land'; landSel = null; game = null; setBar(null);
     applyScene({ prov: Object.fromEntries(LAND.map((r) => [r.id, 0.55])) });
-    after(() => fly([-75.6, 40.0], 5.4, 0, 1500));
+    after(() => fly([-75.6, 40.0], 5.4, null, 1500));
     frame(`${top('The land today', 'intro', 'Deep Jersey')}
       <p class="dp-line">New Jersey has four of the eastern United States’ natural regions, and borders two more. Tap one to see all of it.</p>
       <div class="dp-regions">${LAND.map((r) => `<button class="dp-region" data-d="landone" data-id="${r.id}"><i style="background:${r.color}"></i><span><b>${esc(r.name)}</b><small>${esc(r.nj)}</small></span></button>`).join('')}</div>`);
@@ -415,7 +461,7 @@ export function initDeep(ctx) {
       // the home page opens under this sheet and the bar: hide them while it is up, and come back if Deep Jersey is picked again
       const barWas = bar.hidden; root.hidden = true; bar.hidden = true; if (pinEl) pinEl.hidden = true;
       await ctx.showHome();
-      if (ctx.mode === 'deep') { root.hidden = false; bar.hidden = barWas; drawPins(shown.pins, shown.labels); }
+      if (ctx.mode === 'deep') { root.hidden = false; bar.hidden = barWas; drawPins(shown.pins, shown.labels); setExag(exagNow); }
     },
     intro, land, chain, order, why,
     more: (b) => { const m = b.previousElementSibling; if (m) m.hidden = false; b.remove(); },
@@ -452,7 +498,7 @@ export function initDeep(ctx) {
       for (const t of timers) clearTimeout(t); timers = []; caption('');
       document.body.classList.remove('deep-on');
       if (root) root.hidden = true; if (bar) bar.hidden = true;
-      map.stop(); map.setTerrain(null); terrainOn = false; hideLayers();
+      map.stop(); map.setTerrain(null); exagNow = 0; if (exagEl) exagEl.hidden = true; drift++; hideLayers();
       map.setMaxBounds(ctx.region.maxBounds || null); map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
       map.fitBounds(ctx.region.bounds, { padding: 20, pitch: 0, bearing: 0, duration: ctx.dur(600) });
     },

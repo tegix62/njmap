@@ -272,7 +272,7 @@ export const STORY = [
     scene: { prov: { valleyridge: 0.8, plateau: 0.35 }, provFaint: 0.05 }, cam: [-77.2, 39.8, 5.4], src: ['taconic', 'allegh', 'ridge', 'physio'], close: ['green-pond'], land: 'valleyridge' },
   { id: 's-rift', when: 'About 200 million years ago', title: 'Pangaea tears apart',
     text: ['The supercontinent starts to split and the Atlantic begins to open. Long valleys crack open down the East Coast: rift basins, the red patches on the map. New Jersey’s, the Newark Basin, runs into Pennsylvania and New York.', 'Lava floods the Newark Basin three times, making the three Watchung ridges; molten rock squeezes between the layers and cools underground as the Palisades.'],
-    scene: { prov: { piedmont: 0.75 }, provFaint: 0.05, flows: 'anim' }, cam: [-75.6, 40.0, 6.1], src: ['newark', 'watchung', 'palisades', 'physio'], close: ['watchungs'], land: 'piedmont' },
+    scene: { prov: { piedmont: 0.75 }, provFaint: 0.05 }, cam: [-75.6, 40.0, 6.1], src: ['newark', 'watchung', 'palisades', 'physio'], close: ['watchungs'], land: 'piedmont' },
   { id: 's-coast', when: 'The last 100 million years', title: 'The coastal plain builds',
     text: ['As the Atlantic widens, rivers and the sea lay down sand, clay and gravel along its edge, layer on layer. They make the Coastal Plain, part of the flattest land in the country, from Cape Cod to Mexico.', 'One of the youngest layers, the Cohansey sand of about 12 to 14 million years ago (yellow on the map), is the ground the Pine Barrens stand on.'],
     scene: { prov: { coastal: 0.6 }, provFaint: 0.05, sand: 0.75 }, cam: [-75.4, 39.2, 5.8], src: ['atl', 'sgmc', 'physio'], close: ['cohansey'], land: 'coastal' },

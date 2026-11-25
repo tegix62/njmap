@@ -4213,3 +4213,9 @@ body.deep-on #edges { display: none !important; }   /* the shading outside New J
 .dp-play b { font-size: 15.5px; } .dp-play small { opacity: 0.85; font-size: 12.5px; }
 #deepcap { position: fixed; z-index: 31; left: 12px; right: 12px; max-width: 520px; margin: 0 auto; padding: 9px 12px; border-radius: 12px; background: rgba(23, 50, 80, 0.86); color: #fff; font: 600 14px/1.35 system-ui, sans-serif; text-align: center; pointer-events: none; }
 #deepcap[hidden] { display: none; }
+/* Deep Jersey: the heights tag, and pins popping in one by one */
+#deepexag { position: fixed; z-index: 29; left: 12px; padding: 4px 9px; border-radius: 999px; background: rgba(42, 36, 27, 0.75); color: #fff; font: 700 11.5px system-ui, sans-serif; letter-spacing: 0.03em; pointer-events: none; }
+#deepexag[hidden] { display: none; }
+#deeppins button { animation: dppop 0.5s calc(0.9s + var(--n, 0) * 0.35s) cubic-bezier(.2, 1.4, .4, 1) both; }
+@keyframes dppop { from { opacity: 0; scale: 0.3; } }
+@media (prefers-reduced-motion: reduce) { #deeppins button { animation: none; } }
