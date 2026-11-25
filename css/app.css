@@ -4171,3 +4171,26 @@ body.deep-on #tabs, body.deep-on #fabs, body.deep-on #lookFab, body.deep-on #she
 #deeppins .dp-rl { position: absolute; left: 0; top: 0; margin: -10px 0 0 -70px; width: 140px; text-align: center; pointer-events: auto; cursor: pointer;
   font: 700 12px system-ui, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: #2a241b; text-shadow: 0 0 3px #fff, 0 0 6px #fff, 0 0 2px #fff; }
 #deeppins .dp-rl::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 2px; background: var(--k); vertical-align: 1px; }
+/* Deep Jersey: how it works */
+.dp-how { display: grid; gap: 6px; }
+.dp-how button { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; border-radius: 12px; padding: 10px 12px; text-align: left; background: #f1e8d6; color: #5a3a18; font: 600 14px system-ui, sans-serif; cursor: pointer; }
+.dp-how button svg { flex: none; }
+.dp-ex { margin: 8px 0 6px; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 4px rgba(30, 25, 15, 0.15); }
+.ex-svg { display: block; width: 100%; height: auto; }
+.dp-exdots { display: flex; justify-content: center; gap: 6px; margin: 4px 0 6px; }
+.dp-exdots i { width: 8px; height: 8px; border-radius: 50%; background: #d8ccb4; } .dp-exdots i.on { background: #8a5a2b; }
+.dp-extext { min-height: 4.5em; }
+.dp-exnav { display: flex; gap: 8px; }
+.dp-exnav button { flex: 1; border: 0; border-radius: 14px; padding: 13px; background: #ece5d6; color: inherit; font: 700 15px system-ui, sans-serif; cursor: pointer; }
+.dp-exnav button.go { background: #8a5a2b; color: #fff; } .dp-exnav button:disabled { opacity: 0.4; }
+.ex-svg .ex-in, .ex-svg .ex-grow, .ex-svg .ex-drop, .ex-svg .ex-slide { transform-box: fill-box; }
+.ex-svg .ex-in { animation: exin 0.7s 0.15s ease-out both; }
+.ex-svg .ex-grow { transform-origin: 50% 100%; animation: exgrow 1.4s 0.2s ease-out both; }
+.ex-svg .ex-drop { animation: exdrop 1s 0.2s ease-in-out both; }
+.ex-svg .ex-slide { animation: exslide 1.6s 0.2s ease-in-out both; }
+@keyframes exin { from { opacity: 0; transform: translateY(6px); } }
+@keyframes exgrow { from { transform: scaleY(0.05); } }
+@keyframes exdrop { from { transform: translateY(-28px); } }
+@keyframes exslide { from { transform: translateX(-40px); } }
+@media (prefers-reduced-motion: reduce) { .ex-svg .ex-in, .ex-svg .ex-grow, .ex-svg .ex-drop, .ex-svg .ex-slide { animation: none; } }
+#deep.tall { max-height: 74vh; }

@@ -786,6 +786,11 @@ explanation (no camera flying yet) and three ways in:
   Lenape, iron, canals and glass, and what is left. Each chapter links to its region today and to close-up stories.
 - **The land today**: New Jersey's four natural regions and the two next door (the Poconos and Catskills plateau, the Piedmont
   Upland), each shown whole when tapped, with where it is in New Jersey, what it is made of and how far it runs.
+- **How it works**: short illustrated explainers for the ideas the story leans on, each a side-on slice through the ground in two to
+  four steps (what is new slides in), with a sentence or two each and its sources: what an ice sheet is (and how it differs from an ice
+  shelf), how the ice leaves a moraine, how the ice made a lake, how a boulder ends up on a hilltop, how a rift valley opens (lava flow
+  or sill), why hard rock becomes a ridge, how colliding continents fold rock, how a coastal plain builds, how sand holds water, how
+  iron grows in a bog. They sit under the chapters, regions, stops and cards that need them. `tools/ex-preview.html` shows them all.
 - **Close-ups**: the same story step by step in one place, **Boonton and the Rockaway** (ten stops) and **the Pine Barrens** (five
   stops): pinned story cards (34), a chain from rock to ruin for each, and two light games (put it in order; why is it here?).
 

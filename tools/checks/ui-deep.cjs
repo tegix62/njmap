@@ -30,6 +30,13 @@ const { chromium } = require('playwright'); const fs = require('fs');
   await page.locator('#deep .dp-chips button').first().click(); await page.waitForTimeout(1800);
   console.log('close-up card from the story:', await page.locator('#deep h2').innerText());
   await page.click('#deep [data-d=back]'); await page.waitForTimeout(1200); console.log('back to:', await page.locator('#deep h2').innerText());
+  // how it works: from the ice chapter, every step, then back to the chapter
+  await page.locator('#deepbar .dp-dots button').nth(4).click(); await page.waitForTimeout(2000);
+  const hows = await page.locator('#deep .dp-how button').allInnerTexts(); console.log('how it works in chapter 5:', hows.join(' | '));
+  await page.locator('#deep .dp-how button').first().click(); await page.waitForTimeout(900);
+  for (let k = 0; k < 6; k++) { const t = await page.locator('#deep .dp-extext').innerText(); console.log(`  step ${k + 1}: ${t.slice(0, 70)}…`); await shot(`how-icesheet-${k + 1}`);
+    if (await page.locator('#deep .dp-exnav [data-d=howstep].go').count()) { await page.click('#deep .dp-exnav [data-d=howstep].go'); await page.waitForTimeout(900); } else break; }
+  await page.click('#deep .dp-exnav [data-d=howback]'); await page.waitForTimeout(400); console.log('after Got it:', await page.locator('#deep h2').innerText());
   // the land today
   await page.click('#deep [data-d=intro]'); await page.waitForTimeout(800); await page.click('#deep [data-d=land]'); await page.waitForTimeout(2000);
   console.log('regions:', await page.locator('#deep .dp-region').count()); await shot('land');

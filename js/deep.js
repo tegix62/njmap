@@ -9,6 +9,7 @@
 // Data: data/deep/*.json (tools/build_deep.py: USGS and OpenStreetMap); the words in js/deepcards.js, each card with its sources.
 import { CORRIDORS, CARD, SRC, WHY, STORY, LAND } from './deepcards.js';
 import { juice } from './juice.js';
+import { EXPLAIN, EX_SRC } from './deepexplain.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const shuffle = (a) => a.map((v) => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map((p) => p[1]);
@@ -18,7 +19,15 @@ const ERA_FILL = { grenville: '#c98f6a', paleozoic: '#a9b27a', newark: '#c4614b'
 const REGION_COLOR = Object.fromEntries(LAND.map((r) => [r.id, r.color]));
 const DEM = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
 const LAYERS = ['deep-hs', 'deep-prov', 'deep-prov-line', 'deep-rocks', 'deep-sand', 'deep-flows', 'deep-lake', 'deep-ice-sheet', 'deep-icelines', 'deep-ice-older', 'deep-ice-limit', 'deep-canal'];
-const WIDE = [[-92, 30], [-58, 50]];          // while Deep Jersey is open the map may pull out past the New Jersey frame
+const WIDE = [[-92, 30], [-58, 50]];
+// "How it works" explainers for each chapter, region, close-up stop and card that leans on an idea
+const HOW = {
+  's-mountains': ['fold', 'ridges'], 's-rift': ['rift', 'ridges'], 's-coast': ['coastal', 'aquifer'], 's-ice': ['icesheet', 'moraine'], 's-lake': ['glaciallake', 'erratic'], 's-iron': ['bogiron'],
+  valleyridge: ['fold', 'ridges'], piedmont: ['rift', 'ridges'], coastal: ['coastal', 'aquifer'],
+  paleo: ['fold'], rift: ['rift', 'ridges'], ice: ['icesheet', 'moraine'], moggy: ['glaciallake'], notch: ['glaciallake'], 'p-sand': ['coastal', 'aquifer'], 'p-iron': ['bogiron'],
+  tripod: ['erratic'], moraine: ['moraine', 'icesheet'], 'lake-passaic': ['glaciallake'], 'great-notch': ['glaciallake'], swamp: ['glaciallake'], watchungs: ['rift', 'ridges'],
+  'green-pond': ['fold', 'ridges'], cohansey: ['coastal'], aquifer: ['aquifer'], 'bog-iron': ['bogiron'], batsto: ['bogiron'],
+};          // while Deep Jersey is open the map may pull out past the New Jersey frame
 const BACK = '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 export function initDeep(ctx) {
@@ -169,9 +178,10 @@ export function initDeep(ctx) {
     });
     root.addEventListener('click', (e) => { const b = e.target.closest('[data-d]'); if (!b || b.disabled) return; const f = actions[b.dataset.d]; if (f) f(b); });
   }
-  const frame = (html) => { root.innerHTML = html; root.scrollTop = 0; };
+  const frame = (html) => { root.innerHTML = html; root.scrollTop = 0; root.classList.toggle('tall', view === 'how'); };   // an explainer gets more room
   const top = (title, backTo, backWord = 'Back') => `<div class="dp-top"><button class="tr-back" data-d="${backTo}">${BACK}${backWord}</button><h1>${esc(title)}</h1></div>`;
   const srcList = (keys) => `<details class="dp-srcs"><summary>Sources</summary><ul class="dp-src">${keys.map((k) => `<li><a href="${esc(SRC[k][1])}" target="_blank" rel="noopener">${esc(SRC[k][0])}</a></li>`).join('')}</ul></details>`;
+  const howRow = (key) => (HOW[key] || []).length ? `<h4>How it works</h4><div class="dp-how">${HOW[key].map((k) => `<button data-d="how" data-id="${k}"><svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 8.5l5 3.5-5 3.5z" fill="currentColor"/></svg>${esc(EXPLAIN[k].title)}</button>`).join('')}</div>` : '';
   const chips = (ids) => ids.length ? `<div class="dp-chips">${ids.map((id) => { const c = CARD[id]; return `<button data-d="card" data-id="${id}"><i style="background:${KIND_COLOR[c.kind]}"></i>${esc(c.title)}</button>`; }).join('')}</div>` : '';
 
   // ---- the way in ----------------------------------------------------------------------------------------------------------
@@ -204,6 +214,7 @@ export function initDeep(ctx) {
       <p class="dp-kick">Chapter ${i + 1} of ${STORY.length} · ${esc(S.when)}</p><h2>${esc(S.title)}</h2>
       ${S.text.map((p) => `<p class="dp-p">${esc(p)}</p>`).join('')}
       ${L ? `<button class="dp-region" data-d="landone" data-id="${L.id}"><i style="background:${L.color}"></i><span><b>${esc(L.name)} today</b><small>${esc(L.nj)}</small></span></button>` : ''}
+      ${howRow(S.id)}
       ${S.close.length ? `<h4>See it up close</h4>${chips(S.close)}` : ''}
       ${i < STORY.length - 1 ? `<button class="dp-start" data-d="next"><b>Next: ${esc(STORY[i + 1].title)}</b><small>${esc(STORY[i + 1].when)}</small></button>` : `<button class="dp-start" data-d="intro"><b>The end, for now</b><small>back to Deep Jersey: the land today and the close-ups</small></button>`}
       ${srcList(S.src)}`);
@@ -227,6 +238,7 @@ export function initDeep(ctx) {
     frame(`${top(R.name, from === 'story' ? 'story' : 'land', from === 'story' ? 'The story' : 'All regions')}
       <p class="dp-kick">In New Jersey: ${esc(R.nj)}</p>
       ${R.text.map((p) => `<p class="dp-p">${esc(p)}</p>`).join('')}
+      ${howRow(R.id)}
       ${R.close.length ? `<h4>See it up close</h4>${chips(R.close)}` : ''}
       ${srcList(R.src)}`);
   }
@@ -244,6 +256,7 @@ export function initDeep(ctx) {
     frame(`${top(cor.name, 'intro', 'Deep Jersey')}
       <p class="dp-kick">${esc(E.when)} · stop ${era + 1} of ${ERAS.length}</p><h2>${esc(E.title)}</h2><p class="dp-line">${esc(E.line)}</p>
       <div class="dp-cards">${cards.map((c) => `<button class="dp-card${s.includes(c.id) ? ' seen' : ''}" data-d="card" data-id="${c.id}"><i style="background:${KIND_COLOR[c.kind]}"></i><span><b>${esc(c.title)}</b><small>${esc(c.when)}</small></span></button>`).join('')}</div>
+      ${howRow(E.id)}
       <p class="tn-hint">Step through time with the arrows at the top: newer on the left, older on the right.</p>
       <h4>Follow a thread</h4>
       <button class="tr-card wide" data-d="chain"><b>${esc(cor.chainName)}</b><small>rock → resource → industry → town → decline → what is left</small></button>
@@ -267,10 +280,29 @@ export function initDeep(ctx) {
     frame(`${top(from === 'story' ? 'The story' : from === 'land' ? 'The land today' : cor.name, 'back')}
       <p class="dp-kick" style="color:${KIND_COLOR[c.kind]}">${esc(c.when)} · ${esc(cor.name)}</p><h2>${esc(c.title)}</h2>
       ${c.text.map((p) => `<p class="dp-p">${esc(p)}</p>`).join('')}
+      ${howRow(id)}
       ${c.why ? `<p class="dp-tags">${c.why.map((w) => `<span>${esc(WHY[w])}</span>`).join('')}</p>` : ''}
       ${links.length ? `<button class="tr-card wide" data-d="chain"><b>Part of ${esc(cor.chainName.replace(/^The /, 'the '))}</b><small>${esc(links.join(' and '))}</small></button>` : ''}
       <button class="tr-card wide" data-d="closehere"><b>More from ${esc(cor.name)}</b><small>this stop and the ones around it</small></button>
       ${srcList(c.src)}`);
+  }
+
+  /** An explainer: a slice through the ground, step by step. Back returns to wherever it was opened from. */
+  let howBack = null;
+  function how(id, step = 0) {
+    const X = EXPLAIN[id]; if (!X) return;
+    if (step === 0 && view !== 'how') { const v = view, c0 = chap, l0 = landSel, e0 = era, r0 = ret, html = root.innerHTML;
+      howBack = () => { view = v; chap = c0; landSel = l0; era = e0; ret = r0; root.innerHTML = html; root.scrollTop = 0; root.classList.remove('tall'); }; }
+    view = 'how';
+    const S = X.steps[step], last = step === X.steps.length - 1;
+    frame(`${top('How it works', 'howback')}
+      <h2>${esc(X.title)}</h2>
+      <figure class="dp-ex">${S.draw}</figure>
+      <div class="dp-exdots">${X.steps.map((_, k) => `<i${k === step ? ' class="on"' : ''}></i>`).join('')}</div>
+      <p class="dp-p dp-extext">${esc(S.text)}</p>
+      <div class="dp-exnav"><button data-d="howstep" data-id="${id}" data-s="${step - 1}"${step ? '' : ' disabled'}>Back</button>
+        ${last ? '<button class="go" data-d="howback">Got it</button>' : `<button class="go" data-d="howstep" data-id="${id}" data-s="${step + 1}">Next</button>`}</div>
+      <details class="dp-srcs"><summary>Sources</summary><ul class="dp-src">${X.src.map((k) => `<li><a href="${esc(EX_SRC[k][1])}" target="_blank" rel="noopener">${esc(EX_SRC[k][0])}</a></li>`).join('')}</ul></details>`);
   }
 
   function chain() {
@@ -344,6 +376,9 @@ export function initDeep(ctx) {
     era: () => stopSheet(),
     back: () => (ret ? ret() : intro()),
     card: (b) => openCard(b.dataset.id),
+    how: (b) => how(b.dataset.id),
+    howstep: (b) => how(b.dataset.id, +b.dataset.s),
+    howback: () => (howBack ? howBack() : intro()),
     orderpick: orderPick, whypick: whyPick,
   };
 
