@@ -777,7 +777,8 @@ One tree from seed to old age and death, as a fast time-lapse with the seasons t
 ## Deep Jersey (2026-11-25)
 
 How the ground under New Jersey was made, and what people made of it. From the home page, **Deep Jersey**. It opens on a short
-explanation (no camera flying yet) and three ways in:
+explanation (no camera flying yet) and three ways in. The panel stays short so the map shows (long text opens with **Read more**; the
+handle on top makes the panel tall, and it remembers), and the map has no fence while Deep Jersey is open, so whole ranges fit:
 
 - **The story** (start here): nine short chapters from the oldest rock forward, with Back and Next arrows at the top and a dot per
   chapter. The rock chapters show each belt whole, past the state line: the Highlands from Reading, Pennsylvania, to Connecticut; the

@@ -19,7 +19,6 @@ const ERA_FILL = { grenville: '#c98f6a', paleozoic: '#a9b27a', newark: '#c4614b'
 const REGION_COLOR = Object.fromEntries(LAND.map((r) => [r.id, r.color]));
 const DEM = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
 const LAYERS = ['deep-hs', 'deep-prov', 'deep-prov-line', 'deep-rocks', 'deep-sand', 'deep-flows', 'deep-lake', 'deep-ice-sheet', 'deep-icelines', 'deep-ice-older', 'deep-ice-limit', 'deep-canal'];
-const WIDE = [[-92, 30], [-58, 50]];
 // "How it works" explainers for each chapter, region, close-up stop and card that leans on an idea
 const HOW = {
   's-mountains': ['fold', 'ridges'], 's-rift': ['rift', 'ridges'], 's-coast': ['coastal', 'aquifer'], 's-ice': ['icesheet', 'moraine'], 's-lake': ['glaciallake', 'erratic'], 's-iron': ['bogiron'],
@@ -144,8 +143,13 @@ export function initDeep(ctx) {
   /** The strip of map between the bar (when shown) and the sheet: the camera centres there. */
   const pad = () => { const t = bar && !bar.hidden ? bar.getBoundingClientRect().bottom + 8 : 12, b = root && !root.hidden ? Math.max(12, innerHeight - root.getBoundingClientRect().top + 8) : 12; return { top: t, bottom: b, left: 20, right: 20 }; };
   /** Fit a box in the free strip. (fitBounds adds any padding already stored on the map, which every flyTo leaves behind: clear it first.) */
-  const fitBox = (bb, maxZoom) => { const p = pad(); map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 }); map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], { padding: p, pitch: 0, bearing: 0, duration: ctx.dur(1800), maxZoom }); };
-  const fly = (center, zoom, pitch = 0, dur = 1800) => map.flyTo({ center, zoom, pitch, bearing: zoom > 8 ? -12 : 0, padding: pad(), duration: ctx.dur(dur), essential: true });
+  const fitBox = (bb, maxZoom) => { terrain(false); const p = pad(); map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 }); map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], { padding: p, pitch: 0, bearing: 0, duration: ctx.dur(1800), maxZoom }); };
+  // 3D terrain only close in: at the wide views it adds nothing, and MapLibre leaves part of the screen undrawn with it on
+  let terrainOn = false;
+  const terrain = (on) => { if (on === terrainOn) return; map.stop(); map.setTerrain(on ? { source: 'deep-dem', exaggeration: 1.8 } : null); terrainOn = on; };
+  /** Camera moves wait until the sheet has its new text, so the free strip they centre in is measured right. */
+  const after = (f) => Promise.resolve().then(f);
+  const fly = (center, zoom, pitch = 0, dur = 1800) => terrain(zoom >= 8) || map.flyTo({ center, zoom, pitch, bearing: zoom > 8 ? -12 : 0, padding: pad(), duration: ctx.dur(dur), essential: true });
 
   // ---- the bar: Newer / Older (close-ups) or Back / Next (the story), with a dot per step -------------------------------------
   function setBar(items, i, labels) {
@@ -178,7 +182,11 @@ export function initDeep(ctx) {
     });
     root.addEventListener('click', (e) => { const b = e.target.closest('[data-d]'); if (!b || b.disabled) return; const f = actions[b.dataset.d]; if (f) f(b); });
   }
-  const frame = (html) => { root.innerHTML = html; root.scrollTop = 0; root.classList.toggle('tall', view === 'how'); };   // an explainer gets more room
+  // the sheet stays short so the map shows; a handle on top makes it tall for reading (remembered), and an explainer is always tall
+  const grab = () => `<button class="dp-grab" data-d="grab" aria-label="${root.classList.contains('big') ? 'Make the panel shorter' : 'Make the panel taller'}"><i></i></button>`;
+  const frame = (html) => { root.innerHTML = grab() + html; root.scrollTop = 0; root.classList.toggle('tall', view === 'how'); };
+  /** Long text: the first paragraph, then Read more for the rest. */
+  const paras = (list) => `<p class="dp-p">${esc(list[0])}</p>${list.length > 1 ? `<div class="dp-more" hidden>${list.slice(1).map((x) => `<p class="dp-p">${esc(x)}</p>`).join('')}</div><button class="dp-readmore" data-d="more">Read more</button>` : ''}`;
   const top = (title, backTo, backWord = 'Back') => `<div class="dp-top"><button class="tr-back" data-d="${backTo}">${BACK}${backWord}</button><h1>${esc(title)}</h1></div>`;
   const srcList = (keys) => `<details class="dp-srcs"><summary>Sources</summary><ul class="dp-src">${keys.map((k) => `<li><a href="${esc(SRC[k][1])}" target="_blank" rel="noopener">${esc(SRC[k][0])}</a></li>`).join('')}</ul></details>`;
   const howRow = (key) => (HOW[key] || []).length ? `<h4>How it works</h4><div class="dp-how">${HOW[key].map((k) => `<button data-d="how" data-id="${k}"><svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 8.5l5 3.5-5 3.5z" fill="currentColor"/></svg>${esc(EXPLAIN[k].title)}</button>`).join('')}</div>` : '';
@@ -188,7 +196,7 @@ export function initDeep(ctx) {
   function intro() {
     view = 'intro'; game = null; setBar(null);
     applyScene({ prov: Object.fromEntries(LAND.map((r) => [r.id, 0.5])), labels: ['valleyridge', 'coastal', 'plateau'] });
-    fly([-75.2, 40.2], 6.0, 0, 1600);
+    after(() => fly([-75.2, 40.2], 6.0, 0, 1600));
     const started = store.get('deep.chapter', 0);
     frame(`${top('Deep Jersey', 'home', 'Home')}
       <p class="dp-lead">How the ground under New Jersey was made, and what people made of it.</p>
@@ -207,12 +215,11 @@ export function initDeep(ctx) {
     setBar(STORY, i, ['Back a chapter', 'Next chapter']);
     applyScene(S.scene);
     const bb = S.land && data.provinces.features.find((f) => f.properties.region === S.land).properties.bbox;
-    if (bb) fitBox(bb, 7);   // the whole belt, past the state line
-    else fly([S.cam[0], S.cam[1]], S.cam[2], S.cam[2] > 8 ? 50 : S.cam[2] > 6.8 ? 30 : 0);
+    after(() => (bb ? fitBox(bb, 7) : fly([S.cam[0], S.cam[1]], S.cam[2], S.cam[2] > 8 ? 50 : S.cam[2] > 6.8 ? 30 : 0)));   // the whole belt, past the state line
     const L = S.land && LAND.find((r) => r.id === S.land);
     frame(`${top('The story', 'intro', 'Deep Jersey')}
-      <p class="dp-kick">Chapter ${i + 1} of ${STORY.length} · ${esc(S.when)}</p><h2>${esc(S.title)}</h2>
-      ${S.text.map((p) => `<p class="dp-p">${esc(p)}</p>`).join('')}
+      <p class="dp-kick">Chapter ${i + 1} of ${STORY.length}</p><h2>${esc(S.title)}</h2>
+      ${paras(S.text)}
       ${L ? `<button class="dp-region" data-d="landone" data-id="${L.id}"><i style="background:${L.color}"></i><span><b>${esc(L.name)} today</b><small>${esc(L.nj)}</small></span></button>` : ''}
       ${howRow(S.id)}
       ${S.close.length ? `<h4>See it up close</h4>${chips(S.close)}` : ''}
@@ -224,7 +231,7 @@ export function initDeep(ctx) {
   function land() {
     view = 'land'; landSel = null; game = null; setBar(null);
     applyScene({ prov: Object.fromEntries(LAND.map((r) => [r.id, 0.55])) });
-    fly([-75.6, 40.0], 5.4, 0, 1500);
+    after(() => fly([-75.6, 40.0], 5.4, 0, 1500));
     frame(`${top('The land today', 'intro', 'Deep Jersey')}
       <p class="dp-line">New Jersey has four of the eastern United States’ natural regions, and borders two more. Tap one to see all of it.</p>
       <div class="dp-regions">${LAND.map((r) => `<button class="dp-region" data-d="landone" data-id="${r.id}"><i style="background:${r.color}"></i><span><b>${esc(r.name)}</b><small>${esc(r.nj)}</small></span></button>`).join('')}</div>`);
@@ -234,10 +241,10 @@ export function initDeep(ctx) {
     const from = view; view = 'land'; landSel = id; game = null; setBar(null);
     applyScene({ prov: { [id]: 0.8 }, provFaint: 0.1, labels: [id] });
     const bb = data.provinces.features.find((f) => f.properties.region === id).properties.bbox;
-    fitBox(bb, 7.5);
+    after(() => fitBox(bb, 7.5));
     frame(`${top(R.name, from === 'story' ? 'story' : 'land', from === 'story' ? 'The story' : 'All regions')}
       <p class="dp-kick">In New Jersey: ${esc(R.nj)}</p>
-      ${R.text.map((p) => `<p class="dp-p">${esc(p)}</p>`).join('')}
+      ${paras(R.text)}
       ${howRow(R.id)}
       ${R.close.length ? `<h4>See it up close</h4>${chips(R.close)}` : ''}
       ${srcList(R.src)}`);
@@ -248,7 +255,7 @@ export function initDeep(ctx) {
     era = i; const E = ERAS[i];
     setBar(ERAS, i, ['Newer', 'Older']);
     applyScene(stopScene(E.id));
-    if (flyTo) fly(E.center, E.zoom, E.pitch);
+    if (flyTo) after(() => fly(E.center, E.zoom, E.pitch));
   }
   function stopSheet() {
     view = 'close'; game = null;
@@ -275,11 +282,11 @@ export function initDeep(ctx) {
     game = null; markSeen(id);
     view = 'card';
     const i = ERA_INDEX[c.era]; era = i; setBar(ERAS, i, ['Newer', 'Older']); applyScene(stopScene(c.era));
-    if (c.p) fly(c.p, Math.max(ERAS[i].zoom, 11.2), 55, 1400); else fly(ERAS[i].center, ERAS[i].zoom, ERAS[i].pitch, 1400);
+    after(() => (c.p ? fly(c.p, Math.max(ERAS[i].zoom, 11.2), 55, 1400) : fly(ERAS[i].center, ERAS[i].zoom, ERAS[i].pitch, 1400)));
     const links = CHAIN.filter((x) => x.card === id).map((x) => x.step);
     frame(`${top(from === 'story' ? 'The story' : from === 'land' ? 'The land today' : cor.name, 'back')}
       <p class="dp-kick" style="color:${KIND_COLOR[c.kind]}">${esc(c.when)} · ${esc(cor.name)}</p><h2>${esc(c.title)}</h2>
-      ${c.text.map((p) => `<p class="dp-p">${esc(p)}</p>`).join('')}
+      ${paras(c.text)}
       ${howRow(id)}
       ${c.why ? `<p class="dp-tags">${c.why.map((w) => `<span>${esc(WHY[w])}</span>`).join('')}</p>` : ''}
       ${links.length ? `<button class="tr-card wide" data-d="chain"><b>Part of ${esc(cor.chainName.replace(/^The /, 'the '))}</b><small>${esc(links.join(' and '))}</small></button>` : ''}
@@ -368,6 +375,8 @@ export function initDeep(ctx) {
       if (ctx.mode === 'deep') { root.hidden = false; bar.hidden = barWas; drawPins(shown.pins, shown.labels); }
     },
     intro, land, chain, order, why,
+    more: (b) => { const m = b.previousElementSibling; if (m) m.hidden = false; b.remove(); },
+    grab: () => { const big = !root.classList.contains('big'); root.classList.toggle('big', big); store.set('deep.big', big); const g = root.querySelector('.dp-grab'); if (g) g.setAttribute('aria-label', big ? 'Make the panel shorter' : 'Make the panel taller'); },
     story: () => chapter(store.get('deep.chapter', 0)),
     next: () => chapter(Math.min(STORY.length - 1, chap + 1)),
     landone: (b) => landOne(b.dataset.id),
@@ -385,13 +394,12 @@ export function initDeep(ctx) {
   return {
     async enter() {
       document.body.classList.add('deep-on');
-      await load(); mount(); root.hidden = false;
+      await load(); mount(); root.hidden = false; root.classList.toggle('big', store.get('deep.big', false));
       ctx.clearHighlights && ctx.clearHighlights(); ctx.sheet(''); ctx.hud('');
-      map.setMaxBounds(WIDE);
+      map.setMaxBounds(null);   // no fence while Deep Jersey is open: MapLibre will not zoom out past a fence, and whole ranges need room
       const go = () => {
         if (ctx.mode !== 'deep') return;
         try { addLayers(); } catch (e) { map.once('styledata', go); return; }   // the style is still loading: try again when it is
-        map.setTerrain({ source: 'deep-dem', exaggeration: 1.8 });
         intro();
       };
       go();
@@ -400,7 +408,7 @@ export function initDeep(ctx) {
       for (const t of timers) clearTimeout(t); timers = [];
       document.body.classList.remove('deep-on');
       if (root) root.hidden = true; if (bar) bar.hidden = true;
-      map.stop(); map.setTerrain(null); hideLayers();
+      map.stop(); map.setTerrain(null); terrainOn = false; hideLayers();
       map.setMaxBounds(ctx.region.maxBounds || null); map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
       map.fitBounds(ctx.region.bounds, { padding: 20, pitch: 0, bearing: 0, duration: ctx.dur(600) });
     },

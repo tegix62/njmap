@@ -4,7 +4,7 @@
 const { chromium } = require('playwright'); const fs = require('fs');
 (async () => { const out = process.env.OUT || 'frames/deep'; fs.mkdirSync(out, { recursive: true });
   const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
-  const page = await (await b.newContext({ viewport: { width: 390, height: 800 } })).newPage();
+  const page = await (await b.newContext({ viewport: { width: 390, height: 664 } })).newPage();
   const errs = []; page.on('pageerror', (e) => { errs.push(e.message); console.log('PAGEERR', e.message); });
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to (load resource|fetch)|AJAXError|net::/.test(m.text())) { errs.push(m.text()); console.log('CONSOLE', m.text().slice(0, 200)); } });
   const shot = (n) => page.screenshot({ path: `${out}/${n}.png` });
