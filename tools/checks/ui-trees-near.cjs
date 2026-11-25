@@ -28,7 +28,7 @@ const { chromium } = require('playwright'); const fs = require('fs');
   await page.screenshot({ path: `${out}/5-done.png` }); await page.click('.tr-done [data-t=hub]'); await page.waitForTimeout(300);
   await page.click('[data-t=quick]'); await page.waitForTimeout(800); await page.screenshot({ path: `${out}/6-quick.png` });
   await page.click('.tn-hide'); console.log('hide:', await page.locator('.tn-hide').innerText());
-  for (let i = 0; i < 20; i++) { await page.locator('[data-t=qans]').first().click(); await page.waitForTimeout(1400); if (await page.locator('.tr-done').count()) break; }
+  for (let i = 0; i < 20; i++) { await page.locator('[data-t=qans]').first().click(); await page.waitForTimeout(1400); if (await page.locator('[data-t=qnext]').count()) { await page.click('[data-t=qnext]'); await page.waitForTimeout(300); } if (await page.locator('.tr-done').count()) break; }
   await page.screenshot({ path: `${out}/7-quick-end.png` }); console.log('quick end:', (await page.locator('.tr-done').innerText()).replace(/\n/g, ' | ').slice(0, 200));
   await page.click('.tr-done [data-t=hub]'); await page.waitForTimeout(300);
   await page.click('[data-t=spot]'); await page.click('[data-t=spotmap]'); await page.waitForTimeout(1200);

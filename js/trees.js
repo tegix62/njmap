@@ -375,7 +375,7 @@ export function initTrees(ctx) {
   const WALK_R = 600;   // metres
   function nearby(pt) {
     const out = [], dLat = WALK_R / 111000, dLon = dLat / Math.cos((pt[1] * Math.PI) / 180);
-    for (const [id, a] of Object.entries(PTS)) for (const p of a) {
+    for (const [id, a] of Object.entries(PTS)) if (by.has(id)) for (const p of a) {      // only trees in open waves
       if (Math.abs(p[1] - pt[1]) > dLat || Math.abs(p[0] - pt[0]) > dLon) continue;
       const m = distanceMi(pt, p) * 1609.34; if (m <= WALK_R) out.push({ id, p, m });
     }
