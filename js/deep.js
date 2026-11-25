@@ -27,11 +27,15 @@ const HOW = {
   tripod: ['erratic'], moraine: ['moraine', 'icesheet'], 'lake-passaic': ['glaciallake'], 'great-notch': ['glaciallake'], swamp: ['glaciallake'], watchungs: ['rift', 'ridges'],
   'green-pond': ['fold', 'ridges'], cohansey: ['coastal'], aquifer: ['aquifer'], 'bog-iron': ['bogiron'], batsto: ['bogiron'],
 };          // while Deep Jersey is open the map may pull out past the New Jersey frame
+const HIDE_LABELS = ['region-label', 'county-label', 'section-label', 'section-label-local', 'nature-label', 'landmark-label', 'road-ref-major', 'road-ref', 'road-name', 'reveal-minor', 'reveal-label', 'anchor-label'];   // base labels that crowd the wide views
+// the illustration that plays inside each process chapter
+const STORY_EX = { 's-mountains': 'fold', 's-rift': 'rift', 's-coast': 'coastal', 's-ice': 'icesheet', 's-lake': 'glaciallake', 's-iron': 'bogiron' };
 const BACK = '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 export function initDeep(ctx) {
   const { map, store } = ctx;
   let root = null, bar = null, pinEl = null, data = null, timers = [], game = null;
+  let labelVis = [], exTimer = null;
   let view = 'intro', chap = store.get('deep.chapter', 0), era = 0, ret = null, landSel = null;
   // the close-up on show: its stops, cards and chain
   let cor, ERAS, CARDS, CHAIN, ERA_INDEX;
@@ -196,7 +200,7 @@ export function initDeep(ctx) {
   const after = (f) => Promise.resolve().then(f);
   function fly(center, zoom, pitch = null, dur = 1800, then = null) {
     const e = exagFor(zoom); if (Math.abs(e - exagNow) > 0.01) { map.stop(); setExag(e); }
-    const tok = ++drift, P = pitch ?? (zoom < 7 ? 45 : zoom < 9 ? 52 : 58), bearing = zoom < 7 ? -8 : -16;
+    const tok = ++drift, P = pitch ?? (zoom < 7 ? 28 : zoom < 9 ? 48 : 58), bearing = zoom < 7 ? -8 : -16;
     map.flyTo({ center, zoom, pitch: P, bearing, padding: pad(), duration: ctx.dur(dur), essential: true });
     // wait for this flight to land: a moveend can also come from the move it interrupted, straight away
     const start = Date.now(), onEnd = () => {
@@ -266,7 +270,7 @@ export function initDeep(ctx) {
   }
   // the sheet stays short so the map shows; a handle on top makes it tall for reading (remembered), and an explainer is always tall
   const grab = () => `<button class="dp-grab" data-d="grab" aria-label="${root.classList.contains('big') ? 'Make the panel shorter' : 'Make the panel taller'}"><i></i></button>`;
-  const frame = (html) => { root.innerHTML = grab() + html; root.scrollTop = 0; root.classList.toggle('tall', view === 'how'); };
+  const frame = (html) => { clearInterval(exTimer); exTimer = null; root.innerHTML = grab() + html; root.scrollTop = 0; root.classList.toggle('tall', view === 'how'); root.classList.toggle('ex', html.includes('dp-exlive')); };   // a chapter with a playing illustration opens taller
   /** Long text: the first paragraph, then Read more for the rest. */
   const paras = (list) => `<p class="dp-p">${esc(list[0])}</p>${list.length > 1 ? `<div class="dp-more" hidden>${list.slice(1).map((x) => `<p class="dp-p">${esc(x)}</p>`).join('')}</div><button class="dp-readmore" data-d="more">Read more</button>` : ''}`;
   const top = (title, backTo, backWord = 'Back') => `<div class="dp-top"><button class="tr-back" data-d="${backTo}">${BACK}${backWord}</button><h1>${esc(title)}</h1></div>`;
@@ -295,7 +299,7 @@ export function initDeep(ctx) {
     view = 'story'; game = null; chap = i; store.set('deep.chapter', i);
     const S = STORY[i];
     setBar(STORY, i, ['Back a chapter', 'Next chapter']);
-    applyScene(S.scene);
+    applyScene({ ...S.scene, labels: S.land ? [S.land] : [] });
     const bb = S.land && data.provinces.features.find((f) => f.properties.region === S.land).properties.bbox;
     // each chapter plays: the land rising, the lava flooding, the ice coming and going; otherwise the whole belt, past the state line
     const play = { 's-mountains': () => { setExag(0.01); rise(6); caption('Continents collide: the land is pushed up into mountains (heights ×6)'); timers.push(setTimeout(() => caption(''), ctx.dur(6500) || 1)); },
@@ -306,6 +310,7 @@ export function initDeep(ctx) {
     const L = S.land && LAND.find((r) => r.id === S.land);
     frame(`${top('The story', 'intro', 'Deep Jersey')}
       <p class="dp-kick">Chapter ${i + 1} of ${STORY.length}</p><h2>${esc(S.title)}</h2>
+      ${STORY_EX[S.id] ? liveEx(STORY_EX[S.id]) : ''}
       ${paras(S.text)}
       ${L ? `<button class="dp-region" data-d="landone" data-id="${L.id}"><i style="background:${L.color}"></i><span><b>${esc(L.name)} today</b><small>${esc(L.nj)}</small></span></button>` : ''}
       ${S.id === 's-ice' || S.id === 's-lake' ? '<button class="dp-play" data-d="playice"><b>▶ Play the ice age on the map</b><small>the ice spreads, stops, melts back; the lake fills and drains</small></button>' : ''}
@@ -313,6 +318,7 @@ export function initDeep(ctx) {
       ${S.close.length ? `<h4>See it up close</h4>${chips(S.close)}` : ''}
       ${i < STORY.length - 1 ? `<button class="dp-start" data-d="next"><b>Next: ${esc(STORY[i + 1].title)}</b><small>${esc(STORY[i + 1].when)}</small></button>` : `<button class="dp-start" data-d="intro"><b>The end, for now</b><small>back to Deep Jersey: the land today and the close-ups</small></button>`}
       ${srcList(S.src)}`);
+    if (STORY_EX[S.id]) playLive(STORY_EX[S.id]);
   }
 
   // ---- the land today ------------------------------------------------------------------------------------------------------
@@ -381,6 +387,19 @@ export function initDeep(ctx) {
       ${links.length ? `<button class="tr-card wide" data-d="chain"><b>Part of ${esc(cor.chainName.replace(/^The /, 'the '))}</b><small>${esc(links.join(' and '))}</small></button>` : ''}
       <button class="tr-card wide" data-d="closehere"><b>More from ${esc(cor.name)}</b><small>this stop and the ones around it</small></button>
       ${srcList(c.src)}`);
+  }
+
+  /** The chapter's illustration, playing by itself: each step every few seconds, round again after a pause. Tap it for the full one. */
+  const liveEx = (id) => { const X = EXPLAIN[id]; return `<button class="dp-exlive" data-d="how" data-id="${id}" aria-label="${esc(X.title)}: open step by step"><span class="dp-exhead">${esc(X.title)}</span><span class="dp-exfig">${X.steps[0].draw}</span><span class="dp-excap">${esc(X.steps[0].text)}</span><span class="dp-exdots">${X.steps.map((_, k) => `<i${k ? '' : ' class="on"'}></i>`).join('')}</span></button>`; };
+  function playLive(id) {
+    const X = EXPLAIN[id]; let k = 0;
+    clearInterval(exTimer);
+    exTimer = setInterval(() => {
+      const el = root.querySelector('.dp-exlive'); if (!el || ctx.mode !== 'deep') { clearInterval(exTimer); return; }
+      k = (k + 1) % (X.steps.length + 1); if (k === X.steps.length) return;     // a beat of rest before it starts again
+      el.querySelector('.dp-exfig').innerHTML = X.steps[k].draw; el.querySelector('.dp-excap').textContent = X.steps[k].text;
+      el.querySelectorAll('.dp-exdots i').forEach((d, j) => d.classList.toggle('on', j === k));
+    }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 7000 : 5200);
   }
 
   /** An explainer: a slice through the ground, step by step. Back returns to wherever it was opened from. */
@@ -486,6 +505,8 @@ export function initDeep(ctx) {
       document.body.classList.add('deep-on');
       await load(); mount(); root.hidden = false; root.classList.toggle('big', store.get('deep.big', false));
       ctx.clearHighlights && ctx.clearHighlights(); ctx.sheet(''); ctx.hud('');
+      labelVis = HIDE_LABELS.filter((id) => map.getLayer(id)).map((id) => [id, map.getLayoutProperty(id, 'visibility') || 'visible']);
+      for (const [id] of labelVis) map.setLayoutProperty(id, 'visibility', 'none');
       map.setMaxBounds(null);   // no fence while Deep Jersey is open: MapLibre will not zoom out past a fence, and whole ranges need room
       const go = () => {
         if (ctx.mode !== 'deep') return;
@@ -499,6 +520,7 @@ export function initDeep(ctx) {
       document.body.classList.remove('deep-on');
       if (root) root.hidden = true; if (bar) bar.hidden = true;
       map.stop(); map.setTerrain(null); exagNow = 0; if (exagEl) exagEl.hidden = true; drift++; hideLayers();
+      for (const [id, v] of labelVis) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', v); labelVis = [];
       map.setMaxBounds(ctx.region.maxBounds || null); map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
       map.fitBounds(ctx.region.bounds, { padding: 20, pitch: 0, bearing: 0, duration: ctx.dur(600) });
     },
