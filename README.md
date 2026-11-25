@@ -781,7 +781,7 @@ How New Jersey got here, told on the map. From the home page, **Deep Jersey**. T
 the Miocene sand: bog iron and glass, Brotherton, Wharton's water, the blueberry, ghost towns, the 1978–79 protection, the Jersey Devil
 marked as legend).
 
-- **The time slider** at the top runs from today back past a billion years, in ten stops: what is left today, the canal years, the
+- **The time bar** at the top (arrows to step newer or older, or tap a dot to jump) runs from today back past a billion years, in ten stops: what is left today, the canal years, the
   forges, Lenapehoking, the lake dropping, glacial Lake Passaic, the ice sheet, Pangaea tearing apart, old seas and mountains, and the
   Highlands rock. Each stop changes the map: rock eras, the three Watchung lava flows flooding in one after another, the ice sheet and its
   edge, the lake at its two highest stages, the canal stretches that survive. The camera pulls out as time goes back (town, region,

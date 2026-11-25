@@ -22,7 +22,6 @@ export function initDeep(ctx) {
   function setCorridor(id) {
     cor = CORRIDORS.find((c) => c.id === id) || CORRIDORS[0]; store.set('deep.corridor', cor.id);
     ({ eras: ERAS, cards: CARDS, chain: CHAIN } = cor); ERA_INDEX = Object.fromEntries(ERAS.map((e, i) => [e.id, i]));
-    if (bar) { const inp = bar.querySelector('input'); inp.max = ERAS.length - 1; bar.querySelector('.dp-ends span:last-child').textContent = cor.end; }
   }
   setCorridor(store.get('deep.corridor', 'boonton'));
   const seen = () => store.get('deep.seen', []);
@@ -104,7 +103,11 @@ export function initDeep(ctx) {
     op('deep-sand', 'fill-opacity', id === 'p-sand' ? ['match', ['get', 'unit'], 'cohansey', 0.75, 0.45] : id.startsWith('p-') ? ['match', ['get', 'unit'], 'cohansey', 0.22, 0] : 0);
     drawPins();
     if (fly) map.flyTo({ center: E.center, zoom: E.zoom, pitch: E.pitch, bearing: -12, padding: pad(), duration: ctx.dur(1800), essential: true });
-    if (bar) { bar.querySelector('input').value = i; bar.querySelector('.dp-when').textContent = E.when; bar.querySelector('.dp-title').textContent = E.title; }
+    if (bar) {
+      bar.querySelector('.dp-when').textContent = E.when; bar.querySelector('.dp-title').textContent = E.title;
+      bar.querySelector('[data-b=newer]').disabled = i === 0; bar.querySelector('[data-b=older]').disabled = i === ERAS.length - 1;
+      bar.querySelector('.dp-dots').innerHTML = ERAS.map((e, k) => `<button data-b="go" data-i="${k}" aria-label="${esc(e.when)}: ${esc(e.title)}"${k === i ? ' class="on" aria-current="step"' : ''}></button>`).join('');
+    }
   }
 
   // ---- panel ----------------------------------------------------------------------------------------------------------------
@@ -112,12 +115,16 @@ export function initDeep(ctx) {
     if (root) return;
     root = document.createElement('div'); root.id = 'deep'; document.body.appendChild(root);
     bar = document.createElement('div'); bar.id = 'deepbar';
-    bar.innerHTML = `<div class="dp-head"><span class="dp-when"></span><b class="dp-title"></b></div>
-      <input type="range" min="0" max="${ERAS.length - 1}" step="1" value="0" aria-label="Time: drag right to go back in time">
-      <div class="dp-ends"><span>Today</span><span>${esc(cor.end)}</span></div>`;
+    // arrows, not a slider (a slider is hard to drag on a phone): newer on the left, older on the right, and a dot per stop to jump to
+    bar.innerHTML = `<button class="dp-arrow" data-b="newer" aria-label="Newer"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div class="dp-head"><span class="dp-when"></span><b class="dp-title"></b><div class="dp-dots"></div></div>
+      <button class="dp-arrow" data-b="older" aria-label="Older"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
     document.body.appendChild(bar);
-    const inp = bar.querySelector('input');
-    inp.addEventListener('input', () => { const i = +inp.value; if (i !== era) { showEra(i); if (!game) eraSheet(); } });
+    const go = (i) => { i = Math.max(0, Math.min(ERAS.length - 1, i)); if (i !== era) { showEra(i); if (!game) eraSheet(); } };
+    bar.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-b]'); if (!b || b.disabled) return;
+      if (b.dataset.b === 'newer') go(era - 1); else if (b.dataset.b === 'older') go(era + 1); else go(+b.dataset.i);
+    });
     root.addEventListener('click', (e) => { const b = e.target.closest('[data-d]'); if (!b || b.disabled) return; const f = actions[b.dataset.d]; if (f) f(b); });
   }
   const frame = (html) => { root.innerHTML = html; root.scrollTop = 0; };
@@ -131,7 +138,6 @@ export function initDeep(ctx) {
       <div class="dp-cors">${CORRIDORS.map((c) => `<button data-d="cor" data-id="${c.id}"${c.id === cor.id ? ' class="on" aria-pressed="true"' : ''}>${esc(c.name)}</button>`).join('')}</div>
       <p class="dp-kick">${esc(E.when)} · stop ${era + 1} of ${ERAS.length}</p><h2>${esc(E.title)}</h2><p class="dp-line">${esc(E.line)}</p>
       <div class="dp-cards">${cards.map((c) => `<button class="dp-card${s.includes(c.id) ? ' seen' : ''}" data-d="card" data-id="${c.id}"><i style="background:${KIND_COLOR[c.kind]}"></i><span><b>${esc(c.title)}</b><small>${esc(c.when)}</small></span></button>`).join('')}</div>
-      <div class="dp-nav"><button data-d="newer"${era === 0 ? ' disabled' : ''}>← Newer</button><button data-d="older"${era === ERAS.length - 1 ? ' disabled' : ''}>Older →</button></div>
       <h4>Follow a thread</h4>
       <button class="tr-card wide" data-d="chain"><b>${esc(cor.chainName)}</b><small>rock → resource → industry → town → decline → what is left</small></button>
       <div class="tr-row"><button class="tr-card" data-d="order"><b>Put it in order</b><small>oldest first${store.get('deep.orderbest', 0) ? ` · best ${store.get('deep.orderbest', 0)}` : ''}</small></button>

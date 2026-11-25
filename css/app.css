@@ -4143,3 +4143,14 @@ body.deep-on #tabs, body.deep-on #fabs, body.deep-on #lookFab, body.deep-on #she
 .dp-cors { display: flex; gap: 6px; margin: 2px 0 6px; overflow-x: auto; }
 .dp-cors button { flex: none; border: 1.5px solid #d9ccb2; border-radius: 999px; padding: 6px 12px; background: #fff; color: inherit; font: 600 13px system-ui, sans-serif; cursor: pointer; }
 .dp-cors button.on { background: #8a5a2b; border-color: #8a5a2b; color: #fff; }
+/* Deep Jersey time bar: arrows and dots in place of the slider */
+#deepbar { display: flex; align-items: center; gap: 8px; padding: 8px; }
+#deepbar .dp-head { flex: 1; min-width: 0; align-items: center; text-align: center; }
+#deepbar .dp-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.dp-arrow { flex: none; display: grid; place-items: center; width: 52px; height: 52px; border: 0; border-radius: 16px; background: #8a5a2b; color: #fff; cursor: pointer; }
+.dp-arrow:disabled { background: #e3dccd; color: #a99f8c; cursor: default; }
+.dp-arrow:active:not(:disabled) { transform: scale(0.94); }
+.dp-dots { display: flex; justify-content: center; gap: 2px; margin-top: 4px; }
+.dp-dots button { width: 18px; height: 18px; border: 0; padding: 0; background: none; cursor: pointer; position: relative; }
+.dp-dots button::after { content: ''; position: absolute; inset: 6px; border-radius: 50%; background: #cfc3ab; }
+.dp-dots button.on::after { inset: 4px; background: #8a5a2b; }

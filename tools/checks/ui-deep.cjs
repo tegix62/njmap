@@ -9,16 +9,18 @@ const { chromium } = require('playwright'); const fs = require('fs');
   await page.goto('http://localhost:8077/index.html?debug=1&region=nj'); await page.waitForSelector('#welcome [data-entry=deep]');
   await page.click('[data-entry=deep]'); await page.waitForSelector('#deep .dp-cards'); await page.waitForTimeout(3500);
   await page.screenshot({ path: `${out}/0-today.png` });
-  const n = await page.locator('#deepbar input').evaluate((e) => +e.max);
+  const n = (await page.locator('#deepbar .dp-dots button').count()) - 1;
   for (let i = 1; i <= n; i++) {
-    await page.locator('#deepbar input').evaluate((e, v) => { e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); }, i);
+    await page.click('#deepbar [data-b=older]');
     await page.waitForTimeout(i === 7 ? 4200 : 2600);
     const t = await page.locator('#deepbar .dp-title').innerText(), cards = await page.locator('#deep .dp-card').count();
     console.log(`stop ${i}: ${t} · ${cards} cards · zoom ${(await page.evaluate(() => window.__map ? window.__map.getZoom() : null)) ?? '?'}`);
     await page.screenshot({ path: `${out}/${i}-${t.replace(/\W+/g, '-').toLowerCase()}.png` });
   }
+  console.log('older arrow disabled at the end:', await page.locator('#deepbar [data-b=older]').isDisabled());
+  await page.click('#deepbar [data-b=newer]'); await page.waitForTimeout(600); console.log('newer arrow ->', await page.locator('#deepbar .dp-title').innerText());
   // back to the lake, open its card
-  await page.locator('#deepbar input').evaluate((e) => { e.value = 5; e.dispatchEvent(new Event('input', { bubbles: true })); }); await page.waitForTimeout(1500);
+  await page.locator('#deepbar .dp-dots button').nth(5).click(); await page.waitForTimeout(1500);
   await page.click('#deep .dp-card'); await page.waitForTimeout(2200);
   console.log('card:', (await page.locator('#deep h2').innerText()), '| sources', await page.locator('#deep .dp-src li').count());
   await page.screenshot({ path: `${out}/card.png` });
@@ -36,15 +38,15 @@ const { chromium } = require('playwright'); const fs = require('fs');
   console.log('why:', (await page.locator('#deep .tr-res b').innerText())); await page.screenshot({ path: `${out}/why.png` });
   // the second corridor: the Pine Barrens
   await page.click('#deep [data-d=era]'); await page.click('#deep [data-d=cor][data-id=pine]'); await page.waitForTimeout(2600);
-  const pn = await page.locator('#deepbar input').evaluate((e) => +e.max);
-  console.log('pine stops:', pn + 1, '| end label:', await page.locator('#deepbar .dp-ends span').last().innerText());
+  const pn = (await page.locator('#deepbar .dp-dots button').count()) - 1;
+  console.log('pine stops:', pn + 1);
   for (let i = 0; i <= pn; i++) {
-    await page.locator('#deepbar input').evaluate((e, v) => { e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); }, i); await page.waitForTimeout(2400);
+    await page.locator('#deepbar .dp-dots button').nth(i).click(); await page.waitForTimeout(2400);
     const t = await page.locator('#deepbar .dp-title').innerText();
     console.log(`pine ${i}: ${t} · ${await page.locator('#deep .dp-card').count()} cards · ${await page.locator('#deeppins button').count()} pins`);
     await page.screenshot({ path: `${out}/pine-${i}-${t.replace(/\W+/g, '-').toLowerCase()}.png` });
   }
-  await page.locator('#deepbar input').evaluate((e) => { e.value = 2; e.dispatchEvent(new Event('input', { bubbles: true })); }); await page.waitForTimeout(1200);
+  await page.locator('#deepbar .dp-dots button').nth(2).click(); await page.waitForTimeout(1200);
   await page.locator('#deep .dp-card', { hasText: 'Batsto' }).click(); await page.waitForTimeout(1800);
   console.log('pine card:', await page.locator('#deep h2').innerText()); await page.screenshot({ path: `${out}/pine-card.png` });
   await page.click('#deep [data-d=era]'); await page.click('#deep [data-d=chain]'); console.log('pine chain:', await page.locator('#deep .dp-top h1').innerText(), await page.locator('.dp-chain li').count());
