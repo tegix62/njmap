@@ -37,7 +37,7 @@ function flatSeaDem() {
   });
   demProto = true; return 'deepdem://';
 }
-const LAYERS = ['deep-relief', 'deep-hs', 'deep-iceanim', 'deep-rivers', 'deep-prov', 'deep-prov-line', 'deep-rocks', 'deep-sand', 'deep-flows', 'deep-lake', 'deep-ice-sheet', 'deep-icelines', 'deep-ice-older', 'deep-ice-limit', 'deep-canal'];
+const LAYERS = ['deep-relief', 'deep-hs', 'deep-iceanim', 'deep-rivers', 'deep-prov', 'deep-prov-line', 'deep-rocks', 'deep-sand', 'deep-flows', 'deep-lake', 'deep-ice-sheet', 'deep-icelines', 'deep-ice-older', 'deep-ice-limit', 'deep-canal', 'deep-drain-glow', 'deep-drain'];
 // "How it works" explainers for each chapter, region, close-up stop and card that leans on an idea
 const HOW = {
   's-mountains': ['fold', 'ridges'], 's-rift': ['lava', 'rift', 'ridges'], 's-coast': ['coastal', 'aquifer'], 's-ice': ['icesheet', 'moraine'], 's-lake': ['glaciallake', 'erratic'], 's-iron': ['bogiron'],
@@ -69,7 +69,7 @@ export function initDeep(ctx) {
 
   async function load() {
     if (data) return;
-    const names = ['rocks', 'flows', 'ice', 'lakes', 'canal', 'sand', 'provinces', 'icelines', 'iceanim'];
+    const names = ['rocks', 'flows', 'ice', 'lakes', 'canal', 'sand', 'provinces', 'icelines', 'iceanim', 'drain'];
     const got = await Promise.all(names.map((f) => fetch(`data/deep/${f}.json`).then((r) => r.json())));
     data = Object.fromEntries(names.map((n, i) => [n, got[i]]));
   }
@@ -111,6 +111,9 @@ export function initDeep(ctx) {
     map.addLayer({ id: 'deep-icelines', type: 'line', source: 'deep-icelines', paint: { 'line-color': '#4f86b5', 'line-width': 1.3, 'line-opacity': 0, 'line-opacity-transition': T } });
     map.addLayer({ id: 'deep-ice-older', type: 'line', source: 'deep-ice', filter: ['==', ['get', 'kind'], 'older'], paint: { 'line-color': '#7aa6c8', 'line-width': 1.2, 'line-dasharray': [2, 2], 'line-opacity': 0, 'line-opacity-transition': T } });
     map.addLayer({ id: 'deep-ice-limit', type: 'line', source: 'deep-ice', filter: ['==', ['get', 'kind'], 'limit'], paint: { 'line-color': '#2b6aa3', 'line-width': 3, 'line-opacity': 0, 'line-opacity-transition': T } });
+    map.addSource('deep-drain', { type: 'geojson', data: data.drain });
+    map.addLayer({ id: 'deep-drain-glow', type: 'line', source: 'deep-drain', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#7fc1f0', 'line-width': 12, 'line-blur': 4, 'line-opacity': 0, 'line-opacity-transition': T } });
+    map.addLayer({ id: 'deep-drain', type: 'line', source: 'deep-drain', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#1f5fa0', 'line-width': 4.5, 'line-dasharray': [0, 4, 3], 'line-opacity': 0, 'line-opacity-transition': T } });
     map.addLayer({ id: 'deep-canal', type: 'line', source: 'deep-canal', paint: { 'line-color': '#1f7a68', 'line-width': 3, 'line-opacity': 0, 'line-opacity-transition': T } });
   }
   function hideLayers() { if (pinEl) pinEl.hidden = true; for (const id of LAYERS) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none'); }
@@ -134,7 +137,7 @@ export function initDeep(ctx) {
     op('deep-icelines', 'line-opacity', sc.iceLines ?? 0);
     op('deep-ice-older', 'line-opacity', sc.iceOlder ?? 0);
     if (sc.lake) { map.setFilter('deep-lake', ['==', ['get', 'stage'], sc.lake]); map.setPaintProperty('deep-lake', 'fill-opacity-transition', { duration: ctx.dur(2600), delay: ctx.dur(900) }); op('deep-lake', 'fill-opacity', 0.75); } else { map.setPaintProperty('deep-lake', 'fill-opacity-transition', { duration: ctx.dur(600), delay: 0 }); op('deep-lake', 'fill-opacity', 0); }
-    op('deep-canal', 'line-opacity', sc.canal ?? 0);
+    op('deep-canal', 'line-opacity', sc.canal ?? 0); op('deep-drain', 'line-opacity', 0); op('deep-drain-glow', 'line-opacity', 0);
     drawPins(sc.pins || [], sc.labels || Object.keys(prov).filter((k) => prov[k] >= 0.3));
   }
   // ---- the ice age, played on the map -----------------------------------------------------------------------------------------
@@ -167,6 +170,21 @@ export function initDeep(ctx) {
   }
 
   /** A close-up stop's scene. */
+  /** Lake Passaic drains, in three stages (USGS I-2540-C; Wikipedia: Lake Passaic, Moggy Hollow Natural Area). The flow lines are
+   * schematic: the way the water went, not surveyed channels. Every timer goes in `timers`, so leaving the beat stops it. */
+  function drainLake() {
+    const DASH = [[0, 4, 3], [0.5, 4, 2.5], [1, 4, 2], [1.5, 4, 1.5], [2, 4, 1], [2.5, 4, 0.5], [3, 4, 0], [0, 0.5, 3, 3.5], [0, 1, 3, 3], [0, 1.5, 3, 2.5], [0, 2, 3, 2], [0, 2.5, 3, 1.5], [0, 3, 3, 1], [0, 3.5, 3, 0.5]];
+    let k = 0; const flow = () => { if (!map.getLayer('deep-drain')) return; map.setPaintProperty('deep-drain', 'line-dasharray', DASH[k = (k + 1) % DASH.length]); timers.push(setTimeout(flow, 90)); };
+    const stage = (name) => { map.setFilter('deep-drain', ['==', ['get', 'stage'], name]); map.setFilter('deep-drain-glow', ['==', ['get', 'stage'], name]); op('deep-drain', 'line-opacity', 0.95); op('deep-drain-glow', 'line-opacity', 0.55); };
+    const lakeTo = (st) => { op('deep-lake', 'fill-opacity', 0); timers.push(setTimeout(() => { if (st) { map.setFilter('deep-lake', ['==', ['get', 'stage'], st]); op('deep-lake', 'fill-opacity', 0.75); } }, ctx.dur(700) || 1)); };
+    const at = (ms, f) => timers.push(setTimeout(f, ctx.dur(ms) || 1));
+    const look = (c, z) => { drift++; map.easeTo({ center: c, zoom: z, duration: ctx.dur(2200) }); };   // each stage frames its outlet
+    stage('moggy'); flow(); look([-74.53, 40.7], 9.4);
+    caption('The lake spills out at Moggy Hollow, its lowest gap, south-west to the Raritan');
+    at(5500, () => { lakeTo('notch'); stage('notch'); look([-74.3, 40.83], 9.6); caption('The ice melts back and opens Great Notch, 34 ft lower: the lake drops and spills east, carving the Third River valley'); });
+    at(11500, () => { lakeTo(null); stage('passaic'); look([-74.32, 40.82], 9.2); caption('The ice is gone: the Passaic, blocked from its old shortcut by the moraine, takes the long way round and over the Great Falls'); });
+    at(19000, () => caption(''));
+  }
   function stopScene(id) {
     const rocks = { highlands: ['match', ['get', 'era'], 'grenville', 0.75, 0.12], paleo: ['match', ['get', 'era'], 'paleozoic', 0.75, 'grenville', 0.3, 0.1],
       rift: ['match', ['get', 'era'], 'newark', 0.6, 'diabase', 0.7, 'grenville', 0.25, 'paleozoic', 0.25, 0], ice: 0.18, moggy: 0.14, notch: 0.14 }[id] ?? 0;
@@ -356,7 +374,7 @@ export function initDeep(ctx) {
     lava: () => lavaFloods(),
     ice: () => playIce(),
     sand: () => { op('deep-sand', 'fill-opacity', 0); timers.push(setTimeout(() => { map.setPaintProperty('deep-sand', 'fill-opacity-transition', { duration: ctx.dur(3000), delay: 0 }); op('deep-sand', 'fill-opacity', ['match', ['get', 'unit'], 'cohansey', 0.8, 0.45]); caption('Layer on layer of sand and clay along the coast; the yellow is the Cohansey sand'); }, ctx.dur(300) || 1)); timers.push(setTimeout(() => caption(''), ctx.dur(6000) || 1)); },
-    drain: () => {},
+    drain: () => drainLake(),
   };
   const howList = (S) => (S.explain || []).length || S.photos ? `<h4>How it works</h4>${S.photos === 'lava' ? `<button class="dp-photos" data-d="photos"><span class="dp-photostrip">${LAVA_PHOTOS.list.slice(0, 3).map((x) => `<img src="${x.img}" alt="" loading="lazy">`).join('')}</span><span><b>See the real thing</b><small>lava erupting today, and the rock it left in New Jersey</small></span></button>` : ''}<div class="dp-how">${(S.explain || []).map((k) => `<button data-d="how" data-id="${k}"><svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 8.5l5 3.5-5 3.5z" fill="currentColor"/></svg>${esc(EXPLAIN[k].title)}</button>`).join('')}</div>` : '';
   function story(id, b = 0) {

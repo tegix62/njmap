@@ -299,6 +299,32 @@ def canal():
     dump('canal.json', [{'type': 'Feature', 'properties': {'name': 'Morris Canal (surviving stretches)', 'source': 'OpenStreetMap'}, 'geometry': mapping(rnd(g, 5))}])
 
 
+
+# ---- the lake drains: three flow lines, hand-placed (schematic, not surveyed channels) -----------------------------------------
+DRAIN = {
+    # Moggy Hollow, Far Hills (Wikipedia: Moggy Hollow Natural Area, 40.67351 N 74.61406 W): the lake's outlet at its western edge,
+    # draining to the Raritan River (same article; USGS I-2540-C gives the spillway 103 m).
+    'moggy': [(-74.585, 40.676), (-74.614, 40.6735), (-74.624, 40.648), (-74.638, 40.615), (-74.655, 40.585)],
+    # Great Notch, in First Watchung Mountain at Clifton: its drainage carved the spillway that became the valley of the Third
+    # River (Wikipedia: Lake Passaic, Great Notch Stage), which runs south through Clifton, Nutley and Bloomfield.
+    'notch': [(-74.245, 40.876), (-74.212, 40.889), (-74.196, 40.862), (-74.188, 40.832), (-74.183, 40.801)],
+    # The Passaic today: from the old lake floor north between the ridges, past Two Bridges, east through the Little Falls gap and
+    # over the Great Falls at Paterson (Wikipedia: Lake Passaic, Postglacial stages; Great Falls (Passaic River)).
+    'passaic': [(-74.46, 40.715), (-74.42, 40.735), (-74.37, 40.79), (-74.33, 40.85), (-74.27, 40.893), (-74.235, 40.884),
+                (-74.217, 40.876), (-74.198, 40.902), (-74.181, 40.9157)],
+}
+
+
+def drain():
+    feats = [{'type': 'Feature', 'properties': {'stage': k}, 'geometry': {'type': 'LineString', 'coordinates': [list(p) for p in pts]}}
+             for k, pts in DRAIN.items()]
+    dump('drain.json', feats)
+    stages = sorted(f['properties']['stage'] for f in feats)
+    assert stages == ['moggy', 'notch', 'passaic'], stages
+    assert all(-75.0 <= x <= -74.0 and 40.4 <= y <= 41.1 for f in feats for x, y in f['geometry']['coordinates'])
+    print('drain ok')
+
+
 if __name__ == '__main__':
     import urllib.parse
     what = sys.argv[1:] or ['rocks', 'ice', 'lakes', 'canal', 'sand', 'provinces', 'icelines', 'iceanim']
@@ -311,3 +337,4 @@ if __name__ == '__main__':
     if 'provinces' in what: provinces()
     if 'icelines' in what: ice_region()
     if 'iceanim' in what: ice_anim()
+    if 'drain' in what: drain()

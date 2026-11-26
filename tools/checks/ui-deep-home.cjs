@@ -28,12 +28,33 @@ const { chromium } = require('playwright'); const fs = require('fs');
   console.log('tapped the Watchungs point:', await page.locator('#deep .dp-maphook').innerText().catch(() => 'nothing')); await shot('map-pick');
   await page.click('#deep .dp-maphook [data-d=story]'); await page.waitForTimeout(2000);
   console.log('opened from the map:', await page.locator('#deepbar .dp-title').innerText(), '| story layer hidden:', await page.evaluate(() => window.njtf.map.getLayoutProperty('deep-stories', 'visibility')));
+  // Lake Passaic drains: the water leaves through Moggy Hollow, then Great Notch, then the Passaic finds the Great Falls
+  await page.evaluate(() => { const x = document.createElement('button'); x.dataset.d = 'story'; x.dataset.id = 's-lake'; document.getElementById('deep').appendChild(x); x.click(); }); await page.waitForTimeout(2000);
+  if (await page.locator('#deepex').isVisible()) await page.click('#deepex');
+  await page.click('#deepbar [data-b=next]');
+  const caps = []; let drainSeen = false;
+  for (let k = 0; k < 24; k++) { await page.waitForTimeout(1000);
+    const c = await page.evaluate(() => { const e = document.getElementById('deepcap'); return e && !e.hidden ? e.textContent : ''; });
+    if (c && !caps.includes(c)) { caps.push(c); await page.screenshot({ path: `${out}/drain-${caps.length}.png` }); }
+    if (await page.evaluate(() => window.njtf.map.getLayer('deep-drain') && window.njtf.map.getLayoutProperty('deep-drain', 'visibility') !== 'none' && window.njtf.map.getPaintProperty('deep-drain', 'line-opacity') > 0)) drainSeen = true;
+    if (caps.length >= 2 && caps[caps.length - 1].includes('Great Notch')) break; }
+  console.log('drain captions:', caps.map((c) => c.slice(0, 40)).join(' | '), '| flow line shown:', drainSeen);
+  await page.click('#deep [data-d=intro]'); await page.waitForTimeout(800);
+  console.log('caption after leaving mid-drain:', await page.evaluate(() => { const e = document.getElementById('deepcap'); return !!e && !e.hidden; }), '| flow line after leaving:', await page.evaluate(() => window.njtf.map.getPaintProperty('deep-drain', 'line-opacity')));
+  // and it plays to the end: all three stages
+  await page.evaluate(() => { const x = document.createElement('button'); x.dataset.d = 'story'; x.dataset.id = 's-lake'; document.getElementById('deep').appendChild(x); x.click(); }); await page.waitForTimeout(2000);
+  if (await page.locator('#deepex').isVisible()) await page.click('#deepex');
+  await page.evaluate(() => { window.__caps = []; const e = document.getElementById('deepcap'); new MutationObserver(() => { if (!e.hidden && e.textContent && !window.__caps.includes(e.textContent)) window.__caps.push(e.textContent); }).observe(e, { childList: true, characterData: true, subtree: true, attributes: true }); });
+  await page.click('#deepbar [data-b=next]'); let all = [];
+  for (let k = 0; k < 60; k++) { await page.waitForTimeout(1000); const now = await page.evaluate(() => window.__caps); if (now.length > all.length) await page.screenshot({ path: `${out}/drainfull-${now.length}.png` }); all = now; if (all.some((x) => x.includes('Great Falls'))) break; }
+  console.log('drain stages seen:', all.length, '| last:', (all[all.length - 1] || '').slice(0, 60));
   // blocked storage: still opens
+  await page.close();   // the first page keeps rendering; free the CPU for this one
   const p2 = await (await b.newContext({ viewport: { width: 390, height: 664 } })).newPage();
   await p2.addInitScript(() => { const g = Storage.prototype.getItem; Storage.prototype.getItem = function (k) { if (String(k).startsWith('njtf.deep')) throw new Error('blocked'); return g.call(this, k); }; Storage.prototype.setItem = function () { throw new Error('blocked'); }; });
   p2.on('pageerror', (e) => { errs.push(e.message); console.log('PAGEERR2', e.message); });
   await p2.goto('http://localhost:8077/index.html?debug=1&region=nj'); await p2.waitForSelector('#welcome [data-entry=deep]', { timeout: 20000 }).catch(() => {});
   const ok2 = await p2.locator('#welcome [data-entry=deep]').count();
-  if (ok2) { await p2.waitForTimeout(3000); await p2.click('[data-entry=deep]'); await p2.waitForSelector('#deep .dp-hook', { timeout: 20000 }).catch(() => {}); }
+  if (ok2) { await p2.waitForTimeout(3000); await p2.click('[data-entry=deep]'); await p2.waitForSelector('#deep .dp-hook', { timeout: 45000 }).catch(() => {}); }
   console.log('storage blocked, hooks:', ok2 ? await p2.locator('#deep .dp-hook').count() : 'app did not start');
   console.log('errors', errs.length); await b.close(); })();
