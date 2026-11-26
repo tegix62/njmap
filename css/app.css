@@ -4259,3 +4259,11 @@ body.deep-on #edges { display: none !important; }   /* the shading outside New J
 .dp-next button b { display: block; font-size: 15px; } .dp-next button small { display: block; color: #6b6355; font-size: 13px; margin-top: 2px; }
 .dp-next button::before { content: ''; position: absolute; left: 12px; top: 17px; width: 9px; height: 9px; border-radius: 50%; background: #d8ccb4; }
 .dp-next button.new::before { background: #c8462c; }
+/* Deep Jersey: home hooks and the map index */
+.dp-hooks { display: grid; gap: 8px; margin: 4px 0 12px; }
+.dp-hook { display: flex; gap: 10px; align-items: flex-start; width: 100%; border: 0; border-radius: 14px; padding: 11px 12px; text-align: left; background: #fff; color: inherit; font: inherit; cursor: pointer; box-shadow: 0 1px 3px rgba(30, 25, 15, 0.14); }
+.dp-hook > i { flex: none; width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; }
+.dp-hook b { display: block; font-size: 15px; line-height: 1.35; font-weight: 650; } .dp-hook small { display: block; margin-top: 3px; color: #7a705f; font-size: 12.5px; }
+.dp-hook.read { opacity: 0.6; } .dp-hook.dp-up { background: #fff8ec; }
+.dp-maphook { min-height: 40px; }
+.dp-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 6px 0; font-size: 12.5px; color: #6b6355; } .dp-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }

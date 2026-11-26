@@ -8,8 +8,8 @@
 //                 from rock to ruin, and two light games).
 // Data: data/deep/*.json (tools/build_deep.py: USGS and OpenStreetMap); the words in js/deepcards.js, each card with its sources.
 import { CORRIDORS, CARD, SRC, WHY, LAND } from './deepcards.js';
-import { STORY_BY, SEQUENCE } from './deepstories.js';
-import { DOMAINS, readIds, markRead } from './deepthreads.js';
+import { STORIES, STORY_BY, SEQUENCE } from './deepstories.js';
+import { DOMAINS, readIds, markRead, hooks, pickUp } from './deepthreads.js';
 import { juice } from './juice.js';
 import { EXPLAIN, EX_SRC, LAVA_PHOTOS } from './deepexplain.js';
 
@@ -292,7 +292,7 @@ export function initDeep(ctx) {
   }
   // the sheet stays short so the map shows; a handle on top makes it tall for reading (remembered), and an explainer is always tall
   const grab = () => `<button class="dp-grab" data-d="grab" aria-label="${root.classList.contains('big') ? 'Make the panel shorter' : 'Make the panel taller'}"><i></i></button>`;
-  const frame = (html) => { clearInterval(exTimer); exTimer = null; root.innerHTML = grab() + html; root.scrollTop = 0; root.classList.toggle('tall', view === 'how' || view === 'photos'); if (view !== 'how' && view !== 'photos') backs = []; hideEx(); };
+  const frame = (html) => { clearInterval(exTimer); exTimer = null; root.innerHTML = grab() + html; root.scrollTop = 0; root.classList.toggle('tall', view === 'how' || view === 'photos'); if (view !== 'how' && view !== 'photos') backs = []; if (view !== 'mapidx' && map.getLayer('deep-stories')) map.setLayoutProperty('deep-stories', 'visibility', 'none'); hideEx(); };
   /** Long text: the first paragraph, then Read more for the rest. */
   const paras = (list) => `<p class="dp-p">${esc(list[0])}</p>${list.length > 1 ? `<div class="dp-more" hidden>${list.slice(1).map((x) => `<p class="dp-p">${esc(x)}</p>`).join('')}</div><button class="dp-readmore" data-d="more">Read more</button>` : ''}`;
   const top = (title, backTo, backWord = 'Back') => `<div class="dp-top"><button class="tr-back" data-d="${backTo}">${BACK}${backWord}</button><h1>${esc(title)}</h1></div>`;
@@ -301,22 +301,54 @@ export function initDeep(ctx) {
   const chips = (ids) => ids.length ? `<div class="dp-chips">${ids.map((id) => { const c = CARD[id]; return `<button data-d="card" data-id="${id}"><i style="background:${KIND_COLOR[c.kind]}"></i>${esc(c.title)}</button>`; }).join('')}</div>` : '';
 
   // ---- the way in ----------------------------------------------------------------------------------------------------------
+  const hookCard = (id, cls = 'dp-hook') => { const S = STORY_BY[id], D = DOMAINS[S.domain]; return `<button class="${cls}" data-d="story" data-id="${id}"><i style="background:${D.color}"></i><span><b>${esc(S.hook)}</b><small>${esc(S.title)} · ${esc(D.name)}${S.gone ? ' · gone' : ''}</small></span></button>`; };
   function intro() {
     view = 'intro'; game = null; setBar(null);
     applyScene({ prov: Object.fromEntries(LAND.map((r) => [r.id, 0.5])), labels: ['valleyridge', 'coastal', 'plateau'] });
     after(() => fly([-75.2, 40.2], 6.0, null, 1600));
-    const started = store.get('deep.chapter', 0);
+    const read = readIds(store), up = pickUp(STORIES, read), seq = Math.min(SEQUENCE.length - 1, store.get('deep.chapter', 0));
     frame(`${top('Deep Jersey', 'home', 'Home')}
-      <p class="dp-lead">How the ground under New Jersey was made, and what people made of it.</p>
-      <p class="dp-p">New Jersey sits where four great belts of land meet. Each one runs far past the state, and each was made at a different time: ancient rock, folded mountains, a valley torn open as a supercontinent split, and sand laid down by the sea. Then came the ice, and then people, who built their lives on what each belt gave them.</p>
-      <button class="dp-start" data-d="story"><b>${started ? `Carry on the story` : 'Start the story'}</b><small>${started ? `${started + 1} of ${SEQUENCE.length}: ${esc(STORY_BY[SEQUENCE[started]].title)}` : `${SEQUENCE.length} stories, from a billion years ago to today`}</small></button>
+      <p class="dp-lead">Things far bigger than us, and where they touch New Jersey.</p>
+      <h4>Start somewhere</h4><div class="dp-hooks">${hooks(STORIES, read).map((id) => hookCard(id)).join('')}</div>
+      <p class="tn-hint">Each story starts with something huge and follows it down to a place you can see, or one that is gone, then offers threads to others.</p>
+      ${up.length ? `<h4>Pick up a thread</h4><div class="dp-hooks dp-pickup">${up.map((id) => hookCard(id, 'dp-hook dp-up')).join('')}</div>` : ''}
+      <button class="tr-card wide" data-d="mapidx"><b>The map</b><small>Every story where it lands; ${read.length} of ${STORIES.length} read</small></button>
+      <button class="dp-start" data-d="story" data-id="${SEQUENCE[seq]}"><b>How the ground was made</b><small>${seq ? `Carry on: ${seq + 1} of ${SEQUENCE.length}, ${esc(STORY_BY[SEQUENCE[seq]].title)}` : `${SEQUENCE.length} stories in order, from a billion years ago to today`}</small></button>
       <button class="tr-card wide" data-d="land"><b>The land today</b><small>New Jersey’s regions and the ranges they belong to, shown whole, past the state line</small></button>
-      <h4>Close-ups</h4><p class="tn-hint">The same story, step by step, in one place.</p>
+      <h4>Close-ups</h4><p class="tn-hint">Step by step, in one place.</p>
       <div class="tr-row">${CORRIDORS.map((c) => `<button class="tr-card" data-d="close" data-id="${c.id}"><b>${esc(c.name)}</b><small>${c.eras.length} stops · ${c.cards.length} stories</small></button>`).join('')}</div>
       <p class="tr-note">Every story lists its sources: USGS geology maps and reports, and the Wikipedia articles they point to.</p>`);
   }
 
-  // ---- the story ----------------------------------------------------------------------------------------------------------
+  // ---- the map index: every story at the place it lands, coloured by subject; read ones dimmed ---------------------------------
+  function storyPoints() {
+    const read = new Set(readIds(store));
+    return { type: 'FeatureCollection', features: STORIES.map((S) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: S.beats.here.cam.slice(0, 2) },
+      properties: { id: S.id, color: DOMAINS[S.domain].color, read: read.has(S.id) ? 1 : 0 } })) };
+  }
+  function storyLayer(on) {
+    if (!map.getSource('deep-stories')) {
+      map.addSource('deep-stories', { type: 'geojson', data: storyPoints() });
+      map.addLayer({ id: 'deep-stories', type: 'circle', source: 'deep-stories', layout: { visibility: 'none' }, paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 7, 10, 11],
+        'circle-color': ['get', 'color'], 'circle-opacity': ['case', ['==', ['get', 'read'], 1], 0.4, 1], 'circle-stroke-color': '#fff', 'circle-stroke-width': 2.5 } });
+      map.on('click', 'deep-stories', (e) => { const f = e.features && e.features[0]; if (f && view === 'mapidx') mapPick(f.properties.id); });
+    } else map.getSource('deep-stories').setData(storyPoints());
+    map.setLayoutProperty('deep-stories', 'visibility', on ? 'visible' : 'none');
+  }
+  function mapIndex(focus = null) {
+    view = 'mapidx'; game = null; setBar(null);
+    applyScene({}); storyLayer(true);
+    const pts = STORIES.map((S) => S.beats.here.cam), xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    after(() => (focus ? fly(STORY_BY[focus].beats.here.cam.slice(0, 2), 10, null, 1400) : fitBox([Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)], 9.5)));
+    const read = new Set(readIds(store));
+    frame(`${top('The map', 'intro', 'Deep Jersey')}
+      <div class="dp-maphook">${focus ? mapHook(focus) : '<p class="dp-line">Tap a dot to see its story. Faded dots are ones you have read.</p>'}</div>
+      <div class="dp-legend">${Object.entries(DOMAINS).filter(([k]) => STORIES.some((S) => S.domain === k)).map(([, d]) => `<span><i style="background:${d.color}"></i>${esc(d.name)}</span>`).join('')}</div>
+      <h4>All stories</h4><div class="dp-hooks">${STORIES.map((S) => hookCard(S.id, `dp-hook${read.has(S.id) ? ' read' : ''}`)).join('')}</div>`);
+  }
+  const mapHook = (id) => { const S = STORY_BY[id]; return `<p class="dp-kick"><span class="dp-dom" style="background:${DOMAINS[S.domain].color}">${esc(DOMAINS[S.domain].name)}</span> ${esc(S.when)}</p><h2>${esc(S.title)}</h2><p class="dp-p">${esc(S.hook)}</p><button class="dp-start" data-d="story" data-id="${id}"><b>Open the story</b><small>three steps, then where it leads</small></button>`; };
+  function mapPick(id) { const el = root.querySelector('.dp-maphook'); if (el) { el.innerHTML = mapHook(id); root.scrollTop = 0; } }
+
   // ---- a story: three beats, each moving the camera and playing its scene; the last ends in threads ----------------------------
   const BEAT_KEYS = ['big', 'thread', 'here'], BEAT_NAMES = ['The big thing', 'The thread down', 'Where you stand'];
   const PLAYS = {
@@ -346,7 +378,7 @@ export function initDeep(ctx) {
       ${b === 0 && STORY_EX[id] ? `<button class="dp-play" data-d="watch" data-id="${STORY_EX[id]}"><b>▶ Watch how it happened</b><small>${esc(EXPLAIN[STORY_EX[id]].title)}, drawn as a slice through the ground</small></button>` : ''}
       ${paras(B.text)}
       ${L ? `<button class="dp-region" data-d="landone" data-id="${L.id}"><i style="background:${L.color}"></i><span><b>${esc(L.name)} today</b><small>${esc(L.nj)}</small></span></button>` : ''}
-      ${last ? `${chips(S.places)}<h4>Where next</h4><div class="dp-next">${S.threads.map((t) => `<button data-d="story" data-id="${t.to}"${read.includes(t.to) ? '' : ' class="new"'}><b>${esc(STORY_BY[t.to].title)}</b><small>${esc(t.why)}</small></button>`).join('')}</div>`
+      ${last ? `${chips(S.places)}<h4>Where next</h4><div class="dp-next">${S.threads.map((t) => `<button data-d="story" data-id="${t.to}"${read.includes(t.to) ? '' : ' class="new"'}><b>${esc(STORY_BY[t.to].title)}</b><small>${esc(t.why)}</small></button>`).join('')}</div><button class="tr-card wide" data-d="mapidx" data-id="${id}"><b>Show on the map</b><small>this story and the others near it</small></button>`
         : `<button class="dp-start" data-d="beat" data-b="${b + 1}"><b>Next: ${esc(BEAT_NAMES[b + 1])}</b><small>${esc(S.beats[BEAT_KEYS[b + 1]].text[0].slice(0, 70))}…</small></button>`}
       ${howList(S)}
       ${srcList(S.src)}`);
@@ -554,6 +586,7 @@ export function initDeep(ctx) {
     grab: () => { const big = !root.classList.contains('big'); root.classList.toggle('big', big); store.set('deep.big', big); const g = root.querySelector('.dp-grab'); if (g) g.setAttribute('aria-label', big ? 'Make the panel shorter' : 'Make the panel taller'); },
     story: (b) => story(b.dataset.id || SEQUENCE[Math.min(SEQUENCE.length - 1, store.get('deep.chapter', 0))]),
     beat: (b) => story(cur, +b.dataset.b),
+    mapidx: (b) => mapIndex(b.dataset.id || null),
     landone: (b) => landOne(b.dataset.id),
     close: (b) => openClose(b.dataset.id),
     closehere: () => { showStop(era, false); stopSheet(); },
