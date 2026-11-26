@@ -7,7 +7,9 @@
 //   Close-ups     the same story step by step in one place: Boonton and the Rockaway, and the Pine Barrens (stops, story cards, a chain
 //                 from rock to ruin, and two light games).
 // Data: data/deep/*.json (tools/build_deep.py: USGS and OpenStreetMap); the words in js/deepcards.js, each card with its sources.
-import { CORRIDORS, CARD, SRC, WHY, STORY, LAND } from './deepcards.js';
+import { CORRIDORS, CARD, SRC, WHY, LAND } from './deepcards.js';
+import { STORY_BY, SEQUENCE } from './deepstories.js';
+import { DOMAINS, readIds, markRead } from './deepthreads.js';
 import { juice } from './juice.js';
 import { EXPLAIN, EX_SRC, LAVA_PHOTOS } from './deepexplain.js';
 
@@ -53,7 +55,7 @@ export function initDeep(ctx) {
   const { map, store } = ctx;
   let root = null, bar = null, pinEl = null, data = null, timers = [], game = null;
   let labelVis = [], exTimer = null;
-  let view = 'intro', chap = store.get('deep.chapter', 0), era = 0, ret = null, landSel = null;
+  let view = 'intro', cur = null, chap = 0, era = 0, ret = null, landSel = null;   // cur: the story on show; chap: its beat (0, 1, 2)
   // the close-up on show: its stops, cards and chain
   let cor, ERAS, CARDS, CHAIN, ERA_INDEX;
   function setCorridor(id) {
@@ -267,7 +269,7 @@ export function initDeep(ctx) {
     bar.querySelector('.dp-dots').innerHTML = items.map((e, k) => `<button data-b="go" data-i="${k}" aria-label="${esc(e.when)}: ${esc(e.title)}"${k === i ? ' class="on" aria-current="step"' : ''}></button>`).join('');
   }
   function barGo(i) {
-    if (view === 'story') { if (i >= 0 && i < STORY.length) chapter(i); }
+    if (view === 'story') { if (i >= 0 && i < 3 && i !== chap) story(cur, i); }
     else if (view === 'close') { if (i >= 0 && i < ERAS.length && i !== era) { showStop(i); stopSheet(); } }
   }
 
@@ -283,8 +285,8 @@ export function initDeep(ctx) {
     document.body.appendChild(bar);
     bar.addEventListener('click', (e) => {
       const b = e.target.closest('[data-b]'); if (!b || b.disabled) return;
-      const cur = view === 'story' ? chap : era;
-      barGo(b.dataset.b === 'prev' ? cur - 1 : b.dataset.b === 'next' ? cur + 1 : +b.dataset.i);
+      const at = view === 'story' ? chap : era;
+      barGo(b.dataset.b === 'prev' ? at - 1 : b.dataset.b === 'next' ? at + 1 : +b.dataset.i);
     });
     root.addEventListener('click', (e) => { const b = e.target.closest('[data-d]'); if (!b || b.disabled) return; const f = actions[b.dataset.d]; if (f) f(b); });
   }
@@ -307,7 +309,7 @@ export function initDeep(ctx) {
     frame(`${top('Deep Jersey', 'home', 'Home')}
       <p class="dp-lead">How the ground under New Jersey was made, and what people made of it.</p>
       <p class="dp-p">New Jersey sits where four great belts of land meet. Each one runs far past the state, and each was made at a different time: ancient rock, folded mountains, a valley torn open as a supercontinent split, and sand laid down by the sea. Then came the ice, and then people, who built their lives on what each belt gave them.</p>
-      <button class="dp-start" data-d="story"><b>${started ? `Carry on the story` : 'Start the story'}</b><small>${started ? `Chapter ${started + 1} of ${STORY.length}: ${esc(STORY[started].title)}` : `${STORY.length} short chapters, from a billion years ago to today`}</small></button>
+      <button class="dp-start" data-d="story"><b>${started ? `Carry on the story` : 'Start the story'}</b><small>${started ? `${started + 1} of ${SEQUENCE.length}: ${esc(STORY_BY[SEQUENCE[started]].title)}` : `${SEQUENCE.length} stories, from a billion years ago to today`}</small></button>
       <button class="tr-card wide" data-d="land"><b>The land today</b><small>New Jersey’s regions and the ranges they belong to, shown whole, past the state line</small></button>
       <h4>Close-ups</h4><p class="tn-hint">The same story, step by step, in one place.</p>
       <div class="tr-row">${CORRIDORS.map((c) => `<button class="tr-card" data-d="close" data-id="${c.id}"><b>${esc(c.name)}</b><small>${c.eras.length} stops · ${c.cards.length} stories</small></button>`).join('')}</div>
@@ -315,32 +317,40 @@ export function initDeep(ctx) {
   }
 
   // ---- the story ----------------------------------------------------------------------------------------------------------
-  function chapter(i) {
-    view = 'story'; game = null; chap = i; store.set('deep.chapter', i);
-    const S = STORY[i];
-    setBar(STORY, i, ['Back a chapter', 'Next chapter']);
-    applyScene({ ...S.scene, labels: S.land ? [S.land] : [] });
-    const bb = S.land && data.provinces.features.find((f) => f.properties.region === S.land).properties.bbox;
-    // each chapter plays: the land rising, the lava flooding, the ice coming and going; otherwise the whole belt, past the state line
-    const play = { 's-mountains': () => { const top = exagFor(map.getZoom()); setExag(0.01); rise(top); caption(`Continents collide: the land is pushed up into mountains (heights ×${top})`); timers.push(setTimeout(() => caption(''), ctx.dur(6500) || 1)); },
-      's-rift': () => fly([-74.42, 40.72], 8.4, 55, 2400, () => lavaFloods()),
-      's-ice': () => playIce(),
-      's-coast': () => { op('deep-sand', 'fill-opacity', 0); timers.push(setTimeout(() => { map.setPaintProperty('deep-sand', 'fill-opacity-transition', { duration: ctx.dur(3000), delay: 0 }); op('deep-sand', 'fill-opacity', ['match', ['get', 'unit'], 'cohansey', 0.8, 0.45]); caption('Layer on layer of sand and clay along the coast; the yellow is the Cohansey sand'); }, ctx.dur(300) || 1)); timers.push(setTimeout(() => caption(''), ctx.dur(6000) || 1)); } }[S.id];
-    // the camera goes there under the illustration; the chapter's own animation waits until the illustration has slid away
-    const go = play && (() => afterEx(play));
-    after(() => (bb ? fitBox(bb, 7, go) : fly([S.cam[0], S.cam[1]], S.cam[2], null, 1800, go)));
-    const L = S.land && LAND.find((r) => r.id === S.land);
-    frame(`${top('The story', 'intro', 'Deep Jersey')}
-      <p class="dp-kick">Chapter ${i + 1} of ${STORY.length}</p><h2>${esc(S.title)}</h2>
-      ${STORY_EX[S.id] ? `<button class="dp-play" data-d="watch" data-id="${STORY_EX[S.id]}"><b>▶ Watch how it happened</b><small>${esc(EXPLAIN[STORY_EX[S.id]].title)}, drawn as a slice through the ground</small></button>` : ''}
-      ${paras(S.text)}
+  // ---- a story: three beats, each moving the camera and playing its scene; the last ends in threads ----------------------------
+  const BEAT_KEYS = ['big', 'thread', 'here'], BEAT_NAMES = ['The big thing', 'The thread down', 'Where you stand'];
+  const PLAYS = {
+    rise: () => { const top = exagFor(map.getZoom()); setExag(0.01); rise(top); caption(`Continents collide: the land is pushed up into mountains (heights ×${top})`); timers.push(setTimeout(() => caption(''), ctx.dur(6500) || 1)); },
+    lava: () => lavaFloods(),
+    ice: () => playIce(),
+    sand: () => { op('deep-sand', 'fill-opacity', 0); timers.push(setTimeout(() => { map.setPaintProperty('deep-sand', 'fill-opacity-transition', { duration: ctx.dur(3000), delay: 0 }); op('deep-sand', 'fill-opacity', ['match', ['get', 'unit'], 'cohansey', 0.8, 0.45]); caption('Layer on layer of sand and clay along the coast; the yellow is the Cohansey sand'); }, ctx.dur(300) || 1)); timers.push(setTimeout(() => caption(''), ctx.dur(6000) || 1)); },
+    drain: () => {},
+  };
+  const howList = (S) => (S.explain || []).length || S.photos ? `<h4>How it works</h4>${S.photos === 'lava' ? `<button class="dp-photos" data-d="photos"><span class="dp-photostrip">${LAVA_PHOTOS.list.slice(0, 3).map((x) => `<img src="${x.img}" alt="" loading="lazy">`).join('')}</span><span><b>See the real thing</b><small>lava erupting today, and the rock it left in New Jersey</small></span></button>` : ''}<div class="dp-how">${(S.explain || []).map((k) => `<button data-d="how" data-id="${k}"><svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 8.5l5 3.5-5 3.5z" fill="currentColor"/></svg>${esc(EXPLAIN[k].title)}</button>`).join('')}</div>` : '';
+  function story(id, b = 0) {
+    const S = STORY_BY[id]; if (!S) { intro(); return; }
+    view = 'story'; game = null; cur = id; chap = b;
+    const seq = SEQUENCE.indexOf(id); if (seq >= 0) store.set('deep.chapter', seq);
+    const B = S.beats[BEAT_KEYS[b]], last = b === 2;
+    setBar(BEAT_KEYS.map((k, j) => ({ when: `${j + 1} of 3 · ${BEAT_NAMES[j]}`, title: S.title })), b, ['Back a step', 'Next step']);
+    applyScene(B.scene);
+    // the camera goes there (under the illustration, on the first beat); the beat's animation waits until it has arrived
+    const play = B.play && PLAYS[B.play], go = play && (() => afterEx(play));
+    const bb = B.fit && data.provinces.features.find((f) => f.properties.region === B.fit)?.properties.bbox;
+    after(() => (bb ? fitBox(bb, 7, go) : fly([B.cam[0], B.cam[1]], B.cam[2], null, 1800, go)));
+    if (last) markRead(store, id);
+    const L = B.fit && LAND.find((r) => r.id === B.fit), D = DOMAINS[S.domain], read = readIds(store);
+    frame(`${top(S.title, 'intro', 'Deep Jersey')}
+      <p class="dp-kick"><span class="dp-dom" style="background:${D.color}">${esc(D.name)}</span>${S.gone ? '<span class="dp-dom gone">Gone</span>' : ''} ${esc(S.when)}</p>
+      <h2>${esc(BEAT_NAMES[b])}</h2>
+      ${b === 0 && STORY_EX[id] ? `<button class="dp-play" data-d="watch" data-id="${STORY_EX[id]}"><b>▶ Watch how it happened</b><small>${esc(EXPLAIN[STORY_EX[id]].title)}, drawn as a slice through the ground</small></button>` : ''}
+      ${paras(B.text)}
       ${L ? `<button class="dp-region" data-d="landone" data-id="${L.id}"><i style="background:${L.color}"></i><span><b>${esc(L.name)} today</b><small>${esc(L.nj)}</small></span></button>` : ''}
-      ${S.id === 's-ice' || S.id === 's-lake' ? '<button class="dp-play" data-d="playice"><b>▶ Play the ice age on the map</b><small>the ice spreads, stops, melts back; the lake fills and drains</small></button>' : ''}
-      ${howRow(S.id)}
-      ${S.close.length ? `<h4>See it up close</h4>${chips(S.close)}` : ''}
-      ${i < STORY.length - 1 ? `<button class="dp-start" data-d="next"><b>Next: ${esc(STORY[i + 1].title)}</b><small>${esc(STORY[i + 1].when)}</small></button>` : `<button class="dp-start" data-d="intro"><b>The end, for now</b><small>back to Deep Jersey: the land today and the close-ups</small></button>`}
+      ${last ? `${chips(S.places)}<h4>Where next</h4><div class="dp-next">${S.threads.map((t) => `<button data-d="story" data-id="${t.to}"${read.includes(t.to) ? '' : ' class="new"'}><b>${esc(STORY_BY[t.to].title)}</b><small>${esc(t.why)}</small></button>`).join('')}</div>`
+        : `<button class="dp-start" data-d="beat" data-b="${b + 1}"><b>Next: ${esc(BEAT_NAMES[b + 1])}</b><small>${esc(S.beats[BEAT_KEYS[b + 1]].text[0].slice(0, 70))}…</small></button>`}
+      ${howList(S)}
       ${srcList(S.src)}`);
-    if (STORY_EX[S.id]) showEx(STORY_EX[S.id]);
+    if (b === 0 && STORY_EX[id]) showEx(STORY_EX[id]);
   }
 
   // ---- the land today ------------------------------------------------------------------------------------------------------
@@ -394,8 +404,8 @@ export function initDeep(ctx) {
     const c = CARD[id]; if (!c) return;
     const k = corOf(id); if (k && k.id !== cor.id) setCorridor(k.id);
     // where Back goes: the story chapter, the region or the stop the card was opened from
-    const from = view, fromChap = chap, fromLand = landSel;
-    ret = from === 'story' ? () => chapter(fromChap) : from === 'land' && fromLand ? () => landOne(fromLand) : () => { showStop(era, false); stopSheet(); };
+    const from = view, fromCur = cur, fromChap = chap, fromLand = landSel;
+    ret = from === 'story' ? () => story(fromCur, fromChap) : from === 'land' && fromLand ? () => landOne(fromLand) : () => { showStop(era, false); stopSheet(); };
     game = null; markSeen(id);
     view = 'card';
     const i = ERA_INDEX[c.era]; era = i; setBar(ERAS, i, ['Newer', 'Older']); applyScene(stopScene(c.era));
@@ -447,8 +457,8 @@ export function initDeep(ctx) {
   /** An explainer: a slice through the ground, step by step. Back returns to wherever it was opened from. */
   // Back from an explainer or the photos returns to where it was opened from; they can open each other, so the way back is a stack
   let backs = [];
-  const pushBack = () => { const v = view, c0 = chap, l0 = landSel, e0 = era, r0 = ret, html = root.innerHTML, tall = root.classList.contains('tall');
-    backs.push(() => { view = v; chap = c0; landSel = l0; era = e0; ret = r0; root.innerHTML = html; root.scrollTop = 0; root.classList.toggle('tall', tall); }); };
+  const pushBack = () => { const v = view, s0 = cur, c0 = chap, l0 = landSel, e0 = era, r0 = ret, html = root.innerHTML, tall = root.classList.contains('tall');
+    backs.push(() => { view = v; cur = s0; chap = c0; landSel = l0; era = e0; ret = r0; root.innerHTML = html; root.scrollTop = 0; root.classList.toggle('tall', tall); }); };
   function how(id, step = 0) {
     const X = EXPLAIN[id]; if (!X) return;
     if (step === 0 && view !== 'how') pushBack();
@@ -542,8 +552,8 @@ export function initDeep(ctx) {
     intro, land, chain, order, why,
     more: (b) => { const m = b.previousElementSibling; if (m) m.hidden = false; b.remove(); },
     grab: () => { const big = !root.classList.contains('big'); root.classList.toggle('big', big); store.set('deep.big', big); const g = root.querySelector('.dp-grab'); if (g) g.setAttribute('aria-label', big ? 'Make the panel shorter' : 'Make the panel taller'); },
-    story: () => chapter(store.get('deep.chapter', 0)),
-    next: () => chapter(Math.min(STORY.length - 1, chap + 1)),
+    story: (b) => story(b.dataset.id || SEQUENCE[Math.min(SEQUENCE.length - 1, store.get('deep.chapter', 0))]),
+    beat: (b) => story(cur, +b.dataset.b),
     landone: (b) => landOne(b.dataset.id),
     close: (b) => openClose(b.dataset.id),
     closehere: () => { showStop(era, false); stopSheet(); },

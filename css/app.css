@@ -4251,3 +4251,11 @@ body.deep-on #edges { display: none !important; }   /* the shading outside New J
 .dp-photo figcaption small { display: block; margin-top: 3px; font-size: 11.5px; color: #7a705f; }
 .dp-phtag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: #dfe9d6; color: #3d5a2a; }
 .dp-phtag.far { background: #ffe1c7; color: #8a3a12; }
+/* Deep Jersey: stories and threads */
+.dp-dom { display: inline-block; margin-right: 6px; padding: 2px 8px; border-radius: 999px; color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; vertical-align: 1px; }
+.dp-dom.gone { background: #3d3530; }
+.dp-next { display: grid; gap: 8px; margin: 4px 0 10px; }
+.dp-next button { position: relative; display: block; width: 100%; border: 0; border-radius: 14px; padding: 11px 14px 11px 30px; text-align: left; background: #fff; color: inherit; font: inherit; cursor: pointer; box-shadow: 0 1px 3px rgba(30, 25, 15, 0.14); }
+.dp-next button b { display: block; font-size: 15px; } .dp-next button small { display: block; color: #6b6355; font-size: 13px; margin-top: 2px; }
+.dp-next button::before { content: ''; position: absolute; left: 12px; top: 17px; width: 9px; height: 9px; border-radius: 50%; background: #d8ccb4; }
+.dp-next button.new::before { background: #c8462c; }
