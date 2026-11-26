@@ -4192,7 +4192,15 @@ body.deep-on #tabs, body.deep-on #fabs, body.deep-on #lookFab, body.deep-on #she
 @keyframes exgrow { from { transform: scaleY(0.05); } }
 @keyframes exdrop { from { transform: translateY(-28px); } }
 @keyframes exslide { from { transform: translateX(-40px); } }
-@media (prefers-reduced-motion: reduce) { .ex-svg .ex-in, .ex-svg .ex-grow, .ex-svg .ex-drop, .ex-svg .ex-slide { animation: none; } }
+.ex-svg .ex-glow { filter: drop-shadow(0 0 3px #ffb21f); animation: exglow 1.6s ease-in-out infinite alternate; }
+.ex-svg .ex-glow.ex-grow { animation: exgrow 1.4s 0.2s ease-out both, exglow 1.6s 1.6s ease-in-out infinite alternate; }
+.ex-svg .ex-glow.ex-slide { animation: exslide 1.6s 0.2s ease-in-out both, exglow 1.6s 1.8s ease-in-out infinite alternate; }
+.ex-svg .ex-fount { transform-box: fill-box; transform-origin: 50% 100%; filter: drop-shadow(0 0 3px #ffb21f); animation: exfount 0.9s ease-in-out infinite alternate; }
+.ex-svg .ex-cool { animation: excool 3.2s 0.4s ease-in both; }
+@keyframes exglow { from { opacity: 0.82; } to { opacity: 1; filter: drop-shadow(0 0 6px #ffcc33); } }
+@keyframes exfount { from { transform: scaleY(0.55); } to { transform: scaleY(1.08); } }
+@keyframes excool { from { fill: #ffd23f; } 35% { fill: #ff8a1f; } 70% { fill: #8a3a22; } to { fill: #2f2a2b; } }
+@media (prefers-reduced-motion: reduce) { .ex-svg .ex-in, .ex-svg .ex-grow, .ex-svg .ex-drop, .ex-svg .ex-slide, .ex-svg .ex-glow, .ex-svg .ex-fount, .ex-svg .ex-cool { animation: none; } }
 #deep.tall { max-height: 74vh; }
 /* Deep Jersey: a shorter sheet (more map), a handle to make it tall, a slimmer time bar */
 #deep { max-height: 38vh; padding-top: 4px; transition: max-height 0.3s ease; }
@@ -4234,3 +4242,12 @@ body.deep-on #edges { display: none !important; }   /* the shading outside New J
 .dp-exfoot .dp-exdots { margin: 0; flex: 1; }
 .dp-exfoot button { border: 0; border-radius: 999px; padding: 6px 12px; background: #efe6d6; color: #5a3d1e; font: 600 12.5px system-ui, sans-serif; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { #deepex.in, #deepex.out { animation-duration: 0.01s; } }
+/* Deep Jersey: See the real thing (photos of lava today, and the rock it left in New Jersey) */
+.dp-photos { display: flex; align-items: center; gap: 10px; width: 100%; margin: 4px 0 8px; border: 0; border-radius: 14px; padding: 8px; background: #2b2320; color: #fff; text-align: left; font: inherit; cursor: pointer; }
+.dp-photos b { display: block; font-size: 15px; } .dp-photos small { display: block; opacity: 0.8; font-size: 12.5px; }
+.dp-photostrip { display: flex; flex: none; } .dp-photostrip img { width: 38px; height: 46px; object-fit: cover; border-radius: 8px; border: 2px solid #2b2320; margin-left: -10px; } .dp-photostrip img:first-child { margin-left: 0; }
+.dp-photo { margin: 10px 0 14px; } .dp-photo img { display: block; width: 100%; border-radius: 12px; background: #e9e1d2; aspect-ratio: 3 / 2; object-fit: cover; }
+.dp-photo figcaption { font-size: 14px; line-height: 1.4; padding: 6px 2px 0; } .dp-photo figcaption b { display: block; font-size: 15px; margin: 2px 0; }
+.dp-photo figcaption small { display: block; margin-top: 3px; font-size: 11.5px; color: #7a705f; }
+.dp-phtag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: #dfe9d6; color: #3d5a2a; }
+.dp-phtag.far { background: #ffe1c7; color: #8a3a12; }

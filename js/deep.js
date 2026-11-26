@@ -9,7 +9,7 @@
 // Data: data/deep/*.json (tools/build_deep.py: USGS and OpenStreetMap); the words in js/deepcards.js, each card with its sources.
 import { CORRIDORS, CARD, SRC, WHY, STORY, LAND } from './deepcards.js';
 import { juice } from './juice.js';
-import { EXPLAIN, EX_SRC } from './deepexplain.js';
+import { EXPLAIN, EX_SRC, LAVA_PHOTOS } from './deepexplain.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const shuffle = (a) => a.map((v) => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map((p) => p[1]);
@@ -21,10 +21,10 @@ const DEM = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}
 const LAYERS = ['deep-relief', 'deep-hs', 'deep-iceanim', 'deep-rivers', 'deep-prov', 'deep-prov-line', 'deep-rocks', 'deep-sand', 'deep-flows', 'deep-lake', 'deep-ice-sheet', 'deep-icelines', 'deep-ice-older', 'deep-ice-limit', 'deep-canal'];
 // "How it works" explainers for each chapter, region, close-up stop and card that leans on an idea
 const HOW = {
-  's-mountains': ['fold', 'ridges'], 's-rift': ['rift', 'ridges'], 's-coast': ['coastal', 'aquifer'], 's-ice': ['icesheet', 'moraine'], 's-lake': ['glaciallake', 'erratic'], 's-iron': ['bogiron'],
-  valleyridge: ['fold', 'ridges'], piedmont: ['rift', 'ridges'], coastal: ['coastal', 'aquifer'],
-  paleo: ['fold'], rift: ['rift', 'ridges'], ice: ['icesheet', 'moraine'], moggy: ['glaciallake'], notch: ['glaciallake'], 'p-sand': ['coastal', 'aquifer'], 'p-iron': ['bogiron'],
-  tripod: ['erratic'], moraine: ['moraine', 'icesheet'], 'lake-passaic': ['glaciallake'], 'great-notch': ['glaciallake'], swamp: ['glaciallake'], watchungs: ['rift', 'ridges'],
+  's-mountains': ['fold', 'ridges'], 's-rift': ['lava', 'rift', 'ridges'], 's-coast': ['coastal', 'aquifer'], 's-ice': ['icesheet', 'moraine'], 's-lake': ['glaciallake', 'erratic'], 's-iron': ['bogiron'],
+  valleyridge: ['fold', 'ridges'], piedmont: ['lava', 'rift', 'ridges'], coastal: ['coastal', 'aquifer'],
+  paleo: ['fold'], rift: ['lava', 'rift', 'ridges'], ice: ['icesheet', 'moraine'], moggy: ['glaciallake'], notch: ['glaciallake'], 'p-sand': ['coastal', 'aquifer'], 'p-iron': ['bogiron'],
+  tripod: ['erratic'], moraine: ['moraine', 'icesheet'], 'lake-passaic': ['glaciallake'], 'great-notch': ['glaciallake'], swamp: ['glaciallake'], watchungs: ['lava', 'ridges'],
   'green-pond': ['fold', 'ridges'], cohansey: ['coastal'], aquifer: ['aquifer'], 'bog-iron': ['bogiron'], batsto: ['bogiron'],
 };          // while Deep Jersey is open the map may pull out past the New Jersey frame
 const HIDE_LABELS = ['region-label', 'county-label', 'section-label', 'section-label-local', 'nature-label', 'landmark-label', 'road-ref-major', 'road-ref', 'road-name', 'reveal-minor', 'reveal-label', 'anchor-label'];   // base labels that crowd the wide views
@@ -270,12 +270,12 @@ export function initDeep(ctx) {
   }
   // the sheet stays short so the map shows; a handle on top makes it tall for reading (remembered), and an explainer is always tall
   const grab = () => `<button class="dp-grab" data-d="grab" aria-label="${root.classList.contains('big') ? 'Make the panel shorter' : 'Make the panel taller'}"><i></i></button>`;
-  const frame = (html) => { clearInterval(exTimer); exTimer = null; root.innerHTML = grab() + html; root.scrollTop = 0; root.classList.toggle('tall', view === 'how'); hideEx(); };
+  const frame = (html) => { clearInterval(exTimer); exTimer = null; root.innerHTML = grab() + html; root.scrollTop = 0; root.classList.toggle('tall', view === 'how' || view === 'photos'); if (view !== 'how' && view !== 'photos') backs = []; hideEx(); };
   /** Long text: the first paragraph, then Read more for the rest. */
   const paras = (list) => `<p class="dp-p">${esc(list[0])}</p>${list.length > 1 ? `<div class="dp-more" hidden>${list.slice(1).map((x) => `<p class="dp-p">${esc(x)}</p>`).join('')}</div><button class="dp-readmore" data-d="more">Read more</button>` : ''}`;
   const top = (title, backTo, backWord = 'Back') => `<div class="dp-top"><button class="tr-back" data-d="${backTo}">${BACK}${backWord}</button><h1>${esc(title)}</h1></div>`;
   const srcList = (keys) => `<details class="dp-srcs"><summary>Sources</summary><ul class="dp-src">${keys.map((k) => `<li><a href="${esc(SRC[k][1])}" target="_blank" rel="noopener">${esc(SRC[k][0])}</a></li>`).join('')}</ul></details>`;
-  const howRow = (key) => (HOW[key] || []).length ? `<h4>How it works</h4><div class="dp-how">${HOW[key].map((k) => `<button data-d="how" data-id="${k}"><svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 8.5l5 3.5-5 3.5z" fill="currentColor"/></svg>${esc(EXPLAIN[k].title)}</button>`).join('')}</div>` : '';
+  const howRow = (key) => (HOW[key] || []).length ? `<h4>How it works</h4>${(HOW[key] || []).includes('lava') ? `<button class="dp-photos" data-d="photos"><span class="dp-photostrip">${LAVA_PHOTOS.list.slice(0, 3).map((x) => `<img src="${x.img}" alt="" loading="lazy">`).join('')}</span><span><b>See the real thing</b><small>lava erupting today, and the rock it left in New Jersey</small></span></button>` : ''}<div class="dp-how">${HOW[key].map((k) => `<button data-d="how" data-id="${k}"><svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 8.5l5 3.5-5 3.5z" fill="currentColor"/></svg>${esc(EXPLAIN[k].title)}</button>`).join('')}</div>` : '';
   const chips = (ids) => ids.length ? `<div class="dp-chips">${ids.map((id) => { const c = CARD[id]; return `<button data-d="card" data-id="${id}"><i style="background:${KIND_COLOR[c.kind]}"></i>${esc(c.title)}</button>`; }).join('')}</div>` : '';
 
   // ---- the way in ----------------------------------------------------------------------------------------------------------
@@ -425,11 +425,13 @@ export function initDeep(ctx) {
   const afterEx = (f) => { if (exWait) exWait.push(f); else f(); };
 
   /** An explainer: a slice through the ground, step by step. Back returns to wherever it was opened from. */
-  let howBack = null;
+  // Back from an explainer or the photos returns to where it was opened from; they can open each other, so the way back is a stack
+  let backs = [];
+  const pushBack = () => { const v = view, c0 = chap, l0 = landSel, e0 = era, r0 = ret, html = root.innerHTML, tall = root.classList.contains('tall');
+    backs.push(() => { view = v; chap = c0; landSel = l0; era = e0; ret = r0; root.innerHTML = html; root.scrollTop = 0; root.classList.toggle('tall', tall); }); };
   function how(id, step = 0) {
     const X = EXPLAIN[id]; if (!X) return;
-    if (step === 0 && view !== 'how') { const v = view, c0 = chap, l0 = landSel, e0 = era, r0 = ret, html = root.innerHTML;
-      howBack = () => { view = v; chap = c0; landSel = l0; era = e0; ret = r0; root.innerHTML = html; root.scrollTop = 0; root.classList.remove('tall'); }; }
+    if (step === 0 && view !== 'how') pushBack();
     view = 'how';
     const S = X.steps[step], last = step === X.steps.length - 1;
     frame(`${top('How it works', 'howback')}
@@ -440,6 +442,19 @@ export function initDeep(ctx) {
       <div class="dp-exnav"><button data-d="howstep" data-id="${id}" data-s="${step - 1}"${step ? '' : ' disabled'}>Back</button>
         ${last ? '<button class="go" data-d="howback">Got it</button>' : `<button class="go" data-d="howstep" data-id="${id}" data-s="${step + 1}">Next</button>`}</div>
       <details class="dp-srcs"><summary>Sources</summary><ul class="dp-src">${X.src.map((k) => `<li><a href="${esc(EX_SRC[k][1])}" target="_blank" rel="noopener">${esc(EX_SRC[k][0])}</a></li>`).join('')}</ul></details>`);
+  }
+
+  /** Photos: lava erupting today (labelled as not New Jersey), then the rock it left here. Back returns to where it was opened. */
+  function photos() {
+    if (view !== 'photos') pushBack();
+    view = 'photos';
+    const P = LAVA_PHOTOS;
+    frame(`${top('See the real thing', 'howback')}
+      <p class="dp-p">${esc(P.intro)}</p>
+      ${P.list.map((x) => `<figure class="dp-photo"><img src="${x.img}" alt="${esc(x.title)}" loading="lazy"><figcaption><span class="dp-phtag${x.tag.startsWith('Not') ? ' far' : ''}">${esc(x.tag)}</span><b>${esc(x.title)}</b>${esc(x.text)}<small>${esc(x.credit)} · <a href="${esc(x.page)}" target="_blank" rel="noopener">source</a></small></figcaption></figure>`).join('')}
+      <p class="dp-p">${esc(P.extinction)}</p>
+      <button class="dp-play" data-d="how" data-id="lava"><b>▶ How lava made the Watchungs and the Palisades</b><small>eight steps, drawn as a slice through the ground</small></button>
+      <details class="dp-srcs"><summary>Sources</summary><ul class="dp-src">${P.src.map((k) => `<li><a href="${esc(EX_SRC[k][1])}" target="_blank" rel="noopener">${esc(EX_SRC[k][0])}</a></li>`).join('')}</ul></details>`);
   }
 
   function chain() {
@@ -517,9 +532,10 @@ export function initDeep(ctx) {
     card: (b) => openCard(b.dataset.id),
     how: (b) => how(b.dataset.id),
     watch: (b) => { showEx(b.dataset.id); },
+    photos,
     playice: () => playIce(),
     howstep: (b) => how(b.dataset.id, +b.dataset.s),
-    howback: () => (howBack ? howBack() : intro()),
+    howback: () => { const f = backs.pop(); if (f) f(); else intro(); },
     orderpick: orderPick, whypick: whyPick,
   };
 

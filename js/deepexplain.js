@@ -16,6 +16,8 @@ export const EX_SRC = {
   atl: ['Wikipedia: Atlantic Plain', W('Atlantic_Plain')], pines: ['Wikipedia: New Jersey Pine Barrens', W('New_Jersey_Pine_Barrens')],
   aquifer: ['Wikipedia: Aquifer', W('Aquifer')], kc: ['Wikipedia: Kirkwood–Cohansey aquifer', W('Kirkwood%E2%80%93Cohansey_aquifer')],
   bog: ['Wikipedia: Bog iron', W('Bog_iron')],
+  camp: ['Wikipedia: Central Atlantic magmatic province', W('Central_Atlantic_magmatic_province')], watchung: ['Wikipedia: Watchung Mountains', W('Watchung_Mountains')],
+  diabase: ['Wikipedia: Diabase', W('Diabase')], columns: ['Wikipedia: Columnar jointing', W('Columnar_jointing')], flood: ['Wikipedia: Flood basalt', W('Flood_basalt')],
 };
 
 // ---- drawing ---------------------------------------------------------------------------------------------------------------------
@@ -47,6 +49,28 @@ const sea = (n, x0, y0, cls = '') => { const xs = Array.from({ length: 31 }, (_,
 const worn = (cls = '') => { const xs = Array.from({ length: 61 }, (_, i) => i * 6), bump = (x) => { const m = ((x % 180) + 180) % 180; return m > 14 && m < 76 ? Math.sin(((m - 14) / 62) * Math.PI) : 0; };
   return p(`M0 0 L360 0 L${[...xs].reverse().map((x) => `${x} ${(122 - 22 * bump(x)).toFixed(1)}`).join(' L')}Z`, C.sky, cls); };
 const ground = (d = 'M0 150 L360 150 L360 190 L0 190Z') => p(d, C.rock);
+
+
+// ---- the lava: the Newark Basin, side on (west on the left, the Ramapo Fault at its edge; not to scale) -------------------------------
+const L = { hot: '#ff8a1f', core: '#ffd23f', cold: '#2f2a2b', mud: '#c97b5f' };
+const redBeds = (top = 100) => p(`M30 ${top} L360 ${top} L360 190 L42 190Z`, C.red) + [0, 1, 2, 3, 4].map((k) => p(`M${30 + (top + 18 * k + 9 - top) * 0.13} ${top + 18 * k + 9} L360 ${top + 18 * k + 9} L360 ${top + 18 * k + 18} L${30 + (18 * k + 18) * 0.13} ${top + 18 * k + 18}Z`, C.red2)).join('');
+const border = () => p('M0 40 L30 40 L44 190 L0 190Z', C.rock) + `<line x1="30" y1="40" x2="44" y2="190" stroke="#3d2f25" stroke-width="2"/>`;
+const hot = (d, cls = '') => p(d, L.hot, `ex-glow ${cls}`);
+const sheet = (y0, y1, x0 = 38, cls = '', fill = L.cold) => p(`M${x0} ${y0} L360 ${y0} L360 ${y1} L${x0 + 1} ${y1}Z`, fill, cls);
+const fountains = (y, cls = '') => [90, 150, 205, 265, 320].map((x, i) => `<path class="ex-fount ${cls}" style="animation-delay:${(i * 0.17).toFixed(2)}s" d="M${x - 9} ${y} Q${x} ${y - 46 - (i % 2) * 14} ${x + 9} ${y}Z" fill="${L.hot}"/><path class="ex-fount" style="animation-delay:${(i * 0.17 + 0.1).toFixed(2)}s" d="M${x - 4} ${y} Q${x} ${y - 28 - (i % 2) * 8} ${x + 4} ${y}Z" fill="${L.core}"/>`).join('');
+const cracks = (y0, y1, cls = '') => `<g class="${cls}" stroke="#151213" stroke-width="0.9">${Array.from({ length: 40 }, (_, i) => 44 + i * 8).map((x) => `<line x1="${x}" y1="${y0}" x2="${x}" y2="${y1}"/>`).join('')}</g>`;
+const dikes = (yTop, cls = '') => `<g class="ex-glow ${cls}" stroke="${L.hot}" stroke-width="3.2" stroke-linecap="round" fill="none"><path d="M120 190 L124 ${yTop}"/><path d="M215 190 L210 ${yTop}"/><path d="M300 190 L304 ${yTop}"/></g>`;
+const deep = (cls = '') => hot('M40 190 Q200 168 360 182 L360 190Z', cls);
+const side = (y, s) => `<text x="5" y="${y}" font-size="11" font-weight="700" fill="#fff">${s}</text>`;
+const lavaSvg = (body, label) => svg(border() + body, label);
+// the end: tilted layers worn down (each layer's top rises to the east at 0.35 per unit; the hard ones stand up as ridges, cliffs facing east)
+const TILT = 0.35, ERODE = 118;
+const tBand = (c, th, fill, cls = '') => p(`M0 ${c - th} L360 ${c - th - TILT * 360} L360 ${c - TILT * 360} L0 ${c}Z`, fill, cls);
+const HARD = [[150, 9, 'Third'], [171, 9, 'Second'], [192, 9, 'First'], [227, 16, 'Palisades']];
+const ridgeSurface = () => { let d = `M0 0 L360 0 L360 ${ERODE}`; const pts = [];
+  for (const [c, th, , h = 14] of [...HARD].reverse().map((r) => [...r, r[2] === 'Palisades' ? 22 : 14])) { const xa = (c - th - ERODE) / TILT, xb = xa + h / TILT; pts.push(`L${xb.toFixed(1)} ${ERODE} L${xb.toFixed(1)} ${(ERODE - h).toFixed(1)} L${xa.toFixed(1)} ${ERODE}`); }
+  return p(d + ' ' + pts.join(' ') + ` L0 ${ERODE} Z`, C.sky); };
+const ridgeX = (c, th, h) => (c - th - ERODE) / TILT + h / TILT / 2;
 
 // each explainer: title, steps [{ draw: svg string, text }], src keys. 'ex-in' marks what is new in that step (it slides in).
 export const EXPLAIN = {
@@ -122,6 +146,25 @@ export const EXPLAIN = {
     { text: 'It sinks until it meets a layer of clay, which it cannot pass, and is stored above it. In the Pine Barrens the Cohansey sand holds the water and the clayey Kirkwood lies below.',
       draw: svg(p('M0 190 L0 80 L360 80 L360 190Z', C.sand) + p('M0 160 L360 160 L360 190 L0 190Z', C.clay) + p('M0 115 L360 115 L360 160 L0 160Z', C.water, 'ex-grow', 'opacity="0.55"') + t(180, 142, 'water stored in the sand', 'ex-in') + t(180, 178, 'clay below') + `<rect x="250" y="40" width="10" height="100" fill="#7a7a7a" class="ex-in"/>` + t(255, 34, 'a well', 'ex-in'), 'Water stored above a clay layer') },
   ] },
+  lava: { title: 'How lava made the Watchungs and the Palisades', src: ['newark', 'camp', 'palisades', 'diabase', 'watchung', 'columns', 'flood'], steps: [
+    { text: 'From about 220 million years ago the Newark Basin is a sinking rift valley with lakes in it, filling with red mud and sand. Its west side, along the Ramapo Fault, sinks deepest. (The slice is not to scale.)',
+      draw: lavaSvg(redBeds() + p('M60 100 L330 100 L322 95 L68 95Z', C.water, 'ex-in', 'opacity="0.8"') + t(196, 80, 'a rift lake on red mud and sand', 'ex-in') + t(8, 30, 'Ramapo Fault', '', 'start') + t(352, 180, 'west ← → east', '', 'end'), 'The Newark Basin as a rift valley with a lake') },
+    { text: 'As the crust is stretched thin, rock far below begins to melt, because less weight is pressing on it, and the molten rock (magma) rises up through cracks.',
+      draw: lavaSvg(redBeds() + deep('ex-grow') + dikes(150, 'ex-grow') + t(196, 80, 'magma rising up cracks', 'ex-in'), 'Magma rising through cracks') },
+    { text: 'About 201 million years ago some of it stops 3 to 5 km (2 to 3 miles) down and spreads sideways between the layers: a sheet about 300 m (1,000 ft) thick. It cools there, slowly, into diabase, the same stuff as basalt but cooled underground. That sheet is the Palisades Sill.',
+      draw: lavaSvg(redBeds() + deep() + dikes(150) + hot('M110 150 L360 146 L360 158 L112 162Z', 'ex-slide') + t(196, 80, 'a sheet spreads between the layers', 'ex-in') + t(236, 140, 'the Palisades Sill', 'ex-in'), 'Magma spreading between layers as a sill') },
+    { text: 'Some breaks right through to the surface along long cracks: a fissure eruption, a curtain of lava fountains rather than a cone-shaped volcano. Each burst probably lasted less than a century.',
+      draw: lavaSvg(redBeds() + deep() + dikes(100) + sheet(146, 160, 112, '', '#4a3436') + fountains(100, 'ex-in') + t(196, 30, 'lava fountains along a crack', 'ex-in'), 'A fissure eruption') },
+    { text: 'Runny basalt lava pours out and floods the valley floor, perhaps nearly the whole basin. This is the first of three floods, the Orange Mountain basalt: today’s First Watchung ridge.',
+      draw: lavaSvg(redBeds() + sheet(146, 160, 112, '', '#4a3436') + hot('M36 93 L360 93 L360 100 L37 100Z', 'ex-slide') + fountains(93) + t(196, 30, 'a flood of lava', 'ex-in'), 'Lava flooding the basin') },
+    { text: 'It cools into hard, dark basalt, shrinking and cracking into columns as it does. Then all is quiet: for thousands of years lakes and rivers lay more mud and sand on top.',
+      draw: lavaSvg(redBeds() + sheet(146, 160, 112, '', '#4a3436') + p('M36 93 L360 93 L360 100 L37 100Z', L.hot, 'ex-cool') + cracks(93, 100, 'ex-in') + sheet(84, 93, 35, 'ex-grow', L.mud) + t(196, 70, 'cooled; mud on top', 'ex-in'), 'The lava cools into columns and is buried') },
+    { text: 'Twice more lava floods the basin, with mud between: the Preakness basalt (Second Watchung) and the Hook Mountain basalt (Third Watchung). Their chemistry matches layers inside the Palisades Sill, so they were probably the same magma.',
+      draw: lavaSvg(redBeds() + sheet(146, 160, 112, '', '#4a3436') + sheet(93, 100, 37) + sheet(84, 93, 35, '', L.mud) + sheet(77, 84, 34) + sheet(68, 77, 33, '', L.mud) + p('M32 62 L360 62 L360 68 L33 68Z', L.hot, 'ex-cool') + side(66, '3rd') + side(82, '2nd') + side(99, '1st') + t(160, 40, 'three lava floods, mud between', 'ex-in'), 'Three lava layers with mud between') },
+    { text: 'Then the basin tilts, west side down, and over some 200 million years the soft red rock is worn away. The hard basalt and diabase are left standing: the three Watchung ridges, each with a cliff facing east, and on the east side the Palisades, about 100 m (300 ft) above the Hudson.',
+      draw: svg(p('M0 0 L360 0 L360 190 L0 190Z', C.red) + HARD.map(([c, th, n]) => tBand(c, th, n === 'Palisades' ? '#4a3436' : L.cold, 'ex-in')).join('') + ridgeSurface() + p(`M${((227 - 16 - ERODE) / TILT + 22 / TILT).toFixed(1)} ${ERODE} L360 ${ERODE} L360 ${ERODE + 6} L${((227 - 16 - ERODE) / TILT + 22 / TILT).toFixed(1)} ${ERODE + 6}Z`, C.water) +
+        HARD.map(([c, th, n]) => t(ridgeX(c, th, n === 'Palisades' ? 22 : 14).toFixed(0), n === 'Palisades' ? 84 : 94, n, 'ex-in')).join('') + t(6, 18, '← west', '', 'start') + t(354, 18, 'east →', '', 'end') + t(354, 140, 'Hudson', '', 'end'), 'Tilted, worn-down layers: the Watchung ridges and the Palisades cliffs') },
+  ] },
   bogiron: { title: 'How iron grows in a bog', src: ['bog'], steps: [
     { text: 'Groundwater carrying dissolved iron seeps out at springs and into streams and bogs.',
       draw: svg(p('M0 190 L0 110 L360 110 L360 190Z', C.sand) + p('M120 110 Q180 120 240 110 L240 116 Q180 126 120 116Z', C.water) + arrow(60, 170, 150, 118, 'ex-in', C.water) + t(180, 90, 'iron-bearing water seeps out'), 'Iron-bearing groundwater seeping out') },
@@ -129,3 +172,23 @@ export const EXPLAIN = {
       draw: svg(p('M0 190 L0 110 L360 110 L360 190Z', C.sand) + p('M120 110 Q180 120 240 110 L240 116 Q180 126 120 116Z', C.water) + rocks([[150, 122, 5], [170, 126, 4], [195, 124, 6], [218, 121, 4]], 'ex-in').replaceAll('#6d5544', C.iron) + t(180, 90, 'rusty lumps: bog iron ore', 'ex-in'), 'Bog iron ore forming') },
   ] },
 };
+
+/** See the real thing: photos for the lava explainer. The first two are NOT New Jersey: lava erupting today, to show what the
+ * Newark Basin's eruptions were like. The rest are the rock that lava left in New Jersey. Files from Wikimedia Commons, resized. */
+const CM = (f) => `https://commons.wikimedia.org/wiki/File:${f}`;
+export const LAVA_PHOTOS = {
+  intro: 'About 201 million years ago, lava flooded the Newark Basin three times. Nobody saw it, but eruptions of the same kind happen today. The first two photos are of those, far from New Jersey; the rest are the rock the lava left here.',
+  extinction: 'In the Newark Basin, the change in fossil pollen that marks the end-Triassic mass extinction lies just below the oldest lava flow. These eruptions, across the whole Central Atlantic province, are linked to that extinction, which cleared the way for the dinosaurs.',
+  src: ['camp', 'watchung', 'flood'],
+  list: [
+    { img: 'img/deep/fissure.jpg', tag: 'Not New Jersey · today', title: 'A fissure eruption, Iceland, 2014', text: 'Lava fountaining from a long crack in the ground, in the 2014 eruption from the Bárðarbunga volcano system. The Newark Basin’s eruptions were fissure eruptions like this, on a far bigger scale.', credit: 'Photo: Peter Hartree, CC BY-SA 2.0', page: CM('B%C3%A1r%C3%B0arbunga_Volcano,_September_4_2014_-_15145866372.jpg') },
+    { img: 'img/deep/pahoehoe.jpg', tag: 'Not New Jersey · today', title: 'Runny lava in a channel, Hawaiʻi, 2007', text: 'Pāhoehoe, the smooth, ropey kind of basalt lava, running in an open channel. The Watchungs have this kind and the blocky kind (ʻaʻā).', credit: 'Photo: Brocken Inaglory, CC BY-SA 3.0', page: CM('Lava_channel_with_overflows_edit_4.jpg') },
+    { img: 'img/deep/watchung-columns.jpg', tag: 'New Jersey', title: 'First Watchung Mountain, Hawthorne', text: 'Stacked, jointed basalt near the top of the ridge: lava that shrank and cracked into columns as it cooled.', credit: 'Photo: Wikipedia contributor, public domain', page: CM('WatchungStackedBasalt.jpg') },
+    { img: 'img/deep/lava-front.jpg', tag: 'New Jersey', title: 'An old lava front, Preakness Range', text: 'The edge of an ancient lava flow on the western flank of Beech Mountain, in the Watchungs.', credit: 'Photo: Wikipedia contributor, public domain', page: CM('LavaFront.jpg') },
+    { img: 'img/deep/great-falls.jpg', tag: 'New Jersey', title: 'The Great Falls, Paterson', text: 'The Passaic River pours over the basalt of First Watchung Mountain, 77 ft (23 m) high. A National Natural Landmark, for the jointed basalt lava flow it shows.', credit: 'Photo: TMcKNJDover, CC BY-SA 4.0', page: CM('PAGR_GREAT_FALLS_RAINBOW.jpg') },
+    { img: 'img/deep/palisades.jpg', tag: 'New Jersey', title: 'The Palisades, from Manhattan', text: 'Looking across the Hudson from 187th Street to Fort Lee: the edge of the Palisades Sill, the magma that cooled underground, worn into cliffs and columns.', credit: 'Photo: Beyond My Ken, CC BY-SA', page: CM('Hudson_River_Palisades_seen_from_187th_Street_crop.jpg') },
+  ],
+};
+EX_SRC.gf = ['Wikipedia: Great Falls (Passaic River)', W('Great_Falls_(Passaic_River)')];
+LAVA_PHOTOS.src.push('gf');
+

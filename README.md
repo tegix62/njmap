@@ -792,6 +792,15 @@ handle on top makes the panel tall, and it remembers), and the map has no fence 
   and the chapter's map animation starts. Tap to skip; **Watch how it happened** in the panel replays it; **Step by step** opens the
   full explainer. The panel stays short. The map shows where it is today, with
   only that chapter's region labelled and the crowding base labels hidden.
+- **See the real thing** (rift chapter, the Piedmont region, the Watchungs card): six photos from Wikimedia Commons, resized into
+  `img/deep/`, each credited with its licence and a link to its source page. The first two are labelled **Not New Jersey · today**:
+  a fissure eruption in Iceland (2014) and runny pāhoehoe lava in Hawaiʻi (2007), to show what the Newark Basin's eruptions were like.
+  The rest are the rock the lava left here: Watchung columns, a lava front in the Preakness Range, the Great Falls and the Palisades.
+- **How lava made the Watchungs and the Palisades**: an eight-step slice through the Newark Basin with glowing, cooling lava. Rift lake
+  and red beds, magma rising, the Palisades Sill spreading 3–5 km down, a fissure eruption, the first flood, cooling into columns, two
+  more floods, then tilting and erosion leaving the ridges and the cliffs. Sources: Wikipedia articles on the Central Atlantic magmatic
+  province, the Palisades Sill, the Watchung Mountains, the Newark Basin, diabase, columnar jointing and flood basalt. Where those
+  articles hedge ("may have filled nearly the entire basin", "probably the same magma"), so does the text.
 - **3D and animated**: every view is tilted 3D with heights exaggerated more the further out it is (×5 wide, ×3 at state scale, ×1.8
   close; a tag on the map says how much), then the camera drifts slowly so the shape reads. Chapters play as they open: the land rising
   as continents collide, each Watchung lava flood glowing then cooling to dark basalt, the coastal sand building, the ice age, the lake

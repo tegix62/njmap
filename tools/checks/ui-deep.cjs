@@ -44,6 +44,16 @@ const { chromium } = require('playwright'); const fs = require('fs');
   for (let k = 0; k < 6; k++) { const t = await page.locator('#deep .dp-extext').innerText(); console.log(`  step ${k + 1}: ${t.slice(0, 70)}…`); await shot(`how-icesheet-${k + 1}`);
     if (await page.locator('#deep .dp-exnav [data-d=howstep].go').count()) { await page.click('#deep .dp-exnav [data-d=howstep].go'); await page.waitForTimeout(900); } else break; }
   await page.click('#deep .dp-exnav [data-d=howback]'); await page.waitForTimeout(400); console.log('after Got it:', await page.locator('#deep h2').innerText());
+  // See the real thing and the lava explainer, from the rift chapter
+  await page.locator('#deepbar .dp-dots button').nth(2).click(); await page.waitForTimeout(1500);
+  if (await page.locator('#deepex').isVisible()) await page.click('#deepex');
+  await page.click('#deep [data-d=photos]'); await page.waitForTimeout(1500);
+  console.log('photos:', await page.locator('#deep .dp-photo').count(), '| loaded:', await page.evaluate(() => [...document.querySelectorAll('#deep .dp-photo img')].filter((i) => i.complete && i.naturalWidth > 0).length), '| not-NJ tags:', await page.locator('#deep .dp-phtag.far').count());
+  await shot('photos'); await page.locator('#deep .dp-photo').nth(4).scrollIntoViewIfNeeded(); await shot('photos-2');
+  await page.click('#deep [data-d=how][data-id=lava]'); await page.waitForTimeout(900);
+  for (let k = 0; k < 8; k++) { await shot(`how-lava-${k + 1}`); if (await page.locator('#deep .dp-exnav [data-d=howstep].go').count()) { await page.click('#deep .dp-exnav [data-d=howstep].go'); await page.waitForTimeout(700); } else { console.log('lava steps:', k + 1); break; } }
+  await page.click('#deep .dp-exnav [data-d=howback]'); await page.waitForTimeout(400); console.log('back from lava to:', await page.locator('#deep h1').innerText());
+  await page.click('#deep [data-d=howback]'); await page.waitForTimeout(400); console.log('back from photos to:', await page.locator('#deep h2').innerText());
   // the land today
   await page.click('#deep [data-d=intro]'); await page.waitForTimeout(800); await page.click('#deep [data-d=land]'); await page.waitForTimeout(2000);
   console.log('regions:', await page.locator('#deep .dp-region').count()); await shot('land');
