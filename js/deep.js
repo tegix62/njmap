@@ -270,7 +270,7 @@ export function initDeep(ctx) {
   }
   // the sheet stays short so the map shows; a handle on top makes it tall for reading (remembered), and an explainer is always tall
   const grab = () => `<button class="dp-grab" data-d="grab" aria-label="${root.classList.contains('big') ? 'Make the panel shorter' : 'Make the panel taller'}"><i></i></button>`;
-  const frame = (html) => { clearInterval(exTimer); exTimer = null; root.innerHTML = grab() + html; root.scrollTop = 0; root.classList.toggle('tall', view === 'how'); root.classList.toggle('ex', html.includes('dp-exlive')); };   // a chapter with a playing illustration opens taller
+  const frame = (html) => { clearInterval(exTimer); exTimer = null; root.innerHTML = grab() + html; root.scrollTop = 0; root.classList.toggle('tall', view === 'how'); hideEx(); };
   /** Long text: the first paragraph, then Read more for the rest. */
   const paras = (list) => `<p class="dp-p">${esc(list[0])}</p>${list.length > 1 ? `<div class="dp-more" hidden>${list.slice(1).map((x) => `<p class="dp-p">${esc(x)}</p>`).join('')}</div><button class="dp-readmore" data-d="more">Read more</button>` : ''}`;
   const top = (title, backTo, backWord = 'Back') => `<div class="dp-top"><button class="tr-back" data-d="${backTo}">${BACK}${backWord}</button><h1>${esc(title)}</h1></div>`;
@@ -306,11 +306,13 @@ export function initDeep(ctx) {
       's-rift': () => fly([-74.42, 40.72], 8.4, 55, 2400, () => lavaFloods()),
       's-ice': () => playIce(),
       's-coast': () => { op('deep-sand', 'fill-opacity', 0); timers.push(setTimeout(() => { map.setPaintProperty('deep-sand', 'fill-opacity-transition', { duration: ctx.dur(3000), delay: 0 }); op('deep-sand', 'fill-opacity', ['match', ['get', 'unit'], 'cohansey', 0.8, 0.45]); caption('Layer on layer of sand and clay along the coast; the yellow is the Cohansey sand'); }, ctx.dur(300) || 1)); timers.push(setTimeout(() => caption(''), ctx.dur(6000) || 1)); } }[S.id];
-    after(() => (bb ? fitBox(bb, 7, play) : fly([S.cam[0], S.cam[1]], S.cam[2], null, 1800, play)));
+    // the camera goes there under the illustration; the chapter's own animation waits until the illustration has slid away
+    const go = play && (() => afterEx(play));
+    after(() => (bb ? fitBox(bb, 7, go) : fly([S.cam[0], S.cam[1]], S.cam[2], null, 1800, go)));
     const L = S.land && LAND.find((r) => r.id === S.land);
     frame(`${top('The story', 'intro', 'Deep Jersey')}
       <p class="dp-kick">Chapter ${i + 1} of ${STORY.length}</p><h2>${esc(S.title)}</h2>
-      ${STORY_EX[S.id] ? liveEx(STORY_EX[S.id]) : ''}
+      ${STORY_EX[S.id] ? `<button class="dp-play" data-d="watch" data-id="${STORY_EX[S.id]}"><b>▶ Watch how it happened</b><small>${esc(EXPLAIN[STORY_EX[S.id]].title)}, drawn as a slice through the ground</small></button>` : ''}
       ${paras(S.text)}
       ${L ? `<button class="dp-region" data-d="landone" data-id="${L.id}"><i style="background:${L.color}"></i><span><b>${esc(L.name)} today</b><small>${esc(L.nj)}</small></span></button>` : ''}
       ${S.id === 's-ice' || S.id === 's-lake' ? '<button class="dp-play" data-d="playice"><b>▶ Play the ice age on the map</b><small>the ice spreads, stops, melts back; the lake fills and drains</small></button>' : ''}
@@ -318,7 +320,7 @@ export function initDeep(ctx) {
       ${S.close.length ? `<h4>See it up close</h4>${chips(S.close)}` : ''}
       ${i < STORY.length - 1 ? `<button class="dp-start" data-d="next"><b>Next: ${esc(STORY[i + 1].title)}</b><small>${esc(STORY[i + 1].when)}</small></button>` : `<button class="dp-start" data-d="intro"><b>The end, for now</b><small>back to Deep Jersey: the land today and the close-ups</small></button>`}
       ${srcList(S.src)}`);
-    if (STORY_EX[S.id]) playLive(STORY_EX[S.id]);
+    if (STORY_EX[S.id]) showEx(STORY_EX[S.id]);
   }
 
   // ---- the land today ------------------------------------------------------------------------------------------------------
@@ -389,18 +391,38 @@ export function initDeep(ctx) {
       ${srcList(c.src)}`);
   }
 
-  /** The chapter's illustration, playing by itself: each step every few seconds, round again after a pause. Tap it for the full one. */
-  const liveEx = (id) => { const X = EXPLAIN[id]; return `<button class="dp-exlive" data-d="how" data-id="${id}" aria-label="${esc(X.title)}: open step by step"><span class="dp-exhead">${esc(X.title)}</span><span class="dp-exfig">${X.steps[0].draw}</span><span class="dp-excap">${esc(X.steps[0].text)}</span><span class="dp-exdots">${X.steps.map((_, k) => `<i${k ? '' : ' class="on"'}></i>`).join('')}</span></button>`; };
-  function playLive(id) {
-    const X = EXPLAIN[id]; let k = 0;
-    clearInterval(exTimer);
+  /** The chapter's illustration, played over the map rather than inside the sheet (the sheet stays short and the map keeps its
+   * room): each step a few seconds, then it slides away and the map takes over. Tap to skip; Watch how it happened brings it back. */
+  let exEl = null, exRun = 0, exWait = null;
+  function showEx(id) {
+    const X = EXPLAIN[id]; if (!X) return;
+    if (!exEl) { exEl = document.createElement('div'); exEl.id = 'deepex'; document.body.appendChild(exEl);
+      exEl.addEventListener('click', (e) => { if (e.target.closest('[data-x=steps]')) { const i = exEl.dataset.id; closeEx(true); how(i); } else closeEx(true); }); }
+    const run = ++exRun; exWait = exWait || [];
+    const t = bar && !bar.hidden ? bar.getBoundingClientRect().bottom + 8 : 12, b = root && !root.hidden ? innerHeight - root.getBoundingClientRect().top + 8 : 12;
+    Object.assign(exEl.style, { top: `${t}px`, bottom: `${Math.max(12, b)}px` });
+    exEl.dataset.id = id;
+    exEl.innerHTML = `<div class="dp-exhead">${esc(X.title)}</div><div class="dp-exfig">${X.steps[0].draw}</div><p class="dp-excap">${esc(X.steps[0].text)}</p>
+      <div class="dp-exfoot"><span class="dp-exdots">${X.steps.map((_, k) => `<i${k ? '' : ' class="on"'}></i>`).join('')}</span><button data-x="steps">Step by step</button><span class="dp-exskip">Tap to skip ›</span></div>`;
+    exEl.hidden = false; exEl.classList.remove('out'); void exEl.offsetWidth; exEl.classList.add('in');
+    const each = matchMedia('(prefers-reduced-motion: reduce)').matches ? 6500 : 4600;
+    let k = 0; clearInterval(exTimer);
     exTimer = setInterval(() => {
-      const el = root.querySelector('.dp-exlive'); if (!el || ctx.mode !== 'deep') { clearInterval(exTimer); return; }
-      k = (k + 1) % (X.steps.length + 1); if (k === X.steps.length) return;     // a beat of rest before it starts again
-      el.querySelector('.dp-exfig').innerHTML = X.steps[k].draw; el.querySelector('.dp-excap').textContent = X.steps[k].text;
-      el.querySelectorAll('.dp-exdots i').forEach((d, j) => d.classList.toggle('on', j === k));
-    }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 7000 : 5200);
+      if (run !== exRun || ctx.mode !== 'deep') { clearInterval(exTimer); return; }
+      k++; if (k >= X.steps.length) { closeEx(true); return; }
+      exEl.querySelector('.dp-exfig').innerHTML = X.steps[k].draw; exEl.querySelector('.dp-excap').textContent = X.steps[k].text;
+      exEl.querySelectorAll('.dp-exdots i').forEach((d, j) => d.classList.toggle('on', j === k));
+    }, each);
   }
+  /** Slide the illustration away; when it ends by itself or is skipped, whatever was waiting for it (the chapter's map animation) runs. */
+  function closeEx(finished) {
+    clearInterval(exTimer); exTimer = null; exRun++;
+    const wait = exWait; exWait = null;
+    if (exEl && !exEl.hidden) { exEl.classList.remove('in'); exEl.classList.add('out'); const el = exEl; setTimeout(() => { if (el.classList.contains('out')) el.hidden = true; }, 380); }
+    if (finished && wait) for (const f of wait) f();
+  }
+  const hideEx = () => closeEx(false);
+  const afterEx = (f) => { if (exWait) exWait.push(f); else f(); };
 
   /** An explainer: a slice through the ground, step by step. Back returns to wherever it was opened from. */
   let howBack = null;
@@ -478,7 +500,7 @@ export function initDeep(ctx) {
   const actions = {
     home: async () => {
       // the home page opens under this sheet and the bar: hide them while it is up, and come back if Deep Jersey is picked again
-      const barWas = bar.hidden; root.hidden = true; bar.hidden = true; if (pinEl) pinEl.hidden = true;
+      const barWas = bar.hidden; hideEx(); root.hidden = true; bar.hidden = true; if (pinEl) pinEl.hidden = true;
       await ctx.showHome();
       if (ctx.mode === 'deep') { root.hidden = false; bar.hidden = barWas; drawPins(shown.pins, shown.labels); setExag(exagNow); }
     },
@@ -494,6 +516,7 @@ export function initDeep(ctx) {
     back: () => (ret ? ret() : intro()),
     card: (b) => openCard(b.dataset.id),
     how: (b) => how(b.dataset.id),
+    watch: (b) => { showEx(b.dataset.id); },
     playice: () => playIce(),
     howstep: (b) => how(b.dataset.id, +b.dataset.s),
     howback: () => (howBack ? howBack() : intro()),
@@ -516,7 +539,7 @@ export function initDeep(ctx) {
       go();
     },
     leave() {
-      for (const t of timers) clearTimeout(t); timers = []; caption('');
+      for (const t of timers) clearTimeout(t); timers = []; caption(''); hideEx();
       document.body.classList.remove('deep-on');
       if (root) root.hidden = true; if (bar) bar.hidden = true;
       map.stop(); map.setTerrain(null); exagNow = 0; if (exagEl) exagEl.hidden = true; drift++; hideLayers();

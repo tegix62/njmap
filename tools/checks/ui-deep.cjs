@@ -23,6 +23,13 @@ const { chromium } = require('playwright'); const fs = require('fs');
     await shot(`story-${i + 1}-${slug(t)}`);
   }
   console.log('next disabled at the end:', await page.locator('#deepbar [data-b=next]').isDisabled());
+  // the chapter illustration plays over the map, the sheet stays short, tap skips it, Watch brings it back
+  await page.locator('#deepbar .dp-dots button').nth(1).click(); await page.waitForTimeout(1500);
+  const exBox = await page.evaluate(() => { const e = document.getElementById('deepex'), d = document.getElementById('deep'); const r = e && !e.hidden ? e.getBoundingClientRect() : null; return { shown: !!r, h: r && Math.round(r.height), sheet: Math.round(d.getBoundingClientRect().height), vh: innerHeight }; });
+  console.log('illustration over the map:', JSON.stringify(exBox)); await shot('ex-overlay');
+  await page.click('#deepex'); await page.waitForTimeout(600); console.log('after tap, hidden:', await page.evaluate(() => document.getElementById('deepex').hidden));
+  await page.click('#deep [data-d=watch]'); await page.waitForTimeout(500); console.log('watch again shows it:', await page.evaluate(() => !document.getElementById('deepex').hidden));
+  await page.waitForTimeout(30000); console.log('ends by itself:', await page.evaluate(() => document.getElementById('deepex').hidden)); await shot('ex-after');
   await page.locator('#deepbar .dp-dots button').nth(0).click(); await page.waitForTimeout(2200);
   await page.click('#deep .dp-region'); await page.waitForTimeout(2600);
   console.log('from the story to its region:', await page.locator('#deep h1').innerText()); await shot('story-region');
