@@ -17,7 +17,24 @@ const rand = (a) => a[Math.floor(Math.random() * a.length)];
 const KIND_COLOR = { rock: '#9a5b3c', ice: '#3d7fbf', lenape: '#a2652a', iron: '#5b5f66', canal: '#2f7d6d', water: '#2f6fb0', legend: '#7a4a8c' };
 const ERA_FILL = { grenville: '#c98f6a', paleozoic: '#a9b27a', newark: '#c4614b', basalt: '#4a3b3b', diabase: '#6b5b73', coastal: '#e3d29a' };
 const REGION_COLOR = Object.fromEntries(LAND.map((r) => [r.id, r.color]));
-const DEM = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
+const DEM_SRC = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/';
+// With heights exaggerated ×40 to ×90, the edge of the continental shelf becomes a wall kilometres high that dominates every wide
+// view. The sea floor is not the subject, so as each elevation tile arrives, everything below sea level is flattened to -1 m (the
+// relief colours leave -1 m clear, so the base map's water shows through). Terrarium: metres = R*256 + G + B/256 - 32768.
+let demProto = false;
+function flatSeaDem() {
+  if (demProto || !self.maplibregl?.addProtocol || typeof OffscreenCanvas === 'undefined') return demProto ? 'deepdem://' : DEM_SRC;
+  self.maplibregl.addProtocol('deepdem', async (params, abort) => {
+    const r = await fetch(DEM_SRC + params.url.slice('deepdem://'.length), { signal: abort.signal });
+    if (!r.ok) throw new Error(`DEM tile ${r.status}`);
+    const bmp = await createImageBitmap(await r.blob()), cv = new OffscreenCanvas(bmp.width, bmp.height), g = cv.getContext('2d', { willReadFrequently: true });
+    g.drawImage(bmp, 0, 0); const img = g.getImageData(0, 0, bmp.width, bmp.height), d = img.data;
+    for (let i = 0; i < d.length; i += 4) if (d[i] < 128) { d[i] = 127; d[i + 1] = 255; d[i + 2] = 0; }   // below 0 m -> -1 m
+    g.putImageData(img, 0, 0);
+    return { data: await (await cv.convertToBlob({ type: 'image/png' })).arrayBuffer() };
+  });
+  demProto = true; return 'deepdem://';
+}
 const LAYERS = ['deep-relief', 'deep-hs', 'deep-iceanim', 'deep-rivers', 'deep-prov', 'deep-prov-line', 'deep-rocks', 'deep-sand', 'deep-flows', 'deep-lake', 'deep-ice-sheet', 'deep-icelines', 'deep-ice-older', 'deep-ice-limit', 'deep-canal'];
 // "How it works" explainers for each chapter, region, close-up stop and card that leans on an idea
 const HOW = {
@@ -58,6 +75,7 @@ export function initDeep(ctx) {
   // ---- map layers -----------------------------------------------------------------------------------------------------------
   function addLayers() {
     if (map.getSource('deep-rocks')) { for (const id of LAYERS) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible'); return; }
+    const DEM = `${flatSeaDem()}{z}/{x}/{y}.png`;
     map.addSource('deep-dem', { type: 'raster-dem', tiles: [DEM], encoding: 'terrarium', tileSize: 256, maxzoom: 11, attribution: 'Terrain: AWS Terrain Tiles (USGS 3DEP and others)' });
     map.addSource('deep-dem-hs', { type: 'raster-dem', tiles: [DEM], encoding: 'terrarium', tileSize: 256, maxzoom: 11 });
     map.addSource('deep-prov', { type: 'geojson', data: data.provinces, attribution: 'Regions: USGS Physiographic Divisions (Fenneman and Johnson 1946)' });
@@ -73,13 +91,13 @@ export function initDeep(ctx) {
     // the land coloured by height (green lowlands, tan hills, brown mountains), shading from several directions on top of the region
     // colours, and rivers drawn stronger: valleys, ridges and rivers read at a glance
     map.addLayer({ id: 'deep-relief', type: 'color-relief', source: 'deep-dem-hs', paint: { 'color-relief-opacity': 0.6,
-      'color-relief-color': ['interpolate', ['linear'], ['elevation'], -5, 'rgba(0,0,0,0)', 0, '#cfdcbc', 40, '#d9e0bd', 120, '#e6ddb3', 250, '#dcc597', 450, '#c8a67c', 750, '#a98567', 1100, '#8f7461', 1600, '#a59a91'] } });
+      'color-relief-color': ['interpolate', ['linear'], ['elevation'], -1, 'rgba(0,0,0,0)', 0, '#cfdcbc', 40, '#d9e0bd', 120, '#e6ddb3', 250, '#dcc597', 450, '#c8a67c', 750, '#a98567', 1100, '#8f7461', 1600, '#a59a91'] } });
     map.addLayer({ id: 'deep-prov', type: 'fill', source: 'deep-prov', paint: { 'fill-color': ['match', ['get', 'region'], ...Object.entries(REGION_COLOR).flat(), '#999'], 'fill-opacity': 0, 'fill-opacity-transition': T } });
     map.addLayer({ id: 'deep-prov-line', type: 'line', source: 'deep-prov', paint: { 'line-color': ['match', ['get', 'region'], ...Object.entries(REGION_COLOR).flat(), '#999'], 'line-width': 1.4, 'line-opacity': 0, 'line-opacity-transition': T } });
     map.addLayer({ id: 'deep-hs', type: 'hillshade', source: 'deep-dem-hs', paint: { 'hillshade-method': 'multidirectional',
       'hillshade-illumination-direction': [270, 315, 0, 45], 'hillshade-illumination-altitude': [30, 30, 30, 30],
       'hillshade-highlight-color': ['rgba(255,255,255,0.35)', 'rgba(255,255,255,0.35)', 'rgba(255,255,255,0.35)', 'rgba(255,255,255,0.35)'],
-      'hillshade-shadow-color': ['rgba(40,36,30,0.55)', 'rgba(40,36,30,0.45)', 'rgba(40,36,30,0.35)', 'rgba(40,36,30,0.3)'], 'hillshade-exaggeration': 0.9 } });
+      'hillshade-shadow-color': ['rgba(40,36,30,0.55)', 'rgba(40,36,30,0.45)', 'rgba(40,36,30,0.35)', 'rgba(40,36,30,0.3)'], 'hillshade-exaggeration': 1 } });
     map.addLayer({ id: 'deep-rivers', type: 'line', source: 'omt', 'source-layer': 'waterway', filter: ['==', ['get', 'class'], 'river'],
       paint: { 'line-color': '#3b7fc0', 'line-opacity': 0.9, 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.8, 8, 1.8, 11, 3.2] } });
     map.addLayer({ id: 'deep-rocks', type: 'fill', source: 'deep-rocks', paint: { 'fill-color': ['match', ['get', 'era'], ...Object.entries(ERA_FILL).flat(), '#999'], 'fill-opacity': 0, 'fill-opacity-transition': T } });
@@ -188,7 +206,9 @@ export function initDeep(ctx) {
   // ---- the camera: always 3D, tilted, heights exaggerated more the further out it is (a tag on the map says how much), then a slow
   // drift so the shape of the land reads
   let exagNow = 0, exagEl = null, drift = 0;
-  const exagFor = (z) => (z < 6.8 ? 5 : z < 9 ? 3 : 1.8);
+  // heights grow with distance: at true scale, mountains a few hundred metres high vanish in a view 1,000 km wide. About ×100 at the
+  // widest view, ×40 for a region, ×15 for a valley, ×6 up close (rounded so the tag reads cleanly)
+  const exagFor = (z) => { const e = 6 * 1.6 ** (10 - Math.min(10, Math.max(4, z))); return e > 20 ? Math.round(e / 10) * 10 : Math.round(e); };
   function setExag(e) {
     exagNow = e; map.setTerrain(e ? { source: 'deep-dem', exaggeration: e } : null);
     if (!exagEl) { exagEl = document.createElement('div'); exagEl.id = 'deepexag'; document.body.appendChild(exagEl); }
@@ -200,7 +220,7 @@ export function initDeep(ctx) {
   const after = (f) => Promise.resolve().then(f);
   function fly(center, zoom, pitch = null, dur = 1800, then = null) {
     const e = exagFor(zoom); if (Math.abs(e - exagNow) > 0.01) { map.stop(); setExag(e); }
-    const tok = ++drift, P = pitch ?? (zoom < 7 ? 28 : zoom < 9 ? 48 : 58), bearing = zoom < 7 ? -8 : -16;
+    const tok = ++drift, P = pitch ?? (zoom < 7 ? 52 : zoom < 9 ? 56 : 60), bearing = zoom < 7 ? -8 : -16;
     map.flyTo({ center, zoom, pitch: P, bearing, padding: pad(), duration: ctx.dur(dur), essential: true });
     // wait for this flight to land: a moveend can also come from the move it interrupted, straight away
     const start = Date.now(), onEnd = () => {
@@ -215,7 +235,7 @@ export function initDeep(ctx) {
   function fitBox(bb, maxZoom, then = null) {
     const p = pad(); map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
     const cam = map.cameraForBounds([[bb[0], bb[1]], [bb[2], bb[3]]], { padding: p, maxZoom, bearing: 0, pitch: 0 }) || { center: [(bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2], zoom: 6 };
-    fly(cam.center, cam.zoom - 0.3, null, 1800, then);
+    fly(cam.center, cam.zoom - 0.5, null, 1800, then);   // a little further out: the tilted view needs room
   }
   /** The land rising: heights grow from flat to `to` over a few seconds (the mountain-building chapter). */
   function rise(to, ms = 3200) {
@@ -302,7 +322,7 @@ export function initDeep(ctx) {
     applyScene({ ...S.scene, labels: S.land ? [S.land] : [] });
     const bb = S.land && data.provinces.features.find((f) => f.properties.region === S.land).properties.bbox;
     // each chapter plays: the land rising, the lava flooding, the ice coming and going; otherwise the whole belt, past the state line
-    const play = { 's-mountains': () => { setExag(0.01); rise(6); caption('Continents collide: the land is pushed up into mountains (heights ×6)'); timers.push(setTimeout(() => caption(''), ctx.dur(6500) || 1)); },
+    const play = { 's-mountains': () => { const top = exagFor(map.getZoom()); setExag(0.01); rise(top); caption(`Continents collide: the land is pushed up into mountains (heights ×${top})`); timers.push(setTimeout(() => caption(''), ctx.dur(6500) || 1)); },
       's-rift': () => fly([-74.42, 40.72], 8.4, 55, 2400, () => lavaFloods()),
       's-ice': () => playIce(),
       's-coast': () => { op('deep-sand', 'fill-opacity', 0); timers.push(setTimeout(() => { map.setPaintProperty('deep-sand', 'fill-opacity-transition', { duration: ctx.dur(3000), delay: 0 }); op('deep-sand', 'fill-opacity', ['match', ['get', 'unit'], 'cohansey', 0.8, 0.45]); caption('Layer on layer of sand and clay along the coast; the yellow is the Cohansey sand'); }, ctx.dur(300) || 1)); timers.push(setTimeout(() => caption(''), ctx.dur(6000) || 1)); } }[S.id];

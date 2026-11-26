@@ -801,8 +801,11 @@ handle on top makes the panel tall, and it remembers), and the map has no fence 
   more floods, then tilting and erosion leaving the ridges and the cliffs. Sources: Wikipedia articles on the Central Atlantic magmatic
   province, the Palisades Sill, the Watchung Mountains, the Newark Basin, diabase, columnar jointing and flood basalt. Where those
   articles hedge ("may have filled nearly the entire basin", "probably the same magma"), so does the text.
-- **3D and animated**: every view is tilted 3D with heights exaggerated more the further out it is (×5 wide, ×3 at state scale, ×1.8
-  close; a tag on the map says how much), then the camera drifts slowly so the shape reads. Chapters play as they open: the land rising
+- **3D and animated**: every view is tilted 3D with heights exaggerated far past true scale, more the further out it is
+  (6 × 1.6^(10 − zoom): about ×90 for the whole Appalachian belt, ×40 for the region round New Jersey, ×9 for the Passaic valley, ×6
+  close; a tag on the map says how much). The tilt is 52° to 60°. At these exaggerations the edge of the continental shelf would be a wall
+  kilometres high that dominates every wide view, so each elevation tile is flattened below sea level as it loads (a `deepdem://`
+  protocol in `js/deep.js` rewrites terrarium pixels under 0 m to -1 m); the land carries all the height and the sea stays flat, then the camera drifts slowly so the shape reads. Chapters play as they open: the land rising
   as continents collide, each Watchung lava flood glowing then cooling to dark basalt, the coastal sand building, the ice age, the lake
   filling, story pins popping in one by one.
 - **Relief that reads**: the land coloured by height (green lowlands, tan hills, brown mountains) with shading from several directions
