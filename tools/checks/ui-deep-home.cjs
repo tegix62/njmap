@@ -48,6 +48,11 @@ const { chromium } = require('playwright'); const fs = require('fs');
   await page.click('#deepbar [data-b=next]'); let all = [];
   for (let k = 0; k < 60; k++) { await page.waitForTimeout(1000); const now = await page.evaluate(() => window.__caps); if (now.length > all.length) await page.screenshot({ path: `${out}/drainfull-${now.length}.png` }); all = now; if (all.some((x) => x.includes('Great Falls'))) break; }
   console.log('drain stages seen:', all.length, '| last:', (all[all.length - 1] || '').slice(0, 60));
+  // leaving Deep Jersey from the map index: the story dots go with it
+  await page.click('#deep [data-d=intro]'); await page.waitForTimeout(600); await page.click('#deep [data-d=mapidx]'); await page.waitForTimeout(2500);
+  await page.click('#deep [data-d=intro]'); await page.waitForTimeout(600); await page.click('#deep [data-d=home]'); await page.waitForTimeout(800);
+  await page.click('#welcome [data-entry=nj]'); await page.waitForTimeout(2500);
+  console.log('story dots after leaving Deep Jersey:', await page.evaluate(() => window.njtf.map.getLayer('deep-stories') ? window.njtf.map.getLayoutProperty('deep-stories', 'visibility') : 'no layer'));
   // blocked storage: still opens
   await page.close();   // the first page keeps rendering; free the CPU for this one
   const p2 = await (await b.newContext({ viewport: { width: 390, height: 664 } })).newPage();
