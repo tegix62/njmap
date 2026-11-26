@@ -786,10 +786,15 @@ plan: `docs/superpowers/plans/2026-11-26-deep-jersey-threads.md`.
 - **Home**: four hooks to start from (unread first, rotating day by day), "Pick up a thread" (unread stories linked from ones you have
   read), **The map** (every story at the place it lands, coloured by subject, read ones faded, all stories listed below), and the nine
   old chapters kept in order as **How the ground was made**. The land today and the close-ups are still there.
-- **17 stories**: the nine chapters rewritten in three beats, plus the Great Falls, Hamilton's factory city at Paterson, the Palisades,
+- **17 stories** (first batch): the nine chapters rewritten in three beats, plus the Great Falls, Hamilton's factory city at Paterson, the Palisades,
   the glowing minerals of Franklin and Sterling Hill, the compass that doesn't point north (declination at Boonton from NOAA's World
   Magnetic Model: 12.95° W in 2010, 12.38° W in 2025), the Hudson Canyon and the low ice-age sea, horseshoe crabs and red knots on
   Delaware Bay, and *Hadrosaurus foulkii*, the first mounted dinosaur skeleton, from Haddonfield.
+- **Second batch (23 stories)**: the Black Tom explosion (1916, Liberty State Park), the village under the Monksville Reservoir (with
+  Long Pond's German ironworkers and the Wanaque Reservoir), the year without a summer (Tambora's eruption and five nights of June frost
+  at Cape May), Sandy and the moving barrier islands (the temporary inlet at Mantoloking), Feltville, the Deserted Village (and the
+  rock layer and ice-age outlet named for or running past it), and the Hindenburg at Lakehurst. The chestnut blight waits for a source
+  that ties it to a New Jersey place.
 - **Lake Passaic drains on the map**: the water streams out through Moggy Hollow to the Raritan, the lake drops when Great Notch opens
   (its outflow carved the Third River valley), then the Passaic takes the long way round over the Great Falls. The flow lines are
   schematic (`data/deep/drain.json`, built by `python3 tools/build_deep.py drain`, each point commented with its source).

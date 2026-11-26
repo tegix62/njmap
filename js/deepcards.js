@@ -37,7 +37,13 @@ export const SRC = {
   wmm: ['NOAA NCEI: World Magnetic Model (declination for Boonton computed with WMM2010 and WMM2025)', 'https://www.ncei.noaa.gov/products/world-magnetic-model'],
   hudsoncanyon: ['Wikipedia: Hudson Canyon', W('Hudson_Canyon')], subcanyon: ['Wikipedia: Submarine canyon', W('Submarine_canyon')], lgm: ['Wikipedia: Last Glacial Maximum', W('Last_Glacial_Maximum')],
   crab: ['Wikipedia: Atlantic horseshoe crab', W('Atlantic_horseshoe_crab')], knot: ['Wikipedia: Red knot', W('Red_knot')],
-  hadro: ['Wikipedia: Hadrosaurus', W('Hadrosaurus')], diabase: ['Wikipedia: Diabase', W('Diabase')]
+  hadro: ['Wikipedia: Hadrosaurus', W('Hadrosaurus')], diabase: ['Wikipedia: Diabase', W('Diabase')],
+  blacktom: ['Wikipedia: Black Tom explosion', W('Black_Tom_explosion')], monksville: ['Wikipedia: Monksville, New Jersey', W('Monksville,_New_Jersey')],
+  monksres: ['Wikipedia: Monksville Reservoir', W('Monksville_Reservoir')], wanaque: ['Wikipedia: Wanaque Reservoir', W('Wanaque_Reservoir')],
+  longpond: ['Wikipedia: Long Pond Ironworks State Park', W('Long_Pond_Ironworks_State_Park')], yws: ['Wikipedia: Year Without a Summer', W('Year_Without_a_Summer')],
+  sandynj: ['Wikipedia: Effects of Hurricane Sandy in New Jersey', W('Effects_of_Hurricane_Sandy_in_New_Jersey')], barrier: ['Wikipedia: Barrier island', W('Barrier_island')],
+  feltville: ['Wikipedia: Feltville Historic District', W('Feltville_Historic_District')], feltform: ['Wikipedia: Feltville Formation', W('Feltville_Formation')],
+  hind: ['Wikipedia: Hindenburg disaster', W('Hindenburg_disaster')]
 };
 
 /** The stops on the time slider, newest first. zoom/center: the deep-time zoom (the camera pulls out as time goes back). */
