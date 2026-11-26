@@ -795,6 +795,10 @@ plan: `docs/superpowers/plans/2026-11-26-deep-jersey-threads.md`.
   at Cape May), Sandy and the moving barrier islands (the temporary inlet at Mantoloking), Feltville, the Deserted Village (and the
   rock layer and ice-age outlet named for or running past it), and the Hindenburg at Lakehurst. The chestnut blight waits for a source
   that ties it to a New Jersey place.
+- **Third batch (28 stories)**: the Delaware Water Gap (Mount Tammany, named after Tamanend), New Jersey's earthquakes (the Ramapo
+  Fault, hedged as the sources hedge, and the magnitude 4.8 near Whitehouse Station in April 2024), the swamp that stopped a jetport
+  (the Great Swamp refuge, 1959–1968), the forest that needs fire (pitch pine, from the Apple Pie Hill fire tower), and the Wizard of
+  Menlo Park. A Lenape trails story waits for a source.
 - **Lake Passaic drains on the map**: the water streams out through Moggy Hollow to the Raritan, the lake drops when Great Notch opens
   (its outflow carved the Third River valley), then the Passaic takes the long way round over the Great Falls. The flow lines are
   schematic (`data/deep/drain.json`, built by `python3 tools/build_deep.py drain`, each point commented with its source).

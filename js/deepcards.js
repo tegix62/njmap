@@ -43,7 +43,11 @@ export const SRC = {
   longpond: ['Wikipedia: Long Pond Ironworks State Park', W('Long_Pond_Ironworks_State_Park')], yws: ['Wikipedia: Year Without a Summer', W('Year_Without_a_Summer')],
   sandynj: ['Wikipedia: Effects of Hurricane Sandy in New Jersey', W('Effects_of_Hurricane_Sandy_in_New_Jersey')], barrier: ['Wikipedia: Barrier island', W('Barrier_island')],
   feltville: ['Wikipedia: Feltville Historic District', W('Feltville_Historic_District')], feltform: ['Wikipedia: Feltville Formation', W('Feltville_Formation')],
-  hind: ['Wikipedia: Hindenburg disaster', W('Hindenburg_disaster')]
+  hind: ['Wikipedia: Hindenburg disaster', W('Hindenburg_disaster')],
+  dwg: ['Wikipedia: Delaware Water Gap', W('Delaware_Water_Gap')], ramapo: ['Wikipedia: Ramapo Fault', W('Ramapo_Fault')],
+  nycquake: ['Wikipedia: Seismicity of the New York City area', W('Seismicity_of_the_New_York_City_area')],
+  gsnwr: ['Wikipedia: Great Swamp National Wildlife Refuge', W('Great_Swamp_National_Wildlife_Refuge')], pitch: ['Wikipedia: Pinus rigida (pitch pine)', W('Pinus_rigida')],
+  edisontwp: ['Wikipedia: Edison, New Jersey', W('Edison,_New_Jersey')]
 };
 
 /** The stops on the time slider, newest first. zoom/center: the deep-time zoom (the camera pulls out as time goes back). */

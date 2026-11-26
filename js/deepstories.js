@@ -31,7 +31,7 @@ export const STORIES = [
         scene: { rocks: 0.5 }, cam: [-74.571, 40.947, 10.5] },
     },
     places: ['green-pond'], explain: ['fold', 'ridges'],
-    threads: [{ to: 's-rift', why: 'then the supercontinent the collision made begins to split' }, { to: 's-oldest', why: 'the far older rock the folds were pushed against' }],
+    threads: [{ to: 's-rift', why: 'then the supercontinent the collision made begins to split' }, { to: 's-oldest', why: 'the far older rock the folds were pushed against' }, { to: 'water-gap', why: 'where a river cut through the ridge' }],
     src: ['taconic', 'allegh', 'ridge', 'physio', 'kitt', 'gunks', 'bluemtn', 'sgmc'] }),
 
   story({ id: 's-rift', domain: 'earth', when: 'About 200 million years ago', title: 'Pangaea tears apart',
@@ -158,7 +158,7 @@ export const STORIES = [
         scene: {}, cam: [-74.175, 40.914, 13.4], mark: { p: [-74.178, 40.913], label: 'The mill district' } },
     },
     places: [],
-    threads: [{ to: 'great-falls', why: 'where the power came from' }, { to: 's-iron', why: 'the other industries the land made: iron, canals and glass' }],
+    threads: [{ to: 'great-falls', why: 'where the power came from' }, { to: 's-iron', why: 'the other industries the land made: iron, canals and glass' }, { to: 'menlo', why: 'the inventor’s laboratory, in Middlesex County' }],
     src: ['gf', 'sum', 'strike'] }),
 
   story({ id: 'palisades', domain: 'earth', when: 'About 200 million years ago', title: 'The Palisades',
@@ -256,7 +256,7 @@ export const STORIES = [
         scene: {}, cam: [-74.051, 40.697, 13.4], mark: { p: [-74.051, 40.697], label: 'Black Tom, Liberty State Park' } },
     },
     places: [],
-    threads: [{ to: 'hudson-canyon', why: 'the same harbour, and where its water goes' }, { to: 'hindenburg', why: 'another night the whole region heard about' }],
+    threads: [{ to: 'hudson-canyon', why: 'the same harbour, and where its water goes' }, { to: 'hindenburg', why: 'another night the whole region heard about' }, { to: 'earthquakes', why: 'the real earthquakes under New Jersey' }],
     src: ['blacktom'] }),
 
   story({ id: 'monksville', domain: 'gone', when: '1766 to 1987', title: 'The village under the reservoir', gone: true,
@@ -298,7 +298,7 @@ export const STORIES = [
         scene: {}, cam: [-74.052, 40.04, 12], mark: { p: [-74.052, 40.04], label: 'Mantoloking' } },
     },
     places: [],
-    threads: [{ to: 's-coast', why: 'where all that sand came from' }, { to: 'hudson-canyon', why: 'when the sea was 400 ft lower and the shore far out' }],
+    threads: [{ to: 's-coast', why: 'where all that sand came from' }, { to: 'hudson-canyon', why: 'when the sea was 400 ft lower and the shore far out' }, { to: 'pines', why: 'inland, the forest that lives with fire' }],
     src: ['barrier', 'sandynj'] }),
 
   story({ id: 'feltville', domain: 'gone', when: '1736 to today', title: 'The Deserted Village', gone: true,
@@ -328,6 +328,76 @@ export const STORIES = [
     places: [],
     threads: [{ to: 'black-tom', why: 'another disaster heard across the region' }, { to: 'sandy', why: 'the same shore, in the storm of 2012' }],
     src: ['hind'] }),
+// ---- third batch (November 2026) ---------------------------------------------------------------------------------------------
+  story({ id: 'water-gap', domain: 'earth', when: 'Hundreds of millions of years, and the ice age', title: 'The Delaware Water Gap',
+    hook: 'The Delaware River cuts clean through a mountain ridge, 1,200 ft deep, at the state line.',
+    beats: {
+      big: { text: ['The first great ridge of the Appalachians is one ridge with several names: the Shawangunk Ridge in New York, Kittatinny Mountain in New Jersey, and Blue Mountain in Pennsylvania, which runs on 150 miles beyond the gap. It is made of Shawangunk conglomerate from the Silurian period, a grey quartzite that resists weathering.'],
+        scene: { prov: { valleyridge: 0.7 }, provFaint: 0.05 }, fit: 'valleyridge' },
+      thread: { text: ['Where the rock was cracked and broken, the Delaware River slowly cut its way down through it: a water gap. In the last ice age the ice covered the whole Kittatinny Ridge, with its edge near Belvidere; when it melted back, the gap took its present form.'],
+        scene: { iceLimit: 0.9, prov: { valleyridge: 0.4 } }, cam: [-75.1, 40.95, 9.4] },
+      here: { text: ['The gap is nearly 1,300 ft wide at the river and about a mile wide from summit to summit, and more than 1,200 ft from mountaintop to water. The river runs through it 290 ft above sea level.', 'The New Jersey side is Mount Tammany, 1,540 ft, named after the Lenape chief Tamanend; across the river is Mount Minsi, named after the Munsee.'],
+        scene: {}, cam: [-75.135, 40.972, 12.4], mark: { p: [-75.13, 40.968], label: 'Mount Tammany' } },
+    },
+    places: [],
+    threads: [{ to: 's-mountains', why: 'the collisions that folded the ridge' }, { to: 's-ice', why: 'the ice that buried it' }, { to: 's-people', why: 'whose names the two mountains carry' }],
+    src: ['dwg', 'kitt', 'gunks', 'bluemtn'] }),
+
+  story({ id: 'earthquakes', domain: 'earth', when: '1737 to April 5, 2024', title: 'New Jersey’s earthquakes',
+    hook: 'In April 2024 a magnitude 4.8 earthquake centred near Whitehouse Station shook the whole region.',
+    beats: {
+      big: { text: ['New Jersey is far from any plate boundary; the nearest runs down the middle of the Atlantic. Its earthquakes are thought to come from ancient zones of weakness, faults from long-past collisions and rifting, giving way under today’s stresses.', 'Earthquakes in the north-east are only about one percent as frequent as in California, but the cooler rock carries their energy as much as ten times further, so each one is felt over a much wider area.'],
+        scene: {}, cam: [-74.6, 40.7, 6.6] },
+      thread: { text: ['The Ramapo Fault zone, the western edge of the Newark rift basin, runs more than 185 miles through New York, New Jersey and Pennsylvania. It is often called the most active fault system in the New York City area, though earthquakes here are scattered, and it has not been shown to be more active than other faults.', 'The largest known quake in the area, about magnitude 5, struck in 1884, probably between Brooklyn and Sandy Hook. Two more of about magnitude 5 came in 1737 and 1783.'],
+        scene: { prov: { piedmont: 0.5 } }, cam: [-74.5, 40.85, 8.4] },
+      here: { text: ['On April 5, 2024, a magnitude 4.8 earthquake centred near Whitehouse Station, in Hunterdon County, struck the region: the strongest since 1884. No injuries or damage were immediately reported. An aftershock of magnitude 3.8 came the same day near Gladstone.'],
+        scene: {}, cam: [-74.77, 40.615, 11.4], mark: { p: [-74.77, 40.615], label: 'Whitehouse Station' } },
+    },
+    places: [],
+    threads: [{ to: 's-rift', why: 'the rift whose western edge is the Ramapo Fault' }, { to: 'black-tom', why: 'a blast that shook the ground like a magnitude 5' }],
+    src: ['nycquake', 'ramapo'] }),
+
+  story({ id: 'great-swamp', domain: 'life', when: '14,000 years ago to 1968', title: 'The swamp that stopped a jetport',
+    hook: 'The Port Authority wanted a jet airport on an old glacial lake bed. Local residents stopped it.',
+    beats: {
+      big: { text: ['When Glacial Lake Passaic drained away, it left its floor almost level, and wet: the Passaic Meadows, with the Great Swamp the largest of them, wide wetlands that later ended up in the middle of the suburbs.'],
+        scene: { lake: 'notch', flows: 0.4 }, cam: [-74.45, 40.76, 9.4] },
+      thread: { text: ['In 1959 the Port Authority of New York and New Jersey wanted to turn the Great Swamp into a major airport, to take the large jets Newark could not. Local residents fought it; the Jersey Jetport Site Association was the first to form.', 'Land was bought and given to the federal government, and on November 3, 1960, an Act of Congress established the Great Swamp National Wildlife Refuge.'],
+        scene: {}, cam: [-74.49, 40.71, 10.6] },
+      here: { text: ['In 1968 its eastern half became the first wilderness area in the Fish and Wildlife Service. The refuge now covers nearly 7,800 acres.', 'More than 244 species of birds use it, many as a resting and feeding stop on the migration routes down the East Coast.'],
+        scene: {}, cam: [-74.48, 40.71, 11.6], mark: { p: [-74.48, 40.71], label: 'Great Swamp refuge' } },
+    },
+    places: ['swamp'],
+    threads: [{ to: 's-lake', why: 'the lake whose floor this is' }, { to: 'horseshoe', why: 'another stop for birds on the long flight up the coast' }],
+    src: ['passaic', 'gsnwr'] }),
+
+  story({ id: 'pines', domain: 'life', when: 'Every fire', title: 'The forest that needs fire',
+    hook: 'The pine that makes up almost all of the Pine Barrens survives fire by sprouting from its burnt trunk.',
+    beats: {
+      big: { text: ['Pitch pine is built for fire. Its thick bark protects the living layer beneath from heat, and if the trunk is burned or cut it can sprout new shoots straight from the trunk. Burnt pitch pines often grow back stunted and twisted, with several trunks.'],
+        scene: {}, cam: [-74.6, 39.8, 7.4] },
+      thread: { text: ['It grows where little else can, from dry, acidic sandy uplands to swampy lowlands, and is the main tree of the Atlantic coastal pine barrens. In New Jersey that means the sugar sand of the Cohansey.'],
+        scene: { sand: 0.7 }, cam: [-74.62, 39.8, 8.6] },
+      here: { text: ['From the fire tower on Apple Pie Hill, in Wharton State Forest, Tabernacle Township, the forest to the north is almost entirely pitch pine, to the horizon.'],
+        scene: { sand: 0.4 }, cam: [-74.588, 39.808, 11.4], mark: { p: [-74.588, 39.808], label: 'Apple Pie Hill' } },
+    },
+    places: ['cohansey'],
+    threads: [{ to: 's-coast', why: 'the sand it grows on' }, { to: 's-iron', why: 'pine for the charcoal of the bog-iron furnaces' }],
+    src: ['pitch', 'pines'] }),
+
+  story({ id: 'menlo', domain: 'industry', when: '1876 onward', title: 'The Wizard of Menlo Park',
+    hook: 'The first street in the world lit by electric light was in a failed housing development in Middlesex County.',
+    beats: {
+      big: { text: ['Thomas Edison amassed a record 1,093 patents before his death in 1931: the phonograph, the motion-picture camera, the alkaline storage battery, a mechanical vote counter, the first commercially practical incandescent light bulb and the first commercial electric light.'],
+        scene: {}, cam: [-74.4, 40.55, 8.6] },
+      thread: { text: ['In 1876 he set up his home and laboratory on the site of an unsuccessful real estate development in Raritan Township called Menlo Park. It was one of the first laboratories to set out to turn research into practical, commercial products, and he became known as “the Wizard of Menlo Park”.', 'There he came up with the phonograph and a commercially workable light-bulb filament. Christie Street, outside, was the first street in the world to be lit by electric lights.'],
+        scene: {}, cam: [-74.336, 40.565, 12.6] },
+      here: { text: ['Raritan Township renamed itself Edison Township in 1954. The site of the lab is now Edison State Park, in the Menlo Park section of Edison. A replica of the laboratory stands in Michigan, built by Edison’s friend Henry Ford at his museum in Dearborn.'],
+        scene: {}, cam: [-74.336, 40.566, 13.4], mark: { p: [-74.336, 40.566], label: 'Menlo Park' } },
+    },
+    places: [],
+    threads: [{ to: 'paterson', why: 'an earlier New Jersey city of inventions' }, { to: 'hindenburg', why: 'the next new machine that held the country’s attention' }],
+    src: ['edisontwp'] }),
 ];
 
 export const STORY_BY = Object.fromEntries(STORIES.map((s) => [s.id, s]));
