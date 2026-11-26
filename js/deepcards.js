@@ -28,6 +28,16 @@ export const SRC = {
   hopat: ['Wikipedia: Lake Hopatcong', W('Lake_Hopatcong')],
   montville: ['Wikipedia: Montville, New Jersey', W('Montville,_New_Jersey')],
   swamp: ['Wikipedia: Great Swamp National Wildlife Refuge', W('Great_Swamp_National_Wildlife_Refuge')],
+  // for the stories (deepstories.js)
+  gf: ['Wikipedia: Great Falls (Passaic River)', W('Great_Falls_(Passaic_River)')], sum: ['Wikipedia: Society for Establishing Useful Manufactures', W('Society_for_Establishing_Useful_Manufactures')],
+  strike: ['Wikipedia: 1913 Paterson silk strike', W('1913_Paterson_silk_strike')], lakepassaic: ['Wikipedia: Lake Passaic', W('Lake_Passaic')],
+  moggy: ['Wikipedia: Moggy Hollow Natural Area', W('Moggy_Hollow_Natural_Area')],
+  sterling: ['Wikipedia: Sterling Hill Mining Museum', W('Sterling_Hill_Mining_Museum')], franklinmm: ['Wikipedia: Franklin Mineral Museum', W('Franklin_Mineral_Museum')],
+  willemite: ['Wikipedia: Willemite', W('Willemite')], decl: ['Wikipedia: Magnetic declination', W('Magnetic_declination')],
+  wmm: ['NOAA NCEI: World Magnetic Model (declination for Boonton computed with WMM2010 and WMM2025)', 'https://www.ncei.noaa.gov/products/world-magnetic-model'],
+  hudsoncanyon: ['Wikipedia: Hudson Canyon', W('Hudson_Canyon')], subcanyon: ['Wikipedia: Submarine canyon', W('Submarine_canyon')], lgm: ['Wikipedia: Last Glacial Maximum', W('Last_Glacial_Maximum')],
+  crab: ['Wikipedia: Atlantic horseshoe crab', W('Atlantic_horseshoe_crab')], knot: ['Wikipedia: Red knot', W('Red_knot')],
+  hadro: ['Wikipedia: Hadrosaurus', W('Hadrosaurus')], diabase: ['Wikipedia: Diabase', W('Diabase')]
 };
 
 /** The stops on the time slider, newest first. zoom/center: the deep-time zoom (the camera pulls out as time goes back). */

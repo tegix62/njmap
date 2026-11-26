@@ -4267,3 +4267,4 @@ body.deep-on #edges { display: none !important; }   /* the shading outside New J
 .dp-hook.read { opacity: 0.6; } .dp-hook.dp-up { background: #fff8ec; }
 .dp-maphook { min-height: 40px; }
 .dp-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 6px 0; font-size: 12.5px; color: #6b6355; } .dp-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
+#deeppins .dp-mark { cursor: default; }

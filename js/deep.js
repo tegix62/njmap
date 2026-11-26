@@ -138,7 +138,7 @@ export function initDeep(ctx) {
     op('deep-ice-older', 'line-opacity', sc.iceOlder ?? 0);
     if (sc.lake) { map.setFilter('deep-lake', ['==', ['get', 'stage'], sc.lake]); map.setPaintProperty('deep-lake', 'fill-opacity-transition', { duration: ctx.dur(2600), delay: ctx.dur(900) }); op('deep-lake', 'fill-opacity', 0.75); } else { map.setPaintProperty('deep-lake', 'fill-opacity-transition', { duration: ctx.dur(600), delay: 0 }); op('deep-lake', 'fill-opacity', 0); }
     op('deep-canal', 'line-opacity', sc.canal ?? 0); op('deep-drain', 'line-opacity', 0); op('deep-drain-glow', 'line-opacity', 0);
-    drawPins(sc.pins || [], sc.labels || Object.keys(prov).filter((k) => prov[k] >= 0.3));
+    drawPins(sc.pins || [], sc.labels || Object.keys(prov).filter((k) => prov[k] >= 0.3), sc.mark || null);
   }
   // ---- the ice age, played on the map -----------------------------------------------------------------------------------------
   let capEl = null;
@@ -199,17 +199,18 @@ export function initDeep(ctx) {
 
   // story pins and region names: an overlay placed with map.project (map layers drop points over terrain that has not loaded yet)
   let shown = { pins: [], labels: [] };
-  function drawPins(pins, labels) {
+  function drawPins(pins, labels, mark = null) {
     if (!pinEl) {
       pinEl = document.createElement('div'); pinEl.id = 'deeppins'; document.body.appendChild(pinEl);
       pinEl.addEventListener('click', (e) => { const b = e.target.closest('[data-id]'); if (b) openCard(b.dataset.id); else { const l = e.target.closest('[data-region]'); if (l) landOne(l.dataset.region); } });
       map.on('move', placePins);
     }
-    shown = { pins, labels };
+    shown = { pins, labels, mark };
     const LP = { valleyridge: [-75.55, 40.72], plateau: [-75.55, 41.3] };     // names kept apart where the two belts meet by New Jersey
     const lp = (k) => { const p = (data.provinces.features.find((f) => f.properties.region === k) || {}).properties; return p && LP[k] ? { ...p, lp: LP[k] } : p; };
     pinEl.innerHTML = labels.map((k) => { const p = lp(k), r = LAND.find((x) => x.id === k); return p && r ? `<b class="dp-rl" data-region="${k}" data-p="${p.lp}" style="--k:${r.color}">${esc(r.name.replace(/ \(.*\)|:.*$/, ''))}</b>` : ''; }).join('')
-      + pins.map((id, n) => { const c = CARD[id]; return c && c.p ? `<button data-id="${id}" data-p="${c.p}" style="--k:${KIND_COLOR[c.kind]};--n:${n}"><i></i><span>${esc(c.title)}</span></button>` : ''; }).join('');
+      + pins.map((id, n) => { const c = CARD[id]; return c && c.p ? `<button data-id="${id}" data-p="${c.p}" style="--k:${KIND_COLOR[c.kind]};--n:${n}"><i></i><span>${esc(c.title)}</span></button>` : ''; }).join('')
+      + (mark ? `<button class="dp-mark" data-p="${mark.p}" style="--k:${mark.color || '#2a241b'};--n:0" tabindex="-1"><i></i><span>${esc(mark.label)}</span></button>` : '');   // a story's place that has no card
     pinEl.hidden = false; placePins();
   }
   function placePins() {
@@ -383,7 +384,7 @@ export function initDeep(ctx) {
     const seq = SEQUENCE.indexOf(id); if (seq >= 0) store.set('deep.chapter', seq);
     const B = S.beats[BEAT_KEYS[b]], last = b === 2;
     setBar(BEAT_KEYS.map((k, j) => ({ when: `${j + 1} of 3 · ${BEAT_NAMES[j]}`, title: S.title })), b, ['Back a step', 'Next step']);
-    applyScene(B.scene);
+    applyScene(B.mark ? { ...B.scene, mark: { ...B.mark, color: DOMAINS[S.domain].color } } : B.scene);
     // the camera goes there (under the illustration, on the first beat); the beat's animation waits until it has arrived
     const play = B.play && PLAYS[B.play], go = play && (() => afterEx(play));
     const bb = B.fit && data.provinces.features.find((f) => f.properties.region === B.fit)?.properties.bbox;
@@ -597,7 +598,7 @@ export function initDeep(ctx) {
       // the home page opens under this sheet and the bar: hide them while it is up, and come back if Deep Jersey is picked again
       const barWas = bar.hidden; hideEx(); root.hidden = true; bar.hidden = true; if (pinEl) pinEl.hidden = true;
       await ctx.showHome();
-      if (ctx.mode === 'deep') { root.hidden = false; bar.hidden = barWas; drawPins(shown.pins, shown.labels); setExag(exagNow); }
+      if (ctx.mode === 'deep') { root.hidden = false; bar.hidden = barWas; drawPins(shown.pins, shown.labels, shown.mark); setExag(exagNow); }
     },
     intro, land, chain, order, why,
     more: (b) => { const m = b.previousElementSibling; if (m) m.hidden = false; b.remove(); },
