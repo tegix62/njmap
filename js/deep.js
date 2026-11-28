@@ -10,6 +10,7 @@
 import { CORRIDORS, CARD, SRC, WHY, LAND } from './deepcards.js';
 import { STORIES, STORY_BY, SEQUENCE } from './deepstories.js';
 import { DOMAINS, readIds, markRead, hooks, pickUp } from './deepthreads.js';
+import { PLACE_OF } from './deepplaces.js';
 import { juice } from './juice.js';
 import { EXPLAIN, EX_SRC, LAVA_PHOTOS } from './deepexplain.js';
 
@@ -311,7 +312,7 @@ export function initDeep(ctx) {
   }
   // the sheet stays short so the map shows; a handle on top makes it tall for reading (remembered), and an explainer is always tall
   const grab = () => `<button class="dp-grab" data-d="grab" aria-label="${root.classList.contains('big') ? 'Make the panel shorter' : 'Make the panel taller'}"><i></i></button>`;
-  const frame = (html) => { clearInterval(exTimer); exTimer = null; root.innerHTML = grab() + html; root.scrollTop = 0; root.classList.toggle('tall', view === 'how' || view === 'photos'); if (view !== 'how' && view !== 'photos') backs = []; if (view !== 'mapidx' && map.getLayer('deep-stories')) map.setLayoutProperty('deep-stories', 'visibility', 'none'); hideEx(); };
+  const frame = (html) => { clearInterval(exTimer); exTimer = null; root.innerHTML = grab() + html; root.scrollTop = 0; root.classList.toggle('tall', view === 'how' || view === 'photos'); if (view !== 'how' && view !== 'photos') backs = []; if (view !== 'mapidx' && map.getLayer('deep-stories')) map.setLayoutProperty('deep-stories', 'visibility', 'none'); if (view !== 'county') for (const id of ['deep-county', 'deep-county-fill']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none'); hideEx(); };
   /** Long text: the first paragraph, then Read more for the rest. */
   const paras = (list) => `<p class="dp-p">${esc(list[0])}</p>${list.length > 1 ? `<div class="dp-more" hidden>${list.slice(1).map((x) => `<p class="dp-p">${esc(x)}</p>`).join('')}</div><button class="dp-readmore" data-d="more">Read more</button>` : ''}`;
   const top = (title, backTo, backWord = 'Back') => `<div class="dp-top"><button class="tr-back" data-d="${backTo}">${BACK}${backWord}</button><h1>${esc(title)}</h1></div>`;
@@ -320,7 +321,7 @@ export function initDeep(ctx) {
   const chips = (ids) => ids.length ? `<div class="dp-chips">${ids.map((id) => { const c = CARD[id]; return `<button data-d="card" data-id="${id}"><i style="background:${KIND_COLOR[c.kind]}"></i>${esc(c.title)}</button>`; }).join('')}</div>` : '';
 
   // ---- the way in ----------------------------------------------------------------------------------------------------------
-  const hookCard = (id, cls = 'dp-hook') => { const S = STORY_BY[id], D = DOMAINS[S.domain]; return `<button class="${cls}" data-d="story" data-id="${id}"><i style="background:${D.color}"></i><span><b>${esc(S.hook)}</b><small>${esc(S.title)} · ${esc(D.name)}${S.gone ? ' · gone' : ''}</small></span></button>`; };
+  const hookCard = (id, cls = 'dp-hook') => { const S = STORY_BY[id], D = DOMAINS[S.domain]; return `<button class="${cls}" data-d="story" data-id="${id}"><i style="background:${D.color}"></i><span><b>${esc(S.hook)}</b><small>${esc(S.title)} · ${esc(PLACE_OF[id] ? PLACE_OF[id].town : D.name)}${S.gone ? ' · gone' : ''}</small></span></button>`; };
   function intro() {
     view = 'intro'; game = null; setBar(null);
     applyScene({ prov: Object.fromEntries(LAND.map((r) => [r.id, 0.5])), labels: ['valleyridge', 'coastal', 'plateau'] });
@@ -332,6 +333,7 @@ export function initDeep(ctx) {
       <p class="tn-hint">Each story starts with something huge and follows it down to a place you can see, or one that is gone, then offers threads to others.</p>
       ${up.length ? `<h4>Pick up a thread</h4><div class="dp-hooks dp-pickup">${up.map((id) => hookCard(id, 'dp-hook dp-up')).join('')}</div>` : ''}
       <button class="tr-card wide" data-d="mapidx"><b>The map</b><small>Every story where it lands; ${read.length} of ${STORIES.length} read</small></button>
+      <h4>By county</h4><div class="dp-counties">${countyNames().map((c) => { const n = countyStories(c), r = n.filter((id) => read.includes(id)).length; return `<button data-d="county" data-id="${esc(c)}"${n.length ? '' : ' class="none"'}><b>${esc(c)}</b><small>${n.length ? `${n.length} ${n.length === 1 ? 'story' : 'stories'}${r ? ` · ${r} read` : ''}` : 'none yet'}</small></button>`; }).join('')}</div>
       <button class="dp-start" data-d="story" data-id="${SEQUENCE[seq]}"><b>How the ground was made</b><small>${seq ? `Carry on: ${seq + 1} of ${SEQUENCE.length}, ${esc(STORY_BY[SEQUENCE[seq]].title)}` : `${SEQUENCE.length} stories in order, from a billion years ago to today`}</small></button>
       <button class="tr-card wide" data-d="land"><b>The land today</b><small>New Jersey’s regions and the ranges they belong to, shown whole, past the state line</small></button>
       <h4>Close-ups</h4><p class="tn-hint">Step by step, in one place.</p>
@@ -363,7 +365,35 @@ export function initDeep(ctx) {
     frame(`${top('The map', 'intro', 'Deep Jersey')}
       <div class="dp-maphook">${focus ? mapHook(focus) : '<p class="dp-line">Tap a dot to see its story. Faded dots are ones you have read.</p>'}</div>
       <div class="dp-legend">${Object.entries(DOMAINS).filter(([k]) => STORIES.some((S) => S.domain === k)).map(([, d]) => `<span><i style="background:${d.color}"></i>${esc(d.name)}</span>`).join('')}</div>
-      <h4>All stories</h4><div class="dp-hooks">${STORIES.map((S) => hookCard(S.id, `dp-hook${read.has(S.id) ? ' read' : ''}`)).join('')}</div>`);
+      <h4>All stories <button class="dp-toggle${onlyUnread ? ' on' : ''}" data-d="unread">${onlyUnread ? 'Showing unread' : 'Only unread'}</button></h4>
+      <div class="dp-hooks dp-allstories">${STORIES.filter((S) => !onlyUnread || !read.has(S.id)).map((S) => hookCard(S.id, `dp-hook${read.has(S.id) ? ' read' : ''}`)).join('') || '<p class="tn-hint">You have read them all.</p>'}</div>`);
+    if (map.getLayer('deep-stories')) map.setFilter('deep-stories', onlyUnread ? ['==', ['get', 'read'], 0] : null);
+  }
+  let onlyUnread = false;
+
+  // ---- by county: the stories that land in each county, grouped by town, and those that pass through ----------------------
+  const countyNames = () => (ctx.countyShapes ? [...new Set(ctx.countyShapes.features.map((f) => f.properties.c))].sort() : []);
+  const countyStories = (c) => STORIES.filter((S) => PLACE_OF[S.id] && (PLACE_OF[S.id].county === c || (PLACE_OF[S.id].touches || []).includes(c))).map((S) => S.id);
+  function countyView(c) {
+    const f = ctx.countyShapes && ctx.countyShapes.features.find((x) => x.properties.c === c); if (!f) { intro(); return; }
+    view = 'county'; game = null; setBar(null); applyScene({});
+    if (!map.getSource('deep-county')) {
+      map.addSource('deep-county', { type: 'geojson', data: f });
+      map.addLayer({ id: 'deep-county-fill', type: 'fill', source: 'deep-county', paint: { 'fill-color': '#c8462c', 'fill-opacity': 0.08 } });
+      map.addLayer({ id: 'deep-county', type: 'line', source: 'deep-county', paint: { 'line-color': '#c8462c', 'line-width': 3 } });
+    } else map.getSource('deep-county').setData(f);
+    for (const id of ['deep-county', 'deep-county-fill']) map.setLayoutProperty(id, 'visibility', 'visible');
+    const xs = [], ys = []; const walk = (a) => (typeof a[0] === 'number' ? (xs.push(a[0]), ys.push(a[1])) : a.forEach(walk)); walk(f.geometry.coordinates);
+    after(() => fitBox([Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)], 11));
+    const here = STORIES.filter((S) => PLACE_OF[S.id] && PLACE_OF[S.id].county === c), pass = STORIES.filter((S) => PLACE_OF[S.id] && (PLACE_OF[S.id].touches || []).includes(c));
+    const read = new Set(readIds(store)), byTown = {};
+    for (const S of here) (byTown[PLACE_OF[S.id].town] = byTown[PLACE_OF[S.id].town] || []).push(S);
+    const card = (S) => hookCard(S.id, `dp-hook${read.has(S.id) ? ' read' : ''}`);
+    const unreadFirst = (a) => [...a].sort((x, y) => read.has(x.id) - read.has(y.id));
+    frame(`${top(`${c} County`, 'intro', 'Deep Jersey')}
+      <p class="dp-line">${here.length ? `${here.length} ${here.length === 1 ? 'story lands' : 'stories land'} here${pass.length ? `, and ${pass.length} pass${pass.length === 1 ? 'es' : ''} through` : ''}.` : `No stories land in ${esc(c)} County yet.${pass.length ? ' These pass through:' : ''}`}</p>
+      <div class="dp-cstories">${Object.keys(byTown).sort().map((t) => `<h4 class="dp-town">${esc(t)}</h4><div class="dp-hooks">${unreadFirst(byTown[t]).map(card).join('')}</div>`).join('')}
+      ${pass.length ? `<h4>Passing through</h4><div class="dp-hooks">${unreadFirst(pass).map(card).join('')}</div>` : ''}</div>`);
   }
   const mapHook = (id) => { const S = STORY_BY[id]; return `<p class="dp-kick"><span class="dp-dom" style="background:${DOMAINS[S.domain].color}">${esc(DOMAINS[S.domain].name)}</span> ${esc(S.when)}</p><h2>${esc(S.title)}</h2><p class="dp-p">${esc(S.hook)}</p><button class="dp-start" data-d="story" data-id="${id}"><b>Open the story</b><small>three steps, then where it leads</small></button>`; };
   function mapPick(id) { const el = root.querySelector('.dp-maphook'); if (el) { el.innerHTML = mapHook(id); root.scrollTop = 0; } }
@@ -392,6 +422,7 @@ export function initDeep(ctx) {
     if (last) markRead(store, id);
     const L = B.fit && LAND.find((r) => r.id === B.fit), D = DOMAINS[S.domain], read = readIds(store);
     frame(`${top(S.title, 'intro', 'Deep Jersey')}
+      ${PLACE_OF[id] ? `<button class="dp-where" data-d="county" data-id="${esc(PLACE_OF[id].county)}">${esc(PLACE_OF[id].town)} · ${esc(PLACE_OF[id].county)} County</button>` : ''}
       <p class="dp-kick"><span class="dp-dom" style="background:${D.color}">${esc(D.name)}</span>${S.gone ? '<span class="dp-dom gone">Gone</span>' : ''} ${esc(S.when)}</p>
       <h2>${esc(BEAT_NAMES[b])}</h2>
       ${b === 0 && STORY_EX[id] ? `<button class="dp-play" data-d="watch" data-id="${STORY_EX[id]}"><b>▶ Watch how it happened</b><small>${esc(EXPLAIN[STORY_EX[id]].title)}, drawn as a slice through the ground</small></button>` : ''}
@@ -606,6 +637,8 @@ export function initDeep(ctx) {
     story: (b) => story(b.dataset.id || SEQUENCE[Math.min(SEQUENCE.length - 1, store.get('deep.chapter', 0))]),
     beat: (b) => story(cur, +b.dataset.b),
     mapidx: (b) => mapIndex(b.dataset.id || null),
+    county: (b) => countyView(b.dataset.id),
+    unread: () => { onlyUnread = !onlyUnread; mapIndex(); },
     landone: (b) => landOne(b.dataset.id),
     close: (b) => openClose(b.dataset.id),
     closehere: () => { showStop(era, false); stopSheet(); },

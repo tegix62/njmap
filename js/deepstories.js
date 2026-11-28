@@ -337,7 +337,7 @@ export const STORIES = [
       thread: { text: ['Where the rock was cracked and broken, the Delaware River slowly cut its way down through it: a water gap. In the last ice age the ice covered the whole Kittatinny Ridge, with its edge near Belvidere; when it melted back, the gap took its present form.'],
         scene: { iceLimit: 0.9, prov: { valleyridge: 0.4 } }, cam: [-75.1, 40.95, 9.4] },
       here: { text: ['The gap is nearly 1,300 ft wide at the river and about a mile wide from summit to summit, and more than 1,200 ft from mountaintop to water. The river runs through it 290 ft above sea level.', 'The New Jersey side is Mount Tammany, 1,540 ft, named after the Lenape chief Tamanend; across the river is Mount Minsi, named after the Munsee.'],
-        scene: {}, cam: [-75.135, 40.972, 12.4], mark: { p: [-75.13, 40.968], label: 'Mount Tammany' } },
+        scene: {}, cam: [-75.135, 40.972, 12.4], mark: { p: [-75.1166, 40.9706], label: 'Mount Tammany' } },
     },
     places: [],
     threads: [{ to: 's-mountains', why: 'the collisions that folded the ridge' }, { to: 's-ice', why: 'the ice that buried it' }, { to: 's-people', why: 'whose names the two mountains carry' }],

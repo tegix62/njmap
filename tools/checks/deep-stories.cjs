@@ -46,6 +46,8 @@ const check = (name, f) => { try { f(); } catch (e) { fails.push(`${name}: ${e.m
     const rr = { places: new Set(Object.keys(C.CARD)), src: new Set(Object.keys(C.SRC)), explain: new Set(Object.keys(X.EXPLAIN)) };
     check('real stories are valid', () => assert.deepStrictEqual(T.checkStories(real.STORIES, rr), []));
     check('sequence ids exist', () => { for (const id of real.SEQUENCE) assert.ok(real.STORY_BY[id], id); });
+    const P = await import('../../js/deepplaces.js');
+    check('every story has a town and county (run tools/build_story_places.cjs)', () => { for (const S of real.STORIES) assert.ok(P.PLACE_OF[S.id] && P.PLACE_OF[S.id].county, S.id); });
     console.log(`stories: ${real.STORIES.length}`);
   }
 

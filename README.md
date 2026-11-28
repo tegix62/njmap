@@ -776,6 +776,13 @@ One tree from seed to old age and death, as a fast time-lapse with the seasons t
 
 ## Deep Jersey: stories and threads (2026-11-26)
 
+**Browse by county (2026-11-28).** From a phone test: threads kept leading back to the same well-linked stories. Home now lists all
+21 counties with how many stories land in or pass through each (and how many you have read); a county view draws its outline, frames
+it, and lists its stories by town, unread first, then the ones passing through. Every story shows where it lands ("Paterson · Passaic
+County"), which opens its county. The map's story list has an **Only unread** toggle (it filters the dots too). Town and county come
+from the app's own municipal boundaries: `node tools/build_story_places.cjs` writes `js/deepplaces.js` (rerun after adding stories;
+`deep-stories.cjs` fails if a story has no place).
+
 Deep Jersey is now a library of stories you wander through, not a tour. Design: `docs/superpowers/specs/2026-11-26-deep-jersey-threads-design.md`;
 plan: `docs/superpowers/plans/2026-11-26-deep-jersey-threads.md`.
 

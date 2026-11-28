@@ -11,6 +11,17 @@ const { chromium } = require('playwright'); const fs = require('fs');
   await page.click('[data-entry=deep]'); await page.waitForSelector('#deep .dp-start'); await page.waitForTimeout(2500);
   console.log('hooks:', await page.locator('#deep .dp-hook').count(), '| pick up shown on a fresh start:', await page.locator('#deep .dp-pickup').count());
   await shot('home-fresh');
+  // browse by county: all 21, each with its count; a county shows its stories by town and its outline
+  console.log('counties on home:', await page.locator('#deep .dp-counties button').count());
+  await page.click('#deep .dp-counties button[data-id="Passaic"]'); await page.waitForTimeout(2500);
+  console.log('county view:', await page.locator('#deep h1').innerText(), '| towns:', (await page.locator('#deep .dp-town').allInnerTexts()).join(', '), '| stories:', await page.locator('#deep .dp-cstories .dp-hook').count(),
+    '| outline:', await page.evaluate(() => window.njtf.map.getLayer('deep-county') ? window.njtf.map.getLayoutProperty('deep-county', 'visibility') : 'no layer'));
+  await shot('county-passaic');
+  await page.locator('#deep .dp-cstories .dp-hook').first().click(); await page.waitForTimeout(1800);
+  if (await page.locator('#deepex').isVisible()) await page.click('#deepex');
+  console.log('story place line:', await page.locator('#deep .dp-where').innerText());
+  await page.click('#deep .dp-where'); await page.waitForTimeout(1500); console.log('place line opens:', await page.locator('#deep h1').innerText());
+  console.log('outline gone in another view:', await page.evaluate(() => { document.querySelector('#deep [data-d=intro]').click(); return new Promise((r) => setTimeout(() => r(window.njtf.map.getLayoutProperty('deep-county', 'visibility')), 600)); }));
   // read one story from a hook to its last beat
   await page.locator('#deep .dp-hook').first().click(); await page.waitForTimeout(2200);
   if (await page.locator('#deepex').isVisible()) await page.click('#deepex');
@@ -22,6 +33,9 @@ const { chromium } = require('playwright'); const fs = require('fs');
   await page.click('#deep [data-d=mapidx]'); await page.waitForTimeout(4000);
   const vis = await page.evaluate(() => window.njtf.map.getLayoutProperty('deep-stories', 'visibility'));
   const n = await page.evaluate(() => window.njtf.map.getSource('deep-stories')._data.features.length);
+  await page.click('#deep [data-d=unread]'); await page.waitForTimeout(500);
+  console.log('only unread: list', await page.locator('#deep .dp-allstories .dp-hook').count(), 'of', n);
+  await page.click('#deep [data-d=unread]'); await page.waitForTimeout(300);
   console.log('map index layer:', vis, '| stories on it:', n); await shot('map-index');
   const pt = await page.evaluate(() => { const p = window.njtf.map.project([-74.28, 40.92]); return [p.x, p.y]; });
   await page.mouse.click(pt[0], pt[1]); await page.waitForTimeout(800);
