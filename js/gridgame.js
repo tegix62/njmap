@@ -726,7 +726,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   // Landmark style: 'mini' (js/mini.js: each landmark scaled as a unit, widened, on a ground tile, ordinary buildings held low)
   // or 'classic' (true shapes, everything above 60 m squashed when tilted). Classic is the old look, kept as the way back.
   let rawBldg = null;
-  const miniOn = () => prefs.lmStyle !== 'classic';
+  const miniOn = () => prefs.lmStyle === 'mini';   // off by default: the first try read as unrecognisable on a phone (see README)
   function drawBuildings() {
     if (!rawBldg) return;
     setData('gg-bldg', { type: 'FeatureCollection', features: miniOn() ? miniaturize(rawBldg) : rawBldg });

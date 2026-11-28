@@ -787,6 +787,8 @@ strategy-game-style formula (pure; features in, features out):
 - ordinary buildings keep only a fifth of their height above 45 m, so the landmarks stand clear;
 - each landmark stands on a low hexagonal ground tile.
 
+**Status:** rolled back to off by default after a phone test (the miniatures were unrecognisable). Still selectable in settings.
+
 **The way back:** in a drive game's settings, untick **Miniature landmarks** for the old true-shape look with the squash (saved per
 game). Nothing of the old path was removed. Test: `node tools/checks/mini.cjs`. Explore and the orbit views draw the same city3d
 features and can use `miniaturize()` unchanged if it works out.
