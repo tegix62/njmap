@@ -47,7 +47,10 @@ export const SRC = {
   dwg: ['Wikipedia: Delaware Water Gap', W('Delaware_Water_Gap')], ramapo: ['Wikipedia: Ramapo Fault', W('Ramapo_Fault')],
   nycquake: ['Wikipedia: Seismicity of the New York City area', W('Seismicity_of_the_New_York_City_area')],
   gsnwr: ['Wikipedia: Great Swamp National Wildlife Refuge', W('Great_Swamp_National_Wildlife_Refuge')], pitch: ['Wikipedia: Pinus rigida (pitch pine)', W('Pinus_rigida')],
-  edisontwp: ['Wikipedia: Edison, New Jersey', W('Edison,_New_Jersey')]
+  edisontwp: ['Wikipedia: Edison, New Jersey', W('Edison,_New_Jersey')],
+  devil: ['Wikipedia: Jersey Devil', W('Jersey_Devil')], meadow: ['Wikipedia: New Jersey Meadowlands', W('New_Jersey_Meadowlands')],
+  hook: ['Wikipedia: Sandy Hook', W('Sandy_Hook')], hooklight: ['Wikipedia: Sandy Hook Lighthouse', W('Sandy_Hook_Lighthouse')],
+  passaicr: ['Wikipedia: Passaic River', W('Passaic_River')]
 };
 
 /** The stops on the time slider, newest first. zoom/center: the deep-time zoom (the camera pulls out as time goes back). */

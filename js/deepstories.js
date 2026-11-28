@@ -326,7 +326,7 @@ export const STORIES = [
         scene: {}, cam: [-74.327, 40.033, 12.6], mark: { p: [-74.327, 40.033], label: 'Lakehurst' } },
     },
     places: [],
-    threads: [{ to: 'black-tom', why: 'another disaster heard across the region' }, { to: 'sandy', why: 'the same shore, in the storm of 2012' }],
+    threads: [{ to: 'black-tom', why: 'another disaster heard across the region' }, { to: 'sandy', why: 'the same shore, in the storm of 2012' }, { to: 'meadowlands', why: 'what became of the region’s open marshland' }],
     src: ['hind'] }),
 // ---- third batch (November 2026) ---------------------------------------------------------------------------------------------
   story({ id: 'water-gap', domain: 'earth', when: 'Hundreds of millions of years, and the ice age', title: 'The Delaware Water Gap',
@@ -354,7 +354,7 @@ export const STORIES = [
         scene: {}, cam: [-74.77, 40.615, 11.4], mark: { p: [-74.77, 40.615], label: 'Whitehouse Station' } },
     },
     places: [],
-    threads: [{ to: 's-rift', why: 'the rift whose western edge is the Ramapo Fault' }, { to: 'black-tom', why: 'a blast that shook the ground like a magnitude 5' }],
+    threads: [{ to: 's-rift', why: 'the rift whose western edge is the Ramapo Fault' }, { to: 'black-tom', why: 'a blast that shook the ground like a magnitude 5' }, { to: 'sandy-hook', why: 'the spit near the 1884 quake' }],
     src: ['nycquake', 'ramapo'] }),
 
   story({ id: 'great-swamp', domain: 'life', when: '14,000 years ago to 1968', title: 'The swamp that stopped a jetport',
@@ -368,7 +368,7 @@ export const STORIES = [
         scene: {}, cam: [-74.48, 40.71, 11.6], mark: { p: [-74.48, 40.71], label: 'Great Swamp refuge' } },
     },
     places: ['swamp'],
-    threads: [{ to: 's-lake', why: 'the lake whose floor this is' }, { to: 'horseshoe', why: 'another stop for birds on the long flight up the coast' }],
+    threads: [{ to: 's-lake', why: 'the lake whose floor this is' }, { to: 'horseshoe', why: 'another stop for birds on the long flight up the coast' }, { to: 'floods', why: 'downstream, the same flat floor floods homes' }],
     src: ['passaic', 'gsnwr'] }),
 
   story({ id: 'pines', domain: 'life', when: 'Every fire', title: 'The forest that needs fire',
@@ -382,7 +382,7 @@ export const STORIES = [
         scene: { sand: 0.4 }, cam: [-74.588, 39.808, 11.4], mark: { p: [-74.588, 39.808], label: 'Apple Pie Hill' } },
     },
     places: ['cohansey'],
-    threads: [{ to: 's-coast', why: 'the sand it grows on' }, { to: 's-iron', why: 'pine for the charcoal of the bog-iron furnaces' }],
+    threads: [{ to: 's-coast', why: 'the sand it grows on' }, { to: 's-iron', why: 'pine for the charcoal of the bog-iron furnaces' }, { to: 'jersey-devil', why: 'the legend the Pines are known for' }],
     src: ['pitch', 'pines'] }),
 
   story({ id: 'menlo', domain: 'industry', when: '1876 onward', title: 'The Wizard of Menlo Park',
@@ -398,6 +398,62 @@ export const STORIES = [
     places: [],
     threads: [{ to: 'paterson', why: 'an earlier New Jersey city of inventions' }, { to: 'hindenburg', why: 'the next new machine that held the country’s attention' }],
     src: ['edisontwp'] }),
+// ---- fourth batch (November 2026) --------------------------------------------------------------------------------------------
+  story({ id: 'jersey-devil', domain: 'people', when: '1600s to 1909, and still told', title: 'The Jersey Devil (a legend)',
+    hook: 'A legend, not a fact: the winged creature of the Pine Barrens may have begun as a feud over almanacs.',
+    beats: {
+      big: { text: ['This one is folklore, and the story says so. From the 1600s English Quakers settled South Jersey. One of them, Daniel Leeds, published almanacs from 1687 with astrological symbols and writings, and was shunned by his Quaker congregation for it.', 'One historian argues that colonial political feuds, including Benjamin Franklin’s rivalry with the almanac publisher Titan Leeds, got the Leeds family described as “monsters”: a reputation, not a creature.'],
+        scene: { sand: 0.4 }, cam: [-74.6, 39.75, 7.6] },
+      thread: { text: ['The tale, as usually told: in 1735 a Mrs Leeds, pregnant for the thirteenth time, cursed the child, which grew wings, a tail and claws and flew off into the Pine Barrens. Before the 1900s it was called the Leeds Devil.', 'In 1859 the Atlantic Monthly wrote up the Leeds Devil tales told in the Pines, and an 1887 newspaper reported sightings in Burlington County. The first big wave of reported sightings came in 1909; from those the picture of it settled into batlike wings, a horse’s head and claws.'],
+        scene: { sand: 0.5 }, cam: [-74.55, 39.65, 8.6] },
+      here: { text: ['Leeds Point, in Atlantic County, on land the Leeds family inherited in the Pine Barrens, is the place most tied to the legend. The Japhet Leeds house stood on Moss Mill Road.'],
+        scene: {}, cam: [-74.432, 39.488, 11.6], mark: { p: [-74.432, 39.488], label: 'Leeds Point' } },
+    },
+    places: [],
+    threads: [{ to: 'pines', why: 'the forest it is said to haunt' }, { to: 's-iron', why: 'the real villages deep in those woods' }],
+    src: ['devil'] }),
+
+  story({ id: 'meadowlands', domain: 'life', when: '1600s to today', title: 'The Meadowlands',
+    hook: 'The marsh by the stadiums was a cedar forest, then hay meadows, then a dump for, among other things, rubble from the London Blitz.',
+    beats: {
+      big: { text: ['Where the Hackensack and Passaic rivers run into Newark Bay, tidal wetlands spread across the middle of what is now the New York metropolitan area: the Meadowlands.'],
+        scene: {}, cam: [-74.1, 40.77, 9.4] },
+      thread: { text: ['It was forested with Atlantic white cedar until Dutch settlers in the 1600s cleared the trees and built dikes to drain the land, growing salt hay on the tidal meadows: hence “the Meadows”. In time the cedar was gone, the dikes broke down and the farming stopped.', 'Then it was treated as wasteland. Garbage landfills and dredged material made new land; some fill came from building the World Trade Center in the late 1960s. In the Second World War, rubble from the London Blitz, carried back as ballast in returning ships, was dumped here too.'],
+        scene: {}, cam: [-74.08, 40.78, 11] },
+      here: { text: ['The Meadowlands Sports Complex was built here from the 1960s; its racetrack opened first, in 1976. Around it about 8,400 acres are still open, and since 1969 a state commission has managed development and the landfills. By 2016 over 3,900 acres of wetland had been preserved.'],
+        scene: {}, cam: [-74.075, 40.81, 12.2], mark: { p: [-74.075, 40.812], label: 'The Meadowlands' } },
+    },
+    places: [],
+    threads: [{ to: 'great-swamp', why: 'another marsh the region nearly built over' }, { to: 'black-tom', why: 'more made land in the harbour, and what happened on it' }],
+    src: ['meadow'] }),
+
+  story({ id: 'sandy-hook', domain: 'sea', when: '1764 to today', title: 'The lighthouse that moved inland',
+    hook: 'The oldest working lighthouse in the US stood 500 ft from the tip of Sandy Hook. Now it is a mile and a half inland.',
+    beats: {
+      big: { text: ['The sea keeps moving sand along the coast, a process called littoral drift. Along the Jersey Shore that moving sand makes barrier islands and spits, and keeps reshaping them.'],
+        scene: { prov: { coastal: 0.3 } }, cam: [-74.05, 40.2, 8.6] },
+      thread: { text: ['Sandy Hook is a barrier spit, a long finger of sand at the north end of the Jersey Shore, separated from the mainland by the estuary of the Shrewsbury River. It encloses the southern entrance of Lower New York Bay. The Dutch called it Sant Hoek, “sand corner”.', 'For over three centuries the Sandy Hook pilots have guided ships across its sandbar.'],
+        scene: {}, cam: [-74.0, 40.43, 10.6] },
+      here: { text: ['The Sandy Hook Lighthouse, built in 1764 by Isaac Conro, is the oldest working lighthouse in the United States. When it was built it stood only 500 ft from the tip of the hook. The drifting sand has kept building the spit northward, and today the lighthouse is about one and a half miles from the tip.'],
+        scene: {}, cam: [-74.002, 40.462, 13], mark: { p: [-74.0022, 40.4617], label: 'Sandy Hook Lighthouse' } },
+    },
+    places: [],
+    threads: [{ to: 'sandy', why: 'how storms move the islands' }, { to: 'hudson-canyon', why: 'the channel past its tip, out to the deep sea' }, { to: 'earthquakes', why: 'the 1884 quake, probably between Brooklyn and Sandy Hook' }],
+    src: ['hook', 'hooklight', 'barrier'] }),
+
+  story({ id: 'floods', domain: 'ice', when: '14,000 years ago to today', title: 'Why the Passaic floods',
+    hook: 'Homes along the Passaic flood again and again, on the flat floor of a lake that drained 14,000 years ago.',
+    beats: {
+      big: { text: ['When Glacial Lake Passaic drained, it left its floor almost level: wide, flat, wet meadows that still flood often.'],
+        scene: { lake: 'notch', flows: 0.4 }, cam: [-74.38, 40.82, 9.4] },
+      thread: { text: ['The Passaic meanders slowly across that floor through the Great Piece Meadows, then turns east and, at Two Bridges, is joined by its biggest tributary, the Pompton.'],
+        scene: { flows: 0.4 }, cam: [-74.3, 40.885, 11] },
+      here: { text: ['Where the Pompton meets the Passaic, on the borders of Fairfield, Lincoln Park and Wayne, the two rivers form a sizeable flood plain. Homes and businesses were allowed to be built on it, and in heavy rain or snowmelt they flood, on a fairly regular basis.', 'Some residents have taken federal buy-outs. A 20-mile tunnel to carry floodwater to Newark Bay has been proposed and argued over.'],
+        scene: {}, cam: [-74.27, 40.893, 12.2], mark: { p: [-74.27, 40.893], label: 'Two Bridges' } },
+    },
+    places: ['swamp'],
+    threads: [{ to: 's-lake', why: 'the lake that left the land so flat' }, { to: 'great-falls', why: 'where the river finally leaves the basin' }, { to: 'great-swamp', why: 'the upstream end of the same old lake floor' }],
+    src: ['passaic', 'passaicr'] }),
 ];
 
 export const STORY_BY = Object.fromEntries(STORIES.map((s) => [s.id, s]));

@@ -799,6 +799,10 @@ plan: `docs/superpowers/plans/2026-11-26-deep-jersey-threads.md`.
   Fault, hedged as the sources hedge, and the magnitude 4.8 near Whitehouse Station in April 2024), the swamp that stopped a jetport
   (the Great Swamp refuge, 1959–1968), the forest that needs fire (pitch pine, from the Apple Pie Hill fire tower), and the Wizard of
   Menlo Park. A Lenape trails story waits for a source.
+- **Fourth batch (32 stories)**: the Jersey Devil (labelled a legend in its title, its hook and its first line; the almanac feud is
+  given as one historian's argument), the Meadowlands (cedar forest, salt hay, landfill, Blitz rubble, preserved marsh), the
+  lighthouse that moved inland (Sandy Hook's spit grew a mile and a half past it since 1764), and why the Passaic floods (the old lake
+  floor and the Pompton confluence at Two Bridges).
 - **Lake Passaic drains on the map**: the water streams out through Moggy Hollow to the Raritan, the lake drops when Great Notch opens
   (its outflow carved the Third River valley), then the Passaic takes the long way round over the Great Falls. The flow lines are
   schematic (`data/deep/drain.json`, built by `python3 tools/build_deep.py drain`, each point commented with its source).
