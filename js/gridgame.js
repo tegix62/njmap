@@ -27,6 +27,7 @@
 import { framesStats } from './frames.js';
 import { GUIDES, PEEK_MS, okSides, sideWords, guessRecord, briefingHTML, bindBriefing } from './briefing.js';
 import { buildingFeatures, applySurveyTowers, applyParts, loadParts, loadSurveyTowers, groundFeatures, GROUND_PAINT } from './city3d.js';
+import { miniaturize } from './mini.js';
 
 const CHECK_EVERY_MS = 35000; // a check-in at most this often
 const GRID = 29; // the grid is turned ~29° clockwise from north
@@ -700,7 +701,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
   let lastSq = -1;
   /** Squash the towers while the camera is tilted in the close-up view; true heights otherwise. */
   function syncSquash() {
-    const v = camPitch() ? 1 : 0;
+    const v = camPitch() && !miniOn() ? 1 : 0;   // the miniature board is already low: no squash on top of it
     if (v === lastSq) return;
     lastSq = v;
     map.setGlobalStateProperty('sq', v);
@@ -722,6 +723,15 @@ export function initGridGame(ctx, areaId = 'downtown') {
   const BLDG_FILES = ['downtown', 'midtown', 'uptown'];
   const zoneOfY = (y) => (y < G.areas['14'] ? 0 : y < G.areas['59'] ? 1 : 2);
   let bldgBusy = false;
+  // Landmark style: 'mini' (js/mini.js: each landmark scaled as a unit, widened, on a ground tile, ordinary buildings held low)
+  // or 'classic' (true shapes, everything above 60 m squashed when tilted). Classic is the old look, kept as the way back.
+  let rawBldg = null;
+  const miniOn = () => prefs.lmStyle !== 'classic';
+  function drawBuildings() {
+    if (!rawBldg) return;
+    setData('gg-bldg', { type: 'FeatureCollection', features: miniOn() ? miniaturize(rawBldg) : rawBldg });
+    lastSq = -1; syncSquash();
+  }
   async function loadBuildings() {
     if (bldgBusy || map.__ggBldgReady || !G) return;
     bldgBusy = true;
@@ -735,7 +745,8 @@ export function initGridGame(ctx, areaId = 'downtown') {
         f.properties.z = zoneOfY(gridXY(f.geometry.coordinates[0][0])[1]);
         feats.push(f);
       }
-      setData('gg-bldg', { type: 'FeatureCollection', features: feats });
+      rawBldg = feats;
+      drawBuildings();
       map.__ggBldgReady = true;
     } catch {
       /* try again next time */
@@ -3480,6 +3491,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
             <summary>More options</summary>
             <label><input type="checkbox" id="ggArrows"${prefs.arrows ? ' checked' : ''}/> One-way arrows</label>
             <label><input type="checkbox" id="ggLabels"${prefs.labels ? ' checked' : ''}/> Street names (off: hard mode)</label>
+            <label><input type="checkbox" id="ggMini"${miniOn() ? ' checked' : ''}/> Miniature landmarks (small but recognisable, on tiles; off for true shapes)</label>
             <label><input type="checkbox" id="ggLandmarks"${prefs.landmarks === false ? '' : ' checked'}/> Landmark callouts ("by the way, that's the Chrysler Building") · <a href="credits.html" target="_blank" rel="noopener">photo credits</a></label>
             <label><input type="checkbox" id="ggCover"${prefs.cover ? ' checked' : ''}/> Show streets I've driven</label>
             <label><input type="checkbox" id="ggTrips"${prefs.trips ? ' checked' : ''}/> Mix in my saved trips</label>
@@ -3562,6 +3574,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
       if (!e.target.checked) hideLmTag();
     });
     toggle('ggTrips', 'trips');
+    document.getElementById('ggMini')?.addEventListener('change', (e) => { prefs.lmStyle = e.target.checked ? 'mini' : 'classic'; savePrefs(); drawBuildings(); });
     if (g.startCard) bindBriefing(guessSide, go0);
     document.getElementById('ggGuide').addEventListener('change', (e) => {
       prefs.guide = e.target.value;

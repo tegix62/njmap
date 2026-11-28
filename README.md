@@ -774,6 +774,23 @@ One tree from seed to old age and death, as a fast time-lapse with the seasons t
 - Check: `tools/checks/ui-trees-waves.cjs`.
 - **Wave 3, "Into the woods"** (opens once wave 2 is known): black gum, chestnut oak, black birch, American hornbeam, American persimmon, sweetbay magnolia, basswood and black oak. Each has 6 or 7 photos checked by eye, 80+ pool photos with 40 winter, fall and summer photos (fewer for sweetbay and black birch), bark picks (black birch 15, chestnut oak 13, hornbeam 13, persimmon 11, black gum 10, black oak 9, basswood 6, sweetbay 1), group tells, bark and fall lines, and identifying lines. Chestnut oak goes with the oaks, but the key finds it under "no lobes", where its leaf puts it. Only sweetbay has a traced leaf; the other cut-outs leaked into the background. Check: `tools/checks/ui-trees-wave3.cjs`.
 
+## Miniature landmarks (2026-11-28)
+
+From a phone test: in the Manhattan drive games the famous towers were unrecognisable, because everything above 60 m was squashed
+to 40% at the driving angle, cutting off the spires and crowns that identify them. `js/mini.js` replaces that with one fixed,
+strategy-game-style formula (pure; features in, features out):
+
+- each landmark is gathered from its pieces (features with a colour: tiers, crown, mast) and scaled as one unit to a roof of 9·√H
+  metres (never above its true height): a 440 m tower comes to about 190 m, a 120 m one barely changes, the tallest stays tallest,
+  and every tier keeps its share of the roof;
+- its footprint widens by 1/√k (at most 1.6×) so it reads as a stout miniature; spires and masts widen twice as much again;
+- ordinary buildings keep only a fifth of their height above 45 m, so the landmarks stand clear;
+- each landmark stands on a low hexagonal ground tile.
+
+**The way back:** in a drive game's settings, untick **Miniature landmarks** for the old true-shape look with the squash (saved per
+game). Nothing of the old path was removed. Test: `node tools/checks/mini.cjs`. Explore and the orbit views draw the same city3d
+features and can use `miniaturize()` unchanged if it works out.
+
 ## Deep Jersey: stories and threads (2026-11-26)
 
 **Browse by county (2026-11-28).** From a phone test: threads kept leading back to the same well-linked stories. Home now lists all
