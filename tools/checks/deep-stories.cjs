@@ -24,7 +24,15 @@ const check = (name, f) => { try { f(); } catch (e) { fails.push(`${name}: ${e.m
   check('one thread is too few', () => { const bad = fx.map((s) => (s.id === 'a' ? { ...s, threads: [s.threads[0]] } : s)); assert.ok(T.checkStories(bad, refs).length > 0); });
   check('here beat needs a cam', () => { const bad = fx.map((s) => (s.id === 'a' ? { ...s, beats: { ...s.beats, here: { text: ['x'], scene: {} } } } : s)); assert.ok(T.checkStories(bad, refs).length > 0); });
   check('unknown explainer is reported', () => { const bad = fx.map((s) => (s.id === 'a' ? { ...s, explain: ['nope'] } : s)); assert.ok(T.checkStories(bad, refs).length > 0); });
-  check('domains are exactly the nine', () => assert.deepStrictEqual(Object.keys(T.DOMAINS).sort(), ['earth', 'gone', 'ice', 'industry', 'life', 'people', 'sea', 'sky', 'weather']));
+  // scene scripts: timed moves on a beat
+  const sref = { ...refs, water: new Set(['Pompton River', 'Pompton Lake']), counties: new Set(['Passaic']), regions: new Set(['highlands']) };
+  const withScript = (script) => fx.map((s) => (s.id === 'a' ? { ...s, beats: { ...s.beats, thread: { ...s.beats.thread, script } } } : s));
+  check('a good script passes', () => assert.deepStrictEqual(T.checkStories(withScript([{ at: 0, do: 'cap', text: 'x' }, { at: 500, do: 'trace', name: 'Pompton River' }, { at: 900, do: 'pop', county: 'Passaic' }, { at: 1200, do: 'pop', region: 'highlands' }, { at: 1500, do: 'pulse', to: 2 }]), sref), []));
+  check('an unknown move is reported', () => assert.ok(T.checkStories(withScript([{ at: 0, do: 'explode' }]), sref).some((p) => p.includes('explode'))));
+  check('an unknown river is reported', () => assert.ok(T.checkStories(withScript([{ at: 0, do: 'trace', name: 'Hudson River' }]), sref).some((p) => p.includes('Hudson River'))));
+  check('an unknown county is reported', () => assert.ok(T.checkStories(withScript([{ at: 0, do: 'pop', county: 'Atlantis' }]), sref).some((p) => p.includes('Atlantis'))));
+  check('steps out of time order are reported', () => assert.ok(T.checkStories(withScript([{ at: 900, do: 'cap', text: 'b' }, { at: 100, do: 'cap', text: 'a' }]), sref).some((p) => p.includes('order'))));
+  check('domains are exactly the ten', () => assert.deepStrictEqual(Object.keys(T.DOMAINS).sort(), ['earth', 'gone', 'ice', 'industry', 'life', 'people', 'sea', 'sky', 'water', 'weather']));
 
   check('pick up a thread from what was read', () => assert.deepStrictEqual(T.pickUp(fx, ['a']), ['b', 'c']));
   check('nothing to pick up when all read', () => assert.deepStrictEqual(T.pickUp(fx, ['a', 'b', 'c']), []));
@@ -43,7 +51,9 @@ const check = (name, f) => { try { f(); } catch (e) { fails.push(`${name}: ${e.m
   let real = null; try { real = await import('../../js/deepstories.js'); } catch (e) { if (!/Cannot find module|ERR_MODULE_NOT_FOUND/.test(String(e.code || e.message))) fails.push(`deepstories.js: ${e.message}`); }
   if (real) {
     const C = await import('../../js/deepcards.js'), X = await import('../../js/deepexplain.js');
-    const rr = { places: new Set(Object.keys(C.CARD)), src: new Set(Object.keys(C.SRC)), explain: new Set(Object.keys(X.EXPLAIN)) };
+    const fs = require('fs'), W = JSON.parse(fs.readFileSync(require('path').join(__dirname, '../../data/deep/water.json'))), topo = JSON.parse(fs.readFileSync(require('path').join(__dirname, '../../data/nj.topo.json'))), prov = JSON.parse(fs.readFileSync(require('path').join(__dirname, '../../data/deep/provinces.json')));
+    const rr = { places: new Set(Object.keys(C.CARD)), src: new Set(Object.keys(C.SRC)), explain: new Set(Object.keys(X.EXPLAIN)),
+      water: new Set(W.features.map((f) => f.properties.name)), counties: new Set(topo.objects.counties.geometries.map((g) => g.properties.c)), regions: new Set(prov.features.map((f) => f.properties.region)) };
     check('real stories are valid', () => assert.deepStrictEqual(T.checkStories(real.STORIES, rr), []));
     check('sequence ids exist', () => { for (const id of real.SEQUENCE) assert.ok(real.STORY_BY[id], id); });
     const P = await import('../../js/deepplaces.js');

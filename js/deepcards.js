@@ -59,7 +59,10 @@ export const SRC = {
   jockey: ['Wikipedia: Jockey Hollow', W('Jockey_Hollow')], mnhp: ['Wikipedia: Morristown National Historical Park', W('Morristown_National_Historical_Park')],
   picatinny: ['Wikipedia: Picatinny Arsenal', W('Picatinny_Arsenal')], madison: ['Wikipedia: Madison, New Jersey', W('Madison,_New_Jersey')],
   hopatcong: ['Wikipedia: Lake Hopatcong', W('Lake_Hopatcong')], dover: ['Wikipedia: Dover, New Jersey', W('Dover,_New_Jersey')],
-  butler: ['Wikipedia: Butler, New Jersey', W('Butler,_New_Jersey')]
+  butler: ['Wikipedia: Butler, New Jersey', W('Butler,_New_Jersey')],
+  pomptonr: ['Wikipedia: Pompton River', W('Pompton_River')], ramapor: ['Wikipedia: Ramapo River', W('Ramapo_River')], pequannock: ['Wikipedia: Pequannock River', W('Pequannock_River')],
+  rockawayr: ['Wikipedia: Rockaway River', W('Rockaway_River')], pomptonlake: ['Wikipedia: Pompton Lake', W('Pompton_Lake')], greenwood: ['Wikipedia: Greenwood Lake', W('Greenwood_Lake')],
+  greenpond: ['Wikipedia: Green Pond, New Jersey', W('Green_Pond,_New_Jersey')], kettle: ['Wikipedia: Kettle (landform)', W('Kettle_(landform)')]
 };
 
 /** The stops on the time slider, newest first. zoom/center: the deep-time zoom (the camera pulls out as time goes back). */

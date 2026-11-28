@@ -325,6 +325,35 @@ def drain():
     print('drain ok')
 
 
+
+# ---- water: the northeast Jersey rivers (OpenStreetMap), lakes and ridge crests (the app's own data/nj-geoms.json) ----------------
+RIVERS = ['Ramapo River', 'Pequannock River', 'Pompton River', 'Wanaque River', 'Rockaway River', 'Passaic River']
+LAKES = ['Greenwood Lake', 'Lake Hopatcong', 'Boonton Reservoir', 'Wanaque Reservoir', 'Monksville Reservoir']
+RIDGES = ['Ramapo Mountains', 'Garret Mountain', 'Bearfort Mountain']
+
+
+def water():
+    from shapely.geometry import LineString, MultiLineString, shape, mapping
+    from shapely.ops import linemerge
+    osm = json.load(open(os.path.join(SRC, 'osm_rivers.json')))   # Overpass: way[waterway=river][name~...](40.6,-74.8,41.35,-74.05); out geom
+    feats = []
+    for name in RIVERS:
+        lines = [LineString([(p['lon'], p['lat']) for p in e['geometry']]) for e in osm['elements'] if e.get('tags', {}).get('name') == name and len(e.get('geometry', [])) > 1]
+        if not lines:
+            continue
+        g = linemerge(MultiLineString(lines)).simplify(0.0002)
+        feats.append({'type': 'Feature', 'properties': {'kind': 'river', 'name': name}, 'geometry': mapping(rnd(g))})
+    geoms = json.load(open(os.path.join(ROOT, 'data/nj-geoms.json')))
+    for name in LAKES:
+        feats.append({'type': 'Feature', 'properties': {'kind': 'lake', 'name': name}, 'geometry': mapping(rnd(shape({'type': geoms[name]['type'], 'coordinates': geoms[name]['coordinates']})))})
+    for name in RIDGES:
+        feats.append({'type': 'Feature', 'properties': {'kind': 'ridge', 'name': name}, 'geometry': mapping(rnd(shape({'type': geoms[name]['type'], 'coordinates': geoms[name]['coordinates']})))})
+    dump('water.json', feats)
+    got = {f['properties']['name'] for f in feats}
+    assert all(n in got for n in RIVERS + LAKES + RIDGES), set(RIVERS + LAKES + RIDGES) - got
+    print('water ok')
+
+
 if __name__ == '__main__':
     import urllib.parse
     what = sys.argv[1:] or ['rocks', 'ice', 'lakes', 'canal', 'sand', 'provinces', 'icelines', 'iceanim']
@@ -338,3 +367,4 @@ if __name__ == '__main__':
     if 'icelines' in what: ice_region()
     if 'iceanim' in what: ice_anim()
     if 'drain' in what: drain()
+    if 'water' in what: water()

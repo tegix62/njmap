@@ -794,6 +794,25 @@ path was removed. Test: `node tools/checks/mini.cjs`. Explore and the orbit view
 
 ## Deep Jersey: stories and threads (2026-11-26)
 
+**Directed scenes, starting with water (2026-11-28).** From a phone test: the visual moments taught best, the newer stories were
+just reading, and labels like "The thread down" meant nothing. Design: `docs/superpowers/specs/2026-11-28-deep-jersey-directed-scenes-design.md`.
+
+- A story step can carry a `script`: timed map moves written for that moment (run once the camera arrives; every timer cleared on
+  leaving). Moves: `cap` (one line saying what you are looking at), `cam`, `trace` (a river draws itself along its real course),
+  `lake` (a lake fills in), `ridge` (a ridge crest drawn), `mark` (a named place), `pulse` (heights rise then settle), `pop` (a county,
+  a region such as the Highlands even past the state line, or a lake lifts while everything else dims, then drops back onto the board),
+  and `clear`. `deep-stories.cjs` checks every script: known moves, rivers, lakes, counties and regions, steps in time order.
+- River courses (Ramapo, Pequannock, Pompton, Wanaque, Rockaway, Passaic) from OpenStreetMap, lake outlines and ridge crests from the
+  app's `data/nj-geoms.json`: `data/deep/water.json`, built by `python3 tools/build_deep.py water` (needs `$DEEP_SRC/osm_rivers.json`
+  from Overpass: way[waterway=river] by name in 40.6,-74.8,41.35,-74.05).
+- Water stories: **The Great Falls** rebuilt as scenes (the ice blocks the old way out, the lake fills, the ridge, the river finds
+  its long way round); **Three rivers make the Pompton** (the Highlands pop out, the Ramapo and Pequannock trace in, meet at Pompton
+  Plains, run to Two Bridges; the flat floodplain); **The river that follows the ridges** (the Rockaway straight down its valley, then
+  east to the Boonton Gorge); **Why is a lake still a lake?** (lakes fill in; Pompton Lake 1908, Greenwood 1765/1837, Hopatcong 1831,
+  Boonton 1904 appear one by one; Green Pond, a natural spring-fed glacial lake). A new subject, Water.
+- Plain words: a story shows "Step 1 of 3" and the scene's caption, the button says "Next ›", and the links at the end are "Read
+  next", each with the town it is in. `tools/checks/ui-deep-scenes.cjs` plays the Pompton and lakes stories and checks the moves.
+
 **Browse by county (2026-11-28).** From a phone test: threads kept leading back to the same well-linked stories. Home now lists all
 21 counties with how many stories land in or pass through each (and how many you have read); a county view draws its outline, frames
 it, and lists its stories by town, unread first, then the ones passing through. Every story shows where it lands ("Paterson · Passaic

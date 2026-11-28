@@ -45,4 +45,7 @@ export const PLACE_OF = {"s-oldest":{"town":"Montville","full":"Montville Townsh
   "madison":{"town":"Madison","full":"Madison Borough","county":"Morris"},
   "lake-hopatcong":{"town":"Jefferson","full":"Jefferson Township","county":"Morris"},
   "dover":{"town":"Dover","full":"Dover Town","county":"Morris"},
-  "butler":{"town":"Butler","full":"Butler Borough","county":"Morris"}};
+  "butler":{"town":"Butler","full":"Butler Borough","county":"Morris"},
+  "pompton-rivers":{"town":"Pequannock","full":"Pequannock Township","county":"Morris"},
+  "rockaway":{"town":"Boonton","full":"Boonton Town","county":"Morris"},
+  "still-a-lake":{"town":"Rockaway","full":"Rockaway Township","county":"Morris","touches":["Passaic"]}};

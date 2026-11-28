@@ -50,7 +50,7 @@ function flatSeaDem() {
   }
   demProto = true; return 'deepdem://';
 }
-const LAYERS = ['deep-relief', 'deep-hs', 'deep-iceanim', 'deep-rivers', 'deep-prov', 'deep-prov-line', 'deep-rocks', 'deep-sand', 'deep-flows', 'deep-lake', 'deep-ice-sheet', 'deep-icelines', 'deep-ice-older', 'deep-ice-limit', 'deep-canal', 'deep-drain-glow', 'deep-drain'];
+const LAYERS = ['deep-relief', 'deep-hs', 'deep-iceanim', 'deep-rivers', 'deep-prov', 'deep-prov-line', 'deep-rocks', 'deep-sand', 'deep-flows', 'deep-lake', 'deep-ice-sheet', 'deep-icelines', 'deep-ice-older', 'deep-ice-limit', 'deep-canal', 'deep-drain-glow', 'deep-drain', 'deep-water-lake', 'deep-ridge', 'deep-pop-mask', 'deep-pop-ext', 'deep-pop-edge'];
 // "How it works" explainers for each chapter, region, close-up stop and card that leans on an idea
 const HOW = {
   's-mountains': ['fold', 'ridges'], 's-rift': ['lava', 'rift', 'ridges'], 's-coast': ['coastal', 'aquifer'], 's-ice': ['icesheet', 'moraine'], 's-lake': ['glaciallake', 'erratic'], 's-iron': ['bogiron'],
@@ -82,7 +82,7 @@ export function initDeep(ctx) {
 
   async function load() {
     if (data) return;
-    const names = ['rocks', 'flows', 'ice', 'lakes', 'canal', 'sand', 'provinces', 'icelines', 'iceanim', 'drain'];
+    const names = ['rocks', 'flows', 'ice', 'lakes', 'canal', 'sand', 'provinces', 'icelines', 'iceanim', 'drain', 'water'];
     const got = await Promise.all(names.map((f) => fetch(`data/deep/${f}.json`).then((r) => r.json())));
     data = Object.fromEntries(names.map((n, i) => [n, got[i]]));
   }
@@ -124,6 +124,14 @@ export function initDeep(ctx) {
     map.addLayer({ id: 'deep-icelines', type: 'line', source: 'deep-icelines', paint: { 'line-color': '#4f86b5', 'line-width': 1.3, 'line-opacity': 0, 'line-opacity-transition': T } });
     map.addLayer({ id: 'deep-ice-older', type: 'line', source: 'deep-ice', filter: ['==', ['get', 'kind'], 'older'], paint: { 'line-color': '#7aa6c8', 'line-width': 1.2, 'line-dasharray': [2, 2], 'line-opacity': 0, 'line-opacity-transition': T } });
     map.addLayer({ id: 'deep-ice-limit', type: 'line', source: 'deep-ice', filter: ['==', ['get', 'kind'], 'limit'], paint: { 'line-color': '#2b6aa3', 'line-width': 3, 'line-opacity': 0, 'line-opacity-transition': T } });
+    // scenes: rivers, lakes and ridges (data/deep/water.json), and the pop-out (a shape lifted while the rest dims)
+    map.addSource('deep-water', { type: 'geojson', data: data.water, lineMetrics: true });
+    map.addLayer({ id: 'deep-water-lake', type: 'fill', source: 'deep-water', filter: ['in', ['get', 'name'], ['literal', []]], paint: { 'fill-color': '#3f86c9', 'fill-opacity': 0.8 } });
+    map.addLayer({ id: 'deep-ridge', type: 'line', source: 'deep-water', filter: ['in', ['get', 'name'], ['literal', []]], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#7a4a24', 'line-width': 5, 'line-opacity': 0.85, 'line-dasharray': [1.5, 1] } });
+    map.addSource('deep-pop', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({ id: 'deep-pop-mask', type: 'fill', source: 'deep-pop', filter: ['==', ['get', 'k'], 'mask'], paint: { 'fill-color': '#f3eee3', 'fill-opacity': 0, 'fill-opacity-transition': { duration: ctx.dur(450), delay: 0 } } });
+    map.addLayer({ id: 'deep-pop-ext', type: 'fill-extrusion', source: 'deep-pop', filter: ['==', ['get', 'k'], 'shape'], paint: { 'fill-extrusion-color': ['get', 'col'], 'fill-extrusion-opacity': 0.88, 'fill-extrusion-height': 0, 'fill-extrusion-height-transition': { duration: ctx.dur(550), delay: 0 } } });
+    map.addLayer({ id: 'deep-pop-edge', type: 'line', source: 'deep-pop', filter: ['==', ['get', 'k'], 'shape'], paint: { 'line-color': ['get', 'col'], 'line-width': 3, 'line-opacity': 0, 'line-opacity-transition': { duration: ctx.dur(450), delay: 0 } } });
     map.addSource('deep-drain', { type: 'geojson', data: data.drain });
     map.addLayer({ id: 'deep-drain-glow', type: 'line', source: 'deep-drain', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#7fc1f0', 'line-width': 12, 'line-blur': 4, 'line-opacity': 0, 'line-opacity-transition': T } });
     map.addLayer({ id: 'deep-drain', type: 'line', source: 'deep-drain', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#1f5fa0', 'line-width': 4.5, 'line-dasharray': [0, 4, 3], 'line-opacity': 0, 'line-opacity-transition': T } });
@@ -150,7 +158,7 @@ export function initDeep(ctx) {
     op('deep-icelines', 'line-opacity', sc.iceLines ?? 0);
     op('deep-ice-older', 'line-opacity', sc.iceOlder ?? 0);
     if (sc.lake) { map.setFilter('deep-lake', ['==', ['get', 'stage'], sc.lake]); map.setPaintProperty('deep-lake', 'fill-opacity-transition', { duration: ctx.dur(2600), delay: ctx.dur(900) }); op('deep-lake', 'fill-opacity', 0.75); } else { map.setPaintProperty('deep-lake', 'fill-opacity-transition', { duration: ctx.dur(600), delay: 0 }); op('deep-lake', 'fill-opacity', 0); }
-    op('deep-canal', 'line-opacity', sc.canal ?? 0); op('deep-drain', 'line-opacity', 0); op('deep-drain-glow', 'line-opacity', 0);
+    op('deep-canal', 'line-opacity', sc.canal ?? 0); op('deep-drain', 'line-opacity', 0); op('deep-drain-glow', 'line-opacity', 0); sceneReset();
     drawPins(sc.pins || [], sc.labels || Object.keys(prov).filter((k) => prov[k] >= 0.3), sc.mark || null);
   }
   // ---- the ice age, played on the map -----------------------------------------------------------------------------------------
@@ -198,6 +206,55 @@ export function initDeep(ctx) {
     at(11500, () => { lakeTo(null); stage('passaic'); look([-74.32, 40.82], 9.2); caption('The ice is gone: the Passaic, blocked from its old shortcut by the moraine, takes the long way round and over the Great Falls'); });
     at(19000, () => { caption(''); flowing = false; });   // done: the line stays, the animation (and its timer) stops
   }
+  // ---- directed scenes: a beat's `script` is a list of timed moves, run once the camera has arrived (see deepthreads MOVES) --------
+  let traces = [], lakesOn = [], ridgesOn = [], marksOn = [];
+  function sceneReset() {
+    for (const id of traces) if (map.getLayer(id)) map.removeLayer(id); traces = [];
+    lakesOn = []; ridgesOn = []; marksOn = [];
+    if (map.getLayer('deep-water-lake')) { map.setFilter('deep-water-lake', ['in', ['get', 'name'], ['literal', []]]); map.setFilter('deep-ridge', ['in', ['get', 'name'], ['literal', []]]); }
+    if (map.getSource('deep-pop')) { map.getSource('deep-pop').setData({ type: 'FeatureCollection', features: [] }); op('deep-pop-mask', 'fill-opacity', 0); op('deep-pop-edge', 'line-opacity', 0); op('deep-pop-ext', 'fill-extrusion-height', 0); }
+  }
+  const popShape = (st) => {
+    if (st.county) return ctx.countyShapes && ctx.countyShapes.features.find((f) => f.properties.c === st.county);
+    if (st.region) return data.provinces.features.find((f) => f.properties.region === st.region);
+    return data.water.features.find((f) => f.properties.name === st.water);
+  };
+  const outerRings = (g) => (g.type === 'Polygon' ? [g.coordinates[0]] : g.type === 'MultiPolygon' ? g.coordinates.map((p) => p[0]) : []);
+  function runScript(script) {
+    const at = (ms, f) => timers.push(setTimeout(() => { if (ctx.mode === 'deep') f(); }, ctx.dur(ms) || 1));
+    let end = 0;
+    for (const st of script) {
+      end = Math.max(end, st.at + (st.ms || 0) + (st.hold || 0));
+      at(st.at, () => ({
+        cap: () => caption(st.text),
+        cam: () => fly([st.c[0], st.c[1]], st.c[2], st.c[3] ?? null, st.ms || 1600),
+        trace: () => {
+          const id = `deep-trace-${traces.length}`, col = st.color || '#2a7bd1', w = st.w || 5, ms = ctx.dur(st.ms || 2600) || 1;
+          map.addLayer({ id, type: 'line', source: 'deep-water', filter: ['==', ['get', 'name'], st.name], layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-width': ['interpolate', ['linear'], ['zoom'], 8, w * 0.6, 12, w * 1.4], 'line-gradient': ['step', ['line-progress'], col, 0.001, 'rgba(0,0,0,0)'] } });
+          traces.push(id);
+          const t0 = performance.now(), grow = () => { if (!map.getLayer(id)) return; const p = Math.min(0.999, (performance.now() - t0) / ms);
+            map.setPaintProperty(id, 'line-gradient', ['step', ['line-progress'], col, Math.max(0.001, p), 'rgba(0,0,0,0)']); if (p < 0.999) timers.push(setTimeout(grow, 50)); };
+          grow();
+        },
+        lake: () => { lakesOn = st.show === false ? lakesOn.filter((n) => n !== st.name) : [...new Set([...lakesOn, st.name])]; map.setFilter('deep-water-lake', ['in', ['get', 'name'], ['literal', lakesOn]]); },
+        ridge: () => { ridgesOn = [...new Set([...ridgesOn, st.name])]; map.setFilter('deep-ridge', ['in', ['get', 'name'], ['literal', ridgesOn]]); },
+        mark: () => { marksOn = [...marksOn, { p: st.p, label: st.label, color: st.color }]; drawPins(shown.pins, shown.labels, marksOn); },
+        pulse: () => { const from = exagNow || 1, to = from * (st.to || 2.5); rise(to, 900); timers.push(setTimeout(() => rise(from, 1100), ctx.dur(900 + (st.hold || 1600)) || 1)); },
+        pop: () => {
+          const f = popShape(st); if (!f) return;
+          const col = st.color || '#f6efe0', rings = outerRings(f.geometry);
+          map.getSource('deep-pop').setData({ type: 'FeatureCollection', features: [
+            { type: 'Feature', properties: { k: 'mask' }, geometry: { type: 'Polygon', coordinates: [[[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]], ...rings.map((r) => [...r].reverse())] } },
+            { type: 'Feature', properties: { k: 'shape', col }, geometry: f.geometry }] });
+          op('deep-pop-mask', 'fill-opacity', 0.78); op('deep-pop-edge', 'line-opacity', 1); op('deep-pop-ext', 'fill-extrusion-height', st.h || 600);
+          timers.push(setTimeout(() => { op('deep-pop-ext', 'fill-extrusion-height', 0); op('deep-pop-mask', 'fill-opacity', 0); op('deep-pop-edge', 'line-opacity', 0); }, ctx.dur(st.hold || 2600) || 1));   // and back onto the board
+        },
+        clear: () => sceneReset(),
+      })[st.do]());
+    }
+    at(end + 4500, () => caption(''));
+  }
   function stopScene(id) {
     const rocks = { highlands: ['match', ['get', 'era'], 'grenville', 0.75, 0.12], paleo: ['match', ['get', 'era'], 'paleozoic', 0.75, 'grenville', 0.3, 0.1],
       rift: ['match', ['get', 'era'], 'newark', 0.6, 'diabase', 0.7, 'grenville', 0.25, 'paleozoic', 0.25, 0], ice: 0.18, moggy: 0.14, notch: 0.14 }[id] ?? 0;
@@ -223,7 +280,7 @@ export function initDeep(ctx) {
     const lp = (k) => { const p = (data.provinces.features.find((f) => f.properties.region === k) || {}).properties; return p && LP[k] ? { ...p, lp: LP[k] } : p; };
     pinEl.innerHTML = labels.map((k) => { const p = lp(k), r = LAND.find((x) => x.id === k); return p && r ? `<b class="dp-rl" data-region="${k}" data-p="${p.lp}" style="--k:${r.color}">${esc(r.name.replace(/ \(.*\)|:.*$/, ''))}</b>` : ''; }).join('')
       + pins.map((id, n) => { const c = CARD[id]; return c && c.p ? `<button data-id="${id}" data-p="${c.p}" style="--k:${KIND_COLOR[c.kind]};--n:${n}"><i></i><span>${esc(c.title)}</span></button>` : ''; }).join('')
-      + (mark ? `<button class="dp-mark" data-p="${mark.p}" style="--k:${mark.color || '#2a241b'};--n:0" tabindex="-1"><i></i><span>${esc(mark.label)}</span></button>` : '');   // a story's place that has no card
+      + (mark ? [].concat(mark).map((m, n) => `<button class="dp-mark" data-p="${m.p}" style="--k:${m.color || '#2a241b'};--n:${n}" tabindex="-1"><i></i><span>${esc(m.label)}</span></button>`).join('') : '');   // a story's place that has no card
     pinEl.hidden = false; placePins();
   }
   function placePins() {
@@ -424,10 +481,10 @@ export function initDeep(ctx) {
     view = 'story'; game = null; cur = id; chap = b;
     const seq = SEQUENCE.indexOf(id); if (seq >= 0) store.set('deep.chapter', seq);
     const B = S.beats[BEAT_KEYS[b]], last = b === 2;
-    setBar(BEAT_KEYS.map((k, j) => ({ when: `${j + 1} of 3 · ${BEAT_NAMES[j]}`, title: S.title })), b, ['Back a step', 'Next step']);
+    setBar(BEAT_KEYS.map((k, j) => ({ when: `Step ${j + 1} of 3`, title: S.title })), b, ['Back a step', 'Next step']);
     applyScene(B.mark ? { ...B.scene, mark: { ...B.mark, color: DOMAINS[S.domain].color } } : B.scene);
     // the camera goes there (under the illustration, on the first beat); the beat's animation waits until it has arrived
-    const play = B.play && PLAYS[B.play], go = play && (() => afterEx(play));
+    const play = B.script ? () => runScript(B.script) : B.play && PLAYS[B.play], go = play && (() => afterEx(play));
     const bb = B.fit && data.provinces.features.find((f) => f.properties.region === B.fit)?.properties.bbox;
     after(() => (bb ? fitBox(bb, 7, go) : fly([B.cam[0], B.cam[1]], B.cam[2], null, 1800, go)));
     if (last) markRead(store, id);
@@ -435,12 +492,11 @@ export function initDeep(ctx) {
     frame(`${top(S.title, 'intro', 'Deep Jersey')}
       ${PLACE_OF[id] ? `<button class="dp-where" data-d="county" data-id="${esc(PLACE_OF[id].county)}">${esc(PLACE_OF[id].town)} · ${esc(PLACE_OF[id].county)} County</button>` : ''}
       <p class="dp-kick"><span class="dp-dom" style="background:${D.color}">${esc(D.name)}</span>${S.gone ? '<span class="dp-dom gone">Gone</span>' : ''} ${esc(S.when)}</p>
-      <h2>${esc(BEAT_NAMES[b])}</h2>
       ${b === 0 && STORY_EX[id] ? `<button class="dp-play" data-d="watch" data-id="${STORY_EX[id]}"><b>▶ Watch how it happened</b><small>${esc(EXPLAIN[STORY_EX[id]].title)}, drawn as a slice through the ground</small></button>` : ''}
       ${paras(B.text)}
       ${L ? `<button class="dp-region" data-d="landone" data-id="${L.id}"><i style="background:${L.color}"></i><span><b>${esc(L.name)} today</b><small>${esc(L.nj)}</small></span></button>` : ''}
-      ${last ? `${chips(S.places)}<h4>Where next</h4><div class="dp-next">${S.threads.map((t) => `<button data-d="story" data-id="${t.to}"${read.includes(t.to) ? '' : ' class="new"'}><b>${esc(STORY_BY[t.to].title)}</b><small>${esc(t.why)}</small></button>`).join('')}</div><button class="tr-card wide" data-d="mapidx" data-id="${id}"><b>Show on the map</b><small>this story and the others near it</small></button>`
-        : `<button class="dp-start" data-d="beat" data-b="${b + 1}"><b>Next: ${esc(BEAT_NAMES[b + 1])}</b><small>${esc(S.beats[BEAT_KEYS[b + 1]].text[0].slice(0, 70))}…</small></button>`}
+      ${last ? `${chips(S.places)}<h4>Read next</h4><div class="dp-next">${S.threads.map((t) => `<button data-d="story" data-id="${t.to}"${read.includes(t.to) ? '' : ' class="new"'}><b>${esc(STORY_BY[t.to].title)}${PLACE_OF[t.to] ? ` <em>· ${esc(PLACE_OF[t.to].town)}</em>` : ''}</b><small>${esc(t.why)}</small></button>`).join('')}</div><button class="tr-card wide" data-d="mapidx" data-id="${id}"><b>Show on the map</b><small>this story and the others near it</small></button>`
+        : `<button class="dp-start" data-d="beat" data-b="${b + 1}"><b>Next ›</b><small>${esc(S.beats[BEAT_KEYS[b + 1]].text[0].slice(0, 70))}…</small></button>`}
       ${howList(S)}
       ${srcList(S.src)}`);
     if (b === 0 && STORY_EX[id]) showEx(STORY_EX[id]);

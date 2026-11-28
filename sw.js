@@ -2,7 +2,7 @@
 // cached, so "which town am I in" keeps working with no signal. Online, the
 // app's own files come from the network first (the latest version every time). Background map
 // tiles are only cached opportunistically.
-const VERSION = 'njtf-v331';
+const VERSION = 'njtf-v332';
 const SHELL = [
   './',
   'index.html',
@@ -84,7 +84,7 @@ const SHELL = [
   'js/treekey.js', 'js/treeskills.js', 'js/treeoutlines.js', 'js/treeprofile.js', 'js/juice.js', 'js/treeid.js', 'data/treegrid.json', 'data/treepool.json', 'data/treepoints.json', 'data/treeextra.json',
   'js/treeleaf.js',
   'data/trees.json',
-  'js/deep.js', 'js/deepcards.js', 'js/deepexplain.js', 'js/deepstories.js', 'js/deepthreads.js', 'js/deepplaces.js', 'data/deep/drain.json', 'data/deep/rocks.json', 'data/deep/flows.json', 'data/deep/ice.json', 'data/deep/lakes.json', 'data/deep/canal.json', 'data/deep/sand.json', 'data/deep/provinces.json', 'data/deep/icelines.json', 'data/deep/iceanim.json',
+  'js/deep.js', 'js/deepcards.js', 'js/deepexplain.js', 'js/deepstories.js', 'js/deepthreads.js', 'js/deepplaces.js', 'data/deep/drain.json', 'data/deep/water.json', 'data/deep/rocks.json', 'data/deep/flows.json', 'data/deep/ice.json', 'data/deep/lakes.json', 'data/deep/canal.json', 'data/deep/sand.json', 'data/deep/provinces.json', 'data/deep/icelines.json', 'data/deep/iceanim.json',
   'js/goblin/ui/rush.js',
   'js/goblin/sim/encounters.js',
   'js/goblin/sim/front.js',

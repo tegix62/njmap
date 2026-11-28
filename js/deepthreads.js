@@ -5,7 +5,7 @@
 export const DOMAINS = {
   earth: { name: 'Earth', color: '#9a5b3c' }, ice: { name: 'Ice', color: '#3d7fbf' }, sea: { name: 'Sea', color: '#1f6f8b' },
   sky: { name: 'Sky', color: '#5a4fa2' }, weather: { name: 'Weather', color: '#5f7480' }, life: { name: 'Living things', color: '#3f7f3a' },
-  people: { name: 'People', color: '#a2652a' }, gone: { name: 'Gone', color: '#7a6a5a' }, industry: { name: 'Industry', color: '#5b5f66' },
+  water: { name: 'Water', color: '#2a7bd1' }, people: { name: 'People', color: '#a2652a' }, gone: { name: 'Gone', color: '#7a6a5a' }, industry: { name: 'Industry', color: '#5b5f66' },
 };
 const BEATS = ['big', 'thread', 'here'];
 const KEY = 'deep.read';
@@ -29,6 +29,23 @@ export function hooks(stories, read, n = 4, day = Math.floor(Date.now() / 864e5)
   return [...order(stories.filter((s) => !done.has(s.id))), ...order(stories.filter((s) => done.has(s.id)))].slice(0, n);
 }
 
+/** The moves a scene script can make (js/deep.js runs them). */
+export const MOVES = ['cap', 'cam', 'trace', 'lake', 'ridge', 'pop', 'pulse', 'mark', 'clear'];
+function checkScript(sc, refs, at) {
+  const out = []; let last = -1;
+  for (const st of sc) {
+    if (!MOVES.includes(st.do)) { out.push(`${at}: unknown move "${st.do}".`); continue; }
+    if (typeof st.at !== 'number' || st.at < last) out.push(`${at}: scene steps must be in time order (step "${st.do}" at ${st.at}).`); else last = st.at;
+    const known = (set, v, what) => { if (refs[set] && !refs[set].has(v)) out.push(`${at}: unknown ${what} "${v}".`); };
+    if (st.do === 'trace' || st.do === 'lake' || st.do === 'ridge') known('water', st.name, st.do === 'trace' ? 'river' : st.do);
+    if (st.do === 'pop') { if (st.county) known('counties', st.county, 'county'); else if (st.region) known('regions', st.region, 'region'); else if (st.water) known('water', st.water, 'water'); else out.push(`${at}: a pop needs a county, region or water.`); }
+    if (st.do === 'cap' && !st.text) out.push(`${at}: a caption needs text.`);
+    if (st.do === 'cam' && !(Array.isArray(st.c) && st.c.length >= 3)) out.push(`${at}: a camera move needs c: [lon, lat, zoom].`);
+    if (st.do === 'mark' && !(Array.isArray(st.p) && st.label)) out.push(`${at}: a mark needs p and label.`);
+  }
+  return out;
+}
+
 /** Everything wrong with the stories, as plain sentences; empty when they hold together. */
 export function checkStories(stories, refs) {
   const ids = new Set(stories.map((s) => s.id)), out = [];
@@ -47,6 +64,7 @@ export function checkStories(stories, refs) {
     for (const k of s.src || []) if (!refs.src.has(k)) out.push(`${at} cites an unknown source "${k}".`);
     for (const p of s.places || []) if (!refs.places.has(p)) out.push(`${at} lands on an unknown place "${p}".`);
     for (const x of s.explain || []) if (!refs.explain.has(x)) out.push(`${at} uses an unknown explainer "${x}".`);
+    for (const k of BEATS) { const sc = b[k] && b[k].script; if (sc) out.push(...checkScript(sc, refs, `${at}, beat ${k}`)); }
   }
   if (ids.size !== stories.length) out.push('Two stories share an id.');
   return out;

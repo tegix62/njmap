@@ -4278,3 +4278,4 @@ body.deep-on #edges { display: none !important; }   /* the shading outside New J
 .dp-town { margin-top: 10px; }
 .dp-toggle { float: right; border: 0; border-radius: 999px; padding: 3px 10px; background: #efe6d6; color: #5a3d1e; font: 600 11.5px system-ui, sans-serif; text-transform: none; letter-spacing: 0; cursor: pointer; }
 .dp-toggle.on { background: #8a5a2b; color: #fff; }
+.dp-next b em { font-style: normal; font-weight: 500; color: #7a705f; font-size: 13px; }
