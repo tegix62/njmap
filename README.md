@@ -783,6 +783,12 @@ County"), which opens its county. The map's story list has an **Only unread** to
 from the app's own municipal boundaries: `node tools/build_story_places.cjs` writes `js/deepplaces.js` (rerun after adding stories;
 `deep-stories.cjs` fails if a story has no place).
 
+**Town stories: Passaic and Morris (47 stories).** Passaic County: the hillside where the 1913 strikers met (the Botto House in
+Haledon), the woollen mills strike (Passaic, 1926–27), Ringwood's ironmasters (Robert Erskine's 275 maps for Washington), and the
+powder works by the lake (DuPont at Pompton Lakes). Morris County: the Hard Winter (Jockey Hollow and the Ford Mansion), the arsenal
+in the hills (Picatinny and the 1926 Lake Denmark explosion), the Rose City (Madison, once Bottle Hill), the lake the canal made
+(Lake Hopatcong), iron off the ground (Dover), and the rubber town (Butler).
+
 Deep Jersey is now a library of stories you wander through, not a tour. Design: `docs/superpowers/specs/2026-11-26-deep-jersey-threads-design.md`;
 plan: `docs/superpowers/plans/2026-11-26-deep-jersey-threads.md`.
 

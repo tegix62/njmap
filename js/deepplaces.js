@@ -35,4 +35,14 @@ export const PLACE_OF = {"s-oldest":{"town":"Montville","full":"Montville Townsh
   "abbott":{"town":"Bordentown","full":"Bordentown Township","county":"Burlington","touches":["Mercer"]},
   "pulaski":{"town":"Kearny","full":"Kearny Town","county":"Hudson","touches":["Essex"]},
   "island-beach":{"town":"Berkeley","full":"Berkeley Township","county":"Ocean"},
-  "atsion":{"town":"Shamong","full":"Shamong Township","county":"Burlington"}};
+  "atsion":{"town":"Shamong","full":"Shamong Township","county":"Burlington"},
+  "haledon":{"town":"Haledon","full":"Haledon Borough","county":"Passaic"},
+  "passaic-strike":{"town":"Passaic","full":"Passaic City","county":"Passaic"},
+  "ringwood":{"town":"Ringwood","full":"Ringwood Borough","county":"Passaic"},
+  "pompton-lakes":{"town":"Pompton Lakes","full":"Pompton Lakes Borough","county":"Passaic","touches":["Morris"]},
+  "jockey-hollow":{"town":"Harding","full":"Harding Township","county":"Morris"},
+  "picatinny":{"town":"Rockaway","full":"Rockaway Township","county":"Morris"},
+  "madison":{"town":"Madison","full":"Madison Borough","county":"Morris"},
+  "lake-hopatcong":{"town":"Jefferson","full":"Jefferson Township","county":"Morris"},
+  "dover":{"town":"Dover","full":"Dover Town","county":"Morris"},
+  "butler":{"town":"Butler","full":"Butler Borough","county":"Morris"}};

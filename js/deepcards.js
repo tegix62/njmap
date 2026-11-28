@@ -53,7 +53,13 @@ export const SRC = {
   passaicr: ['Wikipedia: Passaic River', W('Passaic_River')],
   crossing: ['Wikipedia: George Washington’s crossing of the Delaware River', W('George_Washington%27s_crossing_of_the_Delaware_River')], trenton: ['Wikipedia: Battle of Trenton', W('Battle_of_Trenton')],
   abbott: ['Wikipedia: Abbott Farm Historic District', W('Abbott_Farm_Historic_District')], pulaski: ['Wikipedia: Pulaski Skyway', W('Pulaski_Skyway')],
-  ibsp: ['Wikipedia: Island Beach State Park', W('Island_Beach_State_Park')], atsionv: ['Wikipedia: Atsion, New Jersey', W('Atsion,_New_Jersey')]
+  ibsp: ['Wikipedia: Island Beach State Park', W('Island_Beach_State_Park')], atsionv: ['Wikipedia: Atsion, New Jersey', W('Atsion,_New_Jersey')],
+  haledon: ['Wikipedia: Haledon, New Jersey', W('Haledon,_New_Jersey')], ringwood: ['Wikipedia: Ringwood Manor', W('Ringwood_Manor')],
+  passaic26: ['Wikipedia: 1926 Passaic textile strike', W('1926_Passaic_textile_strike')], pompton: ['Wikipedia: Pompton Lakes, New Jersey', W('Pompton_Lakes,_New_Jersey')],
+  jockey: ['Wikipedia: Jockey Hollow', W('Jockey_Hollow')], mnhp: ['Wikipedia: Morristown National Historical Park', W('Morristown_National_Historical_Park')],
+  picatinny: ['Wikipedia: Picatinny Arsenal', W('Picatinny_Arsenal')], madison: ['Wikipedia: Madison, New Jersey', W('Madison,_New_Jersey')],
+  hopatcong: ['Wikipedia: Lake Hopatcong', W('Lake_Hopatcong')], dover: ['Wikipedia: Dover, New Jersey', W('Dover,_New_Jersey')],
+  butler: ['Wikipedia: Butler, New Jersey', W('Butler,_New_Jersey')]
 };
 
 /** The stops on the time slider, newest first. zoom/center: the deep-time zoom (the camera pulls out as time goes back). */
