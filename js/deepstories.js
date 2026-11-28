@@ -101,7 +101,7 @@ export const STORIES = [
         scene: { pins: ['names', 'lenape'] }, cam: [-74.42, 40.88, 10] },
     },
     places: ['lenape', 'names', 'brotherton'],
-    threads: [{ to: 's-iron', why: 'settlers came for what the rock and the bogs held' }, { to: 's-ice', why: 'the land they found had just come out from under the ice' }],
+    threads: [{ to: 's-iron', why: 'settlers came for what the rock and the bogs held' }, { to: 's-ice', why: 'the land they found had just come out from under the ice' }, { to: 'abbott', why: 'a village two thousand years old, below Trenton' }],
     src: ['lenapehoking', 'pines', 'montville', 'indianmills', 'poconos', 'parsip', 'rockaway', 'hopat', 'pompton', 'boonton'] }),
 
   story({ id: 's-iron', domain: 'industry', when: '1700s and 1800s', title: 'Iron, canals and glass',
@@ -284,7 +284,7 @@ export const STORIES = [
         scene: {}, cam: [-74.906, 38.935, 11.4], mark: { p: [-74.906, 38.935], label: 'Cape May' } },
     },
     places: [],
-    threads: [{ to: 'horseshoe', why: 'the same bay shore, every spring' }, { to: 's-rift', why: 'eruptions on a far vaster scale, right here, 200 million years ago' }],
+    threads: [{ to: 'horseshoe', why: 'the same bay shore, every spring' }, { to: 's-rift', why: 'eruptions on a far vaster scale, right here, 200 million years ago' }, { to: 'island-beach', why: 'more of the shore, left wild' }],
     src: ['yws'] }),
 
   story({ id: 'sandy', domain: 'weather', when: 'October 29, 2012', title: 'Sandy and the moving islands',
@@ -410,7 +410,7 @@ export const STORIES = [
         scene: {}, cam: [-74.432, 39.488, 11.6], mark: { p: [-74.432, 39.488], label: 'Leeds Point' } },
     },
     places: [],
-    threads: [{ to: 'pines', why: 'the forest it is said to haunt' }, { to: 's-iron', why: 'the real villages deep in those woods' }],
+    threads: [{ to: 'pines', why: 'the forest it is said to haunt' }, { to: 's-iron', why: 'the real villages deep in those woods' }, { to: 'atsion', why: 'a real ghost town in the same woods' }],
     src: ['devil'] }),
 
   story({ id: 'meadowlands', domain: 'life', when: '1600s to today', title: 'The Meadowlands',
@@ -424,7 +424,7 @@ export const STORIES = [
         scene: {}, cam: [-74.075, 40.81, 12.2], mark: { p: [-74.075, 40.812], label: 'The Meadowlands' } },
     },
     places: [],
-    threads: [{ to: 'great-swamp', why: 'another marsh the region nearly built over' }, { to: 'black-tom', why: 'more made land in the harbour, and what happened on it' }],
+    threads: [{ to: 'great-swamp', why: 'another marsh the region nearly built over' }, { to: 'black-tom', why: 'more made land in the harbour, and what happened on it' }, { to: 'pulaski', why: 'the steel road built across it' }],
     src: ['meadow'] }),
 
   story({ id: 'sandy-hook', domain: 'sea', when: '1764 to today', title: 'The lighthouse that moved inland',
@@ -454,6 +454,76 @@ export const STORIES = [
     places: ['swamp'],
     threads: [{ to: 's-lake', why: 'the lake that left the land so flat' }, { to: 'great-falls', why: 'where the river finally leaves the basin' }, { to: 'great-swamp', why: 'the upstream end of the same old lake floor' }],
     src: ['passaic', 'passaicr'] }),
+// ---- fifth batch (November 2026) ---------------------------------------------------------------------------------------------
+  story({ id: 'crossing', domain: 'people', when: 'December 25–26, 1776', title: 'The crossing and Trenton',
+    hook: 'On Christmas night 1776 a beaten army crossed the Delaware in boats built for hauling iron, and won.',
+    beats: {
+      big: { text: ['By December 1776 the Continental Army had been driven out of New York and forced to retreat across New Jersey into Pennsylvania. Morale was very low. At McConkey’s Ferry, Washington had between 4,000 and 6,000 men, and about 1,700 of them were unfit for duty.'],
+        scene: {}, cam: [-74.6, 40.4, 7.8] },
+      thread: { text: ['On the night of December 25–26, 2,400 men crossed the Delaware. Large ferries carried horses and cannon; the soldiers went in Durham boats, built to carry heavy loads from the Durham Iron Works, with high sides and a shallow draft, poled across the river.'],
+        scene: {}, cam: [-74.86, 40.29, 10.4] },
+      here: { text: ['Trenton, then a small town, was held by about 1,400 Hessian soldiers under Colonel Johann Rall, who thought themselves safe and had no long-distance patrols. On the morning of December 26, after a short, fierce fight, almost two-thirds of them were captured, with few American losses.', 'The victory lifted the army’s morale and brought re-enlistments. On January 2, 1777, the army beat British reinforcements under Cornwallis at Trenton again, at the Assunpink Creek.'],
+        scene: {}, cam: [-74.766, 40.222, 12.6], mark: { p: [-74.766, 40.222], label: 'Trenton' } },
+    },
+    places: [],
+    threads: [{ to: 'atsion', why: 'the Pine Barrens forge that made kettles for this army' }, { to: 'abbott', why: 'the same bend of the Delaware, two thousand years earlier' }],
+    src: ['crossing', 'trenton'] }),
+
+  story({ id: 'abbott', domain: 'people', when: 'About 500 BC to 500 AD', title: 'The village in the marsh',
+    hook: 'The largest known village of its kind on the East Coast lay in the marshes below Trenton, two thousand years ago.',
+    beats: {
+      big: { text: ['People have lived along the Delaware River’s floodplain for a very long time; there is significant evidence of Paleoindian people there over a long period. Between about 500 BC and 500 AD a large village grew up in the marshes and on the bluffs just below what is now Trenton.'],
+        scene: {}, cam: [-74.75, 40.2, 9.2] },
+      thread: { text: ['Charles Conrad Abbott, an archaeologist whose farm stood on one of the bluffs, published his finds there in 1876. They started a long argument about when people first arrived in the region, and shaped much of the archaeology that followed. Many of the finds are at Harvard’s Peabody Museum.'],
+        scene: {}, cam: [-74.71, 40.18, 11.4] },
+      here: { text: ['The Abbott Farm Historic District, about 2,000 acres of marsh and bluff in Hamilton Township and Bordentown, is a National Historic Landmark: the largest known Middle Woodland village of its type on the East Coast. The John A. Roebling Memorial Park, part of the Abbott Marshlands, is the way in.'],
+        scene: {}, cam: [-74.708, 40.175, 12.4], mark: { p: [-74.708, 40.175], label: 'Abbott Marshlands' } },
+    },
+    places: [],
+    threads: [{ to: 's-people', why: 'the Lenape homeland these people’s descendants knew' }, { to: 'crossing', why: 'the same stretch of river, in 1776' }],
+    src: ['abbott'] }),
+
+  story({ id: 'pulaski', domain: 'industry', when: '1932 to today', title: 'The Skyway over the marsh',
+    hook: 'One of America’s first super-highways was a 3.5-mile steel bridge across the Meadowlands; trucks have been banned from it since 1934.',
+    beats: {
+      big: { text: ['The first freeways in the United States, then called “super-highways”, were being built in the 1920s and early 30s. One of the first was the Route 1 Extension, built to connect to the new Holland Tunnel under the Hudson.'],
+        scene: {}, cam: [-74.15, 40.72, 9.6] },
+      thread: { text: ['Its last part, the General Casimir Pulaski Skyway, designed by Sigvald Johannesson, opened in 1932: about 3.5 miles of bridge and causeway, its longest span 550 ft. It was built under the Hudson County political boss Frank Hague, and its construction brought political and labour disputes.'],
+        scene: {}, cam: [-74.1, 40.735, 11.6] },
+      here: { text: ['It still carries US 1/9 high over the Passaic and Hackensack rivers, Kearny Point between them, and the Meadowlands, little changed since it opened. Trucks were barred in 1934. In 2014 it carried about 74,000 crossings a day, and a rehabilitation estimated at more than $1 billion began in 2007.'],
+        scene: {}, cam: [-74.103, 40.735, 12.6], mark: { p: [-74.103, 40.735], label: 'Pulaski Skyway' } },
+    },
+    places: [],
+    threads: [{ to: 'meadowlands', why: 'the marsh it crosses' }, { to: 'black-tom', why: 'Frank Hague again, as Jersey City’s safety commissioner in 1916' }],
+    src: ['pulaski', 'blacktom'] }),
+
+  story({ id: 'island-beach', domain: 'life', when: '1953 to today', title: 'The island left wild',
+    hook: 'The largest stretch of undeveloped barrier island in New Jersey was one man’s estate until the state bought it in 1953.',
+    beats: {
+      big: { text: ['Barrier islands line much of the Jersey Shore: long, narrow strips of sand shielding the bays behind them from the open ocean.'],
+        scene: { prov: { coastal: 0.3 } }, cam: [-74.15, 39.7, 8.6] },
+      thread: { text: ['Island Beach, the southern end of the Barnegat Peninsula, was once a borough of its own. Most of it belonged to the estate of Henry Phipps Jr. In 1953 New Jersey bought the 2,694-acre estate for $2.75 million to make a state park; the house Phipps built in the 1920s is now the governor’s official summer residence.'],
+        scene: {}, cam: [-74.09, 39.88, 11] },
+      here: { text: ['Island Beach State Park is the largest undeveloped barrier island reserve in New Jersey. From the sea you climb a big grassy dune, drop into a narrow maritime forest of holly and black cherry, and come out at reeds and an estuary with blue crabs and herons. Barnegat Inlet is at its southern tip.'],
+        scene: {}, cam: [-74.09, 39.83, 11.6], mark: { p: [-74.09, 39.83], label: 'Island Beach State Park' } },
+    },
+    places: [],
+    threads: [{ to: 'sandy', why: 'what the storms did to the built-up islands' }, { to: 'sandy-hook', why: 'another stretch the drifting sand keeps reshaping' }],
+    src: ['ibsp', 'barrier'] }),
+
+  story({ id: 'atsion', domain: 'gone', when: '1765 to 1974', title: 'Atsion, a ruin twice', gone: true,
+    hook: 'By 1823 a Pine Barrens iron town lay in ruins “as picturesque as the ruins of abbeys”. Then it was rebuilt.',
+    beats: {
+      big: { text: ['In the Pine Barrens, iron came from the bogs, where iron-rich groundwater seeps out and builds up as bog ore. Charcoal from the pines and water power from the streams turned it into iron.'],
+        scene: { sand: 0.6 }, cam: [-74.65, 39.72, 8.6] },
+      thread: { text: ['Charles Read built a forge at Atsion in 1765–66, fed with pig iron from his new furnace at Batsto downstream. In 1773 he sold it to three Philadelphia Quakers, who added a furnace; during the Revolution the forge made 170 camp kettles for the Continental Army.', 'By 1823 it was a ruin. The historian John Fanning Watson found dams, forges, furnaces and a dozen houses “as picturesque as the ruins of abbeys in pictures… now, all is hushed; no wheels turn, no fires blaze.”'],
+        scene: { sand: 0.5 }, cam: [-74.72, 39.74, 11] },
+      here: { text: ['In 1824 the ironmaster Samuel Richards, whose family ran Batsto, bought Atsion and rebuilt it; his Greek Revival mansion dates from 1826. Atsion Village, beside Atsion Lake in Wharton State Forest, is now a historic district, with a forest office at the old village.'],
+        scene: {}, cam: [-74.726, 39.742, 12.6], mark: { p: [-74.726, 39.742], label: 'Atsion' } },
+    },
+    places: ['batsto', 'bog-iron'],
+    threads: [{ to: 's-iron', why: 'the iron age it belonged to' }, { to: 'pines', why: 'the forest that grew back around it' }, { to: 'crossing', why: 'the army its kettles went to' }],
+    src: ['atsionv', 'bog'] }),
 ];
 
 export const STORY_BY = Object.fromEntries(STORIES.map((s) => [s.id, s]));

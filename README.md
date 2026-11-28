@@ -803,6 +803,10 @@ plan: `docs/superpowers/plans/2026-11-26-deep-jersey-threads.md`.
   given as one historian's argument), the Meadowlands (cedar forest, salt hay, landfill, Blitz rubble, preserved marsh), the
   lighthouse that moved inland (Sandy Hook's spit grew a mile and a half past it since 1764), and why the Passaic floods (the old lake
   floor and the Pompton confluence at Two Bridges).
+- **Fifth batch (37 stories)**: the crossing and Trenton (Durham boats built for the Durham Iron Works; the Hessians at Trenton),
+  the village in the marsh (the Abbott Farm, the largest known Middle Woodland village of its type on the East Coast), the Skyway over
+  the marsh (Pulaski Skyway, 1932, trucks barred since 1934), the island left wild (Island Beach, bought from the Phipps estate in
+  1953), and Atsion, a ruin twice (Read's forge, Revolutionary kettles, Watson's 1823 description, the Richards rebuilding).
 - **Lake Passaic drains on the map**: the water streams out through Moggy Hollow to the Raritan, the lake drops when Great Notch opens
   (its outflow carved the Third River valley), then the Passaic takes the long way round over the Great Falls. The flow lines are
   schematic (`data/deep/drain.json`, built by `python3 tools/build_deep.py drain`, each point commented with its source).

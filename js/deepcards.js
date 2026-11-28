@@ -50,7 +50,10 @@ export const SRC = {
   edisontwp: ['Wikipedia: Edison, New Jersey', W('Edison,_New_Jersey')],
   devil: ['Wikipedia: Jersey Devil', W('Jersey_Devil')], meadow: ['Wikipedia: New Jersey Meadowlands', W('New_Jersey_Meadowlands')],
   hook: ['Wikipedia: Sandy Hook', W('Sandy_Hook')], hooklight: ['Wikipedia: Sandy Hook Lighthouse', W('Sandy_Hook_Lighthouse')],
-  passaicr: ['Wikipedia: Passaic River', W('Passaic_River')]
+  passaicr: ['Wikipedia: Passaic River', W('Passaic_River')],
+  crossing: ['Wikipedia: George Washington’s crossing of the Delaware River', W('George_Washington%27s_crossing_of_the_Delaware_River')], trenton: ['Wikipedia: Battle of Trenton', W('Battle_of_Trenton')],
+  abbott: ['Wikipedia: Abbott Farm Historic District', W('Abbott_Farm_Historic_District')], pulaski: ['Wikipedia: Pulaski Skyway', W('Pulaski_Skyway')],
+  ibsp: ['Wikipedia: Island Beach State Park', W('Island_Beach_State_Park')], atsionv: ['Wikipedia: Atsion, New Jersey', W('Atsion,_New_Jersey')]
 };
 
 /** The stops on the time slider, newest first. zoom/center: the deep-time zoom (the camera pulls out as time goes back). */
