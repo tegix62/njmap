@@ -23,6 +23,8 @@ const { chromium } = require('playwright'); const fs = require('fs');
   await page.click('#deep [data-d=intro]'); await page.waitForTimeout(800);
   console.log('after leaving: traces', await page.evaluate(() => window.njtf.map.getStyle().layers.filter((l) => l.id.startsWith('deep-trace-')).length), '| mask', await page.evaluate(() => window.njtf.map.getPaintProperty('deep-pop-mask', 'fill-opacity')), '| caption shown', await page.evaluate(() => { const c = document.getElementById('deepcap'); return !!c && !c.hidden; }));
   // the lakes story: lakes appear one by one
-  await open('still-a-lake'); await page.waitForTimeout(1500); await page.click('#deepbar [data-b=next]'); await page.waitForTimeout(10000); await page.screenshot({ path: `${out}/lakes-2.png` });
+  await open('still-a-lake'); await page.waitForTimeout(1500); await page.click('#deepbar [data-b=next]');
+  for (const [t, n] of [[4000, 'a'], [3500, 'b'], [4500, 'c'], [4500, 'd'], [5000, 'e']]) { await page.waitForTimeout(t); await page.screenshot({ path: `${out}/lakes-2${n}.png` }); }
+  console.log('panel is a strip while playing:', await page.evaluate(() => document.getElementById('deep').classList.contains('playing') || 'ended'), '| greenwood water height:', await page.evaluate(() => Math.round((window.njtf.map.getFeatureState({ source: 'deep-water', id: 'Greenwood Lake' }) || {}).h || 0)));
   console.log('lakes shown:', JSON.stringify(await page.evaluate(() => window.njtf.map.getFilter('deep-water-lake'))));
   console.log('errors', errs.length); await b.close(); })();

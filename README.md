@@ -810,6 +810,10 @@ just reading, and labels like "The thread down" meant nothing. Design: `docs/sup
   Plains, run to Two Bridges; the flat floodplain); **The river that follows the ridges** (the Rockaway straight down its valley, then
   east to the Boonton Gorge); **Why is a lake still a lake?** (lakes fill in; Pompton Lake 1908, Greenwood 1765/1837, Hopatcong 1831,
   Boonton 1904 appear one by one; Green Pond, a natural spring-fed glacial lake). A new subject, Water.
+- From the next phone test (eyes darting between panel and map, pins blinking in, the map barely changing): while a scene plays
+  the panel shrinks to a strip (tap it to read) and a larger caption on the map tells it; moves can carry `go: true`, which flies the
+  camera to that river, lake, region or place first; a lake move with `rise: <metres>` raises the lake as a body of water, visibly
+  filling up (the dams scene raises Greenwood twice, for 1765 and 1837, then Hopatcong and Boonton). Fewer pins.
 - Plain words: a story shows "Step 1 of 3" and the scene's caption, the button says "Next ›", and the links at the end are "Read
   next", each with the town it is in. `tools/checks/ui-deep-scenes.cjs` plays the Pompton and lakes stories and checks the moves.
 

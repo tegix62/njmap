@@ -50,7 +50,7 @@ function flatSeaDem() {
   }
   demProto = true; return 'deepdem://';
 }
-const LAYERS = ['deep-relief', 'deep-hs', 'deep-iceanim', 'deep-rivers', 'deep-prov', 'deep-prov-line', 'deep-rocks', 'deep-sand', 'deep-flows', 'deep-lake', 'deep-ice-sheet', 'deep-icelines', 'deep-ice-older', 'deep-ice-limit', 'deep-canal', 'deep-drain-glow', 'deep-drain', 'deep-water-lake', 'deep-ridge', 'deep-pop-mask', 'deep-pop-ext', 'deep-pop-edge'];
+const LAYERS = ['deep-relief', 'deep-hs', 'deep-iceanim', 'deep-rivers', 'deep-prov', 'deep-prov-line', 'deep-rocks', 'deep-sand', 'deep-flows', 'deep-lake', 'deep-ice-sheet', 'deep-icelines', 'deep-ice-older', 'deep-ice-limit', 'deep-canal', 'deep-drain-glow', 'deep-drain', 'deep-water-lake', 'deep-water-rise', 'deep-ridge', 'deep-pop-mask', 'deep-pop-ext', 'deep-pop-edge'];
 // "How it works" explainers for each chapter, region, close-up stop and card that leans on an idea
 const HOW = {
   's-mountains': ['fold', 'ridges'], 's-rift': ['lava', 'rift', 'ridges'], 's-coast': ['coastal', 'aquifer'], 's-ice': ['icesheet', 'moraine'], 's-lake': ['glaciallake', 'erratic'], 's-iron': ['bogiron'],
@@ -125,7 +125,8 @@ export function initDeep(ctx) {
     map.addLayer({ id: 'deep-ice-older', type: 'line', source: 'deep-ice', filter: ['==', ['get', 'kind'], 'older'], paint: { 'line-color': '#7aa6c8', 'line-width': 1.2, 'line-dasharray': [2, 2], 'line-opacity': 0, 'line-opacity-transition': T } });
     map.addLayer({ id: 'deep-ice-limit', type: 'line', source: 'deep-ice', filter: ['==', ['get', 'kind'], 'limit'], paint: { 'line-color': '#2b6aa3', 'line-width': 3, 'line-opacity': 0, 'line-opacity-transition': T } });
     // scenes: rivers, lakes and ridges (data/deep/water.json), and the pop-out (a shape lifted while the rest dims)
-    map.addSource('deep-water', { type: 'geojson', data: data.water, lineMetrics: true });
+    map.addSource('deep-water', { type: 'geojson', data: data.water, lineMetrics: true, promoteId: 'name' });
+    map.addLayer({ id: 'deep-water-rise', type: 'fill-extrusion', source: 'deep-water', filter: ['in', ['get', 'name'], ['literal', []]], paint: { 'fill-extrusion-color': '#3f86c9', 'fill-extrusion-opacity': 0.85, 'fill-extrusion-height': ['coalesce', ['feature-state', 'h'], 0] } });
     map.addLayer({ id: 'deep-water-lake', type: 'fill', source: 'deep-water', filter: ['in', ['get', 'name'], ['literal', []]], paint: { 'fill-color': '#3f86c9', 'fill-opacity': 0.8 } });
     map.addLayer({ id: 'deep-ridge', type: 'line', source: 'deep-water', filter: ['in', ['get', 'name'], ['literal', []]], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#7a4a24', 'line-width': 5, 'line-opacity': 0.85, 'line-dasharray': [1.5, 1] } });
     map.addSource('deep-pop', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
@@ -207,10 +208,12 @@ export function initDeep(ctx) {
     at(19000, () => { caption(''); flowing = false; });   // done: the line stays, the animation (and its timer) stops
   }
   // ---- directed scenes: a beat's `script` is a list of timed moves, run once the camera has arrived (see deepthreads MOVES) --------
-  let traces = [], lakesOn = [], ridgesOn = [], marksOn = [];
+  let traces = [], lakesOn = [], ridgesOn = [], marksOn = [], risen = [];
   function sceneReset() {
     for (const id of traces) if (map.getLayer(id)) map.removeLayer(id); traces = [];
-    lakesOn = []; ridgesOn = []; marksOn = [];
+    lakesOn = []; ridgesOn = []; marksOn = []; risen = []; if (map.getLayer('deep-water-rise')) map.setFilter('deep-water-rise', ['in', ['get', 'name'], ['literal', []]]);
+    if (map.getSource('deep-water')) for (const f of data.water.features) if (f.properties.kind === 'lake') map.setFeatureState({ source: 'deep-water', id: f.properties.name }, { h: 0 });
+    if (root) { root.classList.remove('playing'); document.body.classList.remove('dp-playing'); }
     if (map.getLayer('deep-water-lake')) { map.setFilter('deep-water-lake', ['in', ['get', 'name'], ['literal', []]]); map.setFilter('deep-ridge', ['in', ['get', 'name'], ['literal', []]]); }
     if (map.getSource('deep-pop')) { map.getSource('deep-pop').setData({ type: 'FeatureCollection', features: [] }); op('deep-pop-mask', 'fill-opacity', 0); op('deep-pop-edge', 'line-opacity', 0); op('deep-pop-ext', 'fill-extrusion-height', 0); }
   }
@@ -220,15 +223,28 @@ export function initDeep(ctx) {
     return data.water.features.find((f) => f.properties.name === st.water);
   };
   const outerRings = (g) => (g.type === 'Polygon' ? [g.coordinates[0]] : g.type === 'MultiPolygon' ? g.coordinates.map((p) => p[0]) : []);
+  const bboxOf = (g) => { const xs = [], ys = []; const walk = (a) => (typeof a[0] === 'number' ? (xs.push(a[0]), ys.push(a[1])) : a.forEach(walk)); walk(g.coordinates); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; };
+  const waterGeom = (name) => (data.water.features.find((f) => f.properties.name === name) || {}).geometry;
+  /** Raise a lake's water from its current height to `to` metres over `ms` (the water visibly filling up). */
+  function raiseLake(name, to, ms) {
+    if (!risen.includes(name)) { risen.push(name); map.setFilter('deep-water-rise', ['in', ['get', 'name'], ['literal', risen]]); }
+    const id = { source: 'deep-water', id: name }, from = (map.getFeatureState(id) || {}).h || 0, t0 = performance.now(), dur = ctx.dur(ms) || 1;
+    const step = () => { if (!map.getSource('deep-water')) return; const k = Math.min(1, (performance.now() - t0) / dur), e = 1 - (1 - k) * (1 - k); map.setFeatureState(id, { h: from + (to - from) * e }); if (k < 1) timers.push(setTimeout(step, 40)); };
+    step();
+  }
   function runScript(script) {
     const at = (ms, f) => timers.push(setTimeout(() => { if (ctx.mode === 'deep') f(); }, ctx.dur(ms) || 1));
     let end = 0;
+    // while a scene plays the panel shrinks to a strip (tap it to read) and the caption on the map does the telling
+    root.classList.add('playing'); document.body.classList.add('dp-playing');
+    const go = (st, bb, z) => { if (st.go && bb) fitBox(bb, st.z || z); };
     for (const st of script) {
       end = Math.max(end, st.at + (st.ms || 0) + (st.hold || 0));
       at(st.at, () => ({
         cap: () => caption(st.text),
         cam: () => fly([st.c[0], st.c[1]], st.c[2], st.c[3] ?? null, st.ms || 1600),
         trace: () => {
+          go(st, waterGeom(st.name) && bboxOf(waterGeom(st.name)), 11.5);
           const id = `deep-trace-${traces.length}`, col = st.color || '#2a7bd1', w = st.w || 5, ms = ctx.dur(st.ms || 2600) || 1;
           map.addLayer({ id, type: 'line', source: 'deep-water', filter: ['==', ['get', 'name'], st.name], layout: { 'line-cap': 'round', 'line-join': 'round' },
             paint: { 'line-width': ['interpolate', ['linear'], ['zoom'], 8, w * 0.6, 12, w * 1.4], 'line-gradient': ['step', ['line-progress'], col, 0.001, 'rgba(0,0,0,0)'] } });
@@ -237,12 +253,13 @@ export function initDeep(ctx) {
             map.setPaintProperty(id, 'line-gradient', ['step', ['line-progress'], col, Math.max(0.001, p), 'rgba(0,0,0,0)']); if (p < 0.999) timers.push(setTimeout(grow, 50)); };
           grow();
         },
-        lake: () => { lakesOn = st.show === false ? lakesOn.filter((n) => n !== st.name) : [...new Set([...lakesOn, st.name])]; map.setFilter('deep-water-lake', ['in', ['get', 'name'], ['literal', lakesOn]]); },
+        lake: () => { go(st, waterGeom(st.name) && bboxOf(waterGeom(st.name)), 12.6); if (st.rise) { timers.push(setTimeout(() => raiseLake(st.name, st.rise, st.ms || 1800), ctx.dur(st.go ? 1500 : 0) || 1)); return; } lakesOn = st.show === false ? lakesOn.filter((n) => n !== st.name) : [...new Set([...lakesOn, st.name])]; map.setFilter('deep-water-lake', ['in', ['get', 'name'], ['literal', lakesOn]]); },
         ridge: () => { ridgesOn = [...new Set([...ridgesOn, st.name])]; map.setFilter('deep-ridge', ['in', ['get', 'name'], ['literal', ridgesOn]]); },
-        mark: () => { marksOn = [...marksOn, { p: st.p, label: st.label, color: st.color }]; drawPins(shown.pins, shown.labels, marksOn); },
+        mark: () => { if (st.go) fly(st.p, st.z || 12.6, null, 1500); marksOn = [...marksOn, { p: st.p, label: st.label, color: st.color }]; drawPins(shown.pins, shown.labels, marksOn); },
         pulse: () => { const from = exagNow || 1, to = from * (st.to || 2.5); rise(to, 900); timers.push(setTimeout(() => rise(from, 1100), ctx.dur(900 + (st.hold || 1600)) || 1)); },
         pop: () => {
           const f = popShape(st); if (!f) return;
+          go(st, bboxOf(f.geometry), 9);
           const col = st.color || '#f6efe0', rings = outerRings(f.geometry);
           map.getSource('deep-pop').setData({ type: 'FeatureCollection', features: [
             { type: 'Feature', properties: { k: 'mask' }, geometry: { type: 'Polygon', coordinates: [[[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]], ...rings.map((r) => [...r].reverse())] } },
@@ -254,6 +271,7 @@ export function initDeep(ctx) {
       })[st.do]());
     }
     at(end + 4500, () => caption(''));
+    at(end + 1200, () => { root.classList.remove('playing'); document.body.classList.remove('dp-playing'); });   // the panel comes back when the scene is done
   }
   function stopScene(id) {
     const rocks = { highlands: ['match', ['get', 'era'], 'grenville', 0.75, 0.12], paleo: ['match', ['get', 'era'], 'paleozoic', 0.75, 'grenville', 0.3, 0.1],
@@ -376,7 +394,7 @@ export function initDeep(ctx) {
       const at = view === 'story' ? chap : era;
       barGo(b.dataset.b === 'prev' ? at - 1 : b.dataset.b === 'next' ? at + 1 : +b.dataset.i);
     });
-    root.addEventListener('click', (e) => { const b = e.target.closest('[data-d]'); if (!b || b.disabled) return; const f = actions[b.dataset.d]; if (f) f(b); });
+    root.addEventListener('click', (e) => { if (root.classList.contains('playing') && !e.target.closest('[data-d=intro],[data-d=home]')) { root.classList.remove('playing'); document.body.classList.remove('dp-playing'); e.stopPropagation(); return; } const b = e.target.closest('[data-d]'); if (!b || b.disabled) return; const f = actions[b.dataset.d]; if (f) f(b); });
   }
   // the sheet stays short so the map shows; a handle on top makes it tall for reading (remembered), and an explainer is always tall
   const grab = () => `<button class="dp-grab" data-d="grab" aria-label="${root.classList.contains('big') ? 'Make the panel shorter' : 'Make the panel taller'}"><i></i></button>`;
