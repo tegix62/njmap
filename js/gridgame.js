@@ -27,7 +27,7 @@
 import { framesStats } from './frames.js';
 import { GUIDES, PEEK_MS, okSides, sideWords, guessRecord, briefingHTML, bindBriefing } from './briefing.js';
 import { buildingFeatures, applySurveyTowers, applyParts, loadParts, loadSurveyTowers, groundFeatures, GROUND_PAINT } from './city3d.js';
-import { miniaturize } from './mini.js';
+import { miniModels } from './mini.js';
 
 const CHECK_EVERY_MS = 35000; // a check-in at most this often
 const GRID = 29; // the grid is turned ~29° clockwise from north
@@ -697,11 +697,11 @@ export function initGridGame(ctx, areaId = 'downtown') {
   const ZONE_NAMES = ['Downtown', 'Midtown', 'Uptown'];
   const OWN_ZONE = { downtown: 0, midtown: 1, uptown: 2 }[areaId];
   const SQUASH_FROM = 60, SQUASH_TO = 0.4;
-  const squash = (e) => ['case', ['<=', e, SQUASH_FROM], e, ['+', SQUASH_FROM, ['*', ['-', e, SQUASH_FROM], ['-', 1, ['*', 1 - SQUASH_TO, ['global-state', 'sq']]]]]];
+  const squash = (e) => ['case', ['has', 'mini'], e, ['<=', e, SQUASH_FROM], e, ['+', SQUASH_FROM, ['*', ['-', e, SQUASH_FROM], ['-', 1, ['*', 1 - SQUASH_TO, ['global-state', 'sq']]]]]];
   let lastSq = -1;
   /** Squash the towers while the camera is tilted in the close-up view; true heights otherwise. */
   function syncSquash() {
-    const v = camPitch() && !miniOn() ? 1 : 0;   // the miniature board is already low: no squash on top of it
+    const v = camPitch() ? 1 : 0;
     if (v === lastSq) return;
     lastSq = v;
     map.setGlobalStateProperty('sq', v);
@@ -725,11 +725,11 @@ export function initGridGame(ctx, areaId = 'downtown') {
   let bldgBusy = false;
   // Landmark style: 'mini' (js/mini.js: each landmark scaled as a unit, widened, on a ground tile, ordinary buildings held low)
   // or 'classic' (true shapes, everything above 60 m squashed when tilted). Classic is the old look, kept as the way back.
-  let rawBldg = null;
-  const miniOn = () => prefs.lmStyle === 'mini';   // off by default: the first try read as unrecognisable on a phone (see README)
+  let rawBldg = null, miniBldg = null;
+  const miniOn = () => prefs.lmStyle !== 'classic';   // on by default for the second try (hand models); untick in settings to go back
   function drawBuildings() {
     if (!rawBldg) return;
-    setData('gg-bldg', { type: 'FeatureCollection', features: miniOn() ? miniaturize(rawBldg) : rawBldg });
+    setData('gg-bldg', { type: 'FeatureCollection', features: miniOn() && miniBldg ? miniBldg : rawBldg });
     lastSq = -1; syncSquash();
   }
   async function loadBuildings() {
@@ -740,12 +740,13 @@ export function initGridGame(ctx, areaId = 'downtown') {
       setData('gg-ground', { type: 'FeatureCollection', features: grounds.filter(Boolean).flatMap(groundFeatures) });
       const [towers, ...rest] = await Promise.all([loadSurveyTowers(), ...BLDG_FILES.map((f) => fetch(`data/buildings-${f}.json`).then((r) => r.json())), ...BLDG_FILES.map((f) => loadParts(f))]);
       const files = rest.slice(0, BLDG_FILES.length), partFiles = rest.slice(BLDG_FILES.length);
-      const feats = [];
-      for (const f of applyParts(applySurveyTowers(files.flatMap((d, i) => buildingFeatures(d, partFiles[i])), towers))) {
-        f.properties.z = zoneOfY(gridXY(f.geometry.coordinates[0][0])[1]);
-        feats.push(f);
-      }
-      rawBldg = feats;
+      const base = files.flatMap((d, i) => buildingFeatures(d, partFiles[i]));
+      const zone = (list) => list.map((f) => { f.properties.z = zoneOfY(gridXY(f.geometry.coordinates[0][0])[1]); return f; });
+      rawBldg = zone(applyParts(applySurveyTowers(base, towers)));
+      // miniature: the towers that have a hand model keep it (the survey's slabs for them are left out), every other building as classic
+      const models = base.filter((f) => f.properties.m), mids = [...new Set(models.map((f) => f.properties.m))].map((m) => { const p = models.filter((f) => f.properties.m === m); const r = p[0].geometry.coordinates[0]; return [r.reduce((a, q) => a + q[0], 0) / r.length, r.reduce((a, q) => a + q[1], 0) / r.length]; });
+      const near = (f) => { const r = f.geometry.coordinates[0], c = [r.reduce((a, q) => a + q[0], 0) / r.length, r.reduce((a, q) => a + q[1], 0) / r.length]; return mids.some((m) => Math.hypot((m[0] - c[0]) * 84200, (m[1] - c[1]) * 111000) < 45); };
+      miniBldg = zone([...rawBldg.filter((f) => !(f.properties.c !== undefined && near(f))), ...miniModels(models.map((f) => ({ ...f, properties: { ...f.properties } })))]);
       drawBuildings();
       map.__ggBldgReady = true;
     } catch {
@@ -3491,7 +3492,7 @@ export function initGridGame(ctx, areaId = 'downtown') {
             <summary>More options</summary>
             <label><input type="checkbox" id="ggArrows"${prefs.arrows ? ' checked' : ''}/> One-way arrows</label>
             <label><input type="checkbox" id="ggLabels"${prefs.labels ? ' checked' : ''}/> Street names (off: hard mode)</label>
-            <label><input type="checkbox" id="ggMini"${miniOn() ? ' checked' : ''}/> Miniature landmarks (small but recognisable, on tiles; off for true shapes)</label>
+            <label><input type="checkbox" id="ggMini"${miniOn() ? ' checked' : ''}/> Miniature landmarks (the famous towers as small, true-proportion models)</label>
             <label><input type="checkbox" id="ggLandmarks"${prefs.landmarks === false ? '' : ' checked'}/> Landmark callouts ("by the way, that's the Chrysler Building") · <a href="credits.html" target="_blank" rel="noopener">photo credits</a></label>
             <label><input type="checkbox" id="ggCover"${prefs.cover ? ' checked' : ''}/> Show streets I've driven</label>
             <label><input type="checkbox" id="ggTrips"${prefs.trips ? ' checked' : ''}/> Mix in my saved trips</label>

@@ -776,22 +776,21 @@ One tree from seed to old age and death, as a fast time-lapse with the seasons t
 
 ## Miniature landmarks (2026-11-28)
 
-From a phone test: in the Manhattan drive games the famous towers were unrecognisable, because everything above 60 m was squashed
-to 40% at the driving angle, cutting off the spires and crowns that identify them. `js/mini.js` replaces that with one fixed,
-strategy-game-style formula (pure; features in, features out):
+From a phone test: in the Manhattan drive games the famous towers were unrecognisable, because everything above 60 m is squashed to
+40% at the driving angle, cutting off the spires and crowns that identify them.
 
-- each landmark is gathered from its pieces (features with a colour: tiers, crown, mast) and scaled as one unit to a roof of 9·√H
-  metres (never above its true height): a 440 m tower comes to about 190 m, a 120 m one barely changes, the tallest stays tallest,
-  and every tier keeps its share of the roof;
-- its footprint widens by 1/√k (at most 1.6×) so it reads as a stout miniature; spires and masts widen twice as much again;
-- ordinary buildings keep only a fifth of their height above 45 m, so the landmarks stand clear;
-- each landmark stands on a low hexagonal ground tile.
+**Second try (on by default):** the 18 towers that have a hand-shaped model in `js/city3d.js` (TOWERS: the Empire State's setbacks and
+mast, the Chrysler's crown, the Woolworth's green top...) always use that model in the drive games, instead of the survey's slab
+outlines, and `miniModels()` in `js/mini.js` shrinks each one evenly, height and footprint alike, by k = min(1, 9·√H / H) about its
+own middle: a 443 m tower comes to about 189 m and a third of its width, a 120 m one barely changes, the tallest stays tallest, and
+the true proportions are kept exactly. The models are exempt from the squash; every other building is drawn as before.
 
-**Status:** rolled back to off by default after a phone test (the miniatures were unrecognisable). Still selectable in settings.
+**First try (dropped):** scaling and widening the survey slabs and standing them on tiles. On a phone they were unrecognisable:
+shape, not size, is what makes a tower read.
 
-**The way back:** in a drive game's settings, untick **Miniature landmarks** for the old true-shape look with the squash (saved per
-game). Nothing of the old path was removed. Test: `node tools/checks/mini.cjs`. Explore and the orbit views draw the same city3d
-features and can use `miniaturize()` unchanged if it works out.
+**The way back:** in a drive game's settings, untick **Miniature landmarks** (saved per game) for the old look; nothing of the old
+path was removed. Test: `node tools/checks/mini.cjs`. Explore and the orbit views draw the same city3d features and can use
+`miniModels()` unchanged.
 
 ## Deep Jersey: stories and threads (2026-11-26)
 

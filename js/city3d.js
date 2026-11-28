@@ -28,14 +28,14 @@ export const TOWERS = {
     'Municipal Building': { color: '#d9ceb8', tiers: [{ h: 0.5, s: 1 }, { h: 0.72, s: 0.6 }, { h: 0.9, s: 0.38 }, { h: 1, s: 0.14, color: '#c9a24a' }] },
   };
   /** A building's outline as the stacked pieces of its model (Polygon features with a height and a base). */
-export function towerFeatures(ring, H, model) {
+export function towerFeatures(ring, H, model, name = null) {
     const xs = ring.map((p) => p[0]), ys = ring.map((p) => p[1]);
     const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
     const bw = x1 - x0, bh = y1 - y0, cx0 = (x0 + x1) / 2, cy0 = (y0 + y1) / 2;
     const poly = (r) => ({ type: 'Polygon', coordinates: [[...r, r[0]]] });
     const piece = (sx, sy, c, base, top, color) => ({
       type: 'Feature',
-      properties: { h: top, b: base, c: color },
+      properties: name ? { h: top, b: base, c: color, m: name } : { h: top, b: base, c: color },   // m: which model it is part of (js/mini.js)
       geometry: poly(ring.map(([x, y]) => [x0 + c[0] * bw + (x - cx0) * sx, y0 + c[1] * bh + (y - cy0) * sy])),
     });
     const out = [];
@@ -72,7 +72,7 @@ export function buildingFeatures(d, parts) {
     }
     const model = b[1] >= 2 && d.m ? TOWERS[d.m[b[1] - 2]] : null;
     if (model) {
-      feats.push(...towerFeatures(ring, b[0], model));
+      feats.push(...towerFeatures(ring, b[0], model, d.m[b[1] - 2]));
       continue;
     }
     ring.push(ring[0]);
