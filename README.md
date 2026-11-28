@@ -800,6 +800,13 @@ County"), which opens its county. The map's story list has an **Only unread** to
 from the app's own municipal boundaries: `node tools/build_story_places.cjs` writes `js/deepplaces.js` (rerun after adding stories;
 `deep-stories.cjs` fails if a story has no place).
 
+**Battery (2026-11-28).** From a phone test (Deep Jersey ran hot): the camera no longer starts a 40-second slow turn after every
+move, so the map rests (draws no frames) while you read; the draining-lake dash stops when its last stage ends; when the app is
+hidden or the screen locks, the camera, timed animations and illustration stop; and each elevation tile is flattened once and
+cached (400 tiles) instead of on every request. `node tools/checks/deep-idle.cjs` counts frames drawn in 20 s on a story step:
+58 before (in software GL; a phone would draw the turn at full frame rate), 0 after. The app's existing dynamic resolution
+(at most 2× at rest, 1.5× moving) already covers the screen-resolution cap.
+
 **Town stories: Passaic and Morris (47 stories).** Passaic County: the hillside where the 1913 strikers met (the Botto House in
 Haledon), the woollen mills strike (Passaic, 1926–27), Ringwood's ironmasters (Robert Erskine's 275 maps for Washington), and the
 powder works by the lake (DuPont at Pompton Lakes). Morris County: the Hard Winter (Jockey Hollow and the Ford Mansion), the arsenal

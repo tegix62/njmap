@@ -27,15 +27,27 @@ const DEM_SRC = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/';
 let demProto = false;
 function flatSeaDem() {
   if (demProto || !self.maplibregl?.addProtocol || typeof OffscreenCanvas === 'undefined') return demProto ? 'deepdem://' : DEM_SRC;
-  self.maplibregl.addProtocol('deepdem', async (params, abort) => {
-    const r = await fetch(DEM_SRC + params.url.slice('deepdem://'.length), { signal: abort.signal });
+  // each tile is fetched and flattened once, then shared: the terrain and the hillshade/relief sources both ask for it
+  const done = new Map();
+  self.maplibregl.addProtocol('deepdem', (params, abort) => {
+    const key = params.url; self.__deepDemAsked = (self.__deepDemAsked || 0) + 1;
+    if (!done.has(key)) {
+      const job = flatten(key).catch((e) => { done.delete(key); throw e; });
+      done.set(key, job);
+      if (done.size > 400) done.delete(done.keys().next().value);   // keep the most recent 400 tiles
+    }
+    return done.get(key).then((data) => ({ data: data.slice(0) }));
+  });
+  async function flatten(url) {
+    self.__deepDemProcessed = (self.__deepDemProcessed || 0) + 1;
+    const r = await fetch(DEM_SRC + url.slice('deepdem://'.length));
     if (!r.ok) throw new Error(`DEM tile ${r.status}`);
     const bmp = await createImageBitmap(await r.blob()), cv = new OffscreenCanvas(bmp.width, bmp.height), g = cv.getContext('2d', { willReadFrequently: true });
     g.drawImage(bmp, 0, 0); const img = g.getImageData(0, 0, bmp.width, bmp.height), d = img.data;
     for (let i = 0; i < d.length; i += 4) if (d[i] < 128) { d[i] = 127; d[i + 1] = 255; d[i + 2] = 0; }   // below 0 m -> -1 m
     g.putImageData(img, 0, 0);
-    return { data: await (await cv.convertToBlob({ type: 'image/png' })).arrayBuffer() };
-  });
+    return (await cv.convertToBlob({ type: 'image/png' })).arrayBuffer();
+  }
   demProto = true; return 'deepdem://';
 }
 const LAYERS = ['deep-relief', 'deep-hs', 'deep-iceanim', 'deep-rivers', 'deep-prov', 'deep-prov-line', 'deep-rocks', 'deep-sand', 'deep-flows', 'deep-lake', 'deep-ice-sheet', 'deep-icelines', 'deep-ice-older', 'deep-ice-limit', 'deep-canal', 'deep-drain-glow', 'deep-drain'];
@@ -175,7 +187,7 @@ export function initDeep(ctx) {
    * schematic: the way the water went, not surveyed channels. Every timer goes in `timers`, so leaving the beat stops it. */
   function drainLake() {
     const DASH = [[0, 4, 3], [0.5, 4, 2.5], [1, 4, 2], [1.5, 4, 1.5], [2, 4, 1], [2.5, 4, 0.5], [3, 4, 0], [0, 0.5, 3, 3.5], [0, 1, 3, 3], [0, 1.5, 3, 2.5], [0, 2, 3, 2], [0, 2.5, 3, 1.5], [0, 3, 3, 1], [0, 3.5, 3, 0.5]];
-    let k = 0; const flow = () => { if (!map.getLayer('deep-drain')) return; map.setPaintProperty('deep-drain', 'line-dasharray', DASH[k = (k + 1) % DASH.length]); timers.push(setTimeout(flow, 90)); };
+    let k = 0, flowing = true; const flow = () => { if (!flowing || !map.getLayer('deep-drain')) return; map.setPaintProperty('deep-drain', 'line-dasharray', DASH[k = (k + 1) % DASH.length]); timers.push(setTimeout(flow, 90)); };
     const stage = (name) => { map.setFilter('deep-drain', ['==', ['get', 'stage'], name]); map.setFilter('deep-drain-glow', ['==', ['get', 'stage'], name]); op('deep-drain', 'line-opacity', 0.95); op('deep-drain-glow', 'line-opacity', 0.55); };
     const lakeTo = (st) => { op('deep-lake', 'fill-opacity', 0); timers.push(setTimeout(() => { if (st) { map.setFilter('deep-lake', ['==', ['get', 'stage'], st]); op('deep-lake', 'fill-opacity', 0.75); } }, ctx.dur(700) || 1)); };
     const at = (ms, f) => timers.push(setTimeout(f, ctx.dur(ms) || 1));
@@ -184,7 +196,7 @@ export function initDeep(ctx) {
     caption('The lake spills out at Moggy Hollow, its lowest gap, south-west to the Raritan');
     at(5500, () => { lakeTo('notch'); stage('notch'); look([-74.3, 40.83], 9.6); caption('The ice melts back and opens Great Notch, 34 ft lower: the lake drops and spills east, carving the Third River valley'); });
     at(11500, () => { lakeTo(null); stage('passaic'); look([-74.32, 40.82], 9.2); caption('The ice is gone: the Passaic, blocked from its old shortcut by the moraine, takes the long way round and over the Great Falls'); });
-    at(19000, () => caption(''));
+    at(19000, () => { caption(''); flowing = false; });   // done: the line stays, the animation (and its timer) stops
   }
   function stopScene(id) {
     const rocks = { highlands: ['match', ['get', 'era'], 'grenville', 0.75, 0.12], paleo: ['match', ['get', 'era'], 'paleozoic', 0.75, 'grenville', 0.3, 0.1],
@@ -248,8 +260,7 @@ export function initDeep(ctx) {
     const start = Date.now(), onEnd = () => {
       if (tok !== drift || ctx.mode !== 'deep') return;
       if (map.isMoving() || Date.now() - start < (ctx.dur(dur) || 0) * 0.6) { map.once('moveend', onEnd); return; }
-      if (then) { then(); if (tok !== drift) return; }   // a follow-on move started: no drift to cancel it
-      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) map.easeTo({ bearing: bearing + 22, duration: 40000, easing: (t) => t, padding: pad() });   // the slow drift
+      if (then) then();   // once it has landed the map rests: no slow drift, so nothing redraws while you read (battery)
     };
     map.once('moveend', onEnd);
   }
@@ -623,6 +634,14 @@ export function initDeep(ctx) {
     root.querySelector('.dp-why').insertAdjacentHTML('afterend', `<div class="tr-res ${ok ? 'ok' : 'no'}"><b>${ok ? '✓' : '✗'} ${esc(g.c.why.map((w) => WHY[w]).join(', '))}</b><p>${esc(g.c.text[0])}</p></div>
       <div class="tr-row"><button class="tr-go" data-d="why">Another</button><button class="tr-card" data-d="card" data-id="${g.c.id}"><b>Read its story</b></button></div>`);
   }
+
+  // when the app is hidden or the screen locks, stop everything that keeps working: the camera, the timed animations, the illustration
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden || ctx.mode !== 'deep') return;
+    map.stop(); drift++;
+    for (const t of timers) clearTimeout(t); timers = []; caption('');
+    hideEx();
+  });
 
   const actions = {
     home: async () => {
